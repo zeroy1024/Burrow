@@ -1,13 +1,12 @@
 package desktop
 
-import "github.com/egoist/mygo/ui"
+import (
+	"sshdesk/internal/theme"
 
-const (
-	maxTerminalPanes = 4
-	paneSpacing      = 8
-	minPaneWidth     = 280
-	minPaneHeight    = 160
+	"github.com/egoist/mygo/ui"
 )
+
+const maxTerminalPanes = 4
 
 type terminalLayout struct {
 	session *remoteSession
@@ -28,14 +27,15 @@ type splitPlacement struct {
 }
 
 func (n *terminalLayout) minimum() ui.Point {
+	t := theme.Current()
 	if n.session != nil {
-		return ui.Point{X: minPaneWidth, Y: minPaneHeight}
+		return ui.Point{X: t.C.Desktop.PaneMinWidth, Y: t.C.Desktop.PaneMinHeight}
 	}
 	a, b := n.first.minimum(), n.second.minimum()
 	if n.stacked {
-		return ui.Point{X: max(a.X, b.X), Y: a.Y + b.Y + paneSpacing}
+		return ui.Point{X: max(a.X, b.X), Y: a.Y + b.Y + t.C.Pane.Gap}
 	}
-	return ui.Point{X: a.X + b.X + paneSpacing, Y: max(a.Y, b.Y)}
+	return ui.Point{X: a.X + b.X + t.C.Pane.Gap, Y: max(a.Y, b.Y)}
 }
 
 func (n *terminalLayout) placements(r ui.Rect, panes *[]panePlacement, splits *[]splitPlacement) {
@@ -50,30 +50,32 @@ func (n *terminalLayout) placements(r ui.Rect, panes *[]panePlacement, splits *[
 }
 
 func (n *terminalLayout) divide(r ui.Rect) (first, second, gap ui.Rect) {
+	t := theme.Current()
 	first, second, gap = r, r, r
 	a, b := n.first.minimum(), n.second.minimum()
 	if n.stacked {
-		available := r.H - paneSpacing
+		available := r.H - t.C.Pane.Gap
 		first.H = min(max(available*n.ratio, a.Y), available-b.Y)
-		second.Y, second.H = r.Y+first.H+paneSpacing, available-first.H
-		gap.Y, gap.H = r.Y+first.H, paneSpacing
+		second.Y, second.H = r.Y+first.H+t.C.Pane.Gap, available-first.H
+		gap.Y, gap.H = r.Y+first.H, t.C.Pane.Gap
 	} else {
-		available := r.W - paneSpacing
+		available := r.W - t.C.Pane.Gap
 		first.W = min(max(available*n.ratio, a.X), available-b.X)
-		second.X, second.W = r.X+first.W+paneSpacing, available-first.W
-		gap.X, gap.W = r.X+first.W, paneSpacing
+		second.X, second.W = r.X+first.W+t.C.Pane.Gap, available-first.W
+		gap.X, gap.W = r.X+first.W, t.C.Pane.Gap
 	}
 	return first, second, gap
 }
 
 // Preserve displayed proportions when removing a pane releases a size constraint.
 func (n *terminalLayout) copyAt(r ui.Rect) *terminalLayout {
+	t := theme.Current()
 	copy := *n
 	if n.session == nil {
 		first, second, _ := n.divide(r)
-		copy.ratio = first.W / (r.W - paneSpacing)
+		copy.ratio = first.W / (r.W - t.C.Pane.Gap)
 		if n.stacked {
-			copy.ratio = first.H / (r.H - paneSpacing)
+			copy.ratio = first.H / (r.H - t.C.Pane.Gap)
 		}
 		copy.first, copy.second = n.first.copyAt(first), n.second.copyAt(second)
 	}
@@ -91,8 +93,10 @@ const (
 )
 
 func zoneAt(x, y, w, h float32, single bool) dropZone {
+	t := theme.Current()
 	x, y = x/w, y/h
-	if !single && x >= .3 && x <= .7 && y >= .3 && y <= .7 {
+	edge := t.C.Desktop.DropEdgeRatio
+	if !single && x >= edge && x <= 1-edge && y >= edge && y <= 1-edge {
 		return dropCenter
 	}
 	zone, nearest := dropLeft, x

@@ -4,35 +4,37 @@ import (
 	"math"
 	"time"
 
+	"sshdesk/internal/theme"
+
 	"github.com/egoist/mygo/ui"
 )
 
-var paneSpring = ui.Animation{Spring: ui.SpringOptions{Duration: 220 * time.Millisecond}}
-var zoomSpring = ui.Animation{Spring: ui.SpringOptions{Duration: 240 * time.Millisecond}}
-
 func canSplit(r ui.Rect, zone dropZone) bool {
+	t := theme.Current()
+	minimumWidth, minimumHeight, gap := t.C.Desktop.PaneMinWidth, t.C.Desktop.PaneMinHeight, t.C.Pane.Gap
 	if zone == dropTop || zone == dropBottom {
-		return r.H >= 2*minPaneHeight+paneSpacing && r.W >= minPaneWidth
+		return r.H >= 2*minimumHeight+gap && r.W >= minimumWidth
 	}
-	return r.W >= 2*minPaneWidth+paneSpacing && r.H >= minPaneHeight
+	return r.W >= 2*minimumWidth+gap && r.H >= minimumHeight
 }
 
 func (a *app) beginWorkspaceFrame(c *ui.Context) {
+	t := theme.Current()
 	a.dragSeen = false
 	a.dockPreview = nil
 	if d := a.drag; d != nil {
 		if d.phase == dragLanded && d.returnStarted.IsZero() {
 			d.returnStarted = c.Now()
 		}
-		duration := 220 * time.Millisecond
-		if d.kind == dragHost && d.phase == dragReturning {
-			duration = 300 * time.Millisecond
+		duration := t.C.ReorderMotion.Cancel.Duration
+		if d.phase == dragLanded {
+			duration = t.C.ReorderMotion.PaneDrop.Duration
 		}
 		if d.phase != dragActive && c.Now().Sub(d.returnStarted) >= duration {
 			a.drag = nil
 		} else if d.kind == dragTab && d.phase == dragActive {
 			bar := a.tabScroll.Bounds(c)
-			d.detached = a.pointer.Y > bar.Y+bar.H+8
+			d.detached = a.pointer.Y > bar.Y+bar.H+t.C.Desktop.TabDetachDistance
 		}
 	}
 	for _, tab := range a.tabs {
@@ -43,7 +45,7 @@ func (a *app) beginWorkspaceFrame(c *ui.Context) {
 			if session.closeStarted.IsZero() {
 				session.closeStarted = c.Now()
 			}
-			if c.Now().Sub(session.closeStarted) >= 160*time.Millisecond {
+			if c.Now().Sub(session.closeStarted) >= t.C.Desktop.PaneCloseDuration {
 				a.removePane(tab, session)
 			} else {
 				c.AnimationFrame()
@@ -61,21 +63,25 @@ func (a *app) markPaneLayout(tab *workspaceTab, duration time.Duration) {
 }
 
 func (a *app) enforcePaneMinimum(c *ui.Context) {
+	t := theme.Current()
 	if a.window == nil {
 		return
 	}
-	minimum := ui.Point{X: minPaneWidth, Y: minPaneHeight}
+	minimum := ui.Point{X: t.C.Desktop.PaneMinWidth, Y: t.C.Desktop.PaneMinHeight}
 	if tab := a.currentTab(); tab != nil {
 		minimum = tab.root.minimum()
 	}
-	width := minimum.X + navigationWidth + workspaceSpacing
+	width := minimum.X + t.C.Rail.Width + t.C.Window.Gutter
 	if !a.sidebarCollapsed {
-		width += a.sidebarWidth + workspaceSpacing
+		width += a.sidebarWidth + t.C.Window.Gutter
 	}
 	if a.statusVisible {
-		width += statusPanelWidth + workspaceSpacing
+		width += t.Size.StatsPanel + t.C.Window.Gutter
 	}
-	size := [2]int{max(1000, int(math.Ceil(float64(width)))), max(640, int(minimum.Y)+titleBarHeight+workspaceSpacing)}
+	size := [2]int{
+		max(int(t.C.Desktop.WindowMinWidth), int(math.Ceil(float64(width)))),
+		max(int(t.C.Desktop.WindowMinHeight), int(minimum.Y+t.C.Titlebar.Height+t.C.Window.Gutter)),
+	}
 	if size == a.minimumWindow {
 		return
 	}
@@ -88,11 +94,12 @@ func (a *app) enforcePaneMinimum(c *ui.Context) {
 }
 
 func (a *app) setPaneZoom(tab *workspaceTab, maximized bool) {
+	t := theme.Current()
 	if tab.maximized == maximized {
 		return
 	}
 	tab.maximized, tab.zoomFrom, tab.zoomPending = maximized, tab.zoomMix, true
-	a.markPaneLayout(tab, 240*time.Millisecond)
+	a.markPaneLayout(tab, t.C.Desktop.ZoomDuration)
 }
 
 func (a *app) togglePaneZoom(tab *workspaceTab, session *remoteSession) {
@@ -101,6 +108,7 @@ func (a *app) togglePaneZoom(tab *workspaceTab, session *remoteSession) {
 }
 
 func (a *app) zoomProgress(c *ui.Context, tab *workspaceTab) float32 {
+	t := theme.Current()
 	if tab.zoomPending {
 		tab.zoomStarted, tab.zoomPending = c.Now(), false
 	}
@@ -111,8 +119,9 @@ func (a *app) zoomProgress(c *ui.Context, tab *workspaceTab) float32 {
 	if tab.zoomStarted.IsZero() {
 		return target
 	}
-	progress := min(1, float32(c.Now().Sub(tab.zoomStarted))/float32(240*time.Millisecond))
-	progress = ui.CubicBezier(.2, .8, .2, 1)(progress)
+	progress := min(1, float32(c.Now().Sub(tab.zoomStarted))/float32(t.C.Desktop.ZoomDuration))
+	curve := t.C.Desktop.MotionEasing
+	progress = ui.CubicBezier(curve[0], curve[1], curve[2], curve[3])(progress)
 	tab.zoomMix = tab.zoomFrom + (target-tab.zoomFrom)*progress
 	if progress < 1 {
 		c.AnimationFrame()
@@ -121,12 +130,13 @@ func (a *app) zoomProgress(c *ui.Context, tab *workspaceTab) float32 {
 }
 
 func (a *app) paneMotion(c *ui.Context, pane ui.Element, tab *workspaceTab, session *remoteSession) {
-	animation := &paneSpring
-	if tab.layoutDuration == 240*time.Millisecond {
-		animation = &zoomSpring
+	t := theme.Current()
+	animation := ui.Animation{Spring: tokenSpring(t.C.ReorderMotion.PaneDisplace)}
+	if tab.layoutDuration == t.C.Desktop.ZoomDuration {
+		animation = ui.Animation{Spring: tokenSpring(t.C.Desktop.ZoomSpring)}
 	}
-	transition := ui.ElementTransition{Position: true, Size: true, Animation: animation}
-	instant := ui.Animation{Duration: time.Nanosecond}
+	transition := ui.ElementTransition{Position: true, Size: true, Animation: &animation}
+	instant := ui.Animation{Duration: t.C.Desktop.InstantDuration}
 	if a.resizing != nil {
 		transition.Animation = &instant
 	}
@@ -135,26 +145,27 @@ func (a *app) paneMotion(c *ui.Context, pane ui.Element, tab *workspaceTab, sess
 	if tab.focused != session {
 		alpha *= 1 - tab.zoomMix
 	} else if c.Preferences().ReduceMotion && !tab.zoomStarted.IsZero() {
-		alpha *= min(1, float32(c.Now().Sub(tab.zoomStarted))/float32(240*time.Millisecond))
+		alpha *= min(1, float32(c.Now().Sub(tab.zoomStarted))/float32(t.C.Desktop.ZoomDuration))
 	}
 	if session.entering {
 		if session.enterStarted.IsZero() {
 			session.enterStarted = c.Now()
 		}
-		progress := min(1, float32(c.Now().Sub(session.enterStarted))/float32(220*time.Millisecond))
-		progress = ui.CubicBezier(.2, .8, .2, 1)(progress)
+		progress := min(1, float32(c.Now().Sub(session.enterStarted))/float32(t.C.Desktop.PaneEnterDuration))
+		curve := t.C.Desktop.MotionEasing
+		progress = ui.CubicBezier(curve[0], curve[1], curve[2], curve[3])(progress)
 		alpha *= progress
 		if !c.Preferences().ReduceMotion {
 			x, y := float32(0), float32(0)
 			switch session.enter {
 			case dropLeft:
-				x = -12
+				x = -t.C.Desktop.PaneEnterOffset
 			case dropRight:
-				x = 12
+				x = t.C.Desktop.PaneEnterOffset
 			case dropTop:
-				y = -12
+				y = -t.C.Desktop.PaneEnterOffset
 			case dropBottom:
-				y = 12
+				y = t.C.Desktop.PaneEnterOffset
 			}
 			pane.Translate(x*(1-progress), y*(1-progress))
 		}
@@ -165,10 +176,11 @@ func (a *app) paneMotion(c *ui.Context, pane ui.Element, tab *workspaceTab, sess
 		}
 	}
 	if session.closing {
-		progress := min(1, float32(c.Now().Sub(session.closeStarted))/float32(160*time.Millisecond))
+		progress := min(1, float32(c.Now().Sub(session.closeStarted))/float32(t.C.Desktop.PaneCloseDuration))
 		alpha *= 1 - progress
 		if !c.Preferences().ReduceMotion {
-			pane.Scale(1-.03*progress, 1-.03*progress)
+			scale := 1 - (1-t.C.Desktop.PaneCloseScale)*progress
+			pane.Scale(scale, scale)
 		}
 	}
 	pane.Opacity(alpha)
@@ -178,17 +190,18 @@ func (a *app) paneMotion(c *ui.Context, pane ui.Element, tab *workspaceTab, sess
 }
 
 func (a *app) terminalDivider(c *ui.Context, split splitPlacement) {
+	t := theme.Current()
 	node, r := split.node, split.rect
 	edge := ui.Box(c).Key(node).Absolute().Left(r.X).Top(r.Y).Size(r.W, r.H).
 		Center().Focusable().FocusRing(false).Role(ui.RoleSplitter).Label("调整终端分屏比例")
-	axis, delta := split.parent.W-paneSpacing, float32(0)
+	axis, delta := split.parent.W-t.C.Pane.Gap, float32(0)
 	firstMin, secondMin := node.first.minimum().X, node.second.minimum().X
 	firstSize := r.X - split.parent.X
 	edge.Cursor(ui.CursorResizeEW)
 	dx, dy, held := edge.Dragged()
 	if node.stacked {
 		edge.Cursor(ui.CursorResizeNS)
-		axis, delta = split.parent.H-paneSpacing, dy
+		axis, delta = split.parent.H-t.C.Pane.Gap, dy
 		firstSize = r.Y - split.parent.Y
 		firstMin, secondMin = node.first.minimum().Y, node.second.minimum().Y
 	} else {
@@ -202,14 +215,14 @@ func (a *app) terminalDivider(c *ui.Context, split splitPlacement) {
 	} else if a.resizing == node {
 		a.resizing = nil
 	}
-	animation := paneSpring
+	animation := ui.Animation{Spring: tokenSpring(t.C.ReorderMotion.PaneDisplace)}
 	if held {
-		animation = ui.Animation{Duration: time.Nanosecond}
+		animation = ui.Animation{Duration: t.C.Desktop.InstantDuration}
 	}
 	edge.Transition(ui.ElementTransition{Position: true, Size: true, Animation: &animation})
 	if edge.DoubleClicked() {
 		node.ratio = .5
-		a.markPaneLayout(a.currentTab(), 220*time.Millisecond)
+		a.markPaneLayout(a.currentTab(), t.C.Desktop.PaneEnterDuration)
 	}
 	if edge.Focused() {
 		var direction float32
@@ -220,23 +233,24 @@ func (a *app) terminalDivider(c *ui.Context, split splitPlacement) {
 			direction = 1
 		}
 		if direction != 0 {
-			node.ratio = min(max(node.ratio+direction*8/axis, firstMin/axis), 1-secondMin/axis)
-			a.markPaneLayout(a.currentTab(), 220*time.Millisecond)
+			node.ratio = min(max(node.ratio+direction*t.C.Desktop.DividerKeyboardStep/axis, firstMin/axis), 1-secondMin/axis)
+			a.markPaneLayout(a.currentTab(), t.C.Desktop.PaneEnterDuration)
 		}
 	}
 	target := float32(0)
 	if edge.Hovered() || held || edge.FocusVisible() {
 		target = 1
 	}
-	color := ui.Hex("#c7c7cc")
+	color := tokenColor(t.C.Desktop.DividerHandleColor)
 	if held {
-		color = a.theme.Accent
+		color = tokenColor(t.C.DropIndicator.LineColor)
 	}
 	edge.Children(func() {
-		handle := ui.Box(c).Size(3, 28).Radius(1.5).Background(color).
-			Opacity(edge.Animate("handle", target, 120*time.Millisecond)).PassThrough()
+		handle := ui.Box(c).Size(t.C.Desktop.DividerHandleWidth, t.C.Desktop.DividerHandleHeight).
+			Radius(t.C.Desktop.DividerHandleRadius).Background(color).
+			Opacity(animateVisual(edge, "handle", target, t.C.Desktop.DividerFadeDuration)).PassThrough()
 		if node.stacked {
-			handle.Size(28, 3)
+			handle.Size(t.C.Desktop.DividerHandleHeight, t.C.Desktop.DividerHandleWidth)
 		}
 	})
 }

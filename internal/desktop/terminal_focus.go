@@ -4,13 +4,15 @@ import (
 	"slices"
 	"time"
 
+	"sshdesk/internal/theme"
+
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/shader"
 )
 
 const (
-	terminalPaneRadius = 10
-	paneTransition     = 160 * time.Millisecond
+	terminalPrimaryText   = "#1d1d1f"
+	terminalSecondaryText = "#8e8e93"
 )
 
 var terminalSaturation = shader.MustCompile(`package main
@@ -50,6 +52,7 @@ func (a *app) paneShortcuts(c *ui.Context) {
 }
 
 func paneFocusShadows(pane ui.Element, focused, multiple bool) {
+	t := theme.Current().C.PaneFocus
 	focusTarget, hoverTarget := float32(0), float32(0)
 	if multiple && focused {
 		focusTarget = 1
@@ -57,38 +60,29 @@ func paneFocusShadows(pane ui.Element, focused, multiple bool) {
 	if multiple && !focused && pane.Hovered() {
 		hoverTarget = 1
 	}
-	focus := pane.Animate("focus-ring", focusTarget, paneTransition)
-	hover := pane.Animate("hover-ring", hoverTarget, paneTransition)
+	focus := animateVisual(pane, "focus-ring", focusTarget, t.Transition)
+	hover := animateVisual(pane, "hover-ring", hoverTarget, t.Transition)
 	if !multiple {
 		return
 	}
-	pane.Shadow(
-		0,
-		0,
-		0,
-		1,
-		ui.RGB(0, 0, 0).Alpha(0.14*hover),
-	).Shadow(
-		0,
-		0,
-		0,
-		1.5,
-		ui.Hex("#0a84ff").Alpha(focus),
-	)
+	applyShadowOpacity(pane, t.RingHover, hover)
+	applyShadowOpacity(pane, t.RingFocused, focus)
 }
 
 func terminalActivity(c *ui.Context, session *remoteSession) {
+	t := theme.Current()
+	b := t.C.ActivityBadge
 	if session.hasNewOutput {
-		ui.Row(c).Shrink(0).Padding(2, 7).Gap(4).Radius(9).
-			Background(ui.Hex("#0a84ff").Alpha(0.10)).PassThrough().Children(func() {
-			ui.Box(c).Size(6, 6).Radius(99).Background(ui.Hex("#0a84ff"))
-			ui.Text(c, "新输出").FontSize(10).TextColor(ui.Hex("#0a6fd6")).SingleLine()
+		ui.Row(c).Shrink(0).Padding(b.PaddingY, b.PaddingRight, b.PaddingY, b.PaddingLeft).Gap(b.Gap).Radius(b.Radius).
+			Background(tokenColor(b.OutputBg)).PassThrough().Children(func() {
+			ui.Box(c).Size(b.DotSize, b.DotSize).Radius(t.Radius.Pill).Background(tokenColor(b.OutputDot))
+			ui.Text(c, "新输出").FontSize(b.FontSize).TextColor(tokenColor(b.OutputText)).SingleLine()
 		})
 	}
 	if session.hasBell {
-		ui.Row(c).Shrink(0).Padding(2, 7).Radius(9).Label("会话响铃").Tooltip("会话响铃").
-			Background(ui.RGB(245, 166, 35).Alpha(0.14)).PassThrough().Children(func() {
-			ui.Icon(c, bellIcon).Size(13, 13).TextColor(ui.Hex("#c7861a"))
+		ui.Row(c).Shrink(0).Padding(b.PaddingY, b.PaddingRight, b.PaddingY, b.PaddingLeft).Radius(b.Radius).Label("会话响铃").Tooltip("会话响铃").
+			Background(tokenColor(b.BellBg)).PassThrough().Children(func() {
+			ui.Icon(c, bellIcon).Size(b.BellIconSize, b.BellIconSize).TextColor(tokenColor(b.BellText))
 		})
 	}
 }
@@ -106,11 +100,11 @@ func terminalCursor(c *ui.Context, session *remoteSession, focused bool) {
 			0,
 			0,
 			1.2,
-			ui.Hex(secondaryText),
+			ui.Hex(terminalSecondaryText),
 		)
 		return
 	}
-	cursor.Background(ui.Hex(primaryText))
+	cursor.Background(ui.Hex(terminalPrimaryText))
 	if c.Preferences().ReduceMotion {
 		return
 	}

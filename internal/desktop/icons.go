@@ -1,6 +1,10 @@
 package desktop
 
-import "github.com/egoist/mygo/ui"
+import (
+	"image/color"
+
+	"github.com/egoist/mygo/ui"
+)
 
 var (
 	sidebarIcon = ui.MustParseSVG([]byte(`
@@ -90,16 +94,17 @@ var (
 )
 
 type systemStyle struct {
-	name, tint, color string
-	icon              *ui.SVG
+	name  string
+	color color.NRGBA
+	icon  *ui.SVG
 }
 
 var systems = []systemStyle{
-	{name: "Ubuntu", tint: "#fff0e9", color: "#ed5422", icon: ubuntuIcon},
-	{name: "Debian", tint: "#faecef", color: "#bd1747", icon: debianIcon},
-	{name: "CentOS", tint: "#eeedf8", color: "#6559aa", icon: centosIcon},
-	{name: "Alpine", tint: "#e7f8f3", color: "#08b789", icon: alpineIcon},
-	{name: "Fedora", tint: "#ecf6ff", color: "#4c9ed8", icon: fedoraIcon},
-	{name: "Linux", tint: "#f0f0f1", color: "#343438", icon: linuxIcon},
-	{name: "Arch", tint: "#e9f5fc", color: "#1599d3", icon: archIcon},
+	{name: "Ubuntu", color: color.NRGBA{R: 0xed, G: 0x54, B: 0x22, A: 0xff}, icon: ubuntuIcon},
+	{name: "Debian", color: color.NRGBA{R: 0xbd, G: 0x17, B: 0x47, A: 0xff}, icon: debianIcon},
+	{name: "CentOS", color: color.NRGBA{R: 0x65, G: 0x59, B: 0xaa, A: 0xff}, icon: centosIcon},
+	{name: "Alpine", color: color.NRGBA{R: 0x08, G: 0xb7, B: 0x89, A: 0xff}, icon: alpineIcon},
+	{name: "Fedora", color: color.NRGBA{R: 0x4c, G: 0x9e, B: 0xd8, A: 0xff}, icon: fedoraIcon},
+	{name: "Linux", color: color.NRGBA{R: 0x34, G: 0x34, B: 0x38, A: 0xff}, icon: linuxIcon},
+	{name: "Arch", color: color.NRGBA{R: 0x15, G: 0x99, B: 0xd3, A: 0xff}, icon: archIcon},
 }

@@ -10,7 +10,7 @@ import (
 func demoTranscript(h host) [][]ui.Span {
 	green := ui.Hex("#229f4a")
 	blue := ui.Hex("#087df0")
-	muted := ui.Hex(secondaryText)
+	muted := ui.Hex(terminalSecondaryText)
 	lines := [][]ui.Span{}
 	command := func(text string) {
 		lines = append(lines, []ui.Span{

@@ -5,36 +5,39 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"time"
+
+	"sshdesk/internal/theme"
 
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
 )
 
 func (a *app) catalogTransition(kind catalogDragKind) ui.ElementTransition {
-	animation := &displace
+	t := theme.Current()
+	animation := catalogDisplaceAnimation()
 	if d := a.catalogDrag; d != nil && d.kind == catalogGroupDrag && kind == catalogHostDrag {
-		duration := 180 * time.Millisecond
+		duration := t.C.ReorderMotion.GroupCollapse
 		if d.phase != catalogDragging {
-			duration = 220 * time.Millisecond
+			duration = t.C.ReorderMotion.GroupRestore
 		}
-		animation = &ui.Animation{Duration: duration, Ease: ui.EaseOut}
+		animation = ui.Animation{Duration: duration, Ease: tokenEasing(t.Motion.Easing.Out)}
 	}
 	return ui.ElementTransition{
-		Position: true, Size: true, Animation: animation,
+		Position: true, Size: true, Animation: &animation,
 		Enter: &ui.Motion{Collapse: true}, Exit: &ui.Motion{Collapse: true},
 	}
 }
 
 func (a *app) catalogList(c *ui.Context) {
+	t := theme.Current()
 	ui.Scroll(c.Key("session-list")).TrackScroll(&a.catalogScroll).
-		Grow(1).MinHeight(0).Padding(12, 8).Children(func() {
+		Grow(1).MinHeight(0).Padding(t.C.Catalog.ListPaddingY, t.C.Catalog.ListPaddingX).Children(func() {
 		ui.Column(c).Key("catalog-items").FillWidth().Children(func() {
 			a.catalogSlots = a.catalogPlan(c)
 			for i, slot := range a.catalogSlots {
-				gap := float32(catalogRowGap)
+				gap := t.C.Catalog.RowGap
 				if slot.key.kind == catalogGroupDrag {
-					gap = catalogGroupGap
+					gap = t.C.Catalog.GroupGap
 					if i == 0 {
 						gap = 0
 					}
@@ -61,7 +64,7 @@ func (a *app) catalogList(c *ui.Context) {
 					a.catalogItem(c, slot).Absolute().Left(0).Top(d.originContentY).FillWidth().Margin(0)
 				}
 				if d.kind == catalogGroupDrag && d.collapseFrames < 2 {
-					// Prime every row's 180ms Exit before removing it, including
+					// Prime every row's collapse Exit before removing it, including
 					// rows built before the source header in the first drag frame.
 					newFrame := d.collapseFrames == 0 || !c.Now().Equal(d.collapseSample)
 					if newFrame {
@@ -72,7 +75,7 @@ func (a *app) catalogList(c *ui.Context) {
 				}
 			}
 			if len(a.catalogSlots) == 0 && strings.TrimSpace(a.query) != "" {
-				ui.Text(c, "没有匹配的主机").FontSize(12).TextColor(a.theme.TextMuted).Padding(12)
+				ui.Text(c, "没有匹配的主机").FontSize(t.Font.Size.Small).TextColor(tokenColor(t.Color.Text.Secondary)).Padding(t.Space.N12)
 			}
 		})
 	})
@@ -96,18 +99,21 @@ func (a *app) catalogItem(c *ui.Context, slot catalogSlot) ui.Element {
 }
 
 func (a *app) catalogPlaceholder(c *ui.Context, slot catalogSlot) ui.Element {
-	row := ui.Box(c).Key("catalog-placeholder").FillWidth().Height(slot.rect.H).Shrink(0).Radius(8).
-		Transition(ui.ElementTransition{Position: true, Size: true, Animation: &displace,
-			Enter: &ui.Motion{Collapse: true}, Exit: &ui.Motion{Collapse: true}})
-	background := ui.RGB(0, 0, 0).Alpha(.035)
-	border := ui.RGB(0, 0, 0).Alpha(.05)
+	t := theme.Current()
+	animation := catalogDisplaceAnimation()
+	row := ui.Box(c).Key("catalog-placeholder").FillWidth().Height(slot.rect.H).Shrink(0).
+		Radius(t.C.DropIndicator.ZoneRadius).Transition(ui.ElementTransition{
+		Position: true, Size: true, Animation: &animation,
+		Enter: &ui.Motion{Collapse: true}, Exit: &ui.Motion{Collapse: true},
+	})
+	background := tokenColor(t.C.DropIndicator.PlaceholderBg)
+	shadow := t.C.DropIndicator.PlaceholderShadow
 	if a.catalogDrag.placeholderReady && containsCatalogPoint(a.catalogScroll.Bounds(c), a.pointer) {
-		background = a.theme.Accent.Alpha(.06)
-		border = a.theme.Accent.Alpha(.28)
+		background = tokenColor(t.C.DropIndicator.PlaceholderAccentBg)
+		shadow = t.C.DropIndicator.PlaceholderAccentShadow
 	}
-	row.Background(row.AnimateColor("placeholder-bg", background, catalogColor))
-	stroke := row.AnimateColor("placeholder-stroke", border, catalogColor)
-	row.DrawOver(func(p *ui.Painter, r ui.Rect) { p.Stroke(r, stroke, 8, 1) })
+	row.Background(row.AnimateColor("placeholder-bg", background, catalogColorAnimation()))
+	applyAnimatedShadow(row, "placeholder-stroke", shadow, catalogColorAnimation())
 	if !a.catalogDrag.placeholderReady {
 		a.catalogDrag.placeholderReady = true
 		c.AnimationFrame()
@@ -116,19 +122,20 @@ func (a *app) catalogPlaceholder(c *ui.Context, slot catalogSlot) ui.Element {
 }
 
 func (a *app) catalogHeader(c *ui.Context, slot catalogSlot) ui.Element {
+	t := theme.Current()
 	group := slot.group
 	expanded := a.catalogExpanded(group)
-	header := ui.ButtonBase(c).Key(slot.key).Height(catalogHeaderHeight).Shrink(0).
-		FillWidth().Padding(0, 8).Gap(5).Radius(8).
-		Label(group.name).Expanded(expanded).TextColor(a.theme.TextMuted)
+	header := ui.ButtonBase(c).Key(slot.key).Height(t.C.GroupHeader.Height).Shrink(0).
+		FillWidth().Padding(0, t.C.GroupHeader.PaddingX).Gap(t.C.GroupHeader.Gap).Radius(t.C.GroupHeader.Radius).
+		Label(group.name).Expanded(expanded).TextColor(tokenColor(t.C.GroupHeader.Text))
 	a.trackCatalogDrag(c, header, slot)
 	highlight := a.catalogDrag != nil && a.catalogDrag.phase == catalogDragging &&
 		a.catalogDrag.kind == catalogHostDrag && a.catalogDrag.hoverGroup == group
-	background, text, chevron := ui.Transparent, a.theme.TextMuted, a.theme.TextMuted
+	background, text, chevron := ui.Transparent, tokenColor(t.C.GroupHeader.Text), tokenColor(t.C.GroupHeader.Text)
 	if highlight {
-		background, text, chevron = a.theme.Accent.Alpha(.08), ui.Hex("#0a6fd6"), a.theme.Accent
+		background, text, chevron = tokenColor(t.C.GroupHeader.DropBg), tokenColor(t.C.GroupHeader.DropText), tokenColor(t.C.GroupHeader.DropCount)
 	}
-	header.Background(header.AnimateColor("header-bg", background, catalogColor))
+	header.Background(header.AnimateColor("header-bg", background, catalogColorAnimation()))
 	if a.catalogDrag == nil {
 		header.OnClick(func() {
 			if err := a.commitCatalogMove(func() { group.collapsed = !group.collapsed }); err != nil {
@@ -150,25 +157,25 @@ func (a *app) catalogHeader(c *ui.Context, slot catalogSlot) ui.Element {
 		if expanded {
 			rotation = 0
 		}
-		arrow := ui.Icon(c, chevronIcon).Key("chevron").Size(11, 11)
-		arrow.TextColor(arrow.AnimateColor("color", chevron, catalogColor)).
-			AnimatePose(ui.Pose{Rotate: rotation}, displace)
-		label := ui.Text(c, group.name).FontSize(11)
-		label.TextColor(label.AnimateColor("color", text, catalogColor))
+		arrow := ui.Icon(c, chevronIcon).Key("chevron").Size(t.Font.Size.Caption, t.Font.Size.Caption)
+		arrow.TextColor(arrow.AnimateColor("color", chevron, catalogColorAnimation())).
+			AnimatePose(ui.Pose{Rotate: rotation}, catalogDisplaceAnimation())
+		label := ui.Text(c, group.name).FontSize(t.C.GroupHeader.FontSize).FontWeight(t.C.GroupHeader.Weight)
+		label.TextColor(label.AnimateColor("color", text, catalogColorAnimation()))
 		ui.Spacer(c)
 		motion := a.catalogMotion(slot.key)
 		count := len(group.hosts)
 		if count != motion.count {
 			motion.down, motion.count = count < motion.count, count
 		}
-		ui.Text(c, strconv.Itoa(count)).Key("count").FontSize(11).
+		ui.Text(c, strconv.Itoa(count)).Key("count").FontSize(t.C.GroupHeader.CountSize).TextColor(tokenColor(t.C.GroupHeader.Count)).
 			ContentTransition(ui.ContentTransition{Numeric: true, Down: motion.down})
 		if highlight && group.collapsed && !a.catalogDrag.autoExpanded[group] {
-			progress := min(1, float32(c.Now().Sub(a.catalogDrag.hoverStarted))/float32(500*time.Millisecond))
-			ui.Box(c).Absolute().Bottom(0).Left(0).Right(0).Height(2).
-				Background(a.theme.Accent.Alpha(.15)).PassThrough().Children(func() {
+			progress := min(1, float32(c.Now().Sub(a.catalogDrag.hoverStarted))/float32(t.C.GroupHeader.ExpandDelay))
+			ui.Box(c).Absolute().Bottom(0).Left(0).Right(0).Height(t.C.GroupHeader.ExpandHeight).
+				Background(tokenColor(t.C.GroupHeader.ExpandTrack)).PassThrough().Children(func() {
 				ui.Box(c).Absolute().Top(0).Bottom(0).Left(0).WidthPercent(progress * 100).
-					Background(a.theme.Accent).PassThrough()
+					Background(tokenColor(t.C.GroupHeader.ExpandFill)).PassThrough()
 			})
 		}
 	})
@@ -188,34 +195,39 @@ func (a *app) catalogHostMenu(c *ui.Context, id hostID) func(*ui.Menu) {
 }
 
 func (a *app) catalogHostRow(c *ui.Context, slot catalogSlot) ui.Element {
+	t := theme.Current()
 	id, h := hostID(slot.key.id), a.hosts[slot.key.id]
-	row := ui.ButtonBase(c).Key(slot.key).Height(catalogRowHeight).Shrink(0).FillWidth().
-		Padding(0, 8).Gap(6).Radius(8).
-		Role(ui.RoleListItem).Label(h.name).Description(h.user + "@" + h.address).TextColor(a.theme.Text)
+	row := ui.ButtonBase(c).Key(slot.key).Height(t.C.Catalog.RowHeight).Shrink(0).FillWidth().
+		Padding(0, t.C.SiderItem.PaddingRight, 0, t.C.SiderItem.PaddingLeft).Gap(t.C.SiderItem.Gap).Radius(t.C.SiderItem.Radius).
+		Role(ui.RoleListItem).Label(h.name).Description(h.user + "@" + h.address).TextColor(tokenColor(t.C.SiderItem.NameColor))
 	a.trackCatalogDrag(c, row, slot)
 	background := ui.Transparent
 	if a.catalogDrag == nil && row.Hovered() {
-		background = ui.Hex("#f7f7f9")
+		background = tokenColor(t.C.SiderItem.BgHover)
 	}
-	animation := catalogColor
+	animation := catalogColorAnimation()
 	colorKey := "row-bg"
 	flashing := a.catalogFlash != nil && *a.catalogFlash == slot.key
 	seeding := flashing && a.catalogFlashSeed > 0
 	if flashing {
 		colorKey = "landing-bg"
 		background = ui.Transparent
-		animation = ui.Animation{Duration: 600 * time.Millisecond, Ease: ui.EaseOut}
+		animation = ui.Animation{Duration: t.C.DropIndicator.FlashDuration, Ease: tokenEasing(t.C.DropIndicator.FlashEasing)}
 		if seeding {
-			background = a.theme.Accent.Alpha(.10)
-			animation = ui.Animation{Duration: time.Nanosecond}
+			background = tokenColor(t.C.DropIndicator.FlashBg)
+			animation = ui.Animation{Duration: t.C.Desktop.InstantDuration}
 		}
 	}
 	shownBackground := row.AnimateColor(colorKey, background, animation)
 	row.Background(shownBackground)
+	if flashing {
+		opacity := float32(shownBackground.A) / float32(t.C.DropIndicator.FlashBg.A)
+		applyShadowOpacity(row, t.C.DropIndicator.FlashShadow, opacity)
+	}
 	if seeding {
 		if shownBackground == background {
 			a.catalogFlashSeed = 0
-			a.catalogFlashUntil = c.Now().Add(600 * time.Millisecond)
+			a.catalogFlashUntil = c.Now().Add(t.C.DropIndicator.FlashDuration)
 		}
 		c.AnimationFrame()
 	}
@@ -228,20 +240,20 @@ func (a *app) catalogHostRow(c *ui.Context, slot catalogSlot) ui.Element {
 	}
 	row.Children(func() {
 		a.catalogHostContents(c, id)
-		action := ui.ButtonBase(c).Key("host-actions").Size(24, 24).Shrink(0).Radius(7).
-			TextColor(a.theme.TextMuted).
+		action := ui.ButtonBase(c).Key("host-actions").Size(t.C.SiderItem.MoreSize, t.C.SiderItem.MoreSize).Shrink(0).Radius(t.C.SiderItem.MoreRadius).
+			TextColor(tokenColor(t.C.SiderItem.MoreIcon)).
 			Label("更多操作 " + h.name).Description(h.system).Tooltip("更多操作")
 		actionBackground := ui.Transparent
 		if a.catalogDrag == nil && action.Hovered() {
-			actionBackground = ui.Hex("#ededf0")
+			actionBackground = tokenColor(t.C.SiderItem.MoreBg)
 		}
-		action.Background(action.AnimateColor("background", actionBackground, catalogColor))
+		action.Background(action.AnimateColor("background", actionBackground, catalogColorAnimation()))
 		target := float32(0)
 		if a.catalogDrag == nil && (row.Hovered() || action.FocusVisible()) {
 			target = 1
 		}
-		action.AnimatePose(ui.Pose{Fade: 1 - target}, catalogColor).
-			Disabled(a.catalogDrag != nil).Children(func() { ui.Icon(c, moreIcon).Size(16, 16) })
+		action.Opacity(animateVisual(action, "more", target, t.C.PaneFocus.Transition)).
+			Disabled(a.catalogDrag != nil).Children(func() { ui.Icon(c, moreIcon).Size(t.Size.Icon, t.Size.Icon) })
 		if a.catalogDrag == nil {
 			action.Menu(a.catalogHostMenu(c, id))
 		}
@@ -250,20 +262,22 @@ func (a *app) catalogHostRow(c *ui.Context, slot catalogSlot) ui.Element {
 }
 
 func (a *app) catalogHostContents(c *ui.Context, id hostID) {
+	t := theme.Current()
 	h := a.hosts[id]
 	style := systems[h.os]
-	ui.Box(c).Size(24, 24).Shrink(0).Radius(7).Background(ui.Hex(style.tint)).Center().
+	ui.Box(c).Size(t.C.OsLogo.Size, t.C.OsLogo.Size).Shrink(0).Radius(t.C.OsLogo.Radius).Background(tokenColor(t.OSLogoBg(style.color))).Center().
 		Children(func() {
-			ui.Image(c, style.icon).Size(16, 16).TextColor(ui.Hex(style.color))
+			ui.Image(c, style.icon).Size(t.C.OsLogo.GlyphSize, t.C.OsLogo.GlyphSize).TextColor(tokenColor(style.color))
 		})
-	ui.Column(c).Grow(1).MinWidth(0).Gap(1).Children(func() {
-		ui.Text(c, h.name).FontSize(13).FontWeight(550).SingleLine().Ellipsis("…")
-		ui.Text(c, h.user+"@"+h.address).Font("Menlo, monospace").FontSize(10.5).
-			TextColor(a.theme.TextMuted).SingleLine().Ellipsis("…")
+	ui.Column(c).Grow(1).MinWidth(0).Gap(t.Space.N1).Children(func() {
+		ui.Text(c, h.name).FontSize(t.C.SiderItem.NameSize).FontWeight(t.C.SiderItem.NameWeight).FixedLineHeight(t.C.SiderItem.NameLineHeight).SingleLine().Ellipsis("…")
+		ui.Text(c, h.user+"@"+h.address).Font(strings.Join(t.C.SiderItem.SubFamily, ", ")).FontSize(t.C.SiderItem.SubSize).FixedLineHeight(t.C.SiderItem.SubLineHeight).
+			TextColor(tokenColor(t.C.SiderItem.SubColor)).SingleLine().Ellipsis("…")
 	})
 }
 
 func (a *app) catalogDragPreview(c *ui.Context) {
+	t := theme.Current()
 	d := a.catalogDrag
 	if d == nil || d.finished {
 		return
@@ -273,20 +287,18 @@ func (a *app) catalogDragPreview(c *ui.Context) {
 	}
 	// This root sibling sits above the clipped sidebar and never takes layout
 	// space or pointer input. The native source node only drives the gesture.
-	ghost := ui.Row(c).Key(d).Absolute().Radius(9).
-		Height(d.origin.H).Width(d.origin.W).Padding(0, 8).Gap(6).
-		Background(ui.Hex("#ffffff")).TextColor(a.theme.Text).PassThrough()
+	ghost := ui.Box(c).Key(d).Absolute().Radius(t.C.DragLift.Radius).
+		Height(d.origin.H).Width(d.origin.W).TextColor(tokenColor(t.C.SiderItem.NameColor)).PassThrough()
 	scale, shadow := float32(1), float32(0)
 	if d.phase == catalogDragging {
 		ghost.Left(d.origin.X).Top(d.visualY)
 		if !c.Now().Equal(d.started) {
-			scale, shadow = 1.03, 1
+			scale, shadow = t.C.DragLift.Scale, 1
 		}
 	} else {
-		animation := catalogLanding
+		animation := catalogLandingAnimation()
 		if d.phase == catalogCanceling {
-			animation = ui.Smooth
-			animation.Spring.Duration = 300 * time.Millisecond
+			animation = ui.Animation{Spring: tokenSpring(t.C.ReorderMotion.Cancel)}
 		}
 		animation.Spring.Velocity = d.velocityY
 		ghost.Left(d.settleBase.X).Top(d.settleBase.Y).Width(d.settleBase.W).
@@ -295,12 +307,12 @@ func (a *app) catalogDragPreview(c *ui.Context) {
 			d.settleSeed = false
 			d.offset = ui.Point{}
 			c.AnimationFrame()
-		} else if !ghost.Transitioning() && c.Now().Sub(d.settleStarted) >= 120*time.Millisecond {
+		} else if !ghost.Transitioning() && c.Now().Sub(d.settleStarted) >= t.C.DragLift.LiftDuration {
 			d.finished = true
 			if d.phase == catalogSettling && d.kind == catalogHostDrag {
 				key := d.key
 				a.catalogFlash, a.catalogFlashSeed = &key, 2
-				a.catalogFlashUntil = c.Now().Add(600 * time.Millisecond)
+				a.catalogFlashUntil = c.Now().Add(t.C.DropIndicator.FlashDuration)
 			}
 			c.AnimationFrame()
 		}
@@ -309,32 +321,32 @@ func (a *app) catalogDragPreview(c *ui.Context) {
 			c.AnimationFrame()
 		}
 	}
-	lift := ui.Snappy
-	lift.Spring.Duration = 120 * time.Millisecond
+	lift := ui.Animation{Duration: t.MotionDuration(t.C.DragLift.LiftDuration, c.Preferences().ReduceMotion)}
 	ghost.AnimatePose(ui.Pose{Scale: scale}, lift)
-	alpha := float32(ghost.AnimateColor("shadow", ui.RGB(0, 0, 0).Alpha(shadow), catalogColor).A) / 255
-	ghost.Shadow(0, 10, 28, 0, ui.RGB(0, 0, 0).Alpha(.16*alpha)).
-		Shadow(0, 2, 6, 0, ui.RGB(0, 0, 0).Alpha(.08*alpha)).
-		Shadow(0, 0, 0, .5, ui.RGB(0, 0, 0).Alpha(.10*alpha))
+	alpha := animateVisual(ghost, "shadow", shadow, t.C.DragLift.LiftDuration)
+	applyShadowOpacity(ghost, t.C.DragLift.Shadow, alpha)
 	ghost.Children(func() {
-		if d.kind == catalogHostDrag {
-			a.catalogHostContents(c, d.host.id)
-			return
-		}
-		// The title remains the front card; the two sheets are painted behind it.
-		ui.Icon(c, chevronIcon).Size(11, 11).Rotate(-90)
-		ui.Text(c, d.group.name).FontSize(11).FontWeight(600)
-		ui.Spacer(c)
-		ui.Text(c, strconv.Itoa(len(d.group.hosts))+" 台").FontSize(11).TextColor(a.theme.TextMuted)
-	})
-	if d.kind == catalogGroupDrag {
-		ghost.Draw(func(p *ui.Painter, r ui.Rect) {
-			for _, offset := range []float32{6, 3} {
-				card := ui.Rect{X: r.X + offset, Y: r.Y + offset, W: r.W - offset*2, H: r.H}
-				p.Fill(card, ui.Hex("#f9f9fa"), 9)
-				p.Stroke(card, ui.RGB(0, 0, 0).Alpha(.08), 9, .5)
+		if d.kind == catalogGroupDrag {
+			// Paint the sheets before the front card so their shadows remain behind it.
+			for _, offset := range []float32{t.C.DragLift.StackInset, t.C.DragLift.StackInset / 2} {
+				sheet := ui.Box(c).Absolute().Top(offset).Left(offset).Right(offset).Height(d.origin.H).
+					Radius(t.C.DragLift.Radius).Background(tokenColor(t.C.DragLift.StackBg)).
+					Opacity(t.C.DragLift.StackBackOpacity).PassThrough()
+				applyShadow(sheet, t.C.DragLift.StackShadow)
 			}
-			p.Fill(r, ui.Hex("#ffffff"), 9)
+		}
+		ui.Row(c).Absolute().Top(0).Right(0).Bottom(0).Left(0).
+			Padding(0, t.C.SiderItem.PaddingRight, 0, t.C.SiderItem.PaddingLeft).Gap(t.C.SiderItem.Gap).
+			Radius(t.C.DragLift.Radius).Background(tokenColor(t.C.DragLift.Bg)).PassThrough().Children(func() {
+			if d.kind == catalogHostDrag {
+				a.catalogHostContents(c, d.host.id)
+				return
+			}
+			ui.Icon(c, chevronIcon).Size(t.Font.Size.Caption, t.Font.Size.Caption).Rotate(-90)
+			ui.Text(c, d.group.name).FontSize(t.C.GroupHeader.FontSize).FontWeight(t.Font.Weight.Semibold)
+			ui.Spacer(c)
+			ui.Text(c, strconv.Itoa(len(d.group.hosts))+" 台").FontSize(t.C.GroupHeader.CountSize).
+				TextColor(tokenColor(t.C.GroupHeader.Count))
 		})
-	}
+	})
 }

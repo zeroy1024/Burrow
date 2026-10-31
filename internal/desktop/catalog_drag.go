@@ -5,23 +5,22 @@ import (
 	"strings"
 	"time"
 
+	"sshdesk/internal/theme"
+
 	"github.com/egoist/mygo/ui"
 )
 
-const (
-	catalogRowHeight    = 40
-	catalogHeaderHeight = 30
-	catalogRowGap       = 2
-	catalogGroupGap     = 10
-)
+func catalogDisplaceAnimation() ui.Animation {
+	return ui.Animation{Spring: tokenSpring(theme.Current().C.ReorderMotion.Displace)}
+}
 
-var (
-	displace       = ui.Animation{Spring: ui.SpringOptions{Stiffness: 420, Damping: 34}}
-	catalogLanding = ui.Animation{Spring: ui.SpringOptions{
-		Duration: 320 * time.Millisecond, Bounce: .15,
-	}}
-	catalogColor = ui.Animation{Duration: 120 * time.Millisecond}
-)
+func catalogLandingAnimation() ui.Animation {
+	return ui.Animation{Spring: tokenSpring(theme.Current().C.ReorderMotion.Drop)}
+}
+
+func catalogColorAnimation() ui.Animation {
+	return ui.Animation{Duration: theme.Current().C.DragLift.LiftDuration}
+}
 
 type catalogDragKind uint8
 
@@ -124,6 +123,7 @@ func (a *app) catalogHostTransfer() (hostDrag, bool, bool) {
 }
 
 func (a *app) syncCatalogWorkspacePreview(c *ui.Context) {
+	t := theme.Current()
 	d := a.catalogDrag
 	if d == nil || d.kind != catalogHostDrag || d.phase != catalogDragging {
 		return
@@ -136,18 +136,20 @@ func (a *app) syncCatalogWorkspacePreview(c *ui.Context) {
 	}
 	if d.workspacePreview == nil {
 		area := a.workArea.Bounds(c)
-		size := ui.Rect{W: min(360, area.W), H: min(260, area.H)}
+		size := ui.Rect{W: min(t.C.Desktop.DragPreviewWidth, area.W), H: min(t.C.Desktop.DragPreviewHeight, area.H)}
 		session := &remoteSession{host: d.host.id, state: connected, output: []string{}}
 		d.workspacePreview = &paneDragState{
 			kind: dragHost, session: session, origin: d.origin, paneRect: size, detached: true,
-			grab: ui.Point{X: min(30, size.W/2), Y: 18}, order: []*workspaceTab{},
-			paneImage: a.paneSnapshot(session, size.W, size.H),
+			grab: ui.Point{X: min(t.C.Desktop.DragGrabX, size.W/2), Y: t.C.Desktop.DragGrabY}, order: []*workspaceTab{},
+			appearance: t,
+			paneImage:  a.paneSnapshot(session, size.W, size.H),
 		}
 	}
 	a.drag, a.dragSeen = d.workspacePreview, d.held
 }
 
 func (a *app) trackCatalogDrag(c *ui.Context, row ui.Element, slot catalogSlot) {
+	t := theme.Current()
 	motion := a.catalogMotion(slot.key)
 	d := a.catalogDrag
 	active := d != nil && d.key == slot.key
@@ -162,14 +164,15 @@ func (a *app) trackCatalogDrag(c *ui.Context, row ui.Element, slot catalogSlot) 
 		}
 	}
 	idle := !held && !released
-	options := ui.DraggableOptions{Axis: ui.Vertical, Animation: catalogLanding}
+	options := ui.DraggableOptions{Axis: ui.Vertical, Animation: catalogLandingAnimation()}
 	if idle || blockGesture {
 		// Only the root overlay animates a landing or return. Keep the native
 		// gesture current, and clear its own offset before another press catches it.
 		motion.offset = ui.Point{}
 		options.Bounds, options.Rigid = &ui.Rect{}, true
-		options.Animation = ui.Animation{Duration: time.Nanosecond}
+		options.Animation = ui.Animation{Duration: t.C.Desktop.InstantDuration}
 	}
+	// MyGo v0.7.3 exposes neither a threshold nor a hold delay in DraggableOptions.
 	row.Draggable(&motion.offset, options)
 	offset := row.DragOffset()
 	if settlingSource && (blockGesture || idle) {
@@ -196,7 +199,7 @@ func (a *app) trackCatalogDrag(c *ui.Context, row ui.Element, slot catalogSlot) 
 		viewport := a.catalogScroll.Bounds(c)
 		d = &catalogDragState{
 			kind: slot.key.kind, key: slot.key, group: slot.group,
-			origin: origin, originContentY: origin.Y - viewport.Y - 12 + a.catalogScroll.Y,
+			origin: origin, originContentY: origin.Y - viewport.Y - t.C.Catalog.ListPaddingY + a.catalogScroll.Y,
 			visualY:     origin.Y + offset.Y,
 			targetGroup: slot.group, started: c.Now(), lastFrame: c.Now(),
 			autoExpanded: map[*hostGroup]bool{},
@@ -260,9 +263,10 @@ func (a *app) catalogPreviewHosts(group *hostGroup) []hostID {
 // Every header and host is a sibling of the same Column. MyGo keys include
 // their parent; nesting hosts in group columns would lose identity across groups.
 func (a *app) catalogPlan(c *ui.Context) []catalogSlot {
+	t := theme.Current()
 	viewport := a.catalogScroll.Bounds(c)
-	y := viewport.Y + 12 - a.catalogScroll.Y
-	width := max(0, viewport.W-16)
+	y := viewport.Y + t.C.Catalog.ListPaddingY - a.catalogScroll.Y
+	width := max(0, viewport.W-2*t.C.Catalog.ListPaddingX)
 	slots := []catalogSlot{}
 	d := a.catalogDrag
 	draggingGroup := d != nil && d.phase == catalogDragging && d.kind == catalogGroupDrag
@@ -279,38 +283,38 @@ func (a *app) catalogPlan(c *ui.Context) []catalogSlot {
 			continue
 		}
 		if len(slots) > 0 {
-			y += catalogGroupGap
+			y += t.C.Catalog.GroupGap
 		}
 		slot := catalogSlot{
 			key: catalogKey{kind: catalogGroupDrag, id: group.id}, group: group,
-			rect:        ui.Rect{X: viewport.X + 8, Y: y, W: width, H: catalogHeaderHeight},
+			rect:        ui.Rect{X: viewport.X + t.C.Catalog.ListPaddingX, Y: y, W: width, H: t.C.GroupHeader.Height},
 			placeholder: draggingGroup && group == d.group,
 		}
 		slot.headerRect = slot.rect
 		slots = append(slots, slot)
-		y += catalogHeaderHeight
+		y += t.C.GroupHeader.Height
 		if !a.catalogExpanded(group) {
 			continue
 		}
 		for position := 0; position <= len(ids); position++ {
 			if d != nil && d.phase == catalogDragging && d.kind == catalogHostDrag &&
 				d.targetGroup == group && d.targetIndex == position {
-				y += catalogRowGap
+				y += t.C.Catalog.RowGap
 				slots = append(slots, catalogSlot{
 					key: d.key, group: group, placeholder: true,
-					rect: ui.Rect{X: viewport.X + 8, Y: y, W: width, H: catalogRowHeight},
+					rect: ui.Rect{X: viewport.X + t.C.Catalog.ListPaddingX, Y: y, W: width, H: t.C.Catalog.RowHeight},
 				})
-				y += catalogRowHeight
+				y += t.C.Catalog.RowHeight
 			}
 			if position == len(ids) || !a.catalogMatches(group, ids[position]) {
 				continue
 			}
-			y += catalogRowGap
+			y += t.C.Catalog.RowGap
 			slots = append(slots, catalogSlot{
 				key: catalogKey{kind: catalogHostDrag, id: int(ids[position])}, group: group,
-				rect: ui.Rect{X: viewport.X + 8, Y: y, W: width, H: catalogRowHeight},
+				rect: ui.Rect{X: viewport.X + t.C.Catalog.ListPaddingX, Y: y, W: width, H: t.C.Catalog.RowHeight},
 			})
-			y += catalogRowHeight
+			y += t.C.Catalog.RowHeight
 		}
 	}
 	return slots
@@ -382,7 +386,7 @@ func (a *app) updateCatalogDestination(c *ui.Context) {
 		d.hoverGroup, d.hoverStarted = header, c.Now()
 	}
 	if header != nil && header.collapsed && !d.autoExpanded[header] {
-		if c.Now().Sub(d.hoverStarted) >= 500*time.Millisecond {
+		if c.Now().Sub(d.hoverStarted) >= theme.Current().C.GroupHeader.ExpandDelay {
 			d.autoExpanded[header] = true
 		} else {
 			c.AnimationFrame()
@@ -417,6 +421,7 @@ func (a *app) updateCatalogDestination(c *ui.Context) {
 }
 
 func (a *app) scrollCatalogDrag(c *ui.Context) {
+	t := theme.Current()
 	d := a.catalogDrag
 	now := c.Now()
 	dt := float32(now.Sub(d.lastFrame).Seconds())
@@ -425,13 +430,14 @@ func (a *app) scrollCatalogDrag(c *ui.Context) {
 	if !containsCatalogPoint(r, a.pointer) {
 		return
 	}
+	zone := t.C.DropIndicator.AutoScrollZone
 	var depth float32
-	if a.pointer.Y < r.Y+48 {
-		depth = -min(1, (r.Y+48-a.pointer.Y)/48)
-	} else if a.pointer.Y > r.Y+r.H-48 {
-		depth = min(1, (a.pointer.Y-(r.Y+r.H-48))/48)
+	if a.pointer.Y < r.Y+zone {
+		depth = -min(1, (r.Y+zone-a.pointer.Y)/zone)
+	} else if a.pointer.Y > r.Y+r.H-zone {
+		depth = min(1, (a.pointer.Y-(r.Y+r.H-zone))/zone)
 	}
-	speed := 900 * depth * depth
+	speed := t.C.DropIndicator.AutoScrollMax * depth * depth
 	if depth < 0 {
 		speed = -speed
 	}
@@ -481,6 +487,7 @@ func (a *app) finishCatalogDrag(c *ui.Context) {
 }
 
 func (a *app) settleCatalogDrag(c *ui.Context, commit bool) {
+	t := theme.Current()
 	d := a.catalogDrag
 	d.phase = catalogCanceling
 	d.awaitingRelease = !d.released
@@ -512,7 +519,7 @@ func (a *app) settleCatalogDrag(c *ui.Context, commit bool) {
 			break
 		}
 		if d.kind == catalogHostDrag && slot.group == d.targetGroup && slot.key.kind == catalogGroupDrag {
-			d.settleBase = ui.Rect{X: slot.rect.X, Y: slot.rect.Y, W: slot.rect.W, H: catalogRowHeight}
+			d.settleBase = ui.Rect{X: slot.rect.X, Y: slot.rect.Y, W: slot.rect.W, H: t.C.Catalog.RowHeight}
 		}
 	}
 	d.offset.Y = d.visualY - d.settleBase.Y

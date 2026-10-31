@@ -6,35 +6,48 @@ import (
 	"strconv"
 	"strings"
 
+	"sshdesk/internal/theme"
+
 	"github.com/egoist/mygo/ui"
 )
 
 func statusDot(c *ui.Context, state connectionState, size float32) {
-	color := ui.Hex("#cfd0d5")
+	t := theme.Current()
+	color := tokenColor(t.C.SiderItem.DotOffline)
+	halo := tokenColor(t.C.SiderItem.DotOffline)
 	if state == connected {
-		color = ui.Hex("#28c15a")
+		color = tokenColor(t.C.SiderItem.DotOnline)
+		halo = tokenColor(t.C.SiderItem.DotOnlineHalo)
 	}
 	if state == connecting {
-		color = ui.Hex("#f5a21a")
+		color = tokenColor(t.C.SiderItem.DotConnecting)
+		halo = tokenColor(t.C.SiderItem.DotConnectingHalo)
 	}
-	ui.Box(c).Size(size+6, size+6).Center().Children(func() {
-		dot := ui.Box(c).Size(size, size).Radius(99).Background(color)
+	ui.Box(c).Size(size+2*t.C.SiderItem.DotHalo, size+2*t.C.SiderItem.DotHalo).Center().Children(func() {
+		dot := ui.Box(c).Size(size, size).Radius(t.Radius.Pill).Background(color)
 		if state != disconnected {
-			dot.Border(3, color.Alpha(0.16)).Size(size+6, size+6).
+			dot.Border(t.C.SiderItem.DotHalo, halo).Size(size+2*t.C.SiderItem.DotHalo, size+2*t.C.SiderItem.DotHalo).
 				Background(ui.Transparent).Children(func() {
-				ui.Box(c).Fill().Radius(99).Background(color)
+				ui.Box(c).Fill().Radius(t.Radius.Pill).Background(color)
 			})
 		}
 	})
 }
 
 func (a *app) sidebar(c *ui.Context, shown float32) {
+	t := theme.Current()
 	ui.Column(c).Width(a.sidebarWidth).FillHeight().Left(a.sidebarWidth * (shown - 1)).
 		Label("远程主机目录").Children(func() {
-		ui.Row(c).Height(52).Shrink(0).Padding(0, 16).Children(func() {
-			ui.Text(c, "远程会话").FontSize(15).FontWeight(650)
+		ui.Row(c).Shrink(0).Padding(
+			t.C.Sider.HeaderPaddingTop,
+			t.C.Sider.HeaderPaddingRight,
+			t.C.Sider.HeaderPaddingBottom,
+			t.C.Sider.HeaderPaddingLeft,
+		).Children(func() {
+			ui.Text(c, "远程会话").FontSize(t.C.Sider.TitleSize).FontWeight(t.C.Sider.TitleWeight)
 			ui.Spacer(c)
-			iconButton(c, "添加", plusIcon).Background(ui.Hex("#f3f3f5")).Menu(func(m *ui.Menu) {
+			iconButton(c, "添加", plusIcon).Size(t.C.Sider.AddButtonSize, t.C.Sider.AddButtonSize).
+				Radius(t.C.Sider.AddButtonRadius).Background(tokenColor(t.C.Sider.AddButtonBg)).Menu(func(m *ui.Menu) {
 				if m.Item("新建分组").Chosen() {
 					a.startGroupDraft()
 				}
@@ -43,21 +56,24 @@ func (a *app) sidebar(c *ui.Context, shown float32) {
 				}
 			})
 		})
-		ui.Row(c).Height(34).Shrink(0).Margin(0, 12).
-			Radius(8).Background(ui.Hex("#f4f4f6")).Children(func() {
+		ui.Row(c).Height(t.C.Search.Height).Shrink(0).
+			Margin(0, t.C.Search.MarginX, t.C.Search.MarginBottom, t.C.Search.MarginX).
+			Radius(t.C.Search.Radius).Background(tokenColor(t.C.Search.Bg)).Children(func() {
 			ui.TextInputBase(c.Key("host-search"), &a.query).Bind(&a.search).Fill().MinWidth(0).
-				Padding(0, 9, 0, 30).Radius(8).
-				FontSize(12).Placeholder("搜索主机、标签").Label("搜索主机、地址或系统")
+				Padding(0, t.C.Search.PaddingX, 0, t.C.Search.Height).Radius(t.C.Search.Radius).
+				FontSize(t.C.Search.FontSize).Placeholder("搜索主机、标签").Label("搜索主机、地址或系统")
 			// The icon shares the input's bounds without intercepting text editing.
 			ui.Row(c).Absolute().Top(0).Right(0).Bottom(0).Left(0).
-				Padding(0, 9).PassThrough().Children(func() {
-				ui.Icon(c, searchIcon).Size(15, 15).TextColor(a.theme.TextMuted).PassThrough()
+				Padding(0, t.C.Search.PaddingX).PassThrough().Children(func() {
+				ui.Icon(c, searchIcon).Size(t.Size.IconMd, t.Size.IconMd).TextColor(tokenColor(t.C.Search.Text)).PassThrough()
 			})
 		})
 		a.catalogList(c)
-		ui.Row(c).Height(34).Shrink(0).Gap(8).Padding(0, 14).TextColor(a.theme.TextMuted).Children(func() {
-			ui.Icon(c, serverIcon).Size(14, 14)
-			ui.Text(c, fmt.Sprintf("%d 台主机", len(a.hosts))).FontSize(11)
+		ui.Row(c).Shrink(0).Gap(t.Space.N8).Padding(t.C.Sider.FooterPaddingY, t.C.Sider.FooterPaddingX).
+			BorderWidth(t.Size.Hairline, 0, 0, 0).BorderColor(tokenColor(t.C.Sider.FooterBorder)).
+			TextColor(tokenColor(t.C.Sider.FooterText)).Children(func() {
+			ui.Icon(c, serverIcon).Size(t.Size.IconSm, t.Size.IconSm)
+			ui.Text(c, fmt.Sprintf("%d 台主机", len(a.hosts))).FontSize(t.C.Sider.FooterSize)
 		})
 	})
 }
@@ -72,31 +88,32 @@ func (a *app) startHostDraft() {
 }
 
 func (a *app) hostDialog(c *ui.Context) {
+	t := theme.Current()
 	ui.Modal(c, &a.addHostOpen, func() {
-		ui.Column(c).Width(340).Gap(14).Children(func() {
-			ui.Text(c, "添加 SSH 主机").FontSize(18).FontWeight(650)
-			ui.Text(c, "添加到本次演示，不会连接服务器。").FontSize(12).TextColor(a.theme.TextMuted)
+		ui.Column(c).Width(t.C.Dialog.HostWidth).Gap(t.Space.N14).Children(func() {
+			ui.Text(c, "添加 SSH 主机").FontSize(t.C.Dialog.TitleSize).FontWeight(t.Font.Weight.Semibold)
+			ui.Text(c, "保存到主机目录，不会连接服务器。").FontSize(t.Font.Size.Small).TextColor(tokenColor(t.Color.Text.Secondary))
 			draftField(c, "名称", &a.draft.name)
 			draftField(c, "主机地址", &a.draft.address)
-			ui.Row(c).Gap(12).Children(func() {
-				ui.Column(c).Grow(1).Gap(6).Children(func() { draftField(c, "用户名", &a.draft.user) })
-				ui.Column(c).Width(90).Gap(6).Children(func() { draftField(c, "端口", &a.draft.port) })
+			ui.Row(c).Gap(t.Space.N12).Children(func() {
+				ui.Column(c).Grow(1).Gap(t.Space.N6).Children(func() { draftField(c, "用户名", &a.draft.user) })
+				ui.Column(c).Width(t.C.Dialog.PortWidth).Gap(t.Space.N6).Children(func() { draftField(c, "端口", &a.draft.port) })
 			})
-			ui.Text(c, "分组").FontSize(12)
+			ui.Text(c, "分组").FontSize(t.Font.Size.Small)
 			groupNames := a.groupNames()
 			ui.Select(c, &a.draft.group, groupNames)
 			names := []string{}
 			for _, system := range systems {
 				names = append(names, system.name)
 			}
-			ui.Text(c, "系统").FontSize(12)
+			ui.Text(c, "系统").FontSize(t.Font.Size.Small)
 			ui.Select(c, &a.draft.system, names)
 			port, err := strconv.Atoi(a.draft.port)
 			validPort := err == nil && port > 0 && port <= 65535
 			validHost := strings.TrimSpace(a.draft.name) != "" && strings.TrimSpace(a.draft.address) != ""
 			validUser := strings.TrimSpace(a.draft.user) != ""
 			canAdd := validPort && validHost && validUser
-			ui.Row(c).Justify(ui.End).Gap(8).Children(func() {
+			ui.Row(c).Justify(ui.End).Gap(t.Space.N8).Children(func() {
 				ui.Button(c, "取消").OnClick(func() { a.addHostOpen = false })
 				ui.PrimaryButton(c, "添加").Disabled(!canAdd).
 					OnClick(func() {
@@ -129,17 +146,18 @@ func (a *app) startGroupDraft() {
 }
 
 func (a *app) groupDialog(c *ui.Context) {
+	t := theme.Current()
 	ui.Modal(c, &a.groupDialogOpen, func() {
-		ui.Column(c).Width(320).Gap(14).Children(func() {
-			ui.Text(c, "新建分组").FontSize(18).FontWeight(650)
-			ui.Text(c, "将主机拖入分组，整理主机目录。").FontSize(12).TextColor(a.theme.TextMuted)
+		ui.Column(c).Width(t.C.Dialog.GroupWidth).Gap(t.Space.N14).Children(func() {
+			ui.Text(c, "新建分组").FontSize(t.C.Dialog.TitleSize).FontWeight(t.Font.Weight.Semibold)
+			ui.Text(c, "将主机拖入分组，整理主机目录。").FontSize(t.Font.Size.Small).TextColor(tokenColor(t.Color.Text.Secondary))
 			ui.TextInput(c, &a.groupDraft).AutoFocus().Label("分组名称").Placeholder("分组名称").FillWidth()
 			name := strings.TrimSpace(a.groupDraft)
 			duplicate := slices.Contains(a.groupNames(), name)
 			if duplicate {
-				ui.Text(c, "此分组名称已存在").FontSize(11).TextColor(a.theme.Danger)
+				ui.Text(c, "此分组名称已存在").FontSize(t.Font.Size.Caption).TextColor(a.theme.Danger)
 			}
-			ui.Row(c).Gap(8).Justify(ui.End).Children(func() {
+			ui.Row(c).Gap(t.Space.N8).Justify(ui.End).Children(func() {
 				ui.Button(c, "取消").OnClick(func() { a.groupDialogOpen = false })
 				ui.PrimaryButton(c, "创建").Disabled(name == "" || duplicate).OnClick(func() {
 					if err := a.commitCatalogMove(func() {
@@ -156,8 +174,9 @@ func (a *app) groupDialog(c *ui.Context) {
 }
 
 func draftField(c *ui.Context, label string, value *string) {
-	ui.Column(c).Gap(6).Children(func() {
-		ui.Text(c, label).FontSize(12)
+	t := theme.Current()
+	ui.Column(c).Gap(t.Space.N6).Children(func() {
+		ui.Text(c, label).FontSize(t.Font.Size.Small)
 		ui.TextInput(c, value).Label(label).FillWidth()
 	})
 }

@@ -5,43 +5,44 @@ import (
 	"math"
 	"slices"
 	"strconv"
-	"time"
+
+	"sshdesk/internal/theme"
 
 	"github.com/egoist/mygo/ui"
 )
 
-const sessionTabGap = 4
-
 func iconButton(c *ui.Context, label string, icon *ui.SVG) ui.Element {
-	button := ui.ButtonBase(c).Key(label).Size(28, 28).Radius(7).
-		Label(label).Tooltip(label).TextColor(c.Theme().TextMuted)
+	t := theme.Current()
+	button := ui.ButtonBase(c).Key(label).Size(t.C.IconButton.Size, t.C.IconButton.Size).Radius(t.C.IconButton.Radius).
+		Label(label).Tooltip(label).TextColor(tokenColor(t.C.IconButton.Icon))
 	switch {
 	case button.Pressed():
-		button.Background(ui.RGB(0, 0, 0).Alpha(0.1))
+		button.Background(tokenColor(t.C.Button.BgPressed))
 	case button.Hovered():
-		button.Background(ui.RGB(0, 0, 0).Alpha(0.055))
+		button.Background(tokenColor(t.C.IconButton.BgHover))
 	}
-	button.Children(func() { ui.Icon(c, icon).Size(16, 16) })
+	button.Children(func() { ui.Icon(c, icon).Size(t.C.IconButton.IconSize, t.C.IconButton.IconSize) })
 	return button
 }
 
 func (a *app) titleBar(c *ui.Context, shown float32) {
+	t := theme.Current()
 	bar := c.TitleBar()
-	ui.Row(c).Height(max(titleBarHeight, bar.Height)).Shrink(0).Gap(6).DragWindow().Children(func() {
-		ui.Row(c).Width(max(navigationWidth+a.sidebarWidth*shown, bar.Left+44)).Shrink(0).
-			PaddingStart(bar.Left + 8).DragWindow().Children(func() {
+	ui.Row(c).Height(max(t.C.Titlebar.Height, bar.Height)).Shrink(0).Gap(t.Space.N6).DragWindow().Children(func() {
+		ui.Row(c).Width(max(t.C.Rail.Width+a.sidebarWidth*shown, bar.Left+t.C.Titlebar.Height)).Shrink(0).
+			PaddingStart(bar.Left + t.C.Titlebar.LeftGap).DragWindow().Children(func() {
 			label := "收起会话栏"
 			if a.sidebarCollapsed {
 				label = "展开会话栏"
 			}
 			iconButton(c, label, sidebarIcon).OnClick(func() { a.sidebarCollapsed = !a.sidebarCollapsed })
 		})
-		ui.Box(c).Grow(1).MinWidth(0).Height(36).Clip().Children(func() {
+		ui.Box(c).Grow(1).MinWidth(0).Height(t.C.Tab.StripHeight).Clip().Children(func() {
 			// Clip the native indicator outside the viewport while retaining native scrolling.
 			strip := ui.ScrollHorizontal(c.Key("session-tabs")).Fill().TrackScroll(&a.tabScroll).ScrollbarInsets(
 				0,
 				0,
-				-12,
+				-t.Space.N12,
 				0,
 			).HandleInput(func(ev ui.InputEvent) bool {
 				if ev.Kind == ui.InputPointerDown && ev.Button == 0 {
@@ -54,7 +55,7 @@ func (a *app) titleBar(c *ui.Context, shown float32) {
 				return true
 			})
 			strip.Children(func() {
-				ui.Row(c).Gap(sessionTabGap).FillHeight().Children(func() {
+				ui.Row(c).Gap(t.C.Titlebar.TabsGap).FillHeight().Children(func() {
 					var pendingClose func()
 					for i, tab := range a.tabs {
 						if close := a.tabButton(c, i, tab); close != nil {
@@ -79,10 +80,10 @@ func (a *app) titleBar(c *ui.Context, shown float32) {
 			})
 			a.tabStripTarget(c, strip)
 		})
-		ui.Row(c).Padding(0, 8).Shrink(0).Children(func() {
+		ui.Row(c).Padding(0, t.C.Titlebar.ActionsPaddingRight).Gap(t.C.Titlebar.ActionsGap).Shrink(0).Children(func() {
 			status := iconButton(c, "服务器监控", activityIcon).Expanded(a.statusVisible)
 			if a.statusVisible {
-				status.Background(ui.RGB(0, 0, 0).Alpha(0.065))
+				status.Background(tokenColor(t.C.TitleAction.BgOn))
 			}
 			status.OnClick(func() { a.statusVisible = !a.statusVisible })
 		})
@@ -90,25 +91,27 @@ func (a *app) titleBar(c *ui.Context, shown float32) {
 }
 
 func (a *app) tabButton(c *ui.Context, index int, tab *workspaceTab) func() {
-	const contentHeight = 20
+	t := theme.Current()
+	contentHeight := t.C.Tab.ContentHeight
 	var pendingClose func()
 	session := tab.focused
 	h := a.hosts[session.host]
-	button := ui.ButtonBase(c).Key(tab.id).Height(32).Padding(0, 9).Gap(6).Radius(8).
-		Bind(&tab.frame).Transition(ui.ElementTransition{Position: true, Duration: 150 * time.Millisecond}).
+	button := ui.ButtonBase(c).Key(tab.id).Height(t.C.Tab.Height).
+		Padding(0, t.C.Tab.PaddingRight, 0, t.C.Tab.PaddingLeft).Gap(t.C.Tab.Gap).Radius(t.C.Tab.Radius).
+		Bind(&tab.frame).Transition(ui.ElementTransition{
+		Position:  true,
+		Animation: &ui.Animation{Spring: tokenSpring(t.C.ReorderMotion.TabDisplace)},
+	}).
 		AlignItems(ui.Center).
-		Role(ui.RoleTab).Label(h.name).Selected(a.activeTab == index).TextColor(a.theme.Text).
+		Role(ui.RoleTab).Label(h.name).Selected(a.activeTab == index).TextColor(tokenColor(t.C.Tab.Text)).
 		Tooltip(fmt.Sprintf("%s@%s:%d", h.user, h.address, h.port))
 	if a.activeTab == index {
-		button.Background(ui.Hex(cardBackground)).Shadow(
-			0,
-			0,
-			0,
-			0.5,
-			ui.RGB(0, 0, 0).Alpha(0.06),
+		applyShadow(
+			button.Background(tokenColor(t.C.Tab.BgSelected)).TextColor(tokenColor(t.C.Tab.TextSelected)),
+			t.C.Tab.ShadowSelected,
 		)
 	} else if button.Hovered() {
-		button.Background(ui.RGB(255, 255, 255).Alpha(0.45))
+		button.Background(tokenColor(t.C.Tab.BgHover))
 	}
 	button.OnClick(func() { a.activateTab(slices.Index(a.tabs, tab)) })
 	button.ContextMenu(func(m *ui.Menu) {
@@ -126,22 +129,22 @@ func (a *app) tabButton(c *ui.Context, index int, tab *workspaceTab) func() {
 		}
 	})
 	button.Children(func() {
-		ui.Box(c).Size(16, contentHeight).Shrink(0).Center().Children(func() {
+		ui.Box(c).Size(t.Size.Icon, contentHeight).Shrink(0).Center().Children(func() {
 			if tab.root.count() > 1 {
-				ui.Icon(c, gridIcon).Size(12, 12).TextColor(a.theme.TextMuted)
+				ui.Icon(c, gridIcon).Size(t.Size.TrafficLight, t.Size.TrafficLight).TextColor(tokenColor(t.C.Tab.Text))
 				return
 			}
-			statusDot(c, session.state, 6)
+			statusDot(c, session.state, t.C.Tab.DotSize)
 		})
 		// Center the visible glyphs as well as their font line boxes.
-		ui.Text(c, h.name).FontSize(12).FontWeight(550).FixedLineHeight(contentHeight).Top(-1.5).SingleLine()
+		ui.Text(c, h.name).FontSize(t.C.Tab.FontSize).FontWeight(t.C.Tab.WeightSelected).FixedLineHeight(contentHeight).Top(t.C.Tab.TitleOffset).SingleLine()
 		if tab.root.count() > 1 {
-			ui.Text(c, "+"+strconv.Itoa(tab.root.count()-1)).FontSize(11).
-				FixedLineHeight(contentHeight).Top(-0.5).TextColor(a.theme.TextMuted)
+			ui.Text(c, "+"+strconv.Itoa(tab.root.count()-1)).FontSize(t.Font.Size.Caption).
+				FixedLineHeight(contentHeight).Top(t.C.Tab.CountOffset).TextColor(tokenColor(t.C.Tab.Text))
 		}
-		iconButton(c, "关闭标签 "+h.name, closeIcon).Size(16, contentHeight).
+		iconButton(c, "关闭标签 "+h.name, closeIcon).Size(t.Size.Icon, contentHeight).
 			OnClick(func() { a.closeTab(slices.Index(a.tabs, tab)) })
-		handle := ui.Box(c).Key("tab-drag-handle").Absolute().Top(0).Bottom(0).Left(0).Right(30).
+		handle := ui.Box(c).Key("tab-drag-handle").Absolute().Top(0).Bottom(0).Left(0).Right(t.C.Tab.DragHandleInset).
 			Label("拖动标签 " + h.name).OnClick(func() { a.activateTab(slices.Index(a.tabs, tab)) })
 		a.paneDragHandle(c, handle, paneTransfer{tab: tab, session: tab.focused, fromTab: true})
 	})

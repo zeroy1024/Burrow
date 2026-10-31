@@ -3,22 +3,10 @@ package desktop
 import (
 	"time"
 
+	"sshdesk/internal/theme"
+
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
-)
-
-const (
-	titleBarHeight      = 48
-	navigationWidth     = 52
-	workspaceSpacing    = 6
-	minSidebarWidth     = 240
-	maxSidebarWidth     = 320
-	defaultSidebarWidth = 260
-	statusPanelWidth    = 220
-	windowBackground    = "#e7e7e8"
-	cardBackground      = "#ffffff"
-	primaryText         = "#1d1d1f"
-	secondaryText       = "#8e8e93"
 )
 
 type section int
@@ -31,6 +19,7 @@ const (
 
 type app struct {
 	section           section
+	appearance        int
 	theme             *ui.Theme
 	sidebarCollapsed  bool
 	sidebarWidth      float32
@@ -73,17 +62,12 @@ type app struct {
 // Run starts the native desktop application and its main window.
 func Run() error {
 	a := &app{
-		theme:         ui.LightTheme(),
-		sidebarWidth:  defaultSidebarWidth,
+		sidebarWidth:  theme.Current().C.Sider.Width,
 		hosts:         demoHosts(),
 		groups:        demoGroups(),
 		tabs:          []*workspaceTab{},
 		statusVisible: true,
 	}
-	a.theme.Text = ui.Hex(primaryText)
-	a.theme.TextMuted = ui.Hex(secondaryText)
-	a.theme.Border = ui.Hex("#eeeef0")
-	a.theme.Accent = ui.Hex("#0a84ff")
 	a.catalogError = a.loadCatalog()
 	for _, id := range []hostID{0, 4, 1} {
 		if int(id) < len(a.hosts) {
@@ -94,16 +78,28 @@ func Run() error {
 		a.activateTab(0)
 	}
 	mygo.Theme.SetSource(mygo.ThemeLight)
+	stopTokens := theme.OnChange(func(t *theme.Theme) {
+		if a.window != nil {
+			if err := a.window.SetBackgroundColor(windowColor(t.C.Window.Bg)); err != nil {
+				panic(err)
+			}
+			a.window.Invalidate()
+		}
+	})
+	defer stopTokens()
+	stopAppearance := mygo.Theme.OnUpdated(func() { a.syncAppearance() })
+	defer stopAppearance()
 	mygo.App.WhenReady(func() {
+		t := theme.Current()
 		a.window = mygo.NewWindow(mygo.WindowOptions{
 			Title:                "SSH Desk",
-			Width:                1180,
-			Height:               780,
-			MinWidth:             1000,
-			MinHeight:            640,
+			Width:                int(t.C.Desktop.WindowWidth),
+			Height:               int(t.C.Desktop.WindowHeight),
+			MinWidth:             int(t.C.Desktop.WindowMinWidth),
+			MinHeight:            int(t.C.Desktop.WindowMinHeight),
 			TitleBarStyle:        mygo.TitleBarHidden,
-			TrafficLightPosition: &mygo.Point{X: 12, Y: 17},
-			BackgroundColor:      windowBackground,
+			TrafficLightPosition: &mygo.Point{X: int(t.C.Desktop.TrafficLightX), Y: int(t.C.Desktop.TrafficLightY)},
+			BackgroundColor:      windowColor(t.C.Window.Bg),
 			Content:              ui.View(a.view),
 		})
 	})
@@ -111,8 +107,10 @@ func Run() error {
 }
 
 func (a *app) view(c *ui.Context) {
+	t := theme.Current()
+	a.theme = nativeTheme(t)
 	c.SetTheme(a.theme)
-	c.Root().Background(ui.Hex(windowBackground))
+	c.Root().Background(tokenColor(t.C.Window.Bg))
 	root := ui.Column(c).Fill()
 	x, y, _ := root.PointerPosition()
 	a.pointer = ui.Point{X: x, Y: y}
@@ -122,7 +120,7 @@ func (a *app) view(c *ui.Context) {
 	if a.sidebarCollapsed {
 		target = 0
 	}
-	shown := root.Animate("sidebar", target, 220*time.Millisecond)
+	shown := root.Animate("sidebar", target, t.MotionDuration(t.C.Desktop.SidebarDuration, c.Preferences().ReduceMotion))
 	a.paneShortcuts(c)
 	if c.Shortcut(ui.Super, ui.KeyK) {
 		a.sidebarCollapsed = false
@@ -138,7 +136,11 @@ func (a *app) view(c *ui.Context) {
 		a.titleBar(c, shown)
 		ui.Row(c).Grow(1).MinHeight(0).AlignItems(ui.Stretch).Children(func() {
 			a.navigation(c)
-			a.workspace(c, shown)
+			if a.section == sectionSettings {
+				a.settings(c)
+			} else {
+				a.workspace(c, shown)
+			}
 		})
 		if a.pendingDock != nil {
 			a.pendingDock()
@@ -159,12 +161,14 @@ func (a *app) view(c *ui.Context) {
 }
 
 func (a *app) navigation(c *ui.Context) {
-	ui.Column(c).Width(navigationWidth).Shrink(0).Padding(
-		6,
-		6,
-		8,
-		6,
-	).Gap(6).AlignItems(ui.Center).Label("主导航").Children(func() {
+	t := theme.Current()
+	r := t.C.Rail
+	ui.Column(c).Width(r.Width).Shrink(0).Padding(
+		r.PaddingTop,
+		t.Space.N6,
+		r.PaddingBottom,
+		t.Space.N6,
+	).Gap(r.Gap).AlignItems(ui.Center).Label("主导航").Children(func() {
 		a.navigationButton(
 			c,
 			sectionSSH,
@@ -188,60 +192,64 @@ func (a *app) navigation(c *ui.Context) {
 }
 
 func (a *app) navigationButton(c *ui.Context, target section, label string, icon *ui.SVG) {
-	button := ui.ButtonBase(c).Key(label).Size(32, 32).Radius(8).
+	t := theme.Current()
+	r := t.C.Rail
+	button := ui.ButtonBase(c).Key(label).Size(r.ButtonSize, r.ButtonSize).Radius(r.ButtonRadius).
 		Label(label).Description(label).Selected(a.section == target).
-		TextColor(ui.Hex("#77777c")).Disabled(target != sectionSSH)
+		TextColor(tokenColor(r.Icon)).Disabled(target == sectionFiles)
 	button.OnClick(func() {
 		a.section = target
 	})
 	switch {
 	case button.Pressed():
-		button.Background(ui.RGB(0, 0, 0).Alpha(0.12))
+		button.Background(tokenColor(t.C.Desktop.RailPressed))
 	case a.section == target:
-		button.Background(ui.RGB(0, 0, 0).Alpha(0.08))
+		button.Background(tokenColor(r.BgOn))
 	case button.Hovered():
-		button.Background(ui.RGB(0, 0, 0).Alpha(0.045))
+		button.Background(tokenColor(t.C.Desktop.RailHover))
 	}
 	button.Children(func() {
-		ui.Icon(c, icon).Size(18, 18)
+		ui.Icon(c, icon).Size(t.Size.IconMd, t.Size.IconMd)
 	})
 	ui.TooltipBase(c, button, func(tip ui.Element) {
-		tip.AttachTo(button, ui.AnchorRight, ui.AnchorLeft).MarginStart(8).
-			Padding(5, 8).Radius(5).Background(a.theme.Text).TextColor(a.theme.Background).FontSize(12).
-			Shadow(
-				0,
-				2,
-				8,
-				0,
-				ui.RGB(0, 0, 0).Alpha(0.2),
-			).Children(func() {
-			ui.Text(c, label)
-		})
+		p := t.C.Tooltip
+		tip.AttachTo(button, ui.AnchorRight, ui.AnchorLeft).MarginStart(t.Space.N8).
+			Padding(p.PaddingY, p.PaddingX).Radius(p.Radius).
+			Background(tokenColor(p.Bg)).TextColor(tokenColor(p.Text)).FontSize(p.FontSize)
+		applyShadow(tip, p.Shadow).Children(func() { ui.Text(c, label) })
 	})
 }
 
 func (a *app) workspace(c *ui.Context, shown float32) {
+	t := theme.Current()
 	panel := ui.Row(c).Grow(1).MinWidth(0).AlignItems(ui.Stretch).
 		Margin(
 			0,
-			workspaceSpacing,
-			workspaceSpacing,
+			t.C.Window.Gutter,
+			t.C.Window.Gutter,
 			0,
 		)
 	statusTarget := float32(1)
 	if !a.statusVisible {
 		statusTarget = 0
 	}
-	statusShown := panel.Animate("status", statusTarget, 220*time.Millisecond)
+	statusShown := panel.Animate("status", statusTarget, t.MotionDuration(t.C.Desktop.SidebarDuration, c.Preferences().ReduceMotion))
+	statusOpacity := animateVisual(panel, "status-opacity", statusTarget, t.C.Desktop.SidebarDuration)
 	panel.Children(func() {
 		workspaceCard(c).Key("sessions").Width(a.sidebarWidth * shown).Shrink(0).
-			MarginEnd(workspaceSpacing * shown).Hidden(shown == 0).Children(func() {
+			MarginEnd(t.C.Window.Gutter * shown).Hidden(shown == 0).Children(func() {
 			a.sidebar(c, shown)
 		})
 		a.terminals(c)
-		workspaceCard(c).Key("status").Width(statusPanelWidth * statusShown).Shrink(0).
-			MarginStart(workspaceSpacing * statusShown).Hidden(statusShown == 0).Children(func() {
-			ui.Column(c).Width(statusPanelWidth).FillHeight().Opacity(statusShown).
+		status := workspaceCard(c).Key("status").Width(t.Size.StatsPanel * statusShown).Shrink(0).
+			MarginStart(t.C.Window.Gutter * statusShown).Hidden(statusShown == 0 && statusOpacity == 0)
+		if c.Preferences().ReduceMotion && !a.statusVisible && statusOpacity > 0 {
+			// Geometry changes immediately; the old panel can still fade over the
+			// expanded workspace without animating its width.
+			status.Absolute().Top(0).Right(0).Bottom(0).Width(t.Size.StatsPanel)
+		}
+		status.Opacity(statusOpacity).Children(func() {
+			ui.Column(c).Width(t.Size.StatsPanel).FillHeight().
 				Children(func() { a.serverStatus(c) })
 		})
 		a.sidebarResizeHandle(c, shown)
@@ -249,20 +257,15 @@ func (a *app) workspace(c *ui.Context, shown float32) {
 }
 
 func workspaceCard(c *ui.Context) ui.Element {
-	return ui.Column(c).Radius(12).Background(ui.Hex(cardBackground)).
-		Shadow(
-			0,
-			0,
-			0,
-			0.5,
-			ui.RGB(0, 0, 0).Alpha(0.06),
-		).Clip()
+	t := theme.Current().C.Card
+	return applyShadow(ui.Column(c).Radius(t.Radius).Background(tokenColor(t.Bg)), t.Shadow).Clip()
 }
 
 func (a *app) sidebarResizeHandle(c *ui.Context, shown float32) {
+	t := theme.Current()
 	// The transparent resize target covers the gap above both cards.
 	edge := ui.Box(c).Key("resize-sidebar").Absolute().Top(0).Bottom(0).
-		Left(a.sidebarWidth * shown).Width(workspaceSpacing * shown).
+		Left(a.sidebarWidth * shown).Width(t.C.Window.Gutter * shown).
 		Hidden(shown != 1).Cursor(ui.CursorResizeEW).Focusable().Role(ui.RoleSplitter).
 		Label("调整会话栏宽度")
 	var delta float32
@@ -271,13 +274,13 @@ func (a *app) sidebarResizeHandle(c *ui.Context, shown float32) {
 		delta = dx
 	}
 	if edge.Shortcut(0, ui.KeyLeft) {
-		delta -= 10
+		delta -= t.C.Desktop.SiderKeyboardStep
 	}
 	if edge.Shortcut(0, ui.KeyRight) {
-		delta += 10
+		delta += t.C.Desktop.SiderKeyboardStep
 	}
 	if delta != 0 {
-		a.sidebarWidth = min(max(a.sidebarWidth+delta, minSidebarWidth), maxSidebarWidth)
+		a.sidebarWidth = min(max(a.sidebarWidth+delta, t.C.Desktop.SiderMinWidth), t.C.Desktop.SiderMaxWidth)
 	}
-	edge.Range(minSidebarWidth, maxSidebarWidth, float64(a.sidebarWidth))
+	edge.Range(float64(t.C.Desktop.SiderMinWidth), float64(t.C.Desktop.SiderMaxWidth), float64(a.sidebarWidth))
 }

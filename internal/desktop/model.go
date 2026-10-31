@@ -5,6 +5,8 @@ import (
 	"strings"
 	"time"
 
+	"sshdesk/internal/theme"
+
 	"github.com/egoist/mygo/ui"
 )
 
@@ -191,7 +193,7 @@ func (a *app) splitSession(session *remoteSession, stacked bool) {
 	node := tab.root.find(session)
 	node.insert(child, zone)
 	child.enter, child.entering = zone, true
-	a.markPaneLayout(tab, 220*time.Millisecond)
+	a.markPaneLayout(tab, theme.Current().C.Desktop.PaneEnterDuration)
 	a.focusSession(tab, child)
 	a.setPaneZoom(tab, false)
 }
@@ -218,6 +220,6 @@ func (a *app) removePane(tab *workspaceTab, session *remoteSession) {
 			tab.focused = tab.root.firstSession()
 		}
 	}
-	a.markPaneLayout(tab, 220*time.Millisecond)
+	a.markPaneLayout(tab, theme.Current().C.Desktop.PaneEnterDuration)
 	a.setPaneZoom(tab, false)
 }

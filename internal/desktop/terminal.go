@@ -4,19 +4,17 @@ import (
 	"fmt"
 	"math"
 	"slices"
-	"time"
+	"strings"
+
+	"sshdesk/internal/theme"
 
 	"github.com/egoist/mygo/plugins/glass"
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/shader"
 )
 
-const (
-	terminalHeaderHeight = 36
-	terminalFooterHeight = 28
-)
-
 func (a *app) terminals(c *ui.Context) {
+	t := theme.Current()
 	area := ui.Box(c).Key("terminals").Grow(1).MinWidth(0).MinHeight(0).Bind(&a.workArea)
 	tab := a.currentTab()
 	if tab == nil {
@@ -28,7 +26,9 @@ func (a *app) terminals(c *ui.Context) {
 			area.Cursor(ui.CursorGrabbing)
 		}
 		if over {
-			area.DrawOver(func(p *ui.Painter, r ui.Rect) { p.Fill(r, a.theme.Accent.Alpha(.12), 10) })
+			area.DrawOver(func(p *ui.Painter, r ui.Rect) {
+				p.Fill(r, tokenColor(t.C.DropIndicator.ZoneBg), t.C.DropIndicator.ZoneRadius)
+			})
 		}
 		if dropped {
 			a.pendingDock = func() {
@@ -42,10 +42,10 @@ func (a *app) terminals(c *ui.Context) {
 			}
 		}
 		area.Children(func() {
-			workspaceCard(c).Fill().MinWidth(0).Center().Gap(12).Children(func() {
-				ui.Icon(c, terminalIcon).Size(32, 32).TextColor(a.theme.TextMuted)
-				ui.Text(c, "选择一台主机，开始会话").FontSize(15).FontWeight(550)
-				ui.Text(c, "左侧主机可拖入终端窗格").FontSize(12).TextColor(a.theme.TextMuted)
+			workspaceCard(c).Fill().MinWidth(0).Center().Gap(t.Space.N12).Children(func() {
+				ui.Icon(c, terminalIcon).Size(t.C.Pane.EmptyIconSize, t.C.Pane.EmptyIconSize).TextColor(tokenColor(t.Color.Text.Secondary))
+				ui.Text(c, "选择一台主机，开始会话").FontSize(t.C.Pane.EmptyTitleSize).FontWeight(t.C.Pane.EmptyTitleWeight)
+				ui.Text(c, "左侧主机可拖入终端窗格").FontSize(t.Font.Size.Body).TextColor(tokenColor(t.Color.Text.Secondary))
 				ui.Button(c, "添加 SSH 主机").OnClick(func() { a.startHostDraft() })
 			})
 		})
@@ -111,25 +111,27 @@ func (a *app) terminals(c *ui.Context) {
 		area.DrawOver(func(p *ui.Painter, bounds ui.Rect) {
 			r := *preview
 			r.X, r.Y = r.X+bounds.X, r.Y+bounds.Y
-			p.Fill(r, a.theme.Accent.Alpha(.12), 8)
-			p.Stroke(r, a.theme.Accent, 8, 1.5)
+			p.Fill(r, tokenColor(t.C.DropIndicator.ZoneBg), t.C.DropIndicator.ZoneRadius)
+			p.Stroke(r, tokenColor(t.C.DropIndicator.ZoneBorder), t.C.DropIndicator.ZoneRadius, t.C.DropIndicator.ZoneBorderWidth)
 		})
 	}
 }
 
 func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlacement) ui.Element {
+	t := theme.Current()
+	p, f, status := t.C.Pane, t.C.PaneFocus, t.C.StatusBar
 	session, rect := placement.session, placement.rect
 	h := a.hosts[session.host]
 	count := tab.root.count()
 	multiple := count > 1
-	topPadding := float32(10)
+	topPadding := p.ContentTop
 	if multiple {
-		topPadding = terminalHeaderHeight + 2
+		topPadding = p.HeaderHeight + t.Space.N2
 	}
 	// Only the inner card clips. Its wrapper owns the focus halo and the overlay hairline.
 	pane := ui.Box(c).Key(fmt.Sprintf("pane-wrap-%d", session.id)).Absolute().
 		Left(rect.X).Top(rect.Y).Size(rect.W, rect.H).Bind(&session.frame).
-		MinWidth(0).MinHeight(0).Radius(terminalPaneRadius).Label(h.name + " 演示终端")
+		MinWidth(0).MinHeight(0).Radius(p.Radius).Label(h.name + " 演示终端")
 	a.paneMotion(c, pane, tab, session)
 	_, catalogActive, _ := a.catalogHostTransfer()
 	frozen := a.drag != nil || catalogActive || a.resizing != nil ||
@@ -140,11 +142,11 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 				session.scroll.offset.Y = math.MaxFloat32
 			}
 			session.contentWidth, session.contentHeight = rect.W, rect.H
-			session.columns = max(1, int((rect.W-28)/a.cellWidth))
-			session.rows = max(1, int((rect.H-topPadding-50)/19))
+			session.columns = max(1, int((rect.W-2*p.ContentSide)/a.cellWidth))
+			session.rows = max(1, int((rect.H-topPadding-p.ContentBottom)/19))
 		}
 	} else {
-		c.After(16 * time.Millisecond)
+		c.After(p.FrameInterval)
 	}
 	pane.OnClick(func() { a.focusSession(tab, session) })
 	pane.ContextMenu(func(m *ui.Menu) {
@@ -158,31 +160,31 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 	scroll := &session.scroll
 	focused, hovered := tab.focused == session, pane.Hovered()
 	opacity, saturation, footerOpacity := float32(1), float32(1), float32(1)
-	titleColor, loginColor := a.theme.Text, a.theme.TextMuted
-	titleWeight := 600
+	titleColor, loginColor := tokenColor(f.NameFocused), tokenColor(p.Host)
+	titleWeight := f.NameWeightFocused
 	if multiple && !focused {
-		opacity, saturation, footerOpacity = 0.5, 0.35, 0.55
-		titleColor, loginColor, titleWeight = ui.Hex("#6e6e73"), ui.Hex("#aeaeb2"), 500
+		opacity, saturation, footerOpacity = f.ContentOpacityUnfocused, f.ContentSaturateUnfocused, f.StatusOpacityUnfocused
+		titleColor, loginColor, titleWeight = tokenColor(f.NameUnfocused), tokenColor(f.HostUnfocused), f.NameWeightUnfocused
 		if hovered {
-			opacity, saturation = 0.78, 0.7
-			titleColor = a.theme.Text
+			opacity, saturation = f.ContentOpacityHover, f.ContentSaturateHover
+			titleColor = tokenColor(f.NameFocused)
 		}
 	}
-	opacity = pane.Animate("output-opacity", opacity, paneTransition)
-	saturation = pane.Animate("output-saturation", saturation, paneTransition)
-	footerOpacity = pane.Animate("footer-opacity", footerOpacity, paneTransition)
+	opacity = animateVisual(pane, "output-opacity", opacity, f.Transition)
+	saturation = animateVisual(pane, "output-saturation", saturation, f.Transition)
+	footerOpacity = animateVisual(pane, "footer-opacity", footerOpacity, f.Transition)
 	if !multiple {
 		opacity, saturation, footerOpacity = 1, 1, 1
 	}
-	titleColor = pane.AnimateColor("host-color", titleColor, ui.Animation{Duration: paneTransition})
-	loginColor = pane.AnimateColor("login-color", loginColor, ui.Animation{Duration: paneTransition})
+	titleColor = pane.AnimateColor("host-color", titleColor, ui.Animation{Duration: f.Transition})
+	loginColor = pane.AnimateColor("login-color", loginColor, ui.Animation{Duration: f.Transition})
 	var card, hairline ui.Element
 	pane.Children(func() {
 		card = ui.Column(c).Key("card").Absolute().Top(0).Right(0).Bottom(0).Left(0).
-			Radius(terminalPaneRadius).Background(ui.Hex(cardBackground)).Clip().
+			Radius(p.Radius).Background(tokenColor(p.Bg)).Clip().
 			Draw(func(p *ui.Painter, r ui.Rect) {
 				// Absolute children paint after the scroll content, so paint its backdrop here.
-				p.Fill(r, ui.Hex("#fbfbfc"), terminalPaneRadius)
+				p.Fill(r, tokenColor(t.C.Pane.Bg), t.C.Pane.Radius)
 			})
 		card.Children(func() {
 			// Move the native thumb outside the card's clip; the fading thumb is drawn below.
@@ -190,15 +192,15 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 				Bind(&session.focus).Focusable().FocusRing(false).
 				TrackScroll(&scroll.offset).Padding(
 				topPadding,
-				14,
-				50,
-				14,
+				p.ContentSide,
+				p.ContentBottom,
+				p.ContentSide,
 			).ScrollbarInsets(
-				terminalHeaderHeight,
-				-12,
-				terminalFooterHeight,
+				p.HeaderHeight,
+				-t.C.Scrollbar.TrackWidth,
+				status.HeightPane,
 				0,
-			).Font("Menlo, monospace").FontSize(11).TextColor(a.theme.Text).
+			).Font("Menlo, monospace").FontSize(11).TextColor(ui.Hex(terminalPrimaryText)).
 				Opacity(opacity).Cache().HandleInput(scroll.input).
 				OnClick(func() { a.focusSession(tab, session) })
 			if saturation != 1 {
@@ -210,33 +212,33 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 				a.terminalLines(c, session, focused)
 			})
 			if multiple {
-				terminalScrollEdge(c, terminalHeaderHeight, false)
+				terminalScrollEdge(c, p.HeaderHeight, false)
 			}
-			terminalScrollEdge(c, terminalFooterHeight, true)
+			terminalScrollEdge(c, status.HeightPane, true)
 			terminalScrollbar(c, pane, scroll)
 			var header ui.Element
 			if multiple {
-				header = ui.Row(c).Key("identity").Absolute().Top(0).Left(0).Height(terminalHeaderHeight).Padding(
+				header = ui.Row(c).Key("identity").Absolute().Top(0).Left(0).Height(p.HeaderHeight).Padding(
 					0,
 					0,
 					0,
-					10,
-				).Gap(5).PassThrough()
+					p.HeaderPaddingLeft,
+				).Gap(p.HeaderGap).PassThrough()
 				header.Children(func() {
-					labelColor, labelBackground := a.theme.TextMuted, ui.RGB(0, 0, 0).Alpha(0.05)
+					labelColor, labelBackground := tokenColor(f.KbdText), tokenColor(f.KbdBg)
 					if focused {
-						labelColor, labelBackground = ui.Hex(cardBackground), a.theme.Accent
+						labelColor, labelBackground = tokenColor(f.KbdTextFocused), tokenColor(f.KbdBgFocused)
 					}
 					number := slices.Index(tab.root.sessions(), session) + 1
-					ui.Text(c, fmt.Sprintf("⌘%d", number)).FontSize(10.5).FontWeight(500).
-						FixedLineHeight(12).SingleLine().Padding(3, 5).Radius(5).
+					ui.Text(c, fmt.Sprintf("⌘%d", number)).FontSize(f.KbdSize).FontWeight(f.KbdWeight).
+						FixedLineHeight(f.KbdLineHeight).SingleLine().Padding(f.KbdPaddingY, f.KbdPaddingX).Radius(f.KbdRadius).
 						Background(labelBackground).TextColor(labelColor)
-					statusDot(c, session.state, 6)
-					ui.Text(c, h.name).FontSize(12).FontWeight(titleWeight).TextColor(titleColor).
+					statusDot(c, session.state, t.C.SiderItem.DotSize)
+					ui.Text(c, h.name).FontSize(p.HeaderFontSize).FontWeight(titleWeight).TextColor(titleColor).
 						SingleLine().Ellipsis("…").MinWidth(0).Shrink(1).
 						Tooltip(fmt.Sprintf("%s · %s@%s:%d", h.name, h.user, h.address, h.port))
 					ui.Text(c, fmt.Sprintf("%s@%s:%d", h.user, h.address, h.port)).
-						Font("Menlo, monospace").FontSize(10).TextColor(loginColor).
+						Font(strings.Join(p.HostFamily, ", ")).FontSize(p.HostSize).TextColor(loginColor).
 						SingleLine().Ellipsis("…").Grow(1).MinWidth(0)
 					if !focused {
 						terminalActivity(c, session)
@@ -246,74 +248,70 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 					a.paneDragHandle(c, handle, paneTransfer{tab: tab, session: session})
 				})
 			}
-			actionsWidth := float32(22)
+			actionsWidth := p.ActionWidth
 			if multiple {
-				actionsWidth = 70
+				actionsWidth = 3*p.ActionWidth + 2*p.ActionGap
 			}
-			actions := ui.Box(c).Key("pane-actions").Absolute().Top(6).Right(8).Size(actionsWidth, 24)
+			actions := ui.Box(c).Key("pane-actions").Absolute().Top(p.ActionTop).Right(p.ActionRight).Size(actionsWidth, p.ActionHeight)
 			x, y, over := pane.PointerPosition()
-			inActionBand := x >= pane.Bounds().W-actionsWidth-40 && y <= terminalHeaderHeight+8
+			inActionBand := x >= pane.Bounds().W-actionsWidth-p.ActionRevealPadding && y <= p.HeaderHeight+p.ActionRight
 			nearActions := over && inActionBand
 			var keyboardFocus bool
 			bounds := pane.Bounds()
 			stacked := count > 1 && bounds.H > bounds.W
 			actions.Children(func() {
 				if !multiple {
-					ui.Box(c).Absolute().Top(0).Left(0).Size(actionsWidth, 24).Radius(7).PassThrough().
-						Material(glass.Blur{Radius: 4})
-					ui.Box(c).Absolute().Top(0).Left(0).Size(actionsWidth, 24).Radius(7).PassThrough().
-						Background(ui.Hex(cardBackground).Alpha(0.9))
+					ui.Box(c).Absolute().Top(0).Left(0).Size(actionsWidth, p.ActionHeight).Radius(p.ActionRadius).PassThrough().
+						Material(glass.Blur{Radius: p.ActionBlur})
+					ui.Box(c).Absolute().Top(0).Left(0).Size(actionsWidth, p.ActionHeight).Radius(p.ActionRadius).PassThrough().
+						Background(tokenColor(p.Bg).Alpha(p.ActionTint))
 				}
-				split := iconButton(c, "分栏 "+h.name, sidebarIcon).Absolute().Top(0).Left(0).Size(22, 24).
+				split := iconButton(c, "分栏 "+h.name, sidebarIcon).Absolute().Top(0).Left(0).Size(p.ActionWidth, p.ActionHeight).
 					Disabled(count >= maxTerminalPanes || session.closing || !canSplit(session.layoutRect, dropRight) && !canSplit(session.layoutRect, dropBottom))
 				keyboardFocus = split.FocusVisible()
 				split.OnClick(func() { a.splitSession(session, stacked) })
 				if multiple {
-					expand := iconButton(c, "放大或恢复 "+h.name, expandIcon).Absolute().Top(0).Left(24).Size(22, 24)
+					expand := iconButton(c, "放大或恢复 "+h.name, expandIcon).Absolute().Top(0).Left(p.ActionWidth+p.ActionGap).Size(p.ActionWidth, p.ActionHeight)
 					keyboardFocus = keyboardFocus || expand.FocusVisible()
 					expand.OnClick(func() {
 						a.togglePaneZoom(tab, session)
 					})
-					close := iconButton(c, "关闭窗格 "+h.name, closeIcon).Absolute().Top(0).Left(48).Size(22, 24)
+					close := iconButton(c, "关闭窗格 "+h.name, closeIcon).Absolute().Top(0).Left(2*(p.ActionWidth+p.ActionGap)).Size(p.ActionWidth, p.ActionHeight)
 					keyboardFocus = keyboardFocus || close.FocusVisible()
 					close.OnClick(func() { a.closePane(session) })
 				}
 			})
-			target := float32(0)
+			target := f.ButtonsOpacityUnfocused
 			showForPane := multiple && (focused || hovered)
 			if showForPane || nearActions || keyboardFocus {
 				target = 1
 			}
-			actionVisibility := actions.Animate("visibility", target, paneTransition)
+			actionVisibility := animateVisual(actions, "visibility", target, f.Transition)
 			actions.Opacity(actionVisibility)
 			if multiple {
-				header.Right(8 + (actionsWidth+10)*actionVisibility)
+				header.Right(p.HeaderPaddingRight + (actionsWidth+t.Space.N10)*actionVisibility)
 			}
-			ui.Row(c).Key("status").Absolute().Bottom(0).Left(0).Right(0).Height(terminalFooterHeight).
+			ui.Row(c).Key("status").Absolute().Bottom(0).Left(0).Right(0).Height(status.HeightPane).
 				Opacity(footerOpacity).
-				Padding(0, 10).Gap(8).PassThrough().TextColor(a.theme.TextMuted).Children(func() {
-				label, tint := "已连接", ui.Hex("#e4f5ea")
-				color := ui.Hex("#2aa255")
+				Padding(0, status.PaddingX).Gap(status.GapPane).PassThrough().TextColor(tokenColor(status.Text)).Children(func() {
+				badge := t.C.Badge
+				label, tint := "已连接", tokenColor(badge.OkBg)
+				color := tokenColor(badge.OkText)
 				if session.state != connected {
-					label, tint, color = "未连接", ui.Hex("#f0f0f3"), a.theme.TextMuted
+					label, tint, color = "未连接", tokenColor(badge.NeutralBg), tokenColor(badge.NeutralText)
 				}
-				ui.Row(c).Padding(2, 6).Gap(4).Radius(99).Background(tint).Children(func() {
-					ui.Box(c).Size(5, 5).Radius(99).Background(color)
-					ui.Text(c, label).FontSize(10).TextColor(color)
+				ui.Row(c).Padding(badge.PaddingY, badge.PaddingXCompact).Gap(badge.Gap).Radius(badge.Radius).Background(tint).Children(func() {
+					ui.Box(c).Size(t.Size.DotSm, t.Size.DotSm).Radius(badge.Radius).Background(color)
+					ui.Text(c, label).FontSize(badge.FontSizeCompact).TextColor(color)
 				})
-				ui.Text(c, fmt.Sprintf("延迟 %d ms", h.latency)).FontSize(10).SingleLine()
+				ui.Text(c, fmt.Sprintf("延迟 %d ms", h.latency)).FontSize(status.FontSize).SingleLine()
 				ui.Spacer(c)
-				ui.Text(c, a.paneSizeLabel(session)).FontSize(10).SingleLine()
+				ui.Text(c, a.paneSizeLabel(session)).FontSize(status.FontSize).SingleLine()
 			})
 		})
 		hairline = ui.Box(c).Key("hairline").Absolute().Top(0).Right(0).Bottom(0).Left(0).
-			Radius(terminalPaneRadius).PassThrough().InsetShadow(
-			0,
-			0,
-			0,
-			0.5,
-			ui.RGB(0, 0, 0).Alpha(0.08),
-		)
+			Radius(p.Radius).PassThrough()
+		applyShadow(hairline, p.Outline)
 	})
 	if a.lifted(session) {
 		card.Opacity(0)
@@ -334,34 +332,41 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 }
 
 func terminalScrollEdge(c *ui.Context, barHeight float32, bottom bool) {
+	t := theme.Current()
+	fade := t.C.FadeBar
 	angle := float32(180)
 	if bottom {
 		angle = 0
 	}
 	band := func() ui.Element {
-		element := ui.Box(c).Absolute().Left(0).Right(0).Height(barHeight).PassThrough()
+		element := ui.Box(c).Absolute().Left(0).Right(0).Height(barHeight + fade.ExtentPane).PassThrough()
 		if bottom {
 			return element.Bottom(0)
 		}
 		return element.Top(0)
 	}
-	// Blur the scrolling output before fading it into the bar's background.
-	band().Material(glass.Blur{
-		Radius: 4,
-		Mask: &ui.LinearGradient{
-			From: ui.RGB(0, 0, 0), To: ui.Transparent,
-			Angle: angle, End: 1,
-		},
-	})
-	background := ui.Hex(cardBackground)
-	stops := make([]ui.GradientStop, 9)
-	for i := range stops {
-		at := float32(i) / float32(len(stops)-1)
-		opacity := 1 - at*at*(3-2*at)
-		stops[i] = ui.GradientStop{Color: background.Alpha(0.96 * opacity), At: at}
+	// Each layer progressively masks a stronger blur before tinting with the pane surface.
+	layers := [...]struct{ radius, solid, end float32 }{
+		{radius: fade.Blur1, solid: fade.Mask1Solid, end: fade.Mask1End},
+		{radius: fade.Blur2, solid: fade.Mask2Solid, end: fade.Mask2End},
+		{radius: fade.Blur3, solid: fade.Mask3Solid, end: fade.Mask3End},
 	}
+	for _, layer := range layers {
+		band().Material(glass.Blur{
+			Radius: layer.radius,
+			Mask: &ui.LinearGradient{
+				From: tokenColor(fade.Tint), To: ui.Transparent,
+				Angle: angle, Start: layer.solid, End: layer.end,
+			},
+		})
+	}
+	background := tokenColor(t.C.Pane.Bg)
 	band().LinearGradient(ui.LinearGradient{
 		Angle: angle,
-		Stops: stops,
+		Stops: []ui.GradientStop{
+			{Color: background.Alpha(fade.TintStart), At: 0},
+			{Color: background.Alpha(fade.TintMid), At: fade.TintMidStop},
+			{Color: background.Alpha(fade.TintEnd), At: 1},
+		},
 	})
 }
