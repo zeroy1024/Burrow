@@ -10,6 +10,8 @@ import (
 	"github.com/egoist/mygo/ui"
 )
 
+const sessionTabGap = 4
+
 func iconButton(c *ui.Context, label string, icon *ui.SVG) ui.Element {
 	button := ui.ButtonBase(c).Key(label).Size(28, 28).Radius(7).
 		Label(label).Tooltip(label).TextColor(c.Theme().TextMuted)
@@ -42,25 +44,22 @@ func (a *app) titleBar(c *ui.Context, shown float32) {
 				-12,
 				0,
 			).HandleInput(func(ev ui.InputEvent) bool {
+				if ev.Kind == ui.InputPointerDown && ev.Button == 0 {
+					a.tabPress = ui.Point{X: ev.X, Y: ev.Y}
+				}
 				if ev.Kind != ui.InputScroll || math.Abs(float64(ev.DY)) <= math.Abs(float64(ev.DX)) {
 					return false
 				}
 				a.tabScroll.X = min(max(a.tabScroll.X+ev.DY, 0), a.tabScroll.MaxX)
 				return true
 			})
-			a.tabStripTarget(c, strip)
 			strip.Children(func() {
-				ui.Row(c).Gap(4).FillHeight().Children(func() {
+				ui.Row(c).Gap(sessionTabGap).FillHeight().Children(func() {
 					var pendingClose func()
 					for i, tab := range a.tabs {
 						if close := a.tabButton(c, i, tab); close != nil {
 							pendingClose = close
 						}
-					}
-					if a.pendingTabMove != nil {
-						a.pendingTabMove()
-						a.pendingTabMove = nil
-						c.AnimationFrame()
 					}
 					iconButton(c, "新建会话", plusIcon).Menu(func(m *ui.Menu) {
 						for _, group := range a.groups {
@@ -78,6 +77,7 @@ func (a *app) titleBar(c *ui.Context, shown float32) {
 					}
 				})
 			})
+			a.tabStripTarget(c, strip)
 		})
 		ui.Row(c).Padding(0, 8).Shrink(0).Children(func() {
 			status := iconButton(c, "服务器监控", activityIcon).Expanded(a.statusVisible)
@@ -145,6 +145,8 @@ func (a *app) tabButton(c *ui.Context, index int, tab *workspaceTab) func() {
 			Label("拖动标签 " + h.name).OnClick(func() { a.activateTab(slices.Index(a.tabs, tab)) })
 		a.paneDragHandle(c, handle, paneTransfer{tab: tab, session: tab.focused, fromTab: true})
 	})
-	a.tabDragTarget(c, button, tab)
+	if d := a.drag; d != nil && d.kind == dragTab && d.originTab == tab && d.phase != dragLanded {
+		button.Opacity(0)
+	}
 	return pendingClose
 }

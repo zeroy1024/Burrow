@@ -43,6 +43,7 @@ type app struct {
 	query            string
 	search           ui.Handle
 	tabScroll        ui.ScrollState
+	tabPress         ui.Point
 	statusVisible    bool
 	addHostOpen      bool
 	draft            hostDraft
@@ -57,7 +58,6 @@ type app struct {
 	dragSeen         bool
 	pendingDock      func()
 	dockPreview      *ui.Rect
-	pendingTabMove   func()
 	resizing         *terminalLayout
 }
 
