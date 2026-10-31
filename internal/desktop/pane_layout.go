@@ -92,11 +92,11 @@ const (
 	dropBottom
 )
 
-func zoneAt(x, y, w, h float32, single bool) dropZone {
+func zoneAt(x, y, w, h float32, edgeOnly bool) dropZone {
 	t := theme.Current()
 	x, y = x/w, y/h
 	edge := t.C.Desktop.DropEdgeRatio
-	if !single && x >= edge && x <= 1-edge && y >= edge && y <= 1-edge {
+	if !edgeOnly && x >= edge && x <= 1-edge && y >= edge && y <= 1-edge {
 		return dropCenter
 	}
 	zone, nearest := dropLeft, x

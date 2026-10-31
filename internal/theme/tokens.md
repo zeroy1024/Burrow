@@ -7,9 +7,9 @@
 
 | 层 | 数量 | 说明 |
 |---|---|---|
-| palette（primitives） | 269 | 原始色值与刻度，其中 49 个为推导值（derived） |
-| semantic（每个主题一份） | 356 | Light = 当前设计；Dark 覆盖其中 95 个（全部 derived） |
-| component | 647 | 只引用 semantic；换主题时自动跟随 |
+| palette（primitives） | 273 | 原始色值与刻度，其中 49 个为推导值（derived） |
+| semantic（每个主题一份） | 371 | Light = 当前设计；Dark 覆盖其中 98 个（全部 derived） |
+| component | 693 | 只引用 semantic；换主题时自动跟随 |
 
 ## 1. 三层结构与引用规则
 
@@ -46,7 +46,10 @@ siderItem.nameColor             ← component，只能引用 semantic
 - 玻璃渐隐栏：`C.FadeBar` 给出 3 层 blur 半径与遮罩停点，以及着色起止 alpha（着色色 = 所在卡片底色）。如果 GPU 不支持 backdrop blur，退化为只画着色渐变。
 - 取当前主题：`theme.Current()`；切换：`theme.Set(theme.Dark())`；监听：`cancel := theme.OnChange(func(t *theme.Theme){ /* 请求重绘 */ })`。
 - 跟随系统外观：在系统外观变化回调里 `theme.Set(theme.ForAppearance(isDark))`（MyGo 的外观 API 以官方文档为准）。
-- 减少动态：`t.MotionDuration(d, c.Preferences().ReduceMotion)` 让位移动画变为 0，颜色/透明度过渡保留。
+- 控件接入：`uiadapt.go` 的按钮、输入框、弹窗、Tooltip 入口消费 component token；原生复合控件通过 `nativeTheme` 接入，内部布局保留框架行为。
+- 状态过渡：`tokenTween` 显式使用 `motion.easing.out`，状态时长为 `motion.duration.focus`（160ms）；搜索几何变化使用 `search.easing`，数字滚动使用 `groupHeader.countMotion`。
+- 减少动态：MyGo 自动将位移、缩放、旋转设为终值；`animateVisual` 使用颜色 alpha 通道保留透明度过渡，不让透明度依赖几何进度。
+- 图标：普通线性 SVG 初始化时读取 `iconButton.stroke`；修改几何 token 后需重启。品牌图形保留独立描边。
 - OS logo 底色：`t.OSLogoBg(brand)` = 品牌色按 `opacity.osTint` 混入卡片色（浅色 9%，深色 18%）。
 
 ## 4. 新增一个主题
@@ -54,14 +57,14 @@ siderItem.nameColor             ← component，只能引用 semantic
 1. 需要新的原始色时，先加到 `tokens_src.py` 的 `PALETTE`（例如 `PALETTE['solarized']`）。
 2. 像 `DARK` 一样写一个覆盖表：`{'color.bg.window': P('solarized.base3'), ...}`，只写 semantic 路径。
 3. 在 `gen.py` 中注册（或者直接在 Go 里：`s := theme.LightSemantic(); s.Color.Accent.Default = theme.Hex("#268bd2"); t := theme.New("solar", false, s)`）。
-4. `python3 gen.py && gofmt -w theme.go && go vet ./... && go test ./...`；`python3 preview.py` 重新渲染预览。
+4. 在 `internal/theme` 运行 `python3 -B gen.py && python3 -B mdgen.py && gofmt -w theme.go`，随后在仓库根目录运行已有构建、vet 和测试。
 5. 组件层不用改；如果某个组件在新主题下不对，说明缺一个 semantic token，应该加 semantic，而不是在组件里写死。
 
 ## 5. 推导值（derived）清单
 
 - 设计稿没画：`color.state.pressed`（按下）、`size.dropLine`（MyGo `ListState.Reorder` 插入线 2px）、组件 `menu.*`（按浮起层/拖动卡片推导）、`button.bgHover/bgPressed`、`iconButton.bgHover`。
 - tab 拖动、窗格拖动没有单独设计：`reorderMotion.tabDisplace / paneDisplace / paneDrop` 沿用 sider 拖动的弹簧参数。
-- 整个 Dark 主题（95 项覆盖 + `palette.graphite / darkTint / whiteA / blackA / inkDark`）。
+- 整个 Dark 主题（98 项覆盖 + `palette.graphite / darkTint / whiteA / blackA / inkDark`）。
 - FTP v3 danger 红色、原生文件面板补充尺寸与演示传输吞吐标记为 **derived**。侧栏状态与选中 token 已标 `deprecated`，保留生成供已有主题兼容，新组件不得引用。
 - 同一含义在稿子里出现过两个值时，取主稿：sider 选中行用 `common.css` 的 `#efeff1`（`sider-drag.html` 里是 `#f2f2f4`）；图标线宽用 `icons.js` 默认 1.75（拖动稿用 1.7）。
 - 已知限制：深色下部分深色品牌 logo（CentOS、Debian 的深色字形）对比度偏低，实现时可以给 OS glyph 加一个 `Mix(brand, white, .35)` 提亮。
@@ -275,6 +278,7 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `palette.space.18` | 18px |  |
 | `palette.space.22` | 22px |  |
 | `palette.space.24` | 24px |  |
+| `palette.space.20` | 20px |  |
 
 ### palette.radius
 | token | 值 | 备注 |
@@ -391,6 +395,7 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `palette.blur.6` | 6px |  |
 | `palette.blur.9` | 9px |  |
 | `palette.blur.16` | 16px |  |
+| `palette.blur.8` | 8px |  |
 
 ### palette.ratio
 | token | 值 | 备注 |
@@ -445,12 +450,14 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `palette.spring.snappy` | stiffness 420 · damping 34 |  |
 | `palette.spring.drop` | duration 320ms · bounce 0.15 |  |
 | `palette.spring.smooth` | duration 300ms · bounce 0 |  |
+| `palette.spring.content` | duration 350ms · bounce 0 |  |
 
 ### palette.easing
 | token | 值 | 备注 |
 |---|---|---|
 | `palette.easing.easeOut` | cubic-bezier(0,0,0.58,1) |  |
 | `palette.easing.standard` | cubic-bezier(0.25,0.1,0.25,1) | **derived** CSS ease |
+| `palette.easing.inOut` | cubic-bezier(0.42,0,0.58,1) |  |
 
 ### palette.red
 | token | 值 | 备注 |
@@ -500,6 +507,7 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `color.border.onGlass` | rgba(0,0,0,0.1) | rgba(255,255,255,0.12) | 玻璃栏内竖分隔 |
 | `color.border.raised` | rgba(0,0,0,0.08) | rgba(255,255,255,0.1) | 浮起层 0.5px 描边 |
 | `color.border.hairlineStrong` | rgba(0,0,0,0.1) | rgba(255,255,255,0.12) | 拖动卡片描边 |
+| `color.border.controlHover` | #c7c7cc | #444448 | 输入框悬停描边 |
 | `color.text.primary` | #1d1d1f | #f5f5f7 |  |
 | `color.text.secondary` | #8e8e93 | #98989d | 次要文字、主机副标题、状态栏 |
 | `color.text.tertiary` | #a1a1a6 | #6e6e73 | 关闭 ×、kbd、caption |
@@ -553,6 +561,7 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `color.fill.placeholderEdge` | rgba(0,0,0,0.05) | rgba(255,255,255,0.08) |  |
 | `color.fill.strong` | #1d1d1f | #f5f5f7 | 资源条填充 |
 | `color.fill.quietHover` | rgba(0,0,0,0.08) | rgba(255,255,255,0.12) | 传输胶囊悬停 |
+| `color.fill.skeleton` | #ececef | #444448 |  |
 | `color.traffic.close` | #ff5f57 | ＝ |  |
 | `color.traffic.minimize` | #febc2e | ＝ |  |
 | `color.traffic.zoom` | #28c840 | ＝ |  |
@@ -571,6 +580,7 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `color.protocol.sftpGlyph` | #0a84ff | ＝ | SFTP 字形 |
 | `color.protocol.ftpBg` | #f2f2f4 | #2e2e31 | FTP 图标块底 |
 | `color.protocol.ftpGlyph` | #8e8e93 | #98989d | FTP 字形 |
+| `color.overlay.backdrop` | rgba(0,0,0,0.4) | ＝ | 弹窗遮罩 |
 
 ### radius
 | token | Light | Dark（derived） | 用途 |
@@ -613,6 +623,7 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `space.18` | 18px | ＝ |  |
 | `space.22` | 22px | ＝ |  |
 | `space.24` | 24px | ＝ |  |
+| `space.20` | 20px | ＝ |  |
 
 ### size
 | token | Light | Dark（derived） | 用途 |
@@ -667,8 +678,8 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `size.siderMaxWidth` | 320px | ＝ |  |
 | `size.paneMinWidth` | 280px | ＝ |  |
 | `size.paneMinHeight` | 160px | ＝ |  |
-| `size.dragPreviewWidth` | 360px | ＝ |  |
-| `size.dragPreviewHeight` | 260px | ＝ |  |
+| `size.dragPreviewWidth` | 220px | ＝ |  |
+| `size.dragPreviewHeight` | 140px | ＝ |  |
 | `size.tabDetachDistance` | 8px | ＝ |  |
 | `size.dragGrabX` | 30px | ＝ |  |
 | `size.dragGrabY` | 18px | ＝ |  |
@@ -726,6 +737,11 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `size.transferDockMaxRows` | 5 | ＝ |  |
 | `size.transferPopoverMaxRows` | 6 | ＝ |  |
 | `size.transferConcurrency` | 3 | ＝ |  |
+| `size.tooltipMaxWidth` | 320px | ＝ | 提示最大宽度 |
+| `size.previewLineHeight` | 6px | ＝ |  |
+| `size.previewLineLong` | 0.78 | ＝ |  |
+| `size.previewLineMedium` | 0.6 | ＝ |  |
+| `size.previewLineShort` | 0.45 | ＝ |  |
 
 ### font
 | token | Light | Dark（derived） | 用途 |
@@ -766,7 +782,7 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `shadow.floatButton` | 0px 2px 8px 0px rgba(0,0,0,0.1), 0px 0px 0px 0.5px rgba(0,0,0,0.08) | ＝ | FTP 中缝传输按钮 |
 | `shadow.lift` | 0px 0px 0px 0.5px rgba(0,0,0,0.1), 0px 10px 28px 0px rgba(0,0,0,0.16), 0px 2px 6px 0px rgba(0,0,0,0.08) | 0px 0px 0px 0.5px rgba(255,255,255,0.14), 0px 10px 28px 0px rgba(0,0,0,0.45), 0px 2px 6px 0px rgba(0,0,0,0.25) | 拖动中卡片 |
 | `shadow.liftStack` | 0px 0px 0px 0.5px rgba(0,0,0,0.08), 0px 4px 10px 0px rgba(0,0,0,0.06) | ＝ | 多选叠卡 |
-| `shadow.focusRing` | 0px 0px 0px 1.5px #0a84ff, 0px 0px 0px 5px rgba(10,132,255,0.16), 0px 8px 24px 0px rgba(0,0,0,0.1) | 0px 0px 0px 1.5px #0a84ff, 0px 0px 0px 5px rgba(10,132,255,0.28), 0px 8px 24px 0px rgba(0,0,0,0.4) | 焦点 D：1.5px 蓝环 + 5px 光晕 + 浮起 |
+| `shadow.focusRing` | 0px 0px 0px 1.5px #0a84ff | ＝ | 焦点窗格：仅 1.5px 蓝色描边 |
 | `shadow.hoverRing` | 0px 0px 0px 1px rgba(0,0,0,0.14) | 0px 0px 0px 1px rgba(255,255,255,0.2) | 非焦点窗格悬停 |
 | `shadow.flash` | inset 0px 0px 0px 1px rgba(10,132,255,0.18) | ＝ | 落位闪光内描边 |
 | `shadow.placeholder` | inset 0px 0px 0px 1px rgba(0,0,0,0.05) | inset 0px 0px 0px 1px rgba(255,255,255,0.08) |  |
@@ -776,6 +792,7 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `shadow.dotOnline` | 0px 0px 0px 3px rgba(48,196,90,0.14) | ＝ |  [deprecated: 侧栏不再显示状态/选中] |
 | `shadow.dotConnecting` | 0px 0px 0px 3px rgba(245,166,35,0.18) | ＝ |  [deprecated: 侧栏不再显示状态/选中] |
 | `shadow.popover` | 0px 0px 0px 0.5px rgba(0,0,0,0.1), 0px 10px 28px 0px rgba(0,0,0,0.12), 0px 2px 6px 0px rgba(0,0,0,0.06), inset 0px 0.5px 0px 0px rgba(255,255,255,0.9) | 0px 0px 0px 0.5px rgba(255,255,255,0.14), 0px 10px 28px 0px rgba(0,0,0,0.45), 0px 2px 6px 0px rgba(0,0,0,0.25) | 传输浮层 |
+| `shadow.dialog` | 0px 10px 30px 0px rgba(0,0,0,0.3) | 0px 10px 30px 0px rgba(0,0,0,0.5) | 弹窗阴影 |
 
 ### glass
 | token | Light | Dark（derived） | 用途 |
@@ -798,6 +815,7 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `glass.bar.blur` | 5px | ＝ |  |
 | `glass.bar.saturate` | 1.8 | ＝ |  |
 | `glass.paneActionBlur` | 4px | ＝ |  |
+| `glass.paneRevealBlur` | 8px | ＝ |  |
 
 ### opacity
 | token | Light | Dark（derived） | 用途 |
@@ -847,12 +865,16 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `motion.duration.exit` | 120ms | ＝ | 浮层退出、胶囊淡出 |
 | `motion.duration.autoHide` | 3000ms | ＝ | 全部完成后胶囊停留 |
 | `motion.duration.spin` | 800ms | ＝ | 连接中转圈一周 |
+| `motion.duration.paneReveal` | 220ms | ＝ |  |
+| `motion.duration.connectionStage` | 300ms | ＝ | SSH 演示连接每个阶段的停留时间 |
 | `motion.easing.out` | cubic-bezier(0,0,0.58,1) | ＝ |  |
 | `motion.easing.pane` | cubic-bezier(0.2,0.8,0.2,1) | ＝ |  |
+| `motion.easing.search` | cubic-bezier(0.42,0,0.58,1) | ＝ |  |
 | `motion.spring.displace` | stiffness 420 · damping 34 | ＝ | 让位（≈ Snappy, 220ms） |
 | `motion.spring.drop` | duration 320ms · bounce 0.15 | ＝ | 落位 |
 | `motion.spring.smooth` | duration 300ms · bounce 0 | ＝ | 取消 / 平滑（ui.Smooth） |
 | `motion.spring.zoom` | duration 240ms · bounce 0 | ＝ |  |
+| `motion.spring.content` | duration 350ms · bounce 0 | ＝ | 数字内容变化 |
 | `motion.drag.threshold` | 4px | ＝ | 移动阈值 px |
 | `motion.drag.liftScale` | 1.03 | ＝ |  |
 | `motion.drag.autoScrollMax` | 900 | ＝ | px/s，t² 曲线 |
@@ -953,6 +975,7 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `rail.icon` | `{color.text.muted}` | #6e6e73 | 未选中 tab、rail 图标、按钮图标 |
 | `rail.bgOn` | `{color.state.onWindow}` | #d6d6d8 | 窗口底色上的激活按钮（rail、标题栏开关） |
 | `rail.iconOn` | `{color.text.primary}` | #1d1d1f |  |
+| `rail.transition` | `{motion.duration.focus}` | 160ms | 焦点/悬停切换 |
 
 ### sider
 | token | 引用 | Light 值 | 说明 |
@@ -997,6 +1020,8 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `search.kbdBorder` | `{color.border.keycap}` | #e3e3e6 | kbd 描边 |
 | `search.kbdBg` | `{color.surface.keycap}` | #ffffff | 键帽 kbd 底 |
 | `search.kbdRadius` | `{radius.keycap}` | 4px |  |
+| `search.transition` | `{motion.duration.focus}` | 160ms | 焦点/悬停切换 |
+| `search.easing` | `{motion.easing.search}` | cubic-bezier(0.42,0,0.58,1) |  |
 
 ### groupHeader
 | token | 引用 | Light 值 | 说明 |
@@ -1019,6 +1044,8 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `groupHeader.expandFill` | `{color.accent.default}` | #0a84ff | 主强调色 #0a84ff |
 | `groupHeader.expandHeight` | `{size.progressThin}` | 2px |  |
 | `groupHeader.expandDelay` | `{motion.duration.autoExpand}` | 500ms | 悬停自动展开 |
+| `groupHeader.transition` | `{motion.duration.focus}` | 160ms | 焦点/悬停切换 |
+| `groupHeader.countMotion` | `{motion.spring.content}` | duration 350ms · bounce 0 | 数字内容变化 |
 
 ### siderItem
 | token | 引用 | Light 值 | 说明 |
@@ -1053,6 +1080,7 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `siderItem.moreRadius` | `{radius.controlSm}` | 6px |  |
 | `siderItem.moreBg` | `{color.surface.controlStrong}` | #ececef | sider 行内「更多」按钮 |
 | `siderItem.moreIcon` | `{color.text.muted}` | #6e6e73 | 未选中 tab、rail 图标、按钮图标 |
+| `siderItem.transition` | `{motion.duration.focus}` | 160ms | 焦点/悬停切换 |
 
 ### osLogo
 | token | 引用 | Light 值 | 说明 |
@@ -1112,7 +1140,7 @@ siderItem.nameColor             ← component，只能引用 semantic
 ### paneFocus
 | token | 引用 | Light 值 | 说明 |
 |---|---|---|---|
-| `paneFocus.ringFocused` | `{shadow.focusRing}` | 0px 0px 0px 1.5px #0a84ff, 0px 0px 0px 5px rgba(10,132,255,0.16), 0px 8px 24px 0px rgba(0,0,0,0.1) | 焦点 D：1.5px 蓝环 + 5px 光晕 + 浮起 |
+| `paneFocus.ringFocused` | `{shadow.focusRing}` | 0px 0px 0px 1.5px #0a84ff | 焦点窗格：仅 1.5px 蓝色描边 |
 | `paneFocus.ringHover` | `{shadow.hoverRing}` | 0px 0px 0px 1px rgba(0,0,0,0.14) | 非焦点窗格悬停 |
 | `paneFocus.nameFocused` | `{color.text.primary}` | #1d1d1f |  |
 | `paneFocus.nameWeightFocused` | `{font.weight.semibold}` | 600 |  |
@@ -1228,6 +1256,8 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `button.primaryText` | `{color.text.onAccent}` | #ffffff |  |
 | `button.bgHover` | `{color.state.hover}` | #f7f7f8 | **derived** 未画 |
 | `button.bgPressed` | `{color.state.pressed}` | #e6e6e9 | **derived** 未画 |
+| `button.bg` | `{color.surface.control}` | #f2f2f4 | 中性控件底：图标按钮 bg、分段控件、中性徽章、队列图标 |
+| `button.transition` | `{motion.duration.focus}` | 160ms | 焦点/悬停切换 |
 
 ### iconButton
 | token | 引用 | Light 值 | 说明 |
@@ -1243,6 +1273,8 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `iconButton.bgHover` | `{color.state.hover}` | #f7f7f8 | **derived** 未画 |
 | `iconButton.iconSize` | `{size.icon}` | 16px |  |
 | `iconButton.stroke` | `{size.iconStroke}` | 1.75px | Lucide 风格线宽 |
+| `iconButton.bgPressed` | `{color.state.pressed}` | #e6e6e9 | 按下（设计稿未画） |
+| `iconButton.transition` | `{motion.duration.focus}` | 160ms | 焦点/悬停切换 |
 
 ### floatButton
 | token | 引用 | Light 值 | 说明 |
@@ -1268,6 +1300,8 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `segmented.bgOn` | `{color.surface.raised}` | #ffffff | 浮起层：拖动卡片、ghost、分段控件选中 |
 | `segmented.textOn` | `{color.text.primary}` | #1d1d1f |  |
 | `segmented.shadowOn` | `{shadow.segment}` | 0px 1px 2px 0px rgba(0,0,0,0.08) |  |
+| `segmented.transition` | `{motion.duration.focus}` | 160ms | 焦点/悬停切换 |
+| `segmented.bgHover` | `{color.state.hover}` | #f7f7f8 | 行悬停 |
 
 ### breadcrumb
 | token | 引用 | Light 值 | 说明 |
@@ -1326,6 +1360,9 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `tooltip.radius` | `{radius.controlSm}` | 6px |  |
 | `tooltip.shadow` | `{shadow.tooltip}` | 0px 4px 12px 0px rgba(0,0,0,0.18) |  |
 | `tooltip.arrow` | `{space.4}` | 4px |  |
+| `tooltip.maxWidth` | `{size.tooltipMaxWidth}` | 320px | 提示最大宽度 |
+| `tooltip.offset` | `{space.6}` | 6px |  |
+| `tooltip.railOffset` | `{space.8}` | 8px |  |
 
 ### menu
 | token | 引用 | Light 值 | 说明 |
@@ -1409,6 +1446,15 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `dragGhost.countBg` | `{color.accent.default}` | #0a84ff | 主强调色 #0a84ff |
 | `dragGhost.countText` | `{color.text.onAccent}` | #ffffff |  |
 | `dragGhost.countSize` | `{font.size.caption2}` | 10.5px | ⌘N 芯片、计数胶囊 |
+| `dragGhost.width` | `{size.dragPreviewWidth}` | 220px |  |
+| `dragGhost.height` | `{size.dragPreviewHeight}` | 140px |  |
+| `dragGhost.headerHeight` | `{size.control}` | 28px |  |
+| `dragGhost.lineHeight` | `{size.previewLineHeight}` | 6px |  |
+| `dragGhost.lineRadius` | `{radius.bar}` | 3px |  |
+| `dragGhost.lineColor` | `{color.fill.skeleton}` | #ececef |  |
+| `dragGhost.lineLong` | `{size.previewLineLong}` | 0.78 |  |
+| `dragGhost.lineMedium` | `{size.previewLineMedium}` | 0.6 |  |
+| `dragGhost.lineShort` | `{size.previewLineShort}` | 0.45 |  |
 
 ### reorderMotion
 | token | 引用 | Light 值 | 说明 |
@@ -1434,8 +1480,8 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `desktop.siderMaxWidth` | `{size.siderMaxWidth}` | 320px |  |
 | `desktop.paneMinWidth` | `{size.paneMinWidth}` | 280px |  |
 | `desktop.paneMinHeight` | `{size.paneMinHeight}` | 160px |  |
-| `desktop.dragPreviewWidth` | `{size.dragPreviewWidth}` | 360px |  |
-| `desktop.dragPreviewHeight` | `{size.dragPreviewHeight}` | 260px |  |
+| `desktop.dragPreviewWidth` | `{size.dragPreviewWidth}` | 220px |  |
+| `desktop.dragPreviewHeight` | `{size.dragPreviewHeight}` | 140px |  |
 | `desktop.tabDetachDistance` | `{size.tabDetachDistance}` | 8px |  |
 | `desktop.dragGrabX` | `{size.dragGrabX}` | 30px |  |
 | `desktop.dragGrabY` | `{size.dragGrabY}` | 18px |  |
@@ -1486,6 +1532,13 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `dialog.groupWidth` | `{size.groupDialogWidth}` | 320px |  |
 | `dialog.portWidth` | `{size.portFieldWidth}` | 90px |  |
 | `dialog.titleSize` | `{size.dialogTitleSize}` | 18px |  |
+| `dialog.bg` | `{color.surface.raised}` | #ffffff | 浮起层：拖动卡片、ghost、分段控件选中 |
+| `dialog.backdrop` | `{color.overlay.backdrop}` | rgba(0,0,0,0.4) | 弹窗遮罩 |
+| `dialog.shadow` | `{shadow.dialog}` | 0px 10px 30px 0px rgba(0,0,0,0.3) | 弹窗阴影 |
+| `dialog.radius` | `{radius.card}` | 10px |  |
+| `dialog.padding` | `{space.20}` | 20px |  |
+| `dialog.gap` | `{space.12}` | 12px |  |
+| `dialog.viewportInset` | `{space.20}` | 20px |  |
 
 ### stats
 | token | 引用 | Light 值 | 说明 |
@@ -1524,6 +1577,7 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `connectionIndicator.connecting` | `{color.warning.default}` | #f5a623 | 连接中 |
 | `connectionIndicator.connectingHalo` | `{color.warning.halo}` | rgba(245,166,35,0.18) |  |
 | `connectionIndicator.halo` | `{size.dotHalo}` | 3px |  |
+| `connectionIndicator.stageDuration` | `{motion.duration.connectionStage}` | 300ms | SSH 演示连接每个阶段的停留时间 |
 
 ### paneToggle
 | token | 引用 | Light 值 | 说明 |
@@ -1693,3 +1747,25 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `filePane.contentPadding` | `{space.8}` | 8px | **derived** FTP v3 原生文件面板布局补全 |
 | `filePane.nameMinWidth` | `{size.fileNameMinWidth}` | 100px | **derived** FTP v3 原生文件面板布局补全 |
 | `filePane.gridIconSize` | `{size.fileGridIconSize}` | 32px | **derived** FTP v3 原生文件面板布局补全 |
+
+### input
+| token | 引用 | Light 值 | 说明 |
+|---|---|---|---|
+| `input.height` | `{size.control}` | 28px |  |
+| `input.paddingX` | `{space.9}` | 9px |  |
+| `input.radius` | `{radius.control}` | 7px |  |
+| `input.bg` | `{color.surface.control}` | #f2f2f4 | 中性控件底：图标按钮 bg、分段控件、中性徽章、队列图标 |
+| `input.text` | `{color.text.primary}` | #1d1d1f |  |
+| `input.fontSize` | `{font.size.body}` | 12.5px | tab、按钮、列表 |
+| `input.border` | `{color.border.control}` | #e6e6e9 | 按钮描边、状态栏竖分隔 |
+| `input.borderHover` | `{color.border.controlHover}` | #c7c7cc | 输入框悬停描边 |
+| `input.borderFocus` | `{color.accent.default}` | #0a84ff | 主强调色 #0a84ff |
+| `input.borderWidth` | `{size.divider}` | 1px |  |
+| `input.transition` | `{motion.duration.focus}` | 160ms | 焦点/悬停切换 |
+
+### paneReveal
+| token | 引用 | Light 值 | 说明 |
+|---|---|---|---|
+| `paneReveal.blur` | `{glass.paneRevealBlur}` | 8px |  |
+| `paneReveal.duration` | `{motion.duration.paneReveal}` | 220ms |  |
+| `paneReveal.easing` | `{motion.easing.out}` | cubic-bezier(0,0,0.58,1) |  |

@@ -6,6 +6,7 @@ import (
 
 	"sshdesk/internal/theme"
 
+	"github.com/egoist/mygo/plugins/glass"
 	"github.com/egoist/mygo/ui"
 )
 
@@ -23,14 +24,9 @@ func (a *app) beginWorkspaceFrame(c *ui.Context) {
 	a.dragSeen = false
 	a.dockPreview = nil
 	if d := a.drag; d != nil {
-		if d.phase == dragLanded && d.returnStarted.IsZero() {
-			d.returnStarted = c.Now()
-		}
-		duration := t.C.ReorderMotion.Cancel.Duration
 		if d.phase == dragLanded {
-			duration = t.C.ReorderMotion.PaneDrop.Duration
-		}
-		if d.phase != dragActive && c.Now().Sub(d.returnStarted) >= duration {
+			a.drag = nil
+		} else if d.phase == dragReturning && c.Now().Sub(d.returnStarted) >= t.C.ReorderMotion.Cancel.Duration {
 			a.drag = nil
 		} else if d.kind == dragTab && d.phase == dragActive {
 			bar := a.tabScroll.Bounds(c)
@@ -55,7 +51,6 @@ func (a *app) beginWorkspaceFrame(c *ui.Context) {
 			tab.layoutUntil, tab.layoutPending = c.Now().Add(tab.layoutDuration), false
 		}
 	}
-	a.enforcePaneMinimum(c)
 }
 
 func (a *app) markPaneLayout(tab *workspaceTab, duration time.Duration) {
@@ -73,14 +68,16 @@ func (a *app) enforcePaneMinimum(c *ui.Context) {
 		if a.files.localOpen {
 			minimum.X += t.C.FTPSplit.MinLocal + t.C.FTPSplit.Gutter
 		}
-	} else if tab := a.currentTab(); tab != nil {
-		minimum = tab.root.minimum()
+	} else if a.section == sectionSSH {
+		if tab := a.currentTab(); tab != nil {
+			minimum = tab.root.minimum()
+		}
 	}
 	width := minimum.X + t.C.Rail.Width + t.C.Window.Gutter
-	if !a.sidebarCollapsed {
-		width += a.sidebarWidth + t.C.Window.Gutter
+	if !a.page().sidebarCollapsed {
+		width += a.page().sidebarWidth + t.C.Window.Gutter
 	}
-	if a.section != sectionFiles && a.statusVisible {
+	if a.section == sectionSSH && a.statusVisible {
 		width += t.Size.StatsPanel + t.C.Window.Gutter
 	}
 	size := [2]int{
@@ -145,11 +142,14 @@ func (a *app) paneMotion(c *ui.Context, pane ui.Element, tab *workspaceTab, sess
 	if a.resizing != nil {
 		transition.Animation = &instant
 	}
-	pane.Transition(transition)
+	// The workspace already animates its size; a second spring would lag behind it.
+	if !session.revealing && !tab.workspaceResizedAt.Equal(c.Now()) {
+		pane.Transition(transition)
+	}
 	alpha := float32(1)
 	if tab.focused != session {
 		alpha *= 1 - tab.zoomMix
-	} else if c.Preferences().ReduceMotion && !tab.zoomStarted.IsZero() {
+	} else if !session.revealing && c.Preferences().ReduceMotion && !tab.zoomStarted.IsZero() {
 		alpha *= min(1, float32(c.Now().Sub(tab.zoomStarted))/float32(t.C.Desktop.ZoomDuration))
 	}
 	if session.entering {
@@ -194,6 +194,40 @@ func (a *app) paneMotion(c *ui.Context, pane ui.Element, tab *workspaceTab, sess
 	}
 }
 
+func startPaneReveal(session *remoteSession) {
+	session.revealing, session.revealStarted = true, time.Time{}
+	session.entering = false
+}
+
+func paneReveal(c *ui.Context, card ui.Element, session *remoteSession) {
+	if !session.revealing {
+		return
+	}
+	t := theme.Current()
+	p := t.C.PaneReveal
+	progress := float32(0)
+	if !session.revealStarted.IsZero() {
+		progress = min(1, float32(c.Now().Sub(session.revealStarted))/float32(p.Duration))
+		if progress == 1 {
+			session.revealing = false
+			return
+		}
+	}
+	blur := p.Blur * (1 - tokenEasing(p.Easing)(progress))
+	card.Children(func() {
+		ui.Box(c).Key("drop-reveal").Absolute().Top(0).Right(0).Bottom(0).Left(0).
+			Radius(t.C.Pane.Radius).Material(glass.Blur{Radius: blur}).PassThrough()
+	})
+	card.DrawOver(func(painter *ui.Painter, _ ui.Rect) {
+		// Start after the final-size content has been painted once, including empty terminals.
+		if session.revealStarted.IsZero() {
+			session.revealStarted = painter.Now()
+			c.Invalidate()
+		}
+	})
+	c.AnimationFrame()
+}
+
 func (a *app) terminalDivider(c *ui.Context, split splitPlacement) {
 	t := theme.Current()
 	node, r := split.node, split.rect
@@ -224,7 +258,9 @@ func (a *app) terminalDivider(c *ui.Context, split splitPlacement) {
 	if held {
 		animation = ui.Animation{Duration: t.C.Desktop.InstantDuration}
 	}
-	edge.Transition(ui.ElementTransition{Position: true, Size: true, Animation: &animation})
+	if !a.currentTab().workspaceResizedAt.Equal(c.Now()) {
+		edge.Transition(ui.ElementTransition{Position: true, Size: true, Animation: &animation})
+	}
 	if edge.DoubleClicked() {
 		node.ratio = .5
 		a.markPaneLayout(a.currentTab(), t.C.Desktop.PaneEnterDuration)

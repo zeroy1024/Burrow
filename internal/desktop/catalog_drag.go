@@ -19,7 +19,7 @@ func catalogLandingAnimation() ui.Animation {
 }
 
 func catalogColorAnimation() ui.Animation {
-	return ui.Animation{Duration: theme.Current().C.DragLift.LiftDuration}
+	return tokenTween(theme.Current().C.SiderItem.Transition)
 }
 
 type catalogDragKind uint8
@@ -90,21 +90,21 @@ type catalogDragState struct {
 }
 
 func (a *app) catalogMotion(key catalogKey) *catalogItemMotion {
-	if a.catalogItems == nil {
-		a.catalogItems = map[catalogKey]*catalogItemMotion{}
+	if a.page().catalogItems == nil {
+		a.page().catalogItems = map[catalogKey]*catalogItemMotion{}
 	}
-	if a.catalogItems[key] == nil {
-		a.catalogItems[key] = &catalogItemMotion{}
+	if a.page().catalogItems[key] == nil {
+		a.page().catalogItems[key] = &catalogItemMotion{}
 	}
-	return a.catalogItems[key]
+	return a.page().catalogItems[key]
 }
 
 func (a *app) beginCatalogFrame(c *ui.Context) {
-	if a.catalogFlash != nil && !a.catalogFlashUntil.IsZero() && !c.Now().Before(a.catalogFlashUntil) {
-		a.catalogFlash = nil
-		a.catalogFlashSeed, a.catalogFlashUntil = 0, time.Time{}
+	if a.page().catalogFlash != nil && !a.page().catalogFlashUntil.IsZero() && !c.Now().Before(a.page().catalogFlashUntil) {
+		a.page().catalogFlash = nil
+		a.page().catalogFlashSeed, a.page().catalogFlashUntil = 0, time.Time{}
 	}
-	d := a.catalogDrag
+	d := a.page().catalogDrag
 	if d == nil {
 		return
 	}
@@ -115,7 +115,7 @@ func (a *app) beginCatalogFrame(c *ui.Context) {
 }
 
 func (a *app) catalogHostTransfer() (hostDrag, bool, bool) {
-	d := a.catalogDrag
+	d := a.page().catalogDrag
 	if d == nil || d.kind != catalogHostDrag || d.phase != catalogDragging {
 		return hostDrag{}, false, false
 	}
@@ -124,28 +124,23 @@ func (a *app) catalogHostTransfer() (hostDrag, bool, bool) {
 
 func (a *app) syncCatalogWorkspacePreview(c *ui.Context) {
 	t := theme.Current()
-	d := a.catalogDrag
+	d := a.page().catalogDrag
 	if d == nil || d.kind != catalogHostDrag || d.phase != catalogDragging {
 		return
 	}
-	if containsCatalogPoint(a.catalogScroll.Bounds(c), a.pointer) {
+	if containsCatalogPoint(a.page().catalogScroll.Bounds(c), a.pointer) {
 		if d.workspacePreview != nil && a.drag == d.workspacePreview {
 			a.drag = nil
 		}
 		return
 	}
 	if d.workspacePreview == nil {
-		area := a.workArea.Bounds(c)
-		size := ui.Rect{W: min(t.C.Desktop.DragPreviewWidth, area.W), H: min(t.C.Desktop.DragPreviewHeight, area.H)}
 		session := &remoteSession{
-			host: d.host.id, state: connected, output: []terminalLine{},
-			transcript: demoTranscript(a.hosts[d.host.id]),
+			host: d.host.id, state: disconnected,
 		}
 		d.workspacePreview = &paneDragState{
-			kind: dragHost, session: session, origin: d.origin, paneRect: size, detached: true,
-			grab: ui.Point{X: min(t.C.Desktop.DragGrabX, size.W/2), Y: t.C.Desktop.DragGrabY}, order: []*workspaceTab{},
-			appearance: t,
-			paneImage:  a.paneSnapshot(session, size.W, size.H),
+			kind: dragHost, session: session, origin: d.origin, detached: true,
+			grab: ui.Point{X: t.C.Desktop.DragGrabX, Y: t.C.Desktop.DragGrabY}, order: []*workspaceTab{},
 		}
 	}
 	a.drag, a.dragSeen = d.workspacePreview, d.held
@@ -154,7 +149,7 @@ func (a *app) syncCatalogWorkspacePreview(c *ui.Context) {
 func (a *app) trackCatalogDrag(c *ui.Context, row ui.Element, slot catalogSlot) {
 	t := theme.Current()
 	motion := a.catalogMotion(slot.key)
-	d := a.catalogDrag
+	d := a.page().catalogDrag
 	active := d != nil && d.key == slot.key
 	_, _, held := row.Dragged()
 	_, releaseVelocityY, released := row.DragEnded()
@@ -192,17 +187,17 @@ func (a *app) trackCatalogDrag(c *ui.Context, row ui.Element, slot catalogSlot) 
 	if d != nil && d.phase != catalogDragging {
 		// A new gesture takes over from a previous landing or return flight.
 		a.catalogMotion(d.key).offset = ui.Point{}
-		a.catalogDrag, d = nil, nil
+		a.page().catalogDrag, d = nil, nil
 	}
 	if d == nil {
 		if a.drag != nil && a.drag.phase != dragActive {
 			a.drag = nil
 		}
 		origin := row.Bounds()
-		viewport := a.catalogScroll.Bounds(c)
+		viewport := a.page().catalogScroll.Bounds(c)
 		d = &catalogDragState{
 			kind: slot.key.kind, key: slot.key, group: slot.group,
-			origin: origin, originContentY: origin.Y - viewport.Y - t.C.Catalog.ListPaddingY + a.catalogScroll.Y,
+			origin: origin, originContentY: origin.Y - viewport.Y - t.C.Catalog.ListPaddingY + a.page().catalogScroll.Y,
 			visualY:     origin.Y + offset.Y,
 			targetGroup: slot.group, started: c.Now(), lastFrame: c.Now(),
 			autoExpanded: map[*hostGroup]bool{},
@@ -216,7 +211,7 @@ func (a *app) trackCatalogDrag(c *ui.Context, row ui.Element, slot catalogSlot) 
 				d.collapseFrames = 2
 			}
 		}
-		a.catalogDrag = d
+		a.page().catalogDrag = d
 		c.AnimationFrame()
 	}
 	if d.key == slot.key && d.phase == catalogDragging {
@@ -234,7 +229,7 @@ func (a *app) trackCatalogDrag(c *ui.Context, row ui.Element, slot catalogSlot) 
 }
 
 func (a *app) catalogExpanded(group *hostGroup) bool {
-	d := a.catalogDrag
+	d := a.page().catalogDrag
 	if d != nil && d.phase == catalogDragging {
 		if d.kind == catalogGroupDrag && d.collapseFrames >= 2 {
 			return false
@@ -243,11 +238,11 @@ func (a *app) catalogExpanded(group *hostGroup) bool {
 			return true
 		}
 	}
-	return !group.collapsed || strings.TrimSpace(a.query) != ""
+	return !a.groupCollapsed(group) || strings.TrimSpace(a.page().query) != ""
 }
 
 func (a *app) catalogMatches(group *hostGroup, id hostID) bool {
-	query := strings.ToLower(strings.TrimSpace(a.query))
+	query := strings.ToLower(strings.TrimSpace(a.page().query))
 	h := a.hosts[id]
 	text := h.name + " " + h.user + " " + h.address + " " + systems[h.os].name + " " + group.name
 	return strings.Contains(strings.ToLower(text), query)
@@ -255,7 +250,7 @@ func (a *app) catalogMatches(group *hostGroup, id hostID) bool {
 
 func (a *app) catalogPreviewHosts(group *hostGroup) []hostID {
 	ids := slices.Clone(group.hosts)
-	d := a.catalogDrag
+	d := a.page().catalogDrag
 	if d != nil && d.kind == catalogHostDrag && d.phase == catalogDragging && group == d.host.group {
 		index := slices.Index(ids, d.host.id)
 		ids = slices.Delete(ids, index, index+1)
@@ -267,11 +262,11 @@ func (a *app) catalogPreviewHosts(group *hostGroup) []hostID {
 // their parent; nesting hosts in group columns would lose identity across groups.
 func (a *app) catalogPlan(c *ui.Context) []catalogSlot {
 	t := theme.Current()
-	viewport := a.catalogScroll.Bounds(c)
-	y := viewport.Y + t.C.Catalog.ListPaddingY - a.catalogScroll.Y
+	viewport := a.page().catalogScroll.Bounds(c)
+	y := viewport.Y + t.C.Catalog.ListPaddingY - a.page().catalogScroll.Y
 	width := max(0, viewport.W-2*t.C.Catalog.ListPaddingX)
 	slots := []catalogSlot{}
-	d := a.catalogDrag
+	d := a.page().catalogDrag
 	draggingGroup := d != nil && d.phase == catalogDragging && d.kind == catalogGroupDrag
 	groups := slices.Clone(a.groups)
 	if draggingGroup {
@@ -282,7 +277,7 @@ func (a *app) catalogPlan(c *ui.Context) []catalogSlot {
 	for _, group := range groups {
 		ids := a.catalogPreviewHosts(group)
 		visible := slices.ContainsFunc(group.hosts, func(id hostID) bool { return a.catalogMatches(group, id) })
-		if !visible && strings.TrimSpace(a.query) != "" && (d == nil || d.targetGroup != group) {
+		if !visible && strings.TrimSpace(a.page().query) != "" && (d == nil || d.targetGroup != group) {
 			continue
 		}
 		if len(slots) > 0 {
@@ -328,8 +323,8 @@ func containsCatalogPoint(r ui.Rect, p ui.Point) bool {
 }
 
 func (a *app) updateCatalogDestination(c *ui.Context) {
-	d := a.catalogDrag
-	if !containsCatalogPoint(a.catalogScroll.Bounds(c), a.pointer) {
+	d := a.page().catalogDrag
+	if !containsCatalogPoint(a.page().catalogScroll.Bounds(c), a.pointer) {
 		d.hoverGroup, d.hoverStarted = nil, time.Time{}
 		return
 	}
@@ -340,7 +335,7 @@ func (a *app) updateCatalogDestination(c *ui.Context) {
 		from := slices.Index(groups, d.group)
 		groups = slices.Delete(groups, from, from+1)
 		index := d.targetIndex
-		for _, slot := range a.catalogSlots {
+		for _, slot := range a.page().catalogSlots {
 			if slot.placeholder || slot.key == d.key {
 				continue
 			}
@@ -361,7 +356,7 @@ func (a *app) updateCatalogDestination(c *ui.Context) {
 	var header *hostGroup
 	var first *hostGroup
 	var firstY, groupY float32
-	for _, slot := range a.catalogSlots {
+	for _, slot := range a.page().catalogSlots {
 		if slot.key.kind != catalogGroupDrag {
 			continue
 		}
@@ -388,7 +383,7 @@ func (a *app) updateCatalogDestination(c *ui.Context) {
 	if d.hoverGroup != header {
 		d.hoverGroup, d.hoverStarted = header, c.Now()
 	}
-	if header != nil && header.collapsed && !d.autoExpanded[header] {
+	if header != nil && a.groupCollapsed(header) && !d.autoExpanded[header] {
 		if c.Now().Sub(d.hoverStarted) >= theme.Current().C.GroupHeader.ExpandDelay {
 			d.autoExpanded[header] = true
 		} else {
@@ -405,7 +400,7 @@ func (a *app) updateCatalogDestination(c *ui.Context) {
 		} else if group == d.host.group {
 			position = slices.Index(group.hosts, d.host.id)
 		}
-		for _, slot := range a.catalogSlots {
+		for _, slot := range a.page().catalogSlots {
 			if slot.placeholder || slot.key == d.key {
 				continue
 			}
@@ -425,11 +420,11 @@ func (a *app) updateCatalogDestination(c *ui.Context) {
 
 func (a *app) scrollCatalogDrag(c *ui.Context) {
 	t := theme.Current()
-	d := a.catalogDrag
+	d := a.page().catalogDrag
 	now := c.Now()
 	dt := float32(now.Sub(d.lastFrame).Seconds())
 	d.lastFrame = now
-	r := a.catalogScroll.Bounds(c)
+	r := a.page().catalogScroll.Bounds(c)
 	if !containsCatalogPoint(r, a.pointer) {
 		return
 	}
@@ -444,14 +439,14 @@ func (a *app) scrollCatalogDrag(c *ui.Context) {
 	if depth < 0 {
 		speed = -speed
 	}
-	previous := a.catalogScroll.Y
-	a.catalogScroll.Y = min(max(previous+speed*dt, 0), a.catalogScroll.MaxY)
-	if a.catalogScroll.Y != previous {
-		delta := a.catalogScroll.Y - previous
-		for i := range a.catalogSlots {
-			a.catalogSlots[i].rect.Y -= delta
-			if a.catalogSlots[i].key.kind == catalogGroupDrag {
-				a.catalogSlots[i].headerRect.Y -= delta
+	previous := a.page().catalogScroll.Y
+	a.page().catalogScroll.Y = min(max(previous+speed*dt, 0), a.page().catalogScroll.MaxY)
+	if a.page().catalogScroll.Y != previous {
+		delta := a.page().catalogScroll.Y - previous
+		for i := range a.page().catalogSlots {
+			a.page().catalogSlots[i].rect.Y -= delta
+			if a.page().catalogSlots[i].key.kind == catalogGroupDrag {
+				a.page().catalogSlots[i].headerRect.Y -= delta
 			}
 		}
 		c.AnimationFrame()
@@ -459,13 +454,13 @@ func (a *app) scrollCatalogDrag(c *ui.Context) {
 }
 
 func (a *app) finishCatalogDrag(c *ui.Context) {
-	d := a.catalogDrag
+	d := a.page().catalogDrag
 	if d == nil {
 		return
 	}
 	if d.phase != catalogDragging {
 		if d.finished && !d.pressed {
-			a.catalogDrag = nil
+			a.page().catalogDrag = nil
 			c.AnimationFrame()
 		}
 		return
@@ -480,7 +475,7 @@ func (a *app) finishCatalogDrag(c *ui.Context) {
 		a.settleCatalogDrag(c, false)
 		return
 	}
-	inside := containsCatalogPoint(a.catalogScroll.Bounds(c), a.pointer)
+	inside := containsCatalogPoint(a.page().catalogScroll.Bounds(c), a.pointer)
 	if inside && !d.externalDrop {
 		// Recompute at the release point, including a final pointer move that
 		// arrived in the same frame as the release.
@@ -491,7 +486,7 @@ func (a *app) finishCatalogDrag(c *ui.Context) {
 
 func (a *app) settleCatalogDrag(c *ui.Context, commit bool) {
 	t := theme.Current()
-	d := a.catalogDrag
+	d := a.page().catalogDrag
 	d.phase = catalogCanceling
 	d.awaitingRelease = !d.released
 	if commit {
@@ -502,7 +497,7 @@ func (a *app) settleCatalogDrag(c *ui.Context, commit bool) {
 				a.moveGroup(d.group, d.targetIndex)
 			}
 			for group := range d.autoExpanded {
-				group.collapsed = false
+				a.setGroupCollapsed(group, false)
 			}
 		})
 		if err != nil {
@@ -528,8 +523,8 @@ func (a *app) settleCatalogDrag(c *ui.Context, commit bool) {
 	d.offset.Y = d.visualY - d.settleBase.Y
 	a.catalogMotion(d.key).offset = ui.Point{}
 	if d.workspacePreview != nil && a.drag == d.workspacePreview {
-		// The workspace preview owns the flight into the shell or back to the
-		// source. Restore the catalog row without starting a second row flight.
+		// The workspace preview handles returning to the source. A successful
+		// drop restores the catalog row without starting a second row flight.
 		if !d.externalDrop {
 			a.drag.phase, a.drag.returnStarted = dragReturning, c.Now()
 			a.drag.returnRect = d.settleBase

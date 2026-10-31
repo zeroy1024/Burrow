@@ -247,6 +247,7 @@ type PaletteTokensSpace struct {
 	N18 float32
 	N22 float32
 	N24 float32
+	N20 float32
 }
 
 // PaletteTokensRadius groups tokens.
@@ -363,6 +364,7 @@ type PaletteTokensBlur struct {
 	N6   float32
 	N9   float32
 	N16  float32
+	N8   float32
 }
 
 // PaletteTokensRatio groups tokens.
@@ -414,15 +416,17 @@ type PaletteTokensSpeed struct {
 
 // PaletteTokensSpring groups tokens.
 type PaletteTokensSpring struct {
-	Snappy Spring
-	Drop   Spring
-	Smooth Spring
+	Snappy  Spring
+	Drop    Spring
+	Smooth  Spring
+	Content Spring
 }
 
 // PaletteTokensEasing groups tokens.
 type PaletteTokensEasing struct {
 	EaseOut  Bezier
 	Standard Bezier // CSS ease [derived]
+	InOut    Bezier
 }
 
 // PaletteTokensRed groups tokens.
@@ -518,6 +522,7 @@ type ColorsBorder struct {
 	OnGlass         color.NRGBA // 玻璃栏内竖分隔
 	Raised          color.NRGBA // 浮起层 0.5px 描边
 	HairlineStrong  color.NRGBA // 拖动卡片描边
+	ControlHover    color.NRGBA // 输入框悬停描边
 }
 
 // ColorsText groups tokens.
@@ -599,6 +604,7 @@ type ColorsFill struct {
 	PlaceholderEdge color.NRGBA
 	Strong          color.NRGBA // 资源条填充
 	QuietHover      color.NRGBA // 传输胶囊悬停
+	Skeleton        color.NRGBA
 }
 
 // ColorsTraffic groups tokens.
@@ -639,6 +645,11 @@ type ColorsProtocol struct {
 	FtpGlyph  color.NRGBA // FTP 字形
 }
 
+// ColorsOverlay groups tokens.
+type ColorsOverlay struct {
+	Backdrop color.NRGBA // 弹窗遮罩
+}
+
 // Colors groups tokens.
 type Colors struct {
 	Bg       ColorsBg
@@ -657,6 +668,7 @@ type Colors struct {
 	Glass    ColorsGlass
 	Danger   ColorsDanger
 	Protocol ColorsProtocol
+	Overlay  ColorsOverlay
 }
 
 // Radii groups tokens.
@@ -699,6 +711,7 @@ type Spacing struct {
 	N18 float32
 	N22 float32
 	N24 float32
+	N20 float32
 }
 
 // Sizes groups tokens.
@@ -812,6 +825,11 @@ type Sizes struct {
 	TransferDockMaxRows     float32
 	TransferPopoverMaxRows  float32
 	TransferConcurrency     float32
+	TooltipMaxWidth         float32 // 提示最大宽度
+	PreviewLineHeight       float32
+	PreviewLineLong         float32
+	PreviewLineMedium       float32
+	PreviewLineShort        float32
 }
 
 // TypographyFamily groups tokens.
@@ -877,7 +895,7 @@ type Shadows struct {
 	FloatButton       Shadow // FTP 中缝传输按钮
 	Lift              Shadow // 拖动中卡片
 	LiftStack         Shadow // 多选叠卡
-	FocusRing         Shadow // 焦点 D：1.5px 蓝环 + 5px 光晕 + 浮起
+	FocusRing         Shadow // 焦点窗格：仅 1.5px 蓝色描边
 	HoverRing         Shadow // 非焦点窗格悬停
 	Flash             Shadow // 落位闪光内描边
 	Placeholder       Shadow
@@ -887,6 +905,7 @@ type Shadows struct {
 	DotOnline         Shadow //  [deprecated: 侧栏不再显示状态/选中]
 	DotConnecting     Shadow //  [deprecated: 侧栏不再显示状态/选中]
 	Popover           Shadow // 传输浮层
+	Dialog            Shadow // 弹窗阴影
 }
 
 // GlassFade groups tokens.
@@ -924,6 +943,7 @@ type Glass struct {
 	Float          GlassFloat
 	Bar            GlassBar
 	PaneActionBlur float32
+	PaneRevealBlur float32
 }
 
 // Opacities groups tokens.
@@ -951,34 +971,37 @@ type Opacities struct {
 
 // MotionDuration groups tokens.
 type MotionDuration struct {
-	Instant        time.Duration
-	Lift           time.Duration // 拿起
-	Hold           time.Duration // 长按拿起
-	Focus          time.Duration // 焦点/悬停切换
-	Collapse       time.Duration // 分组拖动时全部收起
-	Restore        time.Duration // 恢复展开
-	Cancel         time.Duration // 取消飞回
-	Drop           time.Duration // 落位
-	AutoExpand     time.Duration // 悬停自动展开
-	Flash          time.Duration // 落位闪光
-	FrameInterval  time.Duration
-	Zoom           time.Duration
-	PaneEnter      time.Duration
-	PaneClose      time.Duration
-	DividerFade    time.Duration
-	Sidebar        time.Duration
-	ScrollbarHold  time.Duration
-	ScrollbarFade  time.Duration
-	InstantNonzero time.Duration // 1 ns: MyGo zero Animation selects a default spring
-	Exit           time.Duration // 浮层退出、胶囊淡出
-	AutoHide       time.Duration // 全部完成后胶囊停留
-	Spin           time.Duration // 连接中转圈一周
+	Instant         time.Duration
+	Lift            time.Duration // 拿起
+	Hold            time.Duration // 长按拿起
+	Focus           time.Duration // 焦点/悬停切换
+	Collapse        time.Duration // 分组拖动时全部收起
+	Restore         time.Duration // 恢复展开
+	Cancel          time.Duration // 取消飞回
+	Drop            time.Duration // 落位
+	AutoExpand      time.Duration // 悬停自动展开
+	Flash           time.Duration // 落位闪光
+	FrameInterval   time.Duration
+	Zoom            time.Duration
+	PaneEnter       time.Duration
+	PaneClose       time.Duration
+	DividerFade     time.Duration
+	Sidebar         time.Duration
+	ScrollbarHold   time.Duration
+	ScrollbarFade   time.Duration
+	InstantNonzero  time.Duration // 1 ns: MyGo zero Animation selects a default spring
+	Exit            time.Duration // 浮层退出、胶囊淡出
+	AutoHide        time.Duration // 全部完成后胶囊停留
+	Spin            time.Duration // 连接中转圈一周
+	PaneReveal      time.Duration
+	ConnectionStage time.Duration // SSH 演示连接每个阶段的停留时间
 }
 
 // MotionEasing groups tokens.
 type MotionEasing struct {
-	Out  Bezier
-	Pane Bezier
+	Out    Bezier
+	Pane   Bezier
+	Search Bezier
 }
 
 // MotionSpring groups tokens.
@@ -987,6 +1010,7 @@ type MotionSpring struct {
 	Drop     Spring // 落位
 	Smooth   Spring // 取消 / 平滑（ui.Smooth）
 	Zoom     Spring
+	Content  Spring // 数字内容变化
 }
 
 // MotionDrag groups tokens.
@@ -1099,15 +1123,16 @@ type TitleActionTokens struct {
 
 // RailTokens groups tokens.
 type RailTokens struct {
-	Width         float32     // ← size.rail
-	Gap           float32     // ← space.6
-	PaddingTop    float32     // ← space.4
-	PaddingBottom float32     // ← space.10
-	ButtonSize    float32     // ← size.railButton
-	ButtonRadius  float32     // ← radius.railButton
-	Icon          color.NRGBA // ← color.text.muted
-	BgOn          color.NRGBA // ← color.state.onWindow
-	IconOn        color.NRGBA // ← color.text.primary
+	Width         float32       // ← size.rail
+	Gap           float32       // ← space.6
+	PaddingTop    float32       // ← space.4
+	PaddingBottom float32       // ← space.10
+	ButtonSize    float32       // ← size.railButton
+	ButtonRadius  float32       // ← radius.railButton
+	Icon          color.NRGBA   // ← color.text.muted
+	BgOn          color.NRGBA   // ← color.state.onWindow
+	IconOn        color.NRGBA   // ← color.text.primary
+	Transition    time.Duration // ← motion.duration.focus
 }
 
 // SiderTokens groups tokens.
@@ -1138,20 +1163,22 @@ type SiderTokens struct {
 
 // SearchTokens groups tokens.
 type SearchTokens struct {
-	Height       float32     // ← size.controlLg
-	Radius       float32     // ← radius.control
-	Bg           color.NRGBA // ← color.surface.sunken
-	PaddingX     float32     // ← space.9
-	Gap          float32     // ← space.6
-	MarginX      float32     // ← space.12
-	MarginBottom float32     // ← space.8
-	Text         color.NRGBA // ← color.text.secondary
-	FontSize     float32     // ← font.size.body
-	KbdSize      float32     // ← font.size.caption
-	KbdText      color.NRGBA // ← color.text.tertiary
-	KbdBorder    color.NRGBA // ← color.border.keycap
-	KbdBg        color.NRGBA // ← color.surface.keycap
-	KbdRadius    float32     // ← radius.keycap
+	Height       float32       // ← size.controlLg
+	Radius       float32       // ← radius.control
+	Bg           color.NRGBA   // ← color.surface.sunken
+	PaddingX     float32       // ← space.9
+	Gap          float32       // ← space.6
+	MarginX      float32       // ← space.12
+	MarginBottom float32       // ← space.8
+	Text         color.NRGBA   // ← color.text.secondary
+	FontSize     float32       // ← font.size.body
+	KbdSize      float32       // ← font.size.caption
+	KbdText      color.NRGBA   // ← color.text.tertiary
+	KbdBorder    color.NRGBA   // ← color.border.keycap
+	KbdBg        color.NRGBA   // ← color.surface.keycap
+	KbdRadius    float32       // ← radius.keycap
+	Transition   time.Duration // ← motion.duration.focus
+	Easing       Bezier        // ← motion.easing.search
 }
 
 // GroupHeaderTokens groups tokens.
@@ -1174,40 +1201,43 @@ type GroupHeaderTokens struct {
 	ExpandFill    color.NRGBA   // ← color.accent.default
 	ExpandHeight  float32       // ← size.progressThin
 	ExpandDelay   time.Duration // ← motion.duration.autoExpand
+	Transition    time.Duration // ← motion.duration.focus
+	CountMotion   Spring        // ← motion.spring.content
 }
 
 // SiderItemTokens groups tokens.
 type SiderItemTokens struct {
-	PaddingTop        float32     // ← space.6
-	PaddingRight      float32     // ← space.6
-	PaddingBottom     float32     // ← space.6
-	PaddingLeft       float32     // ← space.8
-	Gap               float32     // ← space.9
-	Radius            float32     // ← radius.control
-	Spacing           float32     // ← space.1
-	BgHover           color.NRGBA // ← color.state.hover
-	BgSelected        color.NRGBA // ← color.state.selected; Deprecated: 侧栏不再显示状态/选中
-	NameSize          float32     // ← font.size.bodyLg
-	NameWeight        int         // ← font.weight.medium
-	NameLineHeight    float32     // ← font.lineHeight.name
-	NameColor         color.NRGBA // ← color.text.primary
-	SubSize           float32     // ← font.size.footnote
-	SubFamily         []string    // ← font.family.mono
-	SubLineHeight     float32     // ← font.lineHeight.sub
-	SubTracking       float32     // ← font.tracking.mono
-	SubColor          color.NRGBA // ← color.text.secondary
-	DotSize           float32     // ← size.dot; Deprecated: 侧栏不再显示状态/选中
-	DotHalo           float32     // ← size.dotHalo; Deprecated: 侧栏不再显示状态/选中
-	DotOnline         color.NRGBA // ← color.success.default; Deprecated: 侧栏不再显示状态/选中
-	DotOnlineHalo     color.NRGBA // ← color.success.halo; Deprecated: 侧栏不再显示状态/选中
-	DotOffline        color.NRGBA // ← color.status.offline; Deprecated: 侧栏不再显示状态/选中
-	DotConnecting     color.NRGBA // ← color.warning.default; Deprecated: 侧栏不再显示状态/选中
-	DotConnectingHalo color.NRGBA // ← color.warning.halo; Deprecated: 侧栏不再显示状态/选中
-	ConnectingText    color.NRGBA // ← color.warning.text; Deprecated: 侧栏不再显示状态/选中
-	MoreSize          float32     // ← size.controlSm
-	MoreRadius        float32     // ← radius.controlSm
-	MoreBg            color.NRGBA // ← color.surface.controlStrong
-	MoreIcon          color.NRGBA // ← color.text.muted
+	PaddingTop        float32       // ← space.6
+	PaddingRight      float32       // ← space.6
+	PaddingBottom     float32       // ← space.6
+	PaddingLeft       float32       // ← space.8
+	Gap               float32       // ← space.9
+	Radius            float32       // ← radius.control
+	Spacing           float32       // ← space.1
+	BgHover           color.NRGBA   // ← color.state.hover
+	BgSelected        color.NRGBA   // ← color.state.selected; Deprecated: 侧栏不再显示状态/选中
+	NameSize          float32       // ← font.size.bodyLg
+	NameWeight        int           // ← font.weight.medium
+	NameLineHeight    float32       // ← font.lineHeight.name
+	NameColor         color.NRGBA   // ← color.text.primary
+	SubSize           float32       // ← font.size.footnote
+	SubFamily         []string      // ← font.family.mono
+	SubLineHeight     float32       // ← font.lineHeight.sub
+	SubTracking       float32       // ← font.tracking.mono
+	SubColor          color.NRGBA   // ← color.text.secondary
+	DotSize           float32       // ← size.dot; Deprecated: 侧栏不再显示状态/选中
+	DotHalo           float32       // ← size.dotHalo; Deprecated: 侧栏不再显示状态/选中
+	DotOnline         color.NRGBA   // ← color.success.default; Deprecated: 侧栏不再显示状态/选中
+	DotOnlineHalo     color.NRGBA   // ← color.success.halo; Deprecated: 侧栏不再显示状态/选中
+	DotOffline        color.NRGBA   // ← color.status.offline; Deprecated: 侧栏不再显示状态/选中
+	DotConnecting     color.NRGBA   // ← color.warning.default; Deprecated: 侧栏不再显示状态/选中
+	DotConnectingHalo color.NRGBA   // ← color.warning.halo; Deprecated: 侧栏不再显示状态/选中
+	ConnectingText    color.NRGBA   // ← color.warning.text; Deprecated: 侧栏不再显示状态/选中
+	MoreSize          float32       // ← size.controlSm
+	MoreRadius        float32       // ← radius.controlSm
+	MoreBg            color.NRGBA   // ← color.surface.controlStrong
+	MoreIcon          color.NRGBA   // ← color.text.muted
+	Transition        time.Duration // ← motion.duration.focus
 }
 
 // OsLogoTokens groups tokens.
@@ -1371,33 +1401,37 @@ type BadgeTokens struct {
 
 // ButtonTokens groups tokens.
 type ButtonTokens struct {
-	Height      float32     // ← size.control
-	Radius      float32     // ← radius.control
-	PaddingX    float32     // ← space.9
-	Gap         float32     // ← space.6
-	FontSize    float32     // ← font.size.body
-	Text        color.NRGBA // ← color.text.strong
-	Border      color.NRGBA // ← color.border.control
-	BorderWidth float32     // ← size.divider
-	PrimaryBg   color.NRGBA // ← color.accent.default
-	PrimaryText color.NRGBA // ← color.text.onAccent
-	BgHover     color.NRGBA // ← color.state.hover
-	BgPressed   color.NRGBA // ← color.state.pressed
+	Height      float32       // ← size.control
+	Radius      float32       // ← radius.control
+	PaddingX    float32       // ← space.9
+	Gap         float32       // ← space.6
+	FontSize    float32       // ← font.size.body
+	Text        color.NRGBA   // ← color.text.strong
+	Border      color.NRGBA   // ← color.border.control
+	BorderWidth float32       // ← size.divider
+	PrimaryBg   color.NRGBA   // ← color.accent.default
+	PrimaryText color.NRGBA   // ← color.text.onAccent
+	BgHover     color.NRGBA   // ← color.state.hover
+	BgPressed   color.NRGBA   // ← color.state.pressed
+	Bg          color.NRGBA   // ← color.surface.control
+	Transition  time.Duration // ← motion.duration.focus
 }
 
 // IconButtonTokens groups tokens.
 type IconButtonTokens struct {
-	Size       float32     // ← size.controlMd
-	SizeSm     float32     // ← size.controlSm
-	SizeXs     float32     // ← size.controlXs
-	Radius     float32     // ← radius.controlSm
-	Icon       color.NRGBA // ← color.icon.default
-	IconSubtle color.NRGBA // ← color.icon.subtle
-	IconFaint  color.NRGBA // ← color.icon.faint
-	Bg         color.NRGBA // ← color.surface.control
-	BgHover    color.NRGBA // ← color.state.hover
-	IconSize   float32     // ← size.icon
-	Stroke     float32     // ← size.iconStroke
+	Size       float32       // ← size.controlMd
+	SizeSm     float32       // ← size.controlSm
+	SizeXs     float32       // ← size.controlXs
+	Radius     float32       // ← radius.controlSm
+	Icon       color.NRGBA   // ← color.icon.default
+	IconSubtle color.NRGBA   // ← color.icon.subtle
+	IconFaint  color.NRGBA   // ← color.icon.faint
+	Bg         color.NRGBA   // ← color.surface.control
+	BgHover    color.NRGBA   // ← color.state.hover
+	IconSize   float32       // ← size.icon
+	Stroke     float32       // ← size.iconStroke
+	BgPressed  color.NRGBA   // ← color.state.pressed
+	Transition time.Duration // ← motion.duration.focus
 }
 
 // FloatButtonTokens groups tokens.
@@ -1412,17 +1446,19 @@ type FloatButtonTokens struct {
 
 // SegmentedTokens groups tokens.
 type SegmentedTokens struct {
-	Bg           color.NRGBA // ← color.surface.control
-	Radius       float32     // ← radius.control
-	Padding      float32     // ← space.2
-	FontSize     float32     // ← font.size.footnote
-	ItemPaddingX float32     // ← space.9
-	ItemPaddingY float32     // ← space.2
-	ItemRadius   float32     // ← radius.chip
-	Text         color.NRGBA // ← color.text.muted
-	BgOn         color.NRGBA // ← color.surface.raised
-	TextOn       color.NRGBA // ← color.text.primary
-	ShadowOn     Shadow      // ← shadow.segment
+	Bg           color.NRGBA   // ← color.surface.control
+	Radius       float32       // ← radius.control
+	Padding      float32       // ← space.2
+	FontSize     float32       // ← font.size.footnote
+	ItemPaddingX float32       // ← space.9
+	ItemPaddingY float32       // ← space.2
+	ItemRadius   float32       // ← radius.chip
+	Text         color.NRGBA   // ← color.text.muted
+	BgOn         color.NRGBA   // ← color.surface.raised
+	TextOn       color.NRGBA   // ← color.text.primary
+	ShadowOn     Shadow        // ← shadow.segment
+	Transition   time.Duration // ← motion.duration.focus
+	BgHover      color.NRGBA   // ← color.state.hover
 }
 
 // BreadcrumbTokens groups tokens.
@@ -1472,15 +1508,18 @@ type ProgressTokens struct {
 
 // TooltipTokens groups tokens.
 type TooltipTokens struct {
-	Bg       color.NRGBA // ← color.tooltip.bg
-	Text     color.NRGBA // ← color.tooltip.text
-	Kbd      color.NRGBA // ← color.tooltip.kbd
-	FontSize float32     // ← font.size.footnote
-	PaddingX float32     // ← space.8
-	PaddingY float32     // ← space.4
-	Radius   float32     // ← radius.controlSm
-	Shadow   Shadow      // ← shadow.tooltip
-	Arrow    float32     // ← space.4
+	Bg         color.NRGBA // ← color.tooltip.bg
+	Text       color.NRGBA // ← color.tooltip.text
+	Kbd        color.NRGBA // ← color.tooltip.kbd
+	FontSize   float32     // ← font.size.footnote
+	PaddingX   float32     // ← space.8
+	PaddingY   float32     // ← space.4
+	Radius     float32     // ← radius.controlSm
+	Shadow     Shadow      // ← shadow.tooltip
+	Arrow      float32     // ← space.4
+	MaxWidth   float32     // ← size.tooltipMaxWidth
+	Offset     float32     // ← space.6
+	RailOffset float32     // ← space.8
 }
 
 // MenuTokens groups tokens.
@@ -1564,6 +1603,15 @@ type DragGhostTokens struct {
 	CountBg      color.NRGBA // ← color.accent.default
 	CountText    color.NRGBA // ← color.text.onAccent
 	CountSize    float32     // ← font.size.caption2
+	Width        float32     // ← size.dragPreviewWidth
+	Height       float32     // ← size.dragPreviewHeight
+	HeaderHeight float32     // ← size.control
+	LineHeight   float32     // ← size.previewLineHeight
+	LineRadius   float32     // ← radius.bar
+	LineColor    color.NRGBA // ← color.fill.skeleton
+	LineLong     float32     // ← size.previewLineLong
+	LineMedium   float32     // ← size.previewLineMedium
+	LineShort    float32     // ← size.previewLineShort
 }
 
 // ReorderMotionTokens groups tokens.
@@ -1637,10 +1685,17 @@ type ScrollbarTokens struct {
 
 // DialogTokens groups tokens.
 type DialogTokens struct {
-	HostWidth  float32 // ← size.hostDialogWidth
-	GroupWidth float32 // ← size.groupDialogWidth
-	PortWidth  float32 // ← size.portFieldWidth
-	TitleSize  float32 // ← size.dialogTitleSize
+	HostWidth     float32     // ← size.hostDialogWidth
+	GroupWidth    float32     // ← size.groupDialogWidth
+	PortWidth     float32     // ← size.portFieldWidth
+	TitleSize     float32     // ← size.dialogTitleSize
+	Bg            color.NRGBA // ← color.surface.raised
+	Backdrop      color.NRGBA // ← color.overlay.backdrop
+	Shadow        Shadow      // ← shadow.dialog
+	Radius        float32     // ← radius.card
+	Padding       float32     // ← space.20
+	Gap           float32     // ← space.12
+	ViewportInset float32     // ← space.20
 }
 
 // StatsTokens groups tokens.
@@ -1673,12 +1728,13 @@ type ProtocolIconTokens struct {
 
 // ConnectionIndicatorTokens groups tokens.
 type ConnectionIndicatorTokens struct {
-	Offline        color.NRGBA // ← color.status.offline
-	Connected      color.NRGBA // ← color.success.default
-	ConnectedHalo  color.NRGBA // ← color.success.halo
-	Connecting     color.NRGBA // ← color.warning.default
-	ConnectingHalo color.NRGBA // ← color.warning.halo
-	Halo           float32     // ← size.dotHalo
+	Offline        color.NRGBA   // ← color.status.offline
+	Connected      color.NRGBA   // ← color.success.default
+	ConnectedHalo  color.NRGBA   // ← color.success.halo
+	Connecting     color.NRGBA   // ← color.warning.default
+	ConnectingHalo color.NRGBA   // ← color.warning.halo
+	Halo           float32       // ← size.dotHalo
+	StageDuration  time.Duration // ← motion.duration.connectionStage
 }
 
 // PaneToggleTokens groups tokens.
@@ -1850,6 +1906,28 @@ type FilePaneTokens struct {
 	GridIconSize     float32 // ← size.fileGridIconSize
 }
 
+// InputTokens groups tokens.
+type InputTokens struct {
+	Height      float32       // ← size.control
+	PaddingX    float32       // ← space.9
+	Radius      float32       // ← radius.control
+	Bg          color.NRGBA   // ← color.surface.control
+	Text        color.NRGBA   // ← color.text.primary
+	FontSize    float32       // ← font.size.body
+	Border      color.NRGBA   // ← color.border.control
+	BorderHover color.NRGBA   // ← color.border.controlHover
+	BorderFocus color.NRGBA   // ← color.accent.default
+	BorderWidth float32       // ← size.divider
+	Transition  time.Duration // ← motion.duration.focus
+}
+
+// PaneRevealTokens groups tokens.
+type PaneRevealTokens struct {
+	Blur     float32       // ← glass.paneRevealBlur
+	Duration time.Duration // ← motion.duration.paneReveal
+	Easing   Bezier        // ← motion.easing.out
+}
+
 // Components 组件层：只由 Semantic 计算得出（见 buildComponents）。
 type Components struct {
 	Window              WindowTokens
@@ -1898,6 +1976,8 @@ type Components struct {
 	TransferDock        TransferDockTokens
 	TransferRow         TransferRowTokens
 	FilePane            FilePaneTokens
+	Input               InputTokens
+	PaneReveal          PaneRevealTokens
 }
 
 // Palette is the primitive tier.
@@ -2075,6 +2155,7 @@ var Palette = PaletteTokens{
 		N18: 18,
 		N22: 22,
 		N24: 24,
+		N20: 20,
 	},
 	Radius: PaletteTokensRadius{
 		N1:  1,
@@ -2175,6 +2256,7 @@ var Palette = PaletteTokens{
 		N6:   6,
 		N9:   9,
 		N16:  16,
+		N8:   8,
 	},
 	Ratio: PaletteTokensRatio{
 		N0:    0,
@@ -2218,13 +2300,15 @@ var Palette = PaletteTokens{
 		DemoTransfer: 13002342.4,
 	},
 	Spring: PaletteTokensSpring{
-		Snappy: Spring{Stiffness: 420, Damping: 34},
-		Drop:   Spring{Duration: 320 * time.Millisecond, Bounce: 0.15},
-		Smooth: Spring{Duration: 300 * time.Millisecond, Bounce: 0},
+		Snappy:  Spring{Stiffness: 420, Damping: 34},
+		Drop:    Spring{Duration: 320 * time.Millisecond, Bounce: 0.15},
+		Smooth:  Spring{Duration: 300 * time.Millisecond, Bounce: 0},
+		Content: Spring{Duration: 350 * time.Millisecond, Bounce: 0},
 	},
 	Easing: PaletteTokensEasing{
 		EaseOut:  Bezier{0, 0, 0.58, 1},
 		Standard: Bezier{0.25, 0.1, 0.25, 1},
+		InOut:    Bezier{0.42, 0, 0.58, 1},
 	},
 	Red: PaletteTokensRed{
 		N50:  color.NRGBA{R: 0xfd, G: 0xec, B: 0xec, A: 0xff},
@@ -2277,6 +2361,7 @@ func lightSemantic() Semantic {
 				OnGlass:         Palette.Black.A10,
 				Raised:          Palette.Black.A08,
 				HairlineStrong:  Palette.Black.A10,
+				ControlHover:    Palette.Gray.N400,
 			},
 			Text: ColorsText{
 				Primary:      Palette.Gray.N900,
@@ -2344,6 +2429,7 @@ func lightSemantic() Semantic {
 				PlaceholderEdge: Palette.Black.A05,
 				Strong:          Palette.Gray.N900,
 				QuietHover:      Palette.Black.A08,
+				Skeleton:        Palette.Gray.N175,
 			},
 			Traffic: ColorsTraffic{
 				Close:    Palette.Traffic.Red,
@@ -2372,6 +2458,9 @@ func lightSemantic() Semantic {
 				SftpGlyph: Palette.Blue.N500,
 				FtpBg:     Palette.Gray.N100,
 				FtpGlyph:  Palette.Gray.N600,
+			},
+			Overlay: ColorsOverlay{
+				Backdrop: Palette.BlackA.A40,
 			},
 		},
 		Radius: Radii{
@@ -2411,6 +2500,7 @@ func lightSemantic() Semantic {
 			N18: Palette.Space.N18,
 			N22: Palette.Space.N22,
 			N24: Palette.Space.N24,
+			N20: Palette.Space.N20,
 		},
 		Size: Sizes{
 			Hairline:                Palette.Size.N0_5,
@@ -2463,8 +2553,8 @@ func lightSemantic() Semantic {
 			SiderMaxWidth:           320,
 			PaneMinWidth:            280,
 			PaneMinHeight:           160,
-			DragPreviewWidth:        360,
-			DragPreviewHeight:       260,
+			DragPreviewWidth:        220,
+			DragPreviewHeight:       140,
 			TabDetachDistance:       8,
 			DragGrabX:               30,
 			DragGrabY:               18,
@@ -2522,6 +2612,11 @@ func lightSemantic() Semantic {
 			TransferDockMaxRows:     Palette.Size.N5,
 			TransferPopoverMaxRows:  Palette.Size.N6,
 			TransferConcurrency:     Palette.Size.N3,
+			TooltipMaxWidth:         Palette.Size.N320,
+			PreviewLineHeight:       Palette.Size.N6,
+			PreviewLineLong:         Palette.Ratio.N0_78,
+			PreviewLineMedium:       Palette.Ratio.N0_6,
+			PreviewLineShort:        Palette.Ratio.N0_45,
 		},
 		Font: Typography{
 			Family: TypographyFamily{
@@ -2568,7 +2663,7 @@ func lightSemantic() Semantic {
 			FloatButton:       Shadow{{X: 0, Y: 2, Blur: 8, Spread: 0, Color: Palette.Black.A10}, {X: 0, Y: 0, Blur: 0, Spread: 0.5, Color: Palette.Black.A08}},
 			Lift:              Shadow{{X: 0, Y: 0, Blur: 0, Spread: 0.5, Color: Palette.Black.A10}, {X: 0, Y: 10, Blur: 28, Spread: 0, Color: Palette.Black.A16}, {X: 0, Y: 2, Blur: 6, Spread: 0, Color: Palette.Black.A08}},
 			LiftStack:         Shadow{{X: 0, Y: 0, Blur: 0, Spread: 0.5, Color: Palette.Black.A08}, {X: 0, Y: 4, Blur: 10, Spread: 0, Color: Palette.Black.A06}},
-			FocusRing:         Shadow{{X: 0, Y: 0, Blur: 0, Spread: 1.5, Color: Palette.Blue.N500}, {X: 0, Y: 0, Blur: 0, Spread: 5, Color: Palette.BlueA.A16}, {X: 0, Y: 8, Blur: 24, Spread: 0, Color: Palette.Black.A10}},
+			FocusRing:         Shadow{{X: 0, Y: 0, Blur: 0, Spread: 1.5, Color: Palette.Blue.N500}},
 			HoverRing:         Shadow{{X: 0, Y: 0, Blur: 0, Spread: 1, Color: Palette.Black.A14}},
 			Flash:             Shadow{{X: 0, Y: 0, Blur: 0, Spread: 1, Color: Palette.BlueA.A18, Inset: true}},
 			Placeholder:       Shadow{{X: 0, Y: 0, Blur: 0, Spread: 1, Color: Palette.Black.A05, Inset: true}},
@@ -2578,6 +2673,7 @@ func lightSemantic() Semantic {
 			DotOnline:         Shadow{{X: 0, Y: 0, Blur: 0, Spread: 3, Color: Palette.GreenA.A14}},
 			DotConnecting:     Shadow{{X: 0, Y: 0, Blur: 0, Spread: 3, Color: Palette.AmberA.A18}},
 			Popover:           Palette.Shadow.Popover,
+			Dialog:            Shadow{{X: 0, Y: 10, Blur: 30, Spread: 0, Color: Palette.BlackA.A30}},
 		},
 		Glass: Glass{
 			Fade: GlassFade{
@@ -2604,6 +2700,7 @@ func lightSemantic() Semantic {
 				Saturate: Palette.Ratio.N1_8,
 			},
 			PaneActionBlur: 4,
+			PaneRevealBlur: Palette.Blur.N8,
 		},
 		Opacity: Opacities{
 			PaneUnfocusedContent:  Palette.Ratio.N0_5,
@@ -2628,38 +2725,42 @@ func lightSemantic() Semantic {
 		},
 		Motion: Motion{
 			Duration: MotionDuration{
-				Instant:        Palette.Duration.N0,
-				Lift:           Palette.Duration.N120,
-				Hold:           Palette.Duration.N150,
-				Focus:          Palette.Duration.N160,
-				Collapse:       Palette.Duration.N180,
-				Restore:        Palette.Duration.N220,
-				Cancel:         Palette.Duration.N300,
-				Drop:           Palette.Duration.N320,
-				AutoExpand:     Palette.Duration.N500,
-				Flash:          Palette.Duration.N600,
-				FrameInterval:  16 * time.Millisecond,
-				Zoom:           240 * time.Millisecond,
-				PaneEnter:      220 * time.Millisecond,
-				PaneClose:      160 * time.Millisecond,
-				DividerFade:    120 * time.Millisecond,
-				Sidebar:        220 * time.Millisecond,
-				ScrollbarHold:  700 * time.Millisecond,
-				ScrollbarFade:  180 * time.Millisecond,
-				InstantNonzero: 1 * time.Nanosecond,
-				Exit:           Palette.Duration.N120,
-				AutoHide:       Palette.Duration.N3000,
-				Spin:           Palette.Duration.N800,
+				Instant:         Palette.Duration.N0,
+				Lift:            Palette.Duration.N120,
+				Hold:            Palette.Duration.N150,
+				Focus:           Palette.Duration.N160,
+				Collapse:        Palette.Duration.N180,
+				Restore:         Palette.Duration.N220,
+				Cancel:          Palette.Duration.N300,
+				Drop:            Palette.Duration.N320,
+				AutoExpand:      Palette.Duration.N500,
+				Flash:           Palette.Duration.N600,
+				FrameInterval:   16 * time.Millisecond,
+				Zoom:            240 * time.Millisecond,
+				PaneEnter:       220 * time.Millisecond,
+				PaneClose:       160 * time.Millisecond,
+				DividerFade:     120 * time.Millisecond,
+				Sidebar:         220 * time.Millisecond,
+				ScrollbarHold:   700 * time.Millisecond,
+				ScrollbarFade:   180 * time.Millisecond,
+				InstantNonzero:  1 * time.Nanosecond,
+				Exit:            Palette.Duration.N120,
+				AutoHide:        Palette.Duration.N3000,
+				Spin:            Palette.Duration.N800,
+				PaneReveal:      Palette.Duration.N220,
+				ConnectionStage: Palette.Duration.N300,
 			},
 			Easing: MotionEasing{
-				Out:  Palette.Easing.EaseOut,
-				Pane: Bezier{0.2, 0.8, 0.2, 1},
+				Out:    Palette.Easing.EaseOut,
+				Pane:   Bezier{0.2, 0.8, 0.2, 1},
+				Search: Palette.Easing.InOut,
 			},
 			Spring: MotionSpring{
 				Displace: Palette.Spring.Snappy,
 				Drop:     Palette.Spring.Drop,
 				Smooth:   Palette.Spring.Smooth,
 				Zoom:     Spring{Duration: 240 * time.Millisecond, Bounce: 0},
+				Content:  Palette.Spring.Content,
 			},
 			Drag: MotionDrag{
 				Threshold:      Palette.Size.N4,
@@ -2744,7 +2845,7 @@ func darkOverrides(s *Semantic) {
 	s.Shadow.PaneOutline = Shadow{{X: 0, Y: 0, Blur: 0, Spread: 0.5, Color: Palette.WhiteA.A10, Inset: true}}
 	s.Shadow.TitleTab = Shadow{{X: 0, Y: 0, Blur: 0, Spread: 0.5, Color: Palette.WhiteA.A10}, {X: 0, Y: 1, Blur: 2, Spread: 0, Color: Palette.BlackA.A30}}
 	s.Shadow.Lift = Shadow{{X: 0, Y: 0, Blur: 0, Spread: 0.5, Color: Palette.WhiteA.A14}, {X: 0, Y: 10, Blur: 28, Spread: 0, Color: Palette.BlackA.A45}, {X: 0, Y: 2, Blur: 6, Spread: 0, Color: Palette.BlackA.A25}}
-	s.Shadow.FocusRing = Shadow{{X: 0, Y: 0, Blur: 0, Spread: 1.5, Color: Palette.Blue.N500}, {X: 0, Y: 0, Blur: 0, Spread: 5, Color: Palette.BlueA.A28}, {X: 0, Y: 8, Blur: 24, Spread: 0, Color: Palette.BlackA.A40}}
+	s.Shadow.FocusRing = Shadow{{X: 0, Y: 0, Blur: 0, Spread: 1.5, Color: Palette.Blue.N500}}
 	s.Shadow.HoverRing = Shadow{{X: 0, Y: 0, Blur: 0, Spread: 1, Color: Palette.WhiteA.A20}}
 	s.Shadow.Ghost = Shadow{{X: 0, Y: 8, Blur: 24, Spread: 0, Color: Palette.BlackA.A45}, {X: 0, Y: 0, Blur: 0, Spread: 0.5, Color: Palette.WhiteA.A12}}
 	s.Shadow.Tooltip = Shadow{{X: 0, Y: 4, Blur: 12, Spread: 0, Color: Palette.BlackA.A40}}
@@ -2769,6 +2870,9 @@ func darkOverrides(s *Semantic) {
 	s.Color.Protocol.FtpGlyph = Palette.Graphite.N250
 	s.Color.Fill.QuietHover = Palette.WhiteA.A12
 	s.Shadow.Popover = Palette.Shadow.PopoverDark
+	s.Color.Border.ControlHover = Palette.Graphite.N550
+	s.Shadow.Dialog = Shadow{{X: 0, Y: 10, Blur: 30, Spread: 0, Color: Palette.BlackA.A50}}
+	s.Color.Fill.Skeleton = Palette.Graphite.N550
 }
 
 func buildComponents(s *Semantic) Components {
@@ -2853,6 +2957,7 @@ func buildComponents(s *Semantic) Components {
 			Icon:          s.Color.Text.Muted,
 			BgOn:          s.Color.State.OnWindow,
 			IconOn:        s.Color.Text.Primary,
+			Transition:    s.Motion.Duration.Focus,
 		},
 		Sider: SiderTokens{
 			Width:               s.Size.Sider,
@@ -2893,6 +2998,8 @@ func buildComponents(s *Semantic) Components {
 			KbdBorder:    s.Color.Border.Keycap,
 			KbdBg:        s.Color.Surface.Keycap,
 			KbdRadius:    s.Radius.Keycap,
+			Transition:   s.Motion.Duration.Focus,
+			Easing:       s.Motion.Easing.Search,
 		},
 		GroupHeader: GroupHeaderTokens{
 			Height:        s.Size.GroupRow,
@@ -2913,6 +3020,8 @@ func buildComponents(s *Semantic) Components {
 			ExpandFill:    s.Color.Accent.Default,
 			ExpandHeight:  s.Size.ProgressThin,
 			ExpandDelay:   s.Motion.Duration.AutoExpand,
+			Transition:    s.Motion.Duration.Focus,
+			CountMotion:   s.Motion.Spring.Content,
 		},
 		SiderItem: SiderItemTokens{
 			PaddingTop:        s.Space.N6,
@@ -2945,6 +3054,7 @@ func buildComponents(s *Semantic) Components {
 			MoreRadius:        s.Radius.ControlSm,
 			MoreBg:            s.Color.Surface.ControlStrong,
 			MoreIcon:          s.Color.Text.Muted,
+			Transition:        s.Motion.Duration.Focus,
 		},
 		OsLogo: OsLogoTokens{
 			Size:           s.Size.OsLogo,
@@ -3102,6 +3212,8 @@ func buildComponents(s *Semantic) Components {
 			PrimaryText: s.Color.Text.OnAccent,
 			BgHover:     s.Color.State.Hover,
 			BgPressed:   s.Color.State.Pressed,
+			Bg:          s.Color.Surface.Control,
+			Transition:  s.Motion.Duration.Focus,
 		},
 		IconButton: IconButtonTokens{
 			Size:       s.Size.ControlMd,
@@ -3115,6 +3227,8 @@ func buildComponents(s *Semantic) Components {
 			BgHover:    s.Color.State.Hover,
 			IconSize:   s.Size.Icon,
 			Stroke:     s.Size.IconStroke,
+			BgPressed:  s.Color.State.Pressed,
+			Transition: s.Motion.Duration.Focus,
 		},
 		FloatButton: FloatButtonTokens{
 			Size:        s.Size.ControlLg,
@@ -3136,6 +3250,8 @@ func buildComponents(s *Semantic) Components {
 			BgOn:         s.Color.Surface.Raised,
 			TextOn:       s.Color.Text.Primary,
 			ShadowOn:     s.Shadow.Segment,
+			Transition:   s.Motion.Duration.Focus,
+			BgHover:      s.Color.State.Hover,
 		},
 		Breadcrumb: BreadcrumbTokens{
 			Height:    s.Size.ControlMd,
@@ -3177,15 +3293,18 @@ func buildComponents(s *Semantic) Components {
 			FillDone:    s.Color.Success.Default,
 		},
 		Tooltip: TooltipTokens{
-			Bg:       s.Color.Tooltip.Bg,
-			Text:     s.Color.Tooltip.Text,
-			Kbd:      s.Color.Tooltip.Kbd,
-			FontSize: s.Font.Size.Footnote,
-			PaddingX: s.Space.N8,
-			PaddingY: s.Space.N4,
-			Radius:   s.Radius.ControlSm,
-			Shadow:   s.Shadow.Tooltip,
-			Arrow:    s.Space.N4,
+			Bg:         s.Color.Tooltip.Bg,
+			Text:       s.Color.Tooltip.Text,
+			Kbd:        s.Color.Tooltip.Kbd,
+			FontSize:   s.Font.Size.Footnote,
+			PaddingX:   s.Space.N8,
+			PaddingY:   s.Space.N4,
+			Radius:     s.Radius.ControlSm,
+			Shadow:     s.Shadow.Tooltip,
+			Arrow:      s.Space.N4,
+			MaxWidth:   s.Size.TooltipMaxWidth,
+			Offset:     s.Space.N6,
+			RailOffset: s.Space.N8,
 		},
 		Menu: MenuTokens{
 			Bg:            s.Color.Surface.Raised,
@@ -3259,6 +3378,15 @@ func buildComponents(s *Semantic) Components {
 			CountBg:      s.Color.Accent.Default,
 			CountText:    s.Color.Text.OnAccent,
 			CountSize:    s.Font.Size.Caption2,
+			Width:        s.Size.DragPreviewWidth,
+			Height:       s.Size.DragPreviewHeight,
+			HeaderHeight: s.Size.Control,
+			LineHeight:   s.Size.PreviewLineHeight,
+			LineRadius:   s.Radius.Bar,
+			LineColor:    s.Color.Fill.Skeleton,
+			LineLong:     s.Size.PreviewLineLong,
+			LineMedium:   s.Size.PreviewLineMedium,
+			LineShort:    s.Size.PreviewLineShort,
 		},
 		ReorderMotion: ReorderMotionTokens{
 			Displace:      s.Motion.Spring.Displace,
@@ -3324,10 +3452,17 @@ func buildComponents(s *Semantic) Components {
 			Color:        s.Color.Status.Scrollbar,
 		},
 		Dialog: DialogTokens{
-			HostWidth:  s.Size.HostDialogWidth,
-			GroupWidth: s.Size.GroupDialogWidth,
-			PortWidth:  s.Size.PortFieldWidth,
-			TitleSize:  s.Size.DialogTitleSize,
+			HostWidth:     s.Size.HostDialogWidth,
+			GroupWidth:    s.Size.GroupDialogWidth,
+			PortWidth:     s.Size.PortFieldWidth,
+			TitleSize:     s.Size.DialogTitleSize,
+			Bg:            s.Color.Surface.Raised,
+			Backdrop:      s.Color.Overlay.Backdrop,
+			Shadow:        s.Shadow.Dialog,
+			Radius:        s.Radius.Card,
+			Padding:       s.Space.N20,
+			Gap:           s.Space.N12,
+			ViewportInset: s.Space.N20,
 		},
 		Stats: StatsTokens{
 			HeaderHeight: s.Size.StatsHeaderHeight,
@@ -3358,6 +3493,7 @@ func buildComponents(s *Semantic) Components {
 			Connecting:     s.Color.Warning.Default,
 			ConnectingHalo: s.Color.Warning.Halo,
 			Halo:           s.Size.DotHalo,
+			StageDuration:  s.Motion.Duration.ConnectionStage,
 		},
 		PaneToggle: PaneToggleTokens{
 			Size:       s.Size.ControlMd,
@@ -3511,6 +3647,24 @@ func buildComponents(s *Semantic) Components {
 			ContentPadding:   s.Space.N8,
 			NameMinWidth:     s.Size.FileNameMinWidth,
 			GridIconSize:     s.Size.FileGridIconSize,
+		},
+		Input: InputTokens{
+			Height:      s.Size.Control,
+			PaddingX:    s.Space.N9,
+			Radius:      s.Radius.Control,
+			Bg:          s.Color.Surface.Control,
+			Text:        s.Color.Text.Primary,
+			FontSize:    s.Font.Size.Body,
+			Border:      s.Color.Border.Control,
+			BorderHover: s.Color.Border.ControlHover,
+			BorderFocus: s.Color.Accent.Default,
+			BorderWidth: s.Size.Divider,
+			Transition:  s.Motion.Duration.Focus,
+		},
+		PaneReveal: PaneRevealTokens{
+			Blur:     s.Glass.PaneRevealBlur,
+			Duration: s.Motion.Duration.PaneReveal,
+			Easing:   s.Motion.Easing.Out,
 		},
 	}
 }

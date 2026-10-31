@@ -23,12 +23,12 @@ func statusDot(c *ui.Context, state connectionState, size float32) {
 		color = tokenColor(t.C.ConnectionIndicator.Connecting)
 		halo = tokenColor(t.C.ConnectionIndicator.ConnectingHalo)
 	}
-	ui.Box(c).Size(size+2*t.C.ConnectionIndicator.Halo, size+2*t.C.ConnectionIndicator.Halo).Center().Children(func() {
-		dot := ui.Box(c).Size(size, size).Radius(t.Radius.Pill).Background(color)
+	ui.Box(c).Size(size+2*t.C.ConnectionIndicator.Halo, size+2*t.C.ConnectionIndicator.Halo).Center().PassThrough().Children(func() {
+		dot := ui.Box(c).Size(size, size).Radius(t.Radius.Pill).Background(color).PassThrough()
 		if state != disconnected {
 			dot.Border(t.C.ConnectionIndicator.Halo, halo).Size(size+2*t.C.ConnectionIndicator.Halo, size+2*t.C.ConnectionIndicator.Halo).
 				Background(ui.Transparent).Children(func() {
-				ui.Box(c).Fill().Radius(t.Radius.Pill).Background(color)
+				ui.Box(c).Fill().Radius(t.Radius.Pill).Background(color).PassThrough()
 			})
 		}
 	})
@@ -36,8 +36,12 @@ func statusDot(c *ui.Context, state connectionState, size float32) {
 
 func (a *app) sidebar(c *ui.Context, shown float32) {
 	t := theme.Current()
-	ui.Column(c).Width(a.sidebarWidth).FillHeight().Left(a.sidebarWidth * (shown - 1)).
-		Label("远程主机目录").Children(func() {
+	directoryLabel, searchLabel, placeholder := "远程主机目录", "搜索主机、地址或系统", "搜索主机、标签"
+	if a.section == sectionFiles {
+		directoryLabel, searchLabel, placeholder = "文件站点目录", "搜索站点、地址或系统", "搜索站点、标签"
+	}
+	ui.Column(c).Width(a.page().sidebarWidth).FillHeight().Left(a.page().sidebarWidth * (shown - 1)).
+		Label(directoryLabel).Children(func() {
 		ui.Row(c).Shrink(0).Padding(
 			t.C.Sider.HeaderPaddingTop,
 			t.C.Sider.HeaderPaddingRight,
@@ -67,9 +71,9 @@ func (a *app) sidebar(c *ui.Context, shown float32) {
 		ui.Row(c).Height(t.C.Search.Height).Shrink(0).
 			Margin(0, t.C.Search.MarginX, t.C.Search.MarginBottom, t.C.Search.MarginX).
 			Radius(t.C.Search.Radius).Background(tokenColor(t.C.Search.Bg)).Children(func() {
-			ui.TextInputBase(c.Key("host-search"), &a.query).Bind(&a.search).Fill().MinWidth(0).
+			ui.TextInputBase(c.Key("host-search"), &a.page().query).Bind(&a.page().search).Fill().MinWidth(0).
 				Padding(0, t.C.Search.PaddingX, 0, t.C.Search.Height).Radius(t.C.Search.Radius).
-				FontSize(t.C.Search.FontSize).Placeholder("搜索主机、标签").Label("搜索主机、地址或系统")
+				FontSize(t.C.Search.FontSize).Placeholder(placeholder).Label(searchLabel)
 			// The icon shares the input's bounds without intercepting text editing.
 			ui.Row(c).Absolute().Top(0).Right(0).Bottom(0).Left(0).
 				Padding(0, t.C.Search.PaddingX).PassThrough().Children(func() {
@@ -98,89 +102,89 @@ type hostDraft struct {
 }
 
 func (a *app) startHostDraft() {
-	a.draft = hostDraft{
+	a.page().draft = hostDraft{
 		user: "root", port: "22", group: a.groups[0].name, system: systems[0].name,
 		protocol: "SFTP", files: a.section == sectionFiles,
 	}
-	a.addHostOpen = true
+	a.page().addHostOpen = true
 }
 
 func (a *app) hostDialog(c *ui.Context) {
 	t := theme.Current()
-	ui.Modal(c, &a.addHostOpen, func() {
+	modal(c, &a.page().addHostOpen, func() {
 		ui.Column(c).Width(t.C.Dialog.HostWidth).Gap(t.Space.N14).Children(func() {
-			if a.draft.deleting {
+			if a.page().draft.deleting {
 				a.deleteSiteDialogContents(c)
 				return
 			}
 			title := "添加 SSH 主机"
-			if a.draft.files {
+			if a.page().draft.files {
 				title = "添加文件站点"
-				if a.draft.editing {
+				if a.page().draft.editing {
 					title = "编辑文件站点"
 				}
 			}
 			ui.Text(c, title).FontSize(t.C.Dialog.TitleSize).FontWeight(t.Font.Weight.Semibold)
 			ui.Text(c, "保存到主机目录，不会连接服务器。").FontSize(t.Font.Size.Small).TextColor(tokenColor(t.Color.Text.Secondary))
-			if a.draft.files {
+			if a.page().draft.files {
 				ui.Text(c, "协议").FontSize(t.Font.Size.Small)
-				ui.Select(c, &a.draft.protocol, []string{"SFTP", "FTP"}).OnChange(func() {
-					if a.draft.protocol == "FTP" {
-						a.draft.port = "21"
+				ui.Select(c, &a.page().draft.protocol, []string{"SFTP", "FTP"}).OnChange(func() {
+					if a.page().draft.protocol == "FTP" {
+						a.page().draft.port = "21"
 					} else {
-						a.draft.port = "22"
+						a.page().draft.port = "22"
 					}
 				})
 			}
-			draftField(c, "名称", &a.draft.name)
-			draftField(c, "主机地址", &a.draft.address)
+			draftField(c, "名称", &a.page().draft.name)
+			draftField(c, "主机地址", &a.page().draft.address)
 			ui.Row(c).Gap(t.Space.N12).Children(func() {
-				ui.Column(c).Grow(1).Gap(t.Space.N6).Children(func() { draftField(c, "用户名", &a.draft.user) })
-				ui.Column(c).Width(t.C.Dialog.PortWidth).Gap(t.Space.N6).Children(func() { draftField(c, "端口", &a.draft.port) })
+				ui.Column(c).Grow(1).Gap(t.Space.N6).Children(func() { draftField(c, "用户名", &a.page().draft.user) })
+				ui.Column(c).Width(t.C.Dialog.PortWidth).Gap(t.Space.N6).Children(func() { draftField(c, "端口", &a.page().draft.port) })
 			})
 			ui.Text(c, "分组").FontSize(t.Font.Size.Small)
 			groupNames := a.groupNames()
-			ui.Select(c, &a.draft.group, groupNames)
+			ui.Select(c, &a.page().draft.group, groupNames)
 			names := []string{}
 			for _, system := range systems {
 				names = append(names, system.name)
 			}
 			ui.Text(c, "系统").FontSize(t.Font.Size.Small)
-			ui.Select(c, &a.draft.system, names)
-			port, err := strconv.Atoi(a.draft.port)
+			ui.Select(c, &a.page().draft.system, names)
+			port, err := strconv.Atoi(a.page().draft.port)
 			validPort := err == nil && port > 0 && port <= 65535
-			validHost := strings.TrimSpace(a.draft.name) != "" && strings.TrimSpace(a.draft.address) != ""
-			validUser := strings.TrimSpace(a.draft.user) != ""
+			validHost := strings.TrimSpace(a.page().draft.name) != "" && strings.TrimSpace(a.page().draft.address) != ""
+			validUser := strings.TrimSpace(a.page().draft.user) != ""
 			canAdd := validPort && validHost && validUser
 			ui.Row(c).Justify(ui.End).Gap(t.Space.N8).Children(func() {
-				ui.Button(c, "取消").OnClick(func() { a.addHostOpen = false })
+				button(c, "取消").OnClick(func() { a.page().addHostOpen = false })
 				label := "添加"
-				if a.draft.editing {
+				if a.page().draft.editing {
 					label = "保存"
 				}
-				ui.PrimaryButton(c, label).Disabled(!canAdd).
+				primaryButton(c, label).Disabled(!canAdd).
 					OnClick(func() {
 						err := a.commitCatalogMove(func() {
 							protocol := ""
-							if a.draft.files {
-								protocol = strings.ToLower(a.draft.protocol)
+							if a.page().draft.files {
+								protocol = strings.ToLower(a.page().draft.protocol)
 							}
 							h := host{
-								name: strings.TrimSpace(a.draft.name), address: strings.TrimSpace(a.draft.address),
-								user: strings.TrimSpace(a.draft.user), port: port,
-								os: slices.Index(names, a.draft.system), system: a.draft.system, protocol: protocol,
+								name: strings.TrimSpace(a.page().draft.name), address: strings.TrimSpace(a.page().draft.address),
+								user: strings.TrimSpace(a.page().draft.user), port: port,
+								os: slices.Index(names, a.page().draft.system), system: a.page().draft.system, protocol: protocol,
 							}
 							id := hostID(len(a.hosts))
-							group := a.groups[slices.Index(groupNames, a.draft.group)]
-							if a.draft.editing {
-								id = a.draft.id
+							group := a.groups[slices.Index(groupNames, a.page().draft.group)]
+							if a.page().draft.editing {
+								id = a.page().draft.id
 								previous := a.hosts[id]
 								previous.name, previous.address, previous.user = h.name, h.address, h.user
 								previous.port, previous.os, previous.system = h.port, h.os, h.system
 								previous.protocol = h.protocol
 								a.hosts[id] = previous
 								for _, group := range a.groups {
-									if group.name != a.draft.group {
+									if group.name != a.page().draft.group {
 										group.hosts = slices.DeleteFunc(group.hosts, func(candidate hostID) bool { return candidate == id })
 									}
 								}
@@ -190,14 +194,14 @@ func (a *app) hostDialog(c *ui.Context) {
 							if !slices.Contains(group.hosts, id) {
 								group.hosts = append(group.hosts, id)
 							}
-							group.collapsed = false
+							a.setGroupCollapsed(group, false)
 						})
 						if err != nil {
 							c.Toast("保存主机失败：" + err.Error())
 							return
 						}
-						a.query = ""
-						a.addHostOpen = false
+						a.page().query = ""
+						a.page().addHostOpen = false
 					})
 			})
 		})
@@ -205,32 +209,32 @@ func (a *app) hostDialog(c *ui.Context) {
 }
 
 func (a *app) startGroupDraft() {
-	a.groupDraft = ""
-	a.groupDialogOpen = true
+	a.page().groupDraft = ""
+	a.page().groupDialogOpen = true
 }
 
 func (a *app) groupDialog(c *ui.Context) {
 	t := theme.Current()
-	ui.Modal(c, &a.groupDialogOpen, func() {
+	modal(c, &a.page().groupDialogOpen, func() {
 		ui.Column(c).Width(t.C.Dialog.GroupWidth).Gap(t.Space.N14).Children(func() {
 			ui.Text(c, "新建分组").FontSize(t.C.Dialog.TitleSize).FontWeight(t.Font.Weight.Semibold)
 			ui.Text(c, "将主机拖入分组，整理主机目录。").FontSize(t.Font.Size.Small).TextColor(tokenColor(t.Color.Text.Secondary))
-			ui.TextInput(c, &a.groupDraft).AutoFocus().Label("分组名称").Placeholder("分组名称").FillWidth()
-			name := strings.TrimSpace(a.groupDraft)
+			textInput(c, &a.page().groupDraft).AutoFocus().Label("分组名称").Placeholder("分组名称").FillWidth()
+			name := strings.TrimSpace(a.page().groupDraft)
 			duplicate := slices.Contains(a.groupNames(), name)
 			if duplicate {
 				ui.Text(c, "此分组名称已存在").FontSize(t.Font.Size.Caption).TextColor(a.theme.Danger)
 			}
 			ui.Row(c).Gap(t.Space.N8).Justify(ui.End).Children(func() {
-				ui.Button(c, "取消").OnClick(func() { a.groupDialogOpen = false })
-				ui.PrimaryButton(c, "创建").Disabled(name == "" || duplicate).OnClick(func() {
+				button(c, "取消").OnClick(func() { a.page().groupDialogOpen = false })
+				primaryButton(c, "创建").Disabled(name == "" || duplicate).OnClick(func() {
 					if err := a.commitCatalogMove(func() {
 						a.groups = append(a.groups, &hostGroup{id: len(a.groups), name: name, hosts: []hostID{}})
 					}); err != nil {
 						c.Toast("保存分组失败：" + err.Error())
 						return
 					}
-					a.groupDialogOpen, a.query = false, ""
+					a.page().groupDialogOpen, a.page().query = false, ""
 				})
 			})
 		})
@@ -241,6 +245,6 @@ func draftField(c *ui.Context, label string, value *string) {
 	t := theme.Current()
 	ui.Column(c).Gap(t.Space.N6).Children(func() {
 		ui.Text(c, label).FontSize(t.Font.Size.Small)
-		ui.TextInput(c, value).Label(label).FillWidth()
+		textInput(c, value).Label(label).FillWidth()
 	})
 }

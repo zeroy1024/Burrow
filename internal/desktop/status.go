@@ -22,6 +22,16 @@ func (a *app) serverStatus(c *ui.Context) {
 		ui.Text(c, "选择一个终端查看状态").FontSize(t.Font.Size.Small).TextColor(tokenColor(t.Color.Text.Secondary)).Padding(t.Space.N14)
 		return
 	}
+	state := a.currentTab().focused.state
+	if state != connected {
+		message := "会话未连接"
+		if state == connecting {
+			message = "正在连接，等待服务器状态…"
+		}
+		ui.Text(c, message).FontSize(t.Font.Size.Small).
+			TextColor(tokenColor(t.Color.Text.Secondary)).Padding(t.Space.N14)
+		return
+	}
 	h := a.hosts[id]
 	viewport := ui.Box(c).Key("status-viewport").Grow(1).MinHeight(0).Clip()
 	viewport.Children(func() {

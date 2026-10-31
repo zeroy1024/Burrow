@@ -1,6 +1,7 @@
 package desktop
 
 import (
+	"slices"
 	"time"
 
 	"sshdesk/internal/termtheme"
@@ -12,74 +13,117 @@ import (
 
 type section int
 
+type sidebarMotionKey section
+
+type pageHeaderKey section
+
+type pageDialogKey struct {
+	section section
+	kind    string
+}
+
 const (
 	sectionSSH section = iota
 	sectionFiles
 	sectionSettings
 )
 
-type app struct {
-	section           section
-	appearance        int
-	theme             *ui.Theme
+type pageState struct {
 	sidebarCollapsed  bool
 	sidebarWidth      float32
-	hosts             []host
-	groups            []*hostGroup
-	tabs              []*workspaceTab
-	activeTab         int
-	nextTab           int
-	nextSession       int
 	query             string
 	search            ui.Handle
-	tabScroll         ui.ScrollState
-	tabPress          ui.Point
-	statusVisible     bool
 	addHostOpen       bool
 	draft             hostDraft
 	groupDialogOpen   bool
 	groupDraft        string
-	window            *mygo.Window
-	minimumWindow     [2]int
-	workArea          ui.Handle
-	pointer           ui.Point
-	cellWidth         float32
-	cellFont          ui.Font
-	cellTracking      float32
-	terminal          terminalSettingsState
-	terminalError     error
-	drag              *paneDragState
-	dragSeen          bool
-	pendingDock       func()
-	dockPreview       *ui.Rect
-	resizing          *terminalLayout
-	catalogConfig     catalogConfigState
-	catalogError      error
 	catalogScroll     ui.ScrollState
 	catalogScrollbar  scrollbarState
-	statusScroll      ui.ScrollState
-	statusScrollbar   scrollbarState
 	catalogItems      map[catalogKey]*catalogItemMotion
 	catalogDrag       *catalogDragState
 	catalogSlots      []catalogSlot
 	catalogFlash      *catalogKey
 	catalogFlashSeed  int
 	catalogFlashUntil time.Time
-	fileSessions      []*fileSession
-	activeFile        int
-	nextFileSession   int
-	files             fileWorkspaceState
-	filePrefs         filePreferencesState
-	transfers         transferQueueState
+}
+
+type app struct {
+	section          section
+	pages            [sectionSettings + 1]pageState
+	appearance       int
+	theme            *ui.Theme
+	hosts            []host
+	groups           []*hostGroup
+	tabs             []*workspaceTab
+	activeTab        int
+	nextTab          int
+	nextSession      int
+	tabScroll        ui.ScrollState
+	tabPress         ui.Point
+	statusVisible    bool
+	window           *mygo.Window
+	minimumWindow    [2]int
+	workArea         ui.Handle
+	pointer          ui.Point
+	cellWidth        float32
+	cellFont         ui.Font
+	cellTracking     float32
+	terminal         terminalSettingsState
+	terminalError    error
+	drag             *paneDragState
+	dragSeen         bool
+	pendingDock      func()
+	dockPreview      *ui.Rect
+	resizing         *terminalLayout
+	catalogConfig    catalogConfigState
+	catalogError     error
+	statusScroll     ui.ScrollState
+	statusScrollbar  scrollbarState
+	fileSessions     []*fileSession
+	activeFile       int
+	nextFileSession  int
+	files            fileWorkspaceState
+	filePrefs        filePreferencesState
+	transfers        transferQueueState
+	settingsCategory int
+}
+
+func (a *app) page() *pageState {
+	return &a.pages[a.section]
+}
+
+func (a *app) switchSection(target section) {
+	if a.section == target {
+		return
+	}
+	// Drag previews belong to the page being left; catalog data is only changed on drop.
+	page := a.page()
+	page.catalogDrag, page.catalogFlash = nil, nil
+	for _, item := range page.catalogItems {
+		item.offset = ui.Point{}
+	}
+	if d := a.drag; d != nil && d.kind == dragTab && d.phase == dragActive {
+		active := a.currentTab()
+		a.tabs = slices.Clone(d.order)
+		a.activeTab = slices.Index(a.tabs, active)
+	}
+	a.drag, a.resizing, a.pendingDock, a.dockPreview = nil, nil, nil, nil
+	a.files.drag = nil
+	a.section = target
+	if target == sectionFiles && len(a.fileSessions) == 0 && len(a.hosts) > 0 {
+		a.openFileHost(0)
+	}
 }
 
 // Run starts the native desktop application and its main window.
 func Run() error {
 	a := &app{
-		sidebarWidth: theme.Current().C.Sider.Width,
-		hosts:        demoHosts(),
-		groups:       demoGroups(),
-		tabs:         []*workspaceTab{},
+		hosts:  demoHosts(),
+		groups: demoGroups(),
+		tabs:   []*workspaceTab{},
+	}
+	for i := range a.pages {
+		a.pages[i].sidebarWidth = theme.Current().C.Sider.Width
 	}
 	a.catalogError = a.loadCatalog()
 	a.terminalError = a.loadTerminalSettings()
@@ -140,21 +184,27 @@ func (a *app) view(c *ui.Context) {
 	root := ui.Column(c).Fill()
 	x, y, _ := root.PointerPosition()
 	a.pointer = ui.Point{X: x, Y: y}
-	a.beginWorkspaceFrame(c)
-	a.beginCatalogFrame(c)
+	if a.section == sectionSSH {
+		a.beginWorkspaceFrame(c)
+	}
+	if a.section != sectionSettings {
+		a.beginCatalogFrame(c)
+	}
+	a.enforcePaneMinimum(c)
 	a.files.dragSeen = false
+	a.updateSSHConnections(c)
 	a.tickTransfers(c)
 	target := float32(1)
-	if a.sidebarCollapsed {
+	if a.page().sidebarCollapsed {
 		target = 0
 	}
-	shown := root.Animate("sidebar", target, t.MotionDuration(t.C.Desktop.SidebarDuration, c.Preferences().ReduceMotion))
+	shown := root.AnimateTo(sidebarMotionKey(a.section), target, tokenTween(t.C.Desktop.SidebarDuration))
 	if a.section == sectionSSH {
 		a.paneShortcuts(c)
 	}
-	if c.Shortcut(ui.Super, ui.KeyK) {
-		a.sidebarCollapsed = false
-		a.search.Focus()
+	if a.section != sectionSettings && c.Shortcut(ui.Super, ui.KeyK) {
+		a.page().sidebarCollapsed = false
+		a.page().search.Focus()
 	}
 	if a.section == sectionSSH && c.Shortcut(ui.Super, ui.KeyD) && a.currentTab() != nil {
 		tab := a.currentTab()
@@ -163,24 +213,33 @@ func (a *app) view(c *ui.Context) {
 		a.splitSession(tab.focused, stacked)
 	}
 	root.Children(func() {
-		a.titleBar(c, shown)
-		ui.Row(c).Grow(1).MinHeight(0).AlignItems(ui.Stretch).Children(func() {
-			a.navigation(c)
-			if a.section == sectionSettings {
-				a.settings(c)
-			} else {
-				a.workspace(c, shown)
+		ui.Column(c).Key(pageHeaderKey(a.section)).FillWidth().Shrink(0).Children(func() {
+			switch a.section {
+			case sectionSSH:
+				a.titleBar(c, shown)
+			case sectionFiles:
+				a.fileTitleBar(c, shown)
+			case sectionSettings:
+				a.settingsTitleBar(c, shown)
 			}
 		})
-		if a.pendingDock != nil {
-			a.pendingDock()
-			a.pendingDock = nil
-			c.AnimationFrame()
+		ui.Row(c).Grow(1).MinHeight(0).AlignItems(ui.Stretch).Children(func() {
+			a.navigation(c)
+			a.workspace(c, shown)
+		})
+		if a.section == sectionSSH {
+			if a.pendingDock != nil {
+				a.pendingDock()
+				a.pendingDock = nil
+				c.AnimationFrame()
+			}
+			a.finishWorkspaceDrag(c)
+			a.dragPreview(c)
 		}
-		a.finishWorkspaceDrag(c)
-		a.dragPreview(c)
-		a.finishCatalogDrag(c)
-		a.catalogDragPreview(c)
+		if a.section != sectionSettings {
+			a.finishCatalogDrag(c)
+			a.catalogDragPreview(c)
+		}
 	})
 	if a.catalogError != nil {
 		c.Toast("无法加载主机配置：" + a.catalogError.Error())
@@ -190,9 +249,17 @@ func (a *app) view(c *ui.Context) {
 		c.Toast("终端设置：" + a.terminalError.Error())
 		a.terminalError = nil
 	}
-	a.hostDialog(c)
-	a.groupDialog(c)
-	a.fileDialogs(c)
+	if a.section != sectionSettings {
+		if a.page().addHostOpen {
+			a.hostDialog(c.Key(pageDialogKey{section: a.section, kind: "host"}))
+		}
+		if a.page().groupDialogOpen {
+			a.groupDialog(c.Key(pageDialogKey{section: a.section, kind: "group"}))
+		}
+	}
+	if a.section == sectionFiles {
+		a.fileDialogs(c)
+	}
 	if a.files.drag != nil && !a.files.dragSeen {
 		a.files.drag = nil
 		c.AnimationFrame()
@@ -241,34 +308,31 @@ func (a *app) navigationButton(c *ui.Context, target section, label string, icon
 		Label(label).Description(label).Selected(a.section == target).
 		TextColor(tokenColor(r.Icon))
 	button.OnClick(func() {
-		a.section = target
-		if target == sectionFiles && len(a.fileSessions) == 0 && len(a.hosts) > 0 {
-			a.openFileHost(0)
-		}
+		a.switchSection(target)
 	})
+	background := ui.Transparent
 	switch {
 	case button.Pressed():
-		button.Background(tokenColor(t.C.Desktop.RailPressed))
+		background = tokenColor(t.C.Desktop.RailPressed)
 	case a.section == target:
-		button.Background(tokenColor(r.BgOn))
+		background = tokenColor(r.BgOn)
 	case button.Hovered():
-		button.Background(tokenColor(t.C.Desktop.RailHover))
+		background = tokenColor(t.C.Desktop.RailHover)
 	}
+	button.Background(button.AnimateColor("background", background, tokenTween(r.Transition)))
 	button.Children(func() {
 		ui.Icon(c, icon).Size(t.Size.IconMd, t.Size.IconMd)
 	})
 	ui.TooltipBase(c, button, func(tip ui.Element) {
 		p := t.C.Tooltip
-		tip.AttachTo(button, ui.AnchorRight, ui.AnchorLeft).MarginStart(t.Space.N8).
-			Padding(p.PaddingY, p.PaddingX).Radius(p.Radius).
-			Background(tokenColor(p.Bg)).TextColor(tokenColor(p.Text)).FontSize(p.FontSize)
-		applyShadow(tip, p.Shadow).Children(func() { ui.Text(c, label) })
+		styleTooltip(tip).AttachTo(button, ui.AnchorRight, ui.AnchorLeft).
+			MarginStart(p.RailOffset).Children(func() { ui.Text(c, label) })
 	})
 }
 
 func (a *app) workspace(c *ui.Context, shown float32) {
 	t := theme.Current()
-	panel := ui.Row(c).Grow(1).MinWidth(0).AlignItems(ui.Stretch).
+	panel := ui.Row(c).Key(a.section).Grow(1).MinWidth(0).AlignItems(ui.Stretch).
 		Margin(
 			0,
 			t.C.Window.Gutter,
@@ -276,22 +340,38 @@ func (a *app) workspace(c *ui.Context, shown float32) {
 			0,
 		)
 	statusTarget := float32(1)
-	if !a.statusVisible {
+	if a.section != sectionSSH || !a.statusVisible {
 		statusTarget = 0
 	}
-	statusShown := panel.Animate("status", statusTarget, t.MotionDuration(t.C.Desktop.SidebarDuration, c.Preferences().ReduceMotion))
+	statusShown := panel.AnimateTo("status", statusTarget, tokenTween(t.C.Desktop.SidebarDuration))
 	statusOpacity := animateVisual(panel, "status-opacity", statusTarget, t.C.Desktop.SidebarDuration)
 	panel.Children(func() {
-		workspaceCard(c).Key("sessions").Width(a.sidebarWidth * shown).Shrink(0).
+		workspaceCard(c).Key("sessions").Width(a.page().sidebarWidth * shown).Shrink(0).
 			MarginEnd(t.C.Window.Gutter * shown).Hidden(shown == 0).Children(func() {
-			a.sidebar(c, shown)
+			if a.section == sectionSettings {
+				a.settingsSidebar(c, shown)
+			} else {
+				a.sidebar(c, shown)
+			}
 		})
+		if a.section == sectionSettings {
+			a.settings(c)
+			a.sidebarResizeHandle(c, shown)
+			return
+		}
 		if a.section == sectionFiles {
 			a.fileWorkspace(c)
 			a.sidebarResizeHandle(c, shown)
 			return
 		}
-		a.terminals(c)
+		width, height := c.Size()
+		// Both cards and the terminal use this frame's sidebar/monitor progress.
+		sidebarWidth := (a.page().sidebarWidth + t.C.Window.Gutter) * shown
+		statusWidth := (t.Size.StatsPanel + t.C.Window.Gutter) * statusShown
+		a.terminals(c, ui.Point{
+			X: width - t.C.Rail.Width - t.C.Window.Gutter - sidebarWidth - statusWidth,
+			Y: height - max(t.C.Titlebar.Height, c.TitleBar().Height) - t.C.Window.Gutter,
+		})
 		status := workspaceCard(c).Key("status").Width(t.Size.StatsPanel * statusShown).Shrink(0).
 			MarginStart(t.C.Window.Gutter * statusShown).Hidden(statusShown == 0 && statusOpacity == 0)
 		if c.Preferences().ReduceMotion && !a.statusVisible && statusOpacity > 0 {
@@ -314,13 +394,21 @@ func workspaceCard(c *ui.Context) ui.Element {
 
 func (a *app) sidebarResizeHandle(c *ui.Context, shown float32) {
 	t := theme.Current()
+	label := "调整会话栏宽度"
+	switch a.section {
+	case sectionFiles:
+		label = "调整站点栏宽度"
+	case sectionSettings:
+		label = "调整设置栏宽度"
+	}
 	// The transparent resize target covers the gap above both cards.
 	edge := ui.Box(c).Key("resize-sidebar").Absolute().Top(0).Bottom(0).
-		Left(a.sidebarWidth * shown).Width(t.C.Window.Gutter * shown).
-		Hidden(shown != 1).Cursor(ui.CursorResizeEW).Focusable().Role(ui.RoleSplitter).
-		Label("调整会话栏宽度")
+		Left(a.page().sidebarWidth * shown).Width(t.C.Window.Gutter * shown).
+		Hidden(shown != 1).Cursor(ui.CursorResizeEW).Focusable().FocusRing(false).Center().Role(ui.RoleSplitter).
+		Label(label)
 	var delta float32
-	if dx, _, dragging := edge.Dragged(); dragging {
+	dx, _, dragging := edge.Dragged()
+	if dragging {
 		edge.Focus()
 		delta = dx
 	}
@@ -331,7 +419,20 @@ func (a *app) sidebarResizeHandle(c *ui.Context, shown float32) {
 		delta += t.C.Desktop.SiderKeyboardStep
 	}
 	if delta != 0 {
-		a.sidebarWidth = min(max(a.sidebarWidth+delta, t.C.Desktop.SiderMinWidth), t.C.Desktop.SiderMaxWidth)
+		a.page().sidebarWidth = min(max(a.page().sidebarWidth+delta, t.C.Desktop.SiderMinWidth), t.C.Desktop.SiderMaxWidth)
 	}
-	edge.Range(float64(t.C.Desktop.SiderMinWidth), float64(t.C.Desktop.SiderMaxWidth), float64(a.sidebarWidth))
+	edge.Range(float64(t.C.Desktop.SiderMinWidth), float64(t.C.Desktop.SiderMaxWidth), float64(a.page().sidebarWidth))
+	visible := float32(0)
+	if edge.Hovered() || dragging || edge.FocusVisible() {
+		visible = 1
+	}
+	color := tokenColor(t.C.Desktop.DividerHandleColor)
+	if dragging {
+		color = tokenColor(t.C.DropIndicator.LineColor)
+	}
+	edge.Children(func() {
+		ui.Box(c).Size(t.C.Desktop.DividerHandleWidth, t.C.Desktop.DividerHandleHeight).
+			Radius(t.C.Desktop.DividerHandleRadius).Background(color).PassThrough().
+			Opacity(animateVisual(edge, "handle", visible, t.C.Desktop.DividerFadeDuration))
+	})
 }

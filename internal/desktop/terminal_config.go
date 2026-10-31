@@ -24,7 +24,6 @@ type terminalSettingsState struct {
 	path        string
 	loadErr     error
 	scroll      ui.ScrollState
-	licenses    bool
 	importing   bool
 }
 

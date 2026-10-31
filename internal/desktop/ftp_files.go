@@ -351,7 +351,8 @@ func (a *app) revealTransferredFile(c *ui.Context, task *transferTask) {
 		a.fileSessions = append(a.fileSessions, task.session)
 		index = len(a.fileSessions) - 1
 	}
-	a.section, a.activeFile = sectionFiles, index
+	a.switchSection(sectionFiles)
+	a.activeFile = index
 	pane := task.session.remote
 	if task.sourceRemote {
 		pane, a.files.localOpen = task.session.local, true

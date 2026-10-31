@@ -2,7 +2,6 @@ package desktop
 
 import (
 	"slices"
-	"time"
 
 	"sshdesk/internal/termtheme"
 	"sshdesk/internal/theme"
@@ -62,8 +61,7 @@ func paneFocusShadows(pane ui.Element, focused, multiple bool, surface *theme.Th
 		return
 	}
 	applyShadowOpacity(pane, t.RingHover, hover)
-	// The first layer is the blue outline; omit the halo and raised shadow.
-	applyShadowOpacity(pane, t.RingFocused[:1], focus)
+	applyShadowOpacity(pane, t.RingFocused, focus)
 }
 
 func terminalActivity(c *ui.Context, session *remoteSession, surface *theme.Theme) {
@@ -77,7 +75,7 @@ func terminalActivity(c *ui.Context, session *remoteSession, surface *theme.Them
 		})
 	}
 	if session.hasBell {
-		ui.Row(c).Shrink(0).Padding(b.PaddingY, b.PaddingRight, b.PaddingY, b.PaddingLeft).Radius(b.Radius).Label("会话响铃").Tooltip("会话响铃").
+		tooltip(c, ui.Row(c).Shrink(0).Padding(b.PaddingY, b.PaddingRight, b.PaddingY, b.PaddingLeft).Radius(b.Radius).Label("会话响铃"), "会话响铃").
 			Background(tokenColor(b.BellBg)).PassThrough().Children(func() {
 			ui.Icon(c, bellIcon).Size(b.BellIconSize, b.BellIconSize).TextColor(tokenColor(b.BellText))
 		})
@@ -89,15 +87,15 @@ func (a *app) terminalCursor(c *ui.Context, session *remoteSession, focused bool
 	background := termtheme.TerminalBackground(scheme, theme.Current().C.Pane.Bg, prefs.Background)
 	surface := terminalSurface(background)
 	width := a.terminalCellWidth()
-	height := min(prefs.LineHeight, prefs.FontSize+3.5)
+	height := min(prefs.LineHeight, prefs.FontSize+termtheme.CursorHeightPadding)
 	cursor := ui.Box(c).Key("terminal-cursor").Size(width, height).Shrink(0).
-		Radius(1).Margin(0, 0, 1.5, 0).Unselectable()
+		Radius(termtheme.CursorRadius).Margin(0, 0, termtheme.CursorBottomInset, 0).Unselectable()
 	if !focused {
 		cursor.InsetShadow(
 			0,
 			0,
 			0,
-			1.2,
+			termtheme.CursorOutlineWidth,
 			tokenColor(surface.C.PaneFocus.CursorRingUnfocused),
 		)
 		return
@@ -106,9 +104,9 @@ func (a *app) terminalCursor(c *ui.Context, session *remoteSession, focused bool
 		mark := ui.Box(c).Absolute().Left(0).Bottom(0).Background(tokenColor(scheme.Cursor))
 		switch prefs.CursorShape {
 		case termtheme.CursorBar:
-			mark.Size(1.5, height)
+			mark.Size(termtheme.CursorBarWidth, height)
 		case termtheme.CursorUnderline:
-			mark.Size(width, 2)
+			mark.Size(width, termtheme.CursorUnderlineSize)
 		default:
 			mark.Size(width, height).Children(func() {
 				ui.Text(c, text).TextColor(tokenColor(scheme.CursorText)).SingleLine()
@@ -121,7 +119,7 @@ func (a *app) terminalCursor(c *ui.Context, session *remoteSession, focused bool
 	if session.cursorStarted.IsZero() {
 		session.cursorStarted = c.Now()
 	}
-	const interval = 500 * time.Millisecond
+	const interval = termtheme.CursorBlinkInterval
 	phase := c.Now().Sub(session.cursorStarted) % (2 * interval)
 	if phase >= interval {
 		cursor.Opacity(0)

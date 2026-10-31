@@ -64,27 +64,127 @@ func tokenEasing(b theme.Bezier) ui.Easing {
 	return ui.CubicBezier(b[0], b[1], b[2], b[3])
 }
 
+func tokenTween(duration time.Duration) ui.Animation {
+	return ui.Animation{Duration: duration, Ease: tokenEasing(theme.Current().Motion.Easing.Out)}
+}
+
 // MyGo suppresses scalar animations under ReduceMotion, but AnimateColor keeps
 // color and alpha transitions. Encode visual-only values in its alpha channel.
 func animateVisual(e ui.Element, key any, target float32, duration time.Duration) float32 {
 	c := ui.Color{A: uint8(math.Round(float64(target * 255)))}
-	value := e.AnimateColor(key, c, ui.Animation{Duration: duration})
+	value := e.AnimateColor(key, c, tokenTween(duration))
 	if value.A == c.A {
 		return target
 	}
 	return float32(value.A) / 255
 }
 
+func button(c *ui.Context, label string) ui.Element {
+	return styledButton(c, label, false)
+}
+
+func primaryButton(c *ui.Context, label string) ui.Element {
+	return styledButton(c, label, true)
+}
+
+func styledButton(c *ui.Context, label string, primary bool) ui.Element {
+	p := theme.Current().C.Button
+	e := ui.ButtonBase(c).Height(p.Height).Padding(0, p.PaddingX).Gap(p.Gap).
+		Radius(p.Radius).FontSize(p.FontSize).Label(label)
+	bg, fg := p.Bg, p.Text
+	if primary {
+		bg, fg = p.PrimaryBg, p.PrimaryText
+	} else {
+		e.Border(p.BorderWidth, tokenColor(p.Border))
+		switch {
+		case e.Pressed():
+			bg = p.BgPressed
+		case e.Hovered():
+			bg = p.BgHover
+		}
+	}
+	e.Background(e.AnimateColor("background", tokenColor(bg), tokenTween(p.Transition))).
+		TextColor(tokenColor(fg)).Children(func() { ui.Text(c, label).SingleLine() })
+	return e
+}
+
+func textInput(c *ui.Context, value *string) ui.Element {
+	p := theme.Current().C.Input
+	e := ui.TextInputBase(c, value).Height(p.Height).Padding(0, p.PaddingX).
+		Radius(p.Radius).FontSize(p.FontSize).TextColor(tokenColor(p.Text)).Background(tokenColor(p.Bg))
+	border := p.Border
+	switch {
+	case e.Focused():
+		border = p.BorderFocus
+	case e.Hovered():
+		border = p.BorderHover
+	}
+	return e.Border(p.BorderWidth, e.AnimateColor("border", tokenColor(border), tokenTween(p.Transition)))
+}
+
+func modal(c *ui.Context, open *bool, content func()) {
+	p := theme.Current().C.Dialog
+	width, height := c.Size()
+	ui.DialogBase(c, open, func(backdrop, panel ui.Element) {
+		backdrop.Background(tokenColor(p.Backdrop))
+		panel.Padding(p.Padding).Gap(p.Gap).Radius(p.Radius).Background(tokenColor(p.Bg)).
+			MaxWidth(width - 2*p.ViewportInset).MaxHeight(height - 2*p.ViewportInset)
+		applyShadow(panel, p.Shadow)
+		content()
+	})
+}
+
+func styleTooltip(tip ui.Element) ui.Element {
+	p := theme.Current().C.Tooltip
+	return applyShadow(tip.MaxWidth(p.MaxWidth).Padding(p.PaddingY, p.PaddingX).
+		Radius(p.Radius).Background(tokenColor(p.Bg)).TextColor(tokenColor(p.Text)).FontSize(p.FontSize), p.Shadow)
+}
+
+func tooltip(c *ui.Context, anchor ui.Element, label string) ui.Element {
+	anchor.Description(label)
+	ui.TooltipBase(c, anchor, func(tip ui.Element) {
+		styleTooltip(tip).AttachTo(anchor, ui.AnchorTop, ui.AnchorBottom).
+			Margin(0, 0, theme.Current().C.Tooltip.Offset, 0).Children(func() { ui.Text(c, label) })
+	})
+	return anchor
+}
+
+func styleIconButton(e ui.Element, t *theme.Theme) ui.Element {
+	p := t.C.IconButton
+	bg := ui.Transparent
+	switch {
+	case e.Pressed():
+		bg = tokenColor(p.BgPressed)
+	case e.Hovered():
+		bg = tokenColor(p.BgHover)
+	}
+	return e.Size(p.Size, p.Size).Radius(p.Radius).TextColor(tokenColor(p.Icon)).
+		Background(e.AnimateColor("background", bg, tokenTween(p.Transition)))
+}
+
+func styleSegment(e ui.Element, p theme.SegmentedTokens, selected bool) ui.Element {
+	bg, fg, shadow := ui.Transparent, tokenColor(p.Text), float32(0)
+	if selected {
+		bg, fg, shadow = tokenColor(p.BgOn), tokenColor(p.TextOn), 1
+	} else if e.Hovered() {
+		bg = tokenColor(p.BgHover)
+	}
+	animation := tokenTween(p.Transition)
+	e.Background(e.AnimateColor("background", bg, animation)).
+		TextColor(e.AnimateColor("text", fg, animation))
+	return applyShadowOpacity(e, p.ShadowOn, animateVisual(e, "shadow", shadow, p.Transition))
+}
+
 func nativeTheme(t *theme.Theme) *ui.Theme {
 	return &ui.Theme{
 		Dark:           t.IsDark,
 		Background:     tokenColor(t.C.Window.Bg),
-		Surface:        tokenColor(t.C.IconButton.Bg),
+		Surface:        tokenColor(t.C.Button.Bg),
 		SurfaceHover:   tokenColor(t.C.Button.BgHover),
 		SurfacePressed: tokenColor(t.C.Button.BgPressed),
 		Border:         tokenColor(t.C.Button.Border),
-		Text:           tokenColor(t.C.Pane.Name),
-		TextMuted:      tokenColor(t.C.Pane.Host),
+		Text:           tokenColor(t.Color.Text.Primary),
+		TextMuted:      tokenColor(t.Color.Text.Secondary),
 		Accent:         tokenColor(t.C.Button.PrimaryBg),
 		AccentHover:    tokenColor(t.C.Button.PrimaryBg),
 		AccentPressed:  tokenColor(t.C.Button.PrimaryBg),

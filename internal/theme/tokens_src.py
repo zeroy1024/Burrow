@@ -165,7 +165,7 @@ SEM={
    'floatButton':SH([L(0,2,8,0,P('black.a10')),L(0,0,0,.5,P('black.a08'))],'FTP 中缝传输按钮'),
    'lift':SH([L(0,0,0,.5,P('black.a10')),L(0,10,28,0,P('black.a16')),L(0,2,6,0,P('black.a08'))],'拖动中卡片'),
    'liftStack':SH([L(0,0,0,.5,P('black.a08')),L(0,4,10,0,P('black.a06'))],'多选叠卡'),
-   'focusRing':SH([L(0,0,0,1.5,P('blue.500')),L(0,0,0,5,P('blueA.a16')),L(0,8,24,0,P('black.a10'))],'焦点 D：1.5px 蓝环 + 5px 光晕 + 浮起'),
+   'focusRing':SH([L(0,0,0,1.5,P('blue.500'))],'焦点窗格：仅 1.5px 蓝色描边'),
    'hoverRing':SH([L(0,0,0,1,P('black.a14'))],'非焦点窗格悬停'),
    'flash':SH([L(0,0,0,1,P('blueA.a18'),True)],'落位闪光内描边'),
    'placeholder':SH([L(0,0,0,1,P('black.a05'),True)]),
@@ -222,7 +222,7 @@ DARK={
  'shadow.card':[L(0,0,0,.5,P('whiteA.a08'))],'shadow.paneOutline':[L(0,0,0,.5,P('whiteA.a10'),True)],
  'shadow.titleTab':[L(0,0,0,.5,P('whiteA.a10')),L(0,1,2,0,P('blackA.a30'))],
  'shadow.lift':[L(0,0,0,.5,P('whiteA.a14')),L(0,10,28,0,P('blackA.a45')),L(0,2,6,0,P('blackA.a25'))],
- 'shadow.focusRing':[L(0,0,0,1.5,P('blue.500')),L(0,0,0,5,P('blueA.a28')),L(0,8,24,0,P('blackA.a40'))],
+ 'shadow.focusRing':[L(0,0,0,1.5,P('blue.500'))],
  'shadow.hoverRing':[L(0,0,0,1,P('whiteA.a20'))],
  'shadow.ghost':[L(0,8,24,0,P('blackA.a45')),L(0,0,0,.5,P('whiteA.a12'))],
  'shadow.tooltip':[L(0,4,12,0,P('blackA.a40'))],'shadow.float':[L(0,0,0,.5,P('whiteA.a14')),L(0,4,12,0,P('blackA.a30'))],
@@ -331,7 +331,7 @@ SEM['size'].update({
  'windowMinWidth':D(1000), 'windowMinHeight':D(640),
  'trafficLightY':D(17), 'siderMinWidth':D(236), 'siderMaxWidth':D(320),
  'paneMinWidth':D(280), 'paneMinHeight':D(160),
- 'dragPreviewWidth':D(360), 'dragPreviewHeight':D(260),
+ 'dragPreviewWidth':D(220), 'dragPreviewHeight':D(140),
  'tabDetachDistance':D(8), 'dragGrabX':D(30), 'dragGrabY':D(18),
  'paneEnterOffset':D(12), 'dividerHandleWidth':D(3),
  'dividerHandleHeight':D(28), 'dividerKeyboardStep':D(8),
@@ -630,3 +630,56 @@ DEPRECATED_COMP={
 }
 for key in ['dotOnline','dotConnecting','osSelected']:
  SEM['shadow'][key].desc += ' [deprecated: 侧栏不再显示状态/选中]'
+
+# Shared desktop controls and motion. Keep framework behavior in the Base APIs;
+# all application styling is resolved here before the MyGo adapter consumes it.
+PALETTE['space']['20']=D(20)
+PALETTE['easing']['inOut']=BZ([.42,0,.58,1])
+PALETTE['spring']['content']=SP({'duration':350,'bounce':0})
+SEM['space']['20']=D(P('space.20'))
+SEM['color']['overlay']={'backdrop':C(P('blackA.a40'),'弹窗遮罩')}
+SEM['color']['border']['controlHover']=C(P('gray.400'),'输入框悬停描边')
+DARK['color.border.controlHover']=P('graphite.550')
+SEM['shadow']['dialog']=SH([L(0,10,30,0,P('blackA.a30'))],'弹窗阴影')
+DARK['shadow.dialog']=[L(0,10,30,0,P('blackA.a50'))]
+SEM['motion']['easing']['search']=BZ(P('easing.inOut'))
+SEM['motion']['spring']['content']=SP(P('spring.content'),'数字内容变化')
+SEM['size']['tooltipMaxWidth']=D(P('size.320'),'提示最大宽度')
+COMP['button'].update({'bg':'color.surface.control','transition':'motion.duration.focus'})
+COMP['iconButton'].update({'bgPressed':'color.state.pressed','transition':'motion.duration.focus'})
+for component in ['rail','siderItem','groupHeader','segmented']:
+ COMP[component]['transition']='motion.duration.focus'
+COMP['groupHeader']['countMotion']='motion.spring.content'
+COMP['search'].update({'transition':'motion.duration.focus','easing':'motion.easing.search'})
+COMP['input']={
+ 'height':'size.control','paddingX':'space.9','radius':'radius.control',
+ 'bg':'color.surface.control','text':'color.text.primary','fontSize':'font.size.body',
+ 'border':'color.border.control','borderHover':'color.border.controlHover',
+ 'borderFocus':'color.accent.default','borderWidth':'size.divider','transition':'motion.duration.focus',
+}
+COMP['segmented']['bgHover']='color.state.hover'
+COMP['tooltip'].update({'maxWidth':'size.tooltipMaxWidth','offset':'space.6','railOffset':'space.8'})
+COMP['dialog'].update({
+ 'bg':'color.surface.raised','backdrop':'color.overlay.backdrop','shadow':'shadow.dialog',
+ 'radius':'radius.card','padding':'space.20','gap':'space.12','viewportInset':'space.20',
+})
+
+# Compact Shell drag preview and reveal at the final pane size.
+PALETTE['blur']['8']=D(8)
+SEM['size']['previewLineHeight']=D(P('size.6'))
+SEM['size']['previewLineLong']=N(P('ratio.0_78'))
+SEM['size']['previewLineMedium']=N(P('ratio.0_6'))
+SEM['size']['previewLineShort']=N(P('ratio.0_45'))
+SEM['color']['fill']['skeleton']=C(P('gray.175'))
+DARK['color.fill.skeleton']=P('graphite.550')
+SEM['glass']['paneRevealBlur']=D(P('blur.8'))
+SEM['motion']['duration']['paneReveal']=MS(P('duration.220'))
+COMP['dragGhost'].update({
+ 'width':'size.dragPreviewWidth','height':'size.dragPreviewHeight','headerHeight':'size.control',
+ 'lineHeight':'size.previewLineHeight','lineRadius':'radius.bar','lineColor':'color.fill.skeleton',
+ 'lineLong':'size.previewLineLong','lineMedium':'size.previewLineMedium','lineShort':'size.previewLineShort',
+})
+COMP['paneReveal']={'blur':'glass.paneRevealBlur','duration':'motion.duration.paneReveal','easing':'motion.easing.out'}
+
+SEM['motion']['duration']['connectionStage']=MS(P('duration.300'),'SSH 演示连接每个阶段的停留时间')
+COMP['connectionIndicator']['stageDuration']='motion.duration.connectionStage'

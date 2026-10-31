@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 )
 
 //go:embed schemes/*
@@ -267,6 +268,17 @@ const (
 	CursorBlock CursorShape = iota
 	CursorBar
 	CursorUnderline
+)
+
+// Cursor metrics belong to terminal rendering, independently of app controls.
+const (
+	CursorHeightPadding float32 = 3.5
+	CursorRadius        float32 = 1
+	CursorBottomInset   float32 = 1.5
+	CursorOutlineWidth  float32 = 1.2
+	CursorBarWidth      float32 = 1.5
+	CursorUnderlineSize float32 = 2
+	CursorBlinkInterval         = 500 * time.Millisecond
 )
 
 // Prefs are terminal font/cursor preferences. They are not part of a

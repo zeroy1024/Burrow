@@ -10,6 +10,68 @@ import (
 	"github.com/egoist/mygo/ui"
 )
 
+var settingsCategories = [...]struct {
+	label string
+	icon  *ui.SVG
+}{
+	{label: "外观", icon: appearanceIcon},
+	{label: "终端配色", icon: paletteIcon},
+	{label: "文字与光标", icon: textCursorIcon},
+	{label: "关于 / 致谢", icon: infoIcon},
+}
+
+func (a *app) settingsTitleBar(c *ui.Context, shown float32) {
+	t := theme.Current()
+	bar := c.TitleBar()
+	ui.Row(c).Height(max(t.C.Titlebar.Height, bar.Height)).Shrink(0).
+		Gap(t.Space.N6).DragWindow().Label("设置标题栏").Children(func() {
+		ui.Row(c).Width(max(t.C.Rail.Width+a.page().sidebarWidth*shown, bar.Left+t.C.Titlebar.Height)).
+			Shrink(0).PaddingStart(bar.Left + t.C.Titlebar.LeftGap).DragWindow().Children(func() {
+			label := "收起设置栏"
+			if a.page().sidebarCollapsed {
+				label = "展开设置栏"
+			}
+			keyedIconButton(c, "settings-sidebar-toggle", label, sidebarIcon).
+				OnClick(func() { a.page().sidebarCollapsed = !a.page().sidebarCollapsed })
+		})
+		ui.Text(c, "设置").FontSize(t.C.Sider.TitleSize).FontWeight(t.C.Sider.TitleWeight)
+	})
+}
+
+func (a *app) settingsSidebar(c *ui.Context, shown float32) {
+	t := theme.Current()
+	ui.Column(c).Width(a.page().sidebarWidth).FillHeight().Left(a.page().sidebarWidth * (shown - 1)).
+		Label("设置分类").Children(func() {
+		ui.Text(c, "设置").FontSize(t.C.Sider.TitleSize).FontWeight(t.C.Sider.TitleWeight).
+			Padding(t.C.Sider.HeaderPaddingTop, t.C.Sider.HeaderPaddingRight,
+				t.C.Sider.HeaderPaddingBottom, t.C.Sider.HeaderPaddingLeft)
+		ui.Column(c).FillWidth().Padding(t.C.Catalog.ListPaddingY, t.C.Catalog.ListPaddingX).
+			Gap(t.C.Catalog.RowGap).Children(func() {
+			for index, category := range settingsCategories {
+				item := ui.ButtonBase(c).Key(index).FillWidth().Height(t.C.GroupHeader.Height).
+					Padding(0, t.C.GroupHeader.PaddingX).Radius(t.C.GroupHeader.Radius).
+					Justify(ui.Start).AlignItems(ui.Center).Gap(t.C.SiderItem.Gap).
+					Label(category.label).Selected(a.settingsCategory == index)
+				bg, fg := ui.Transparent, tokenColor(t.Color.Text.Primary)
+				if a.settingsCategory == index {
+					bg, fg = tokenColor(t.Color.State.SelectedAccent), tokenColor(t.Color.Text.AccentStrong)
+				} else if item.Hovered() {
+					bg = tokenColor(t.Color.State.Hover)
+				}
+				animation := tokenTween(t.C.GroupHeader.Transition)
+				item.Background(item.AnimateColor("background", bg, animation)).
+					TextColor(item.AnimateColor("text", fg, animation)).OnClick(func() {
+					a.settingsCategory = index
+					a.terminal.scroll.Y = 0
+				}).Children(func() {
+					ui.Icon(c, category.icon).Size(t.Size.Icon, t.Size.Icon).Shrink(0).PassThrough()
+					ui.Text(c, category.label).FontSize(t.Font.Size.Body).SingleLine().PassThrough()
+				})
+			}
+		})
+	})
+}
+
 func (a *app) syncAppearance() {
 	dark := mygo.Theme.IsDark()
 	if theme.Current().IsDark != dark {
@@ -29,17 +91,20 @@ func (a *app) setAppearance(index int) {
 
 func (a *app) settings(c *ui.Context) {
 	t := theme.Current()
-	workspaceCard(c).Key("settings").Grow(1).MinHeight(0).
-		Margin(0, t.C.Window.BodyPaddingRight, t.C.Window.BodyPaddingBottom, 0).
+	workspaceCard(c).Key("settings").Grow(1).MinWidth(0).MinHeight(0).
 		Children(func() {
 			ui.Scroll(c).Fill().TrackScroll(&a.terminal.scroll).Children(func() {
-				ui.Column(c).FillWidth().Padding(t.Space.N24).Gap(t.Space.N18).Children(func() {
-					ui.Text(c, "设置").FontSize(t.C.Dialog.TitleSize).FontWeight(t.Font.Weight.Semibold)
-					a.appearanceSettings(c)
-					a.terminalColorSettings(c)
-					a.terminalTextSettings(c)
-					ui.Button(c, "关于 / 致谢").OnClick(func() { a.terminal.licenses = !a.terminal.licenses })
-					if a.terminal.licenses {
+				ui.Column(c).Key(a.settingsCategory).FillWidth().Padding(t.Space.N24).Gap(t.Space.N18).Children(func() {
+					ui.Text(c, settingsCategories[a.settingsCategory].label).
+						FontSize(t.C.Dialog.TitleSize).FontWeight(t.Font.Weight.Semibold)
+					switch a.settingsCategory {
+					case 0:
+						a.appearanceSettings(c)
+					case 1:
+						a.terminalColorSettings(c)
+					case 2:
+						a.terminalTextSettings(c)
+					case 3:
 						ui.Text(c, termtheme.Licenses).FillWidth().FontSize(t.Font.Size.Body).
 							TextColor(tokenColor(t.Color.Text.Primary))
 					}
@@ -59,10 +124,7 @@ func (a *app) appearanceSettings(c *ui.Context) {
 						Selected(a.appearance == index).FontSize(p.FontSize).
 						Padding(p.ItemPaddingY, p.ItemPaddingX).Radius(p.ItemRadius).
 						TextColor(tokenColor(p.Text)).OnClick(func() { a.setAppearance(index) })
-					if a.appearance == index {
-						button.Background(tokenColor(p.BgOn)).TextColor(tokenColor(p.TextOn))
-						applyShadow(button, p.ShadowOn)
-					}
+					styleSegment(button, p, a.appearance == index)
 					button.Children(func() { ui.Text(c, label) })
 				}
 			})
@@ -81,7 +143,7 @@ func (a *app) terminalColorSettings(c *ui.Context) {
 				scheme, _ := termtheme.Lookup(name)
 				a.terminalSchemeRow(c, name, termtheme.Fixed(name), scheme)
 			}
-			ui.Button(c, "导入文件…").Disabled(a.terminal.importing).OnClick(a.chooseTerminalTheme)
+			button(c, "导入文件…").Disabled(a.terminal.importing).OnClick(a.chooseTerminalTheme)
 		})
 	})
 	settingsRow(c, "终端背景", func() {
@@ -116,11 +178,7 @@ func (a *app) terminalSchemeRow(c *ui.Context, label string, mode termtheme.Mode
 	button := ui.ButtonBase(c).Key(label).FillWidth().Padding(p.ItemPaddingY, p.ItemPaddingX).
 		Radius(p.ItemRadius).Label(label).Selected(selected).TextColor(tokenColor(p.Text)).
 		OnClick(func() { a.changeTerminalSettings(func() { a.terminal.mode = mode }) })
-	if selected {
-		button.Background(tokenColor(p.BgOn)).TextColor(tokenColor(p.TextOn))
-	} else if button.Hovered() {
-		button.Background(tokenColor(t.C.Button.BgHover))
-	}
+	styleSegment(button, p, selected)
 	button.Children(func() {
 		ui.Row(c).FillWidth().Gap(t.Space.N16).AlignItems(ui.Center).PassThrough().Children(func() {
 			ui.Text(c, label).FontSize(p.FontSize).Grow(1)

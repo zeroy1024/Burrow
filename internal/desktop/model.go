@@ -1,6 +1,7 @@
 package desktop
 
 import (
+	"fmt"
 	"math"
 	"time"
 
@@ -30,23 +31,27 @@ type host struct {
 }
 
 type workspaceTab struct {
-	id                int
-	root              *terminalLayout
-	focused           *remoteSession
-	maximized         bool
-	frame             ui.Handle
-	zoomFrom, zoomMix float32
-	zoomStarted       time.Time
-	zoomPending       bool
-	layoutDuration    time.Duration
-	layoutPending     bool
-	layoutUntil       time.Time
+	id                 int
+	root               *terminalLayout
+	focused            *remoteSession
+	maximized          bool
+	frame              ui.Handle
+	zoomFrom, zoomMix  float32
+	zoomStarted        time.Time
+	zoomPending        bool
+	layoutDuration     time.Duration
+	layoutPending      bool
+	layoutUntil        time.Time
+	workspaceSize      ui.Point
+	workspaceResizedAt time.Time
 }
 
 type remoteSession struct {
 	id                          int
 	host                        hostID
 	state                       connectionState
+	connectionStarted           time.Time
+	connectionStep              int
 	scroll                      terminalScrollState
 	focus                       ui.Handle
 	transcript                  []terminalLine
@@ -64,6 +69,8 @@ type remoteSession struct {
 	enterStarted                time.Time
 	closing                     bool
 	closeStarted                time.Time
+	revealing                   bool
+	revealStarted               time.Time
 }
 
 func demoHosts() []host {
@@ -110,11 +117,76 @@ func (a *app) focusedHost() (hostID, bool) {
 
 func (a *app) newSession(id hostID) *remoteSession {
 	a.nextSession++
-	return &remoteSession{
-		id: a.nextSession, host: id, state: connected,
-		transcript: demoTranscript(a.hosts[id]), output: []terminalLine{},
+	session := &remoteSession{
+		id: a.nextSession, host: id,
+		transcript: []terminalLine{}, output: []terminalLine{},
 		scroll: terminalScrollState{offset: ui.ScrollState{Y: math.MaxFloat32}},
 	}
+	a.connectSession(session)
+	return session
+}
+
+func (a *app) connectSession(session *remoteSession) {
+	h := a.hosts[session.host]
+	session.state, session.connectionStarted, session.connectionStep = connecting, time.Time{}, 0
+	session.hasNewOutput, session.hasBell = false, false
+	session.scroll.offset.Y = math.MaxFloat32
+	appendSessionLines(session,
+		terminalLine{{Text: fmt.Sprintf("[演示] ssh -p %d %s@%s", h.port, h.user, h.address), Foreground: terminalIndexed(4)}},
+		terminalLine{{Text: fmt.Sprintf("正在连接 %s:%d…", h.address, h.port)}},
+	)
+}
+
+func disconnectSession(session *remoteSession) {
+	message := "会话已断开。可从标签菜单重新连接。"
+	if session.state == connecting {
+		message = "连接已取消。可从标签菜单重新连接。"
+	}
+	session.state = disconnected
+	appendSessionLines(session, terminalLine{{Text: message, Foreground: terminalIndexed(8)}})
+}
+
+// The prototype advances connection stages on the UI clock, shared by tabs and Shell text.
+func (a *app) updateSSHConnections(c *ui.Context) {
+	interval := theme.Current().C.ConnectionIndicator.StageDuration
+	for _, tab := range a.tabs {
+		for _, session := range tab.root.sessions() {
+			if session.state != connecting || session.closing {
+				continue
+			}
+			if session.connectionStarted.IsZero() {
+				session.connectionStarted = c.Now()
+			}
+			h := a.hosts[session.host]
+			steps := []terminalLine{
+				{{Text: "连接已建立，正在进行 SSH 握手…"}},
+				{{Text: fmt.Sprintf("握手完成，正在验证用户 %s…", h.user)}},
+				{{Text: "身份验证通过，正在启动远程 Shell…"}},
+				{{Text: fmt.Sprintf("已连接到 %s（演示会话）", h.name), Foreground: terminalIndexed(2)}},
+			}
+			elapsed := c.Now().Sub(session.connectionStarted)
+			step := min(int(elapsed/interval), len(steps))
+			for session.connectionStep < step {
+				appendSessionLines(session, steps[session.connectionStep])
+				session.connectionStep++
+			}
+			if step == len(steps) {
+				session.state = connected
+				session.cursorStarted = c.Now()
+				appendSessionLines(session, terminalLine{})
+				appendSessionLines(session, demoTranscript(h)...)
+				continue
+			}
+			c.After(time.Duration(step+1)*interval - elapsed)
+		}
+	}
+}
+
+func appendSessionLines(session *remoteSession, lines ...terminalLine) {
+	if session.scroll.offset.Y >= session.scroll.offset.MaxY {
+		session.scroll.offset.Y = math.MaxFloat32
+	}
+	session.output = append(session.output, lines...)
 }
 
 func (a *app) focusSession(tab *workspaceTab, session *remoteSession) {
@@ -140,10 +212,7 @@ func (a *app) receiveSessionOutput(session *remoteSession, text string) {
 	if len(lines) == 0 {
 		return
 	}
-	if session.scroll.offset.Y >= session.scroll.offset.MaxY {
-		session.scroll.offset.Y = math.MaxFloat32
-	}
-	session.output = append(session.output, lines...)
+	appendSessionLines(session, lines...)
 	if background {
 		session.hasNewOutput = true
 	}

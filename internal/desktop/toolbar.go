@@ -12,34 +12,29 @@ import (
 )
 
 func iconButton(c *ui.Context, label string, icon *ui.SVG) ui.Element {
+	return keyedIconButton(c, label, label, icon)
+}
+
+func keyedIconButton(c *ui.Context, key, label string, icon *ui.SVG) ui.Element {
 	t := theme.Current()
-	button := ui.ButtonBase(c).Key(label).Size(t.C.IconButton.Size, t.C.IconButton.Size).Radius(t.C.IconButton.Radius).
-		Label(label).Tooltip(label).TextColor(tokenColor(t.C.IconButton.Icon))
-	switch {
-	case button.Pressed():
-		button.Background(tokenColor(t.C.Button.BgPressed))
-	case button.Hovered():
-		button.Background(tokenColor(t.C.IconButton.BgHover))
-	}
+	button := styleIconButton(ui.ButtonBase(c).Key(key).Label(label), t)
+	tooltip(c, button, label)
 	button.Children(func() { ui.Icon(c, icon).Size(t.C.IconButton.IconSize, t.C.IconButton.IconSize) })
 	return button
 }
 
 func (a *app) titleBar(c *ui.Context, shown float32) {
-	if a.section == sectionFiles {
-		a.fileTitleBar(c, shown)
-		return
-	}
 	t := theme.Current()
 	bar := c.TitleBar()
 	ui.Row(c).Height(max(t.C.Titlebar.Height, bar.Height)).Shrink(0).Gap(t.Space.N6).DragWindow().Children(func() {
-		ui.Row(c).Width(max(t.C.Rail.Width+a.sidebarWidth*shown, bar.Left+t.C.Titlebar.Height)).Shrink(0).
+		ui.Row(c).Width(max(t.C.Rail.Width+a.page().sidebarWidth*shown, bar.Left+t.C.Titlebar.Height)).Shrink(0).
 			PaddingStart(bar.Left + t.C.Titlebar.LeftGap).DragWindow().Children(func() {
 			label := "收起会话栏"
-			if a.sidebarCollapsed {
+			if a.page().sidebarCollapsed {
 				label = "展开会话栏"
 			}
-			iconButton(c, label, sidebarIcon).OnClick(func() { a.sidebarCollapsed = !a.sidebarCollapsed })
+			keyedIconButton(c, "sidebar-toggle", label, sidebarIcon).
+				OnClick(func() { a.page().sidebarCollapsed = !a.page().sidebarCollapsed })
 		})
 		ui.Box(c).Grow(1).MinWidth(0).Height(t.C.Tab.StripHeight).Clip().Children(func() {
 			// Clip the native indicator outside the viewport while retaining native scrolling.
@@ -107,28 +102,38 @@ func (a *app) tabButton(c *ui.Context, index int, tab *workspaceTab) func() {
 		Animation: &ui.Animation{Spring: tokenSpring(t.C.ReorderMotion.TabDisplace)},
 	}).
 		AlignItems(ui.Center).
-		Role(ui.RoleTab).Label(h.name).Selected(a.activeTab == index).TextColor(tokenColor(t.C.Tab.Text)).
-		Tooltip(fmt.Sprintf("%s@%s:%d", h.user, h.address, h.port))
+		Role(ui.RoleTab).Label(h.name).Selected(a.activeTab == index)
+	background, foreground := ui.Transparent, tokenColor(t.C.Tab.Text)
+	hint := fmt.Sprintf("%s@%s:%d", h.user, h.address, h.port)
 	if a.activeTab == index {
-		applyShadow(
-			button.Background(tokenColor(t.C.Tab.BgSelected)).TextColor(tokenColor(t.C.Tab.TextSelected)),
-			t.C.Tab.ShadowSelected,
-		)
+		background, foreground = tokenColor(t.C.Tab.BgSelected), tokenColor(t.C.Tab.TextSelected)
+		applyShadow(button, t.C.Tab.ShadowSelected)
 	} else if button.Hovered() {
-		button.Background(tokenColor(t.C.Tab.BgHover))
+		background = tokenColor(t.C.Tab.BgHover)
 	}
-	if session.state == disconnected {
-		button.TextColor(tokenColor(t.C.Tab.TextDisconnected)).Tooltip("已断开 · 可从菜单重新连接")
+	switch session.state {
+	case connecting:
+		hint = "正在连接 " + h.address + "…（演示）"
+	case disconnected:
+		foreground, hint = tokenColor(t.C.Tab.TextDisconnected), "已断开 · 可从菜单重新连接"
 	}
+	animation := tokenTween(t.C.Tab.StateTransition)
+	button.Background(button.AnimateColor("background", background, animation)).
+		TextColor(button.AnimateColor("text", foreground, animation))
+	tooltip(c, button, hint)
 	button.OnClick(func() { a.activateTab(slices.Index(a.tabs, tab)) })
 	button.ContextMenu(func(m *ui.Menu) {
 		current := tab.focused
-		if current.state == connected {
-			if m.Item("断开当前会话").Chosen() {
-				current.state = disconnected
+		if current.state == connected || current.state == connecting {
+			label := "断开当前会话"
+			if current.state == connecting {
+				label = "取消连接"
+			}
+			if m.Item(label).Chosen() {
+				disconnectSession(current)
 			}
 		} else if m.Item("连接当前会话").Chosen() {
-			current.state = connected
+			a.connectSession(current)
 		}
 		m.Separator()
 		if m.Item("关闭选项卡").Chosen() {

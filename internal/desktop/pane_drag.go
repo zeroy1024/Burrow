@@ -2,9 +2,7 @@ package desktop
 
 import (
 	"fmt"
-	"math"
 	"slices"
-	"strings"
 	"time"
 
 	"sshdesk/internal/termtheme"
@@ -17,6 +15,11 @@ type paneTransfer struct {
 	tab     *workspaceTab
 	session *remoteSession
 	fromTab bool
+}
+
+func paneDropCanSwap(value any) bool {
+	source, ok := value.(paneTransfer)
+	return ok && !source.fromTab
 }
 
 type paneDragKind uint8
@@ -36,17 +39,15 @@ const (
 )
 
 type paneDragState struct {
-	kind                         paneDragKind
-	phase                        paneDragPhase
-	session                      *remoteSession
-	originTab                    *workspaceTab
-	origin, paneRect, returnRect ui.Rect
-	grab                         ui.Point
-	paneImage, tabImage          *ui.Bitmap
-	detached                     bool
-	order                        []*workspaceTab
-	returnStarted                time.Time
-	appearance                   *theme.Theme
+	kind               paneDragKind
+	phase              paneDragPhase
+	session            *remoteSession
+	originTab          *workspaceTab
+	origin, returnRect ui.Rect
+	grab               ui.Point
+	detached           bool
+	order              []*workspaceTab
+	returnStarted      time.Time
 }
 
 func (a *app) paneDragHandle(c *ui.Context, source ui.Element, transfer paneTransfer) {
@@ -70,25 +71,17 @@ func (a *app) paneDragHandle(c *ui.Context, source ui.Element, transfer paneTran
 		}
 		a.drag = nil
 	}
-	area := a.workArea.Bounds(c)
 	r := transfer.session.frame.Bounds(c)
 	kind := dragPane
 	if transfer.fromTab {
 		kind, r = dragTab, transfer.tab.frame.Bounds(c)
 	}
-	size := ui.Rect{W: r.W, H: r.H}
-	if transfer.fromTab {
-		size.W, size.H = min(t.C.Desktop.DragPreviewWidth, area.W), min(t.C.Desktop.DragPreviewHeight, area.H)
-	}
 	d := &paneDragState{
-		kind: kind, session: transfer.session, originTab: transfer.tab, origin: r, paneRect: size,
+		kind: kind, session: transfer.session, originTab: transfer.tab, origin: r,
 		grab: ui.Point{X: a.pointer.X - r.X, Y: a.pointer.Y - r.Y}, order: []*workspaceTab{},
 	}
-	d.appearance = t
-	d.paneImage = a.paneSnapshot(transfer.session, size.W, size.H)
 	if transfer.fromTab {
 		d.order = slices.Clone(a.tabs)
-		d.tabImage = a.tabSnapshot(transfer.tab, r.W, r.H)
 		bar := a.tabScroll.Bounds(c)
 		d.grab = ui.Point{X: a.tabPress.X + bar.X - r.X, Y: a.tabPress.Y + bar.Y - r.Y}
 		d.detached = a.pointer.Y > bar.Y+bar.H+t.C.Desktop.TabDetachDistance
@@ -167,7 +160,8 @@ func (a *app) tabSlot(c *ui.Context, tab *workspaceTab) ui.Rect {
 
 func (a *app) lifted(session *remoteSession) bool {
 	d := a.drag
-	return d != nil && d.session == session && (d.phase == dragLanded || d.kind != dragHost && (d.kind == dragPane || d.detached))
+	return d != nil && d.phase == dragActive && d.session == session &&
+		d.kind != dragHost && (d.kind == dragPane || d.detached)
 }
 
 func (a *app) finishWorkspaceDrag(c *ui.Context) {
@@ -192,114 +186,69 @@ func (a *app) finishWorkspaceDrag(c *ui.Context) {
 
 func (a *app) dragPreview(c *ui.Context) {
 	d := a.drag
-	if d == nil {
+	if d == nil || d.phase == dragLanded {
 		return
 	}
 	t := theme.Current()
-	if d.appearance != t {
-		d.appearance = t
-		d.paneImage = a.paneSnapshot(d.session, d.paneRect.W, d.paneRect.H)
-		if d.kind == dragTab {
-			d.tabImage = a.tabSnapshot(d.originTab, d.origin.W, d.origin.H)
-		}
+	p := t.C.DragGhost
+	tabPreview := d.kind == dragTab && !d.detached
+	r := ui.Rect{W: p.Width, H: p.Height}
+	grab := ui.Point{X: min(d.grab.X, r.W/2), Y: t.C.Desktop.DragGrabY}
+	radius := p.Radius
+	if tabPreview {
+		r, grab, radius = d.origin, d.grab, t.C.Tab.Radius
 	}
-	r, image := d.paneRect, d.paneImage
-	if d.kind == dragTab && !d.detached {
-		r, image = d.origin, d.tabImage
-	}
-	r.X, r.Y = a.pointer.X-d.grab.X, a.pointer.Y-d.grab.Y
-	if d.kind == dragTab && d.detached {
-		r.X, r.Y = a.pointer.X-min(d.grab.X, r.W/2), a.pointer.Y-t.C.Desktop.DragGrabY
-	}
+	r.X, r.Y = a.pointer.X-grab.X, a.pointer.Y-grab.Y
 	animation := ui.Animation{Duration: t.C.Desktop.InstantDuration}
-	scale, rotate, opacity := t.C.DragLift.Scale, t.C.Desktop.DragRotation, t.C.Desktop.DragOpacity
-	duration := t.C.DragLift.LiftDuration
+	visible := float32(1)
 	if d.phase == dragReturning {
-		r = d.returnRect
+		r.X, r.Y = d.returnRect.X, d.returnRect.Y
 		animation = ui.Animation{Spring: tokenSpring(t.C.ReorderMotion.Cancel)}
-		scale, rotate, opacity = 1, 0, 1
-		duration = t.C.ReorderMotion.Cancel.Duration
+		visible = 0
 	}
-	if d.phase == dragLanded && !d.returnStarted.IsZero() {
-		area := a.workArea.Bounds(c)
-		r = d.session.layoutRect
-		r.X, r.Y = r.X+area.X, r.Y+area.Y
-		animation = ui.Animation{Spring: tokenSpring(t.C.ReorderMotion.PaneDrop)}
-		scale, rotate, opacity = 1, 0, 1
-		duration = t.C.ReorderMotion.PaneDrop.Duration
-	}
-	transition := ui.ElementTransition{Position: true, Size: true, Animation: &animation}
+	// Return the compact preview to its source without stretching it into a pane.
 	ghost := ui.Box(c).Key(d).Absolute().Left(r.X).Top(r.Y).Size(r.W, r.H).
-		Radius(t.C.DragLift.Radius).PassThrough().Transition(transition)
-	ghost.Scale(ghost.Animate("lift-scale", scale, t.C.DragLift.LiftDuration), ghost.Animate("lift-scale-y", scale, t.C.DragLift.LiftDuration)).
-		Rotate(ghost.Animate("lift-angle", rotate, t.C.DragLift.LiftDuration)).
-		Opacity(animateVisual(ghost, "lift-alpha", opacity, t.C.DragLift.LiftDuration))
-	applyShadow(ghost, t.C.DragLift.Shadow)
-	if d.phase != dragActive && !d.returnStarted.IsZero() {
-		elapsed := c.Now().Sub(d.returnStarted)
-		if c.Preferences().ReduceMotion {
-			progress := min(1, float32(elapsed)/float32(duration))
-			ghost.Opacity(t.C.Desktop.DragOpacity + (1-t.C.Desktop.DragOpacity)*progress)
-			if progress < 1 {
-				c.AnimationFrame()
+		Radius(radius).PassThrough().Transition(ui.ElementTransition{Position: true, Animation: &animation})
+	ghost.Opacity(animateVisual(ghost, "visible", visible, t.C.ReorderMotion.Cancel.Duration))
+	applyShadow(ghost, p.Shadow)
+	ghost.Children(func() {
+		if tabPreview {
+			ui.Row(c).Fill().Padding(0, t.C.Tab.PaddingLeft).Gap(t.C.Tab.Gap).
+				Radius(radius).Background(tokenColor(p.Bg)).PassThrough().Children(func() {
+				statusDot(c, d.session.state, t.C.Tab.DotSize)
+				ui.Text(c, a.hosts[d.session.host].name).FontSize(t.C.Tab.FontSize).
+					FontWeight(t.C.Tab.WeightSelected).TextColor(tokenColor(t.C.Tab.TextSelected)).SingleLine().PassThrough()
+			})
+			return
+		}
+		a.paneDragPreview(c, d.session)
+	})
+}
+
+func (a *app) paneDragPreview(c *ui.Context, session *remoteSession) {
+	t := theme.Current()
+	background := termtheme.TerminalBackground(termtheme.Current(), t.C.Pane.Bg, a.terminal.prefs.Background)
+	surface := terminalSurface(background)
+	p := surface.C.DragGhost
+	// PassThrough is per element in MyGo; every preview descendant must opt out of hit testing.
+	ui.Column(c).Fill().Radius(p.Radius).Background(tokenColor(background)).Clip().PassThrough().Padding(
+		p.PaddingY,
+		p.PaddingRight,
+		p.PaddingY,
+		p.PaddingLeft,
+	).Gap(t.Space.N8).Children(func() {
+		ui.Row(c).Height(p.HeaderHeight).Shrink(0).Gap(t.Space.N8).PassThrough().Children(func() {
+			statusDot(c, session.state, t.C.Tab.DotSize)
+			ui.Text(c, a.hosts[session.host].name).FontSize(p.FontSize).FontWeight(t.Font.Weight.Medium).
+				TextColor(tokenColor(surface.C.Pane.Name)).SingleLine().Ellipsis("…").MinWidth(0).PassThrough()
+		})
+		ui.Column(c).FillWidth().Grow(1).Justify(ui.Center).Gap(t.Space.N8).PassThrough().Children(func() {
+			for _, width := range []float32{p.LineLong, p.LineMedium, p.LineLong, p.LineShort} {
+				ui.Box(c).WidthPercent(width * 100).Height(p.LineHeight).Shrink(0).
+					Radius(p.LineRadius).Background(tokenColor(p.LineColor)).PassThrough()
 			}
-		}
-		if elapsed < duration {
-			c.After(duration - elapsed)
-		}
-	}
-	ghost.Children(func() { ui.Image(c, image).Fill().Fit(ui.Cover).Radius(t.C.DragLift.Radius).PassThrough() })
-}
-
-func (a *app) paneSnapshot(session *remoteSession, width, height float32) *ui.Bitmap {
-	t := theme.Current()
-	s := termtheme.Current()
-	prefs := a.terminal.prefs
-	terminalBackground := termtheme.TerminalBackground(s, t.C.Pane.Bg, prefs.Background)
-	background := tokenColor(terminalBackground)
-	surface := terminalSurface(terminalBackground)
-	h := a.hosts[session.host]
-	position := session.scroll.offset.Y
-	if position >= session.scroll.offset.MaxY {
-		position = math.MaxFloat32
-	}
-	offset := ui.ScrollState{Y: position}
-	image := ui.Render(func(c *ui.Context) {
-		c.SetTheme(a.theme)
-		ui.Column(c).Fill().Radius(t.C.Pane.Radius).Clip().Background(background).Children(func() {
-			ui.Scroll(c.Key("preview-output")).Fill().TrackScroll(&offset).Padding(
-				t.C.Pane.HeaderHeight+t.Space.N4,
-				t.C.Pane.ContentSide,
-				t.C.StatusBar.HeightPane+t.Space.N4,
-				t.C.Pane.ContentSide,
-			).ScrollbarInsets(0, -12, 0, 0).Font(strings.Join(prefs.FontFamily, ", ")).FontSize(prefs.FontSize).
-				LetterSpacing(prefs.Tracking).TextColor(tokenColor(s.Foreground)).Children(func() {
-				a.terminalLines(c, session, false)
-			})
-			ui.Row(c).Absolute().Top(0).Left(0).Right(0).Height(t.C.Pane.HeaderHeight).Padding(0, t.C.Pane.HeaderPaddingLeft).Gap(t.C.Pane.HeaderGap).
-				Background(background.Alpha(t.C.Desktop.PreviewHeaderOpacity)).Children(func() {
-				statusDot(c, session.state, t.Size.Dot)
-				ui.Text(c, h.name).FontSize(t.C.Pane.HeaderFontSize).FontWeight(t.C.Pane.NameWeight).TextColor(tokenColor(surface.C.Pane.Name))
-			})
-			ui.Row(c).Absolute().Bottom(0).Left(0).Right(0).Height(t.C.StatusBar.HeightPane).Padding(0, t.C.StatusBar.PaddingX).
-				Background(background.Alpha(t.C.Desktop.PreviewHeaderOpacity)).Children(func() {
-				ui.Text(c, h.user+"@"+h.address).FontSize(t.C.StatusBar.FontSize).TextColor(tokenColor(surface.C.StatusBar.Text))
-			})
 		})
-	}, int(math.Ceil(float64(width))), int(math.Ceil(float64(height))), 1)
-	return ui.NewBitmap(image)
-}
-
-func (a *app) tabSnapshot(tab *workspaceTab, width, height float32) *ui.Bitmap {
-	t := theme.Current()
-	image := ui.Render(func(c *ui.Context) {
-		c.SetTheme(a.theme)
-		ui.Row(c).Fill().Padding(0, t.C.Tab.PaddingLeft).Gap(t.C.Tab.Gap).Radius(t.C.Tab.Radius).Background(tokenColor(t.C.DragGhost.Bg)).Children(func() {
-			statusDot(c, tab.focused.state, t.C.Tab.DotSize)
-			ui.Text(c, a.hosts[tab.focused.host].name).FontSize(t.C.Tab.FontSize).FontWeight(t.C.Tab.WeightSelected).TextColor(tokenColor(t.C.Tab.TextSelected))
-		})
-	}, int(math.Ceil(float64(width))), int(math.Ceil(float64(height))), 1)
-	return ui.NewBitmap(image)
+	})
 }
 
 func (a *app) paneDrop(c *ui.Context, pane ui.Element, target *remoteSession, catalog bool) {
@@ -322,7 +271,8 @@ func (a *app) paneDrop(c *ui.Context, pane ui.Element, target *remoteSession, ca
 	}
 	tab := a.currentTab()
 	x, y, _ := pane.PointerPosition()
-	zone := zoneAt(x, y, pane.Bounds().W, pane.Bounds().H, tab.root.count() == 1)
+	edgeOnly := tab.root.count() == 1 || !paneDropCanSwap(payload)
+	zone := zoneAt(x, y, pane.Bounds().W, pane.Bounds().H, edgeOnly)
 	plan, valid := a.planPaneDrop(c, target, payload, zone)
 	if !valid {
 		pane.Cursor(ui.CursorNotAllowed)
@@ -354,7 +304,7 @@ func (a *app) paneDrop(c *ui.Context, pane ui.Element, target *remoteSession, ca
 		a.pendingDock = func() {
 			a.dockSession(tab, target, payload, plan)
 			if catalogDropped {
-				a.catalogDrag.externalDrop = true
+				a.page().catalogDrag.externalDrop = true
 			}
 		}
 	}
@@ -431,7 +381,7 @@ func (a *app) planPaneDrop(c *ui.Context, target *remoteSession, value any, zone
 		return plan, false
 	}
 	if zone == dropCenter {
-		return plan, true
+		return plan, paneDropCanSwap(value)
 	}
 	if local != nil {
 		area, minimum := a.workArea.Bounds(c), tab.root.minimum()
@@ -448,7 +398,9 @@ func (a *app) planPaneDrop(c *ui.Context, target *remoteSession, value any, zone
 		plan.remaining = remaining
 	}
 	if !canSplit(plan.target, zone) {
-		return paneDropPlan{zone: dropCenter, target: target.layoutRect}, true
+		// Header and sidebar drops must preserve every destination session.
+		// Only an existing Shell pane may fall back to swapping positions.
+		return paneDropPlan{zone: dropCenter, target: target.layoutRect}, paneDropCanSwap(value)
 	}
 	return plan, local != nil || tab.root.count() < maxTerminalPanes
 }
@@ -460,12 +412,10 @@ func (a *app) dockSession(tab *workspaceTab, target *remoteSession, value any, p
 	switch source := value.(type) {
 	case hostDrag:
 		session = a.newSession(source.id)
-		if zone == dropCenter {
-			tab.root.find(target).session = session
-		}
+		tab.root.find(target).insert(session, zone)
 	case paneTransfer:
 		session = source.session
-		if zone == dropCenter {
+		if zone == dropCenter && !source.fromTab {
 			source.tab.root.find(session).session, tab.root.find(target).session = target, session
 			if source.tab != tab && source.tab.focused == session {
 				source.tab.focused = target
@@ -483,14 +433,13 @@ func (a *app) dockSession(tab *workspaceTab, target *remoteSession, value any, p
 					source.tab.focused = source.tab.root.firstSession()
 				}
 			}
+			tab.root.find(target).insert(session, zone)
 		}
-	}
-	if zone != dropCenter {
-		tab.root.find(target).insert(session, zone)
 	}
 	a.focusSession(tab, session)
 	a.setPaneZoom(tab, false)
 	a.markPaneLayout(tab, t.C.ReorderMotion.PaneDrop.Duration)
+	startPaneReveal(session)
 	if a.drag != nil {
 		a.drag.session, a.drag.phase = session, dragLanded
 	}

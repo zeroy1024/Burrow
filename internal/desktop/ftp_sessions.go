@@ -92,13 +92,14 @@ func (a *app) fileTitleBar(c *ui.Context, shown float32) {
 	bar := c.TitleBar()
 	ui.Row(c).Height(max(t.C.Titlebar.Height, bar.Height)).Shrink(0).
 		Gap(t.Space.N6).DragWindow().Children(func() {
-		ui.Row(c).Width(max(t.C.Rail.Width+a.sidebarWidth*shown, bar.Left+t.C.Titlebar.Height)).
+		ui.Row(c).Width(max(t.C.Rail.Width+a.page().sidebarWidth*shown, bar.Left+t.C.Titlebar.Height)).
 			Shrink(0).PaddingStart(bar.Left + t.C.Titlebar.LeftGap).DragWindow().Children(func() {
 			label := "收起站点栏"
-			if a.sidebarCollapsed {
+			if a.page().sidebarCollapsed {
 				label = "展开站点栏"
 			}
-			iconButton(c, label, sidebarIcon).OnClick(func() { a.sidebarCollapsed = !a.sidebarCollapsed })
+			keyedIconButton(c, "sidebar-toggle", label, sidebarIcon).
+				OnClick(func() { a.page().sidebarCollapsed = !a.page().sidebarCollapsed })
 		})
 		ui.Box(c).Grow(1).MinWidth(0).Height(t.C.Tab.StripHeight).Clip().Children(func() {
 			ui.ScrollHorizontal(c.Key("file-session-tabs")).Fill().ScrollbarInsets(
@@ -142,15 +143,15 @@ func (a *app) fileTabButton(c *ui.Context, index int, session *fileSession) bool
 	if selected {
 		foreground = tokenColor(t.C.Tab.TextSelected)
 	}
-	tooltip := fmt.Sprintf("%s@%s:%d · 演示会话", h.user, h.address, h.port)
+	hint := fmt.Sprintf("%s@%s:%d · 演示会话", h.user, h.address, h.port)
 	switch session.state {
 	case connecting:
-		tooltip = "正在连接 " + h.address + "…（演示）"
+		hint = "正在连接 " + h.address + "…（演示）"
 	case disconnected:
-		tooltip = "已断开 · 选择后可重新连接"
+		hint = "已断开 · 选择后可重新连接"
 		foreground = tokenColor(t.C.Tab.TextDisconnected)
 	case connectionFailed:
-		tooltip = session.errorText
+		hint = session.errorText
 		if selected {
 			foreground = tokenColor(t.C.Tab.TextErrorSelected)
 		}
@@ -158,13 +159,17 @@ func (a *app) fileTabButton(c *ui.Context, index int, session *fileSession) bool
 	button := ui.ButtonBase(c).Key(session).Height(t.C.Tab.Height).
 		Padding(0, t.C.Tab.PaddingRight, 0, t.C.Tab.PaddingLeft).
 		Gap(t.C.Tab.Gap).Radius(t.C.Tab.Radius).AlignItems(ui.Center).
-		Role(ui.RoleTab).Label(h.name).Selected(selected).Tooltip(tooltip)
-	button.TextColor(button.AnimateColor("text", foreground, ui.Animation{Duration: t.C.Tab.StateTransition}))
+		Role(ui.RoleTab).Label(h.name).Selected(selected)
+	tooltip(c, button, hint)
+	button.TextColor(button.AnimateColor("text", foreground, tokenTween(t.C.Tab.StateTransition)))
+	background := ui.Transparent
 	if selected {
-		applyShadow(button.Background(tokenColor(t.C.Tab.BgSelected)), t.C.Tab.ShadowSelected)
+		background = tokenColor(t.C.Tab.BgSelected)
+		applyShadow(button, t.C.Tab.ShadowSelected)
 	} else if button.Hovered() {
-		button.Background(tokenColor(t.C.Tab.BgHover))
+		background = tokenColor(t.C.Tab.BgHover)
 	}
+	button.Background(button.AnimateColor("background", background, tokenTween(t.C.Tab.StateTransition)))
 	button.OnClick(func() { a.activeFile = slices.Index(a.fileSessions, session) })
 	closing := false
 	button.ContextMenu(func(m *ui.Menu) {
@@ -213,7 +218,7 @@ func tabConnectionIndicator(c *ui.Context, state connectionState) {
 		color = tokenColor(t.Spinner)
 	}
 	indicator := ui.Box(c).Key("connection-indicator").Size(t.SpinnerSize, t.SpinnerSize)
-	color = indicator.AnimateColor("state", color, ui.Animation{Duration: t.StateTransition})
+	color = indicator.AnimateColor("state", color, tokenTween(t.StateTransition))
 	filledTarget, ringTarget, spinnerTarget := float32(0), float32(0), float32(0)
 	switch {
 	case state == disconnected:
@@ -324,8 +329,8 @@ func (a *app) fileSiteMenu(c *ui.Context, m *ui.Menu, id hostID) {
 			c.Toast("请先取消或清除该站点的传输任务")
 			return
 		}
-		a.draft = hostDraft{id: id, deleting: true}
-		a.addHostOpen = true
+		a.page().draft = hostDraft{id: id, deleting: true}
+		a.page().addHostOpen = true
 	}
 }
 
@@ -342,11 +347,11 @@ func (a *app) startEditHostDraft(id hostID) {
 	if h.protocol == "ftp" {
 		protocol = "FTP"
 	}
-	a.draft = hostDraft{
+	a.page().draft = hostDraft{
 		id: id, editing: true, files: true, name: h.name, address: h.address,
 		user: h.user, port: strconv.Itoa(h.port), group: group, system: systems[h.os].name, protocol: protocol,
 	}
-	a.addHostOpen = true
+	a.page().addHostOpen = true
 }
 
 func (a *app) deleteFileSite(id hostID) error {
@@ -402,15 +407,15 @@ func (a *app) deleteFileSite(id hostID) error {
 
 func (a *app) deleteSiteDialogContents(c *ui.Context) {
 	t := theme.Current()
-	id := a.draft.id
+	id := a.page().draft.id
 	h := a.hosts[id]
 	ui.Text(c, "删除站点「"+h.name+"」？").FontSize(t.C.Dialog.TitleSize).
 		FontWeight(t.Font.Weight.Semibold)
 	ui.Text(c, "将从共享主机目录移除，并关闭此主机的 SSH 与文件会话。服务器文件不受影响。").
 		FontSize(t.Font.Size.Small).TextColor(tokenColor(t.Color.Text.Secondary))
 	ui.Row(c).Justify(ui.End).Gap(t.Space.N8).Children(func() {
-		ui.Button(c, "取消").OnClick(func() { a.addHostOpen = false })
-		ui.Button(c, "删除站点").TextColor(tokenColor(t.C.Tab.TextErrorSelected)).OnClick(func() {
+		button(c, "取消").OnClick(func() { a.page().addHostOpen = false })
+		button(c, "删除站点").TextColor(tokenColor(t.C.Tab.TextErrorSelected)).OnClick(func() {
 			if a.fileSiteBusy(id) {
 				c.Toast("请先取消或清除该站点的传输任务")
 				return
@@ -419,7 +424,7 @@ func (a *app) deleteSiteDialogContents(c *ui.Context) {
 				c.Toast("删除站点失败：" + err.Error())
 				return
 			}
-			a.addHostOpen = false
+			a.page().addHostOpen = false
 		})
 	})
 }

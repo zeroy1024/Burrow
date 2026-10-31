@@ -249,10 +249,9 @@ func (a *app) transferDock(c *ui.Context, maxHeight float32) {
 			return
 		}
 		// Keep the gap outside the clipped card so it remains a full-height hit target.
-		divider := ui.Box(c).Key("transfer-dock-divider").Absolute().Left(0).Right(0).
+		divider := tooltip(c, ui.Box(c).Key("transfer-dock-divider").Absolute().Left(0).Right(0).
 			Top(-t.C.FTPSplit.Gutter).Height(t.C.FTPSplit.Gutter).Cursor(ui.CursorResizeNS).
-			Focusable().FocusRing(false).Role(ui.RoleSplitter).Label("调整传输面板高度").
-			Tooltip("拖动调整高度 · 双击恢复默认")
+			Focusable().FocusRing(false).Role(ui.RoleSplitter).Label("调整传输面板高度"), "拖动调整高度 · 双击恢复默认")
 		_, dy, dragging := divider.Dragged()
 		if dragging && dy != 0 {
 			height = min(max(height-dy, minHeight), maxHeight)
@@ -328,16 +327,16 @@ func (a *app) transferHeader(c *ui.Context) {
 		if s.running+s.queued == 0 && s.paused > 0 {
 			pauseIcon, pauseLabel = transferPlayIcon, "全部继续"
 		}
-		transferAction(c, pauseLabel, pauseIcon).Disabled(s.running+s.queued+s.paused == 0).
+		transferAction(c, "pause-all", pauseLabel, pauseIcon).Disabled(s.running+s.queued+s.paused == 0).
 			OnClick(func() { a.pauseAllTransfers(c) })
-		transferAction(c, "清除已完成", transferTrashIcon).Disabled(s.done == 0).OnClick(func() {
+		transferAction(c, "clear-done", "清除已完成", transferTrashIcon).Disabled(s.done == 0).OnClick(func() {
 			q.tasks = slices.DeleteFunc(q.tasks, func(task *transferTask) bool { return task.state == transferDone })
 		})
 		label := "折叠传输列表"
 		if q.collapsed {
 			label = "展开传输列表"
 		}
-		button := transferAction(c, label, chevronIcon).Expanded(!q.collapsed)
+		button := transferAction(c, "toggle-dock", label, chevronIcon).Expanded(!q.collapsed)
 		rotation := float32(0)
 		if q.collapsed {
 			rotation = 180
@@ -362,9 +361,7 @@ func (a *app) transferFilters(c *ui.Context, summary transferSummary) {
 		for i, label := range labels {
 			segment := parts.Segment(i).Padding(t.ItemPaddingY, t.ItemPaddingX).Radius(t.ItemRadius).
 				FontSize(t.FontSize).TextColor(tokenColor(t.Text)).Label(label)
-			if q.filter == i {
-				applyShadow(segment.Background(tokenColor(t.BgOn)).TextColor(tokenColor(t.TextOn)), t.ShadowOn)
-			}
+			styleSegment(segment, t, q.filter == i)
 			segment.Children(func() { ui.Text(c, label).SingleLine() })
 		}
 	})
@@ -373,13 +370,11 @@ func (a *app) transferFilters(c *ui.Context, summary transferSummary) {
 	}
 }
 
-func transferAction(c *ui.Context, label string, icon *ui.SVG) ui.Element {
+func transferAction(c *ui.Context, key, label string, icon *ui.SVG) ui.Element {
 	t := theme.Current()
-	button := ui.ButtonBase(c).Key(label).Size(t.C.IconButton.SizeSm, t.C.IconButton.SizeSm).
-		Radius(t.C.IconButton.Radius).Label(label).Tooltip(label).TextColor(tokenColor(t.C.IconButton.IconSubtle))
-	if button.Hovered() {
-		button.Background(tokenColor(t.C.IconButton.BgHover))
-	}
+	button := styleIconButton(ui.ButtonBase(c).Key(key).Label(label), t).
+		Size(t.C.IconButton.SizeSm, t.C.IconButton.SizeSm).TextColor(tokenColor(t.C.IconButton.IconSubtle))
+	tooltip(c, button, label)
 	button.Children(func() { ui.Icon(c, icon).Size(t.C.IconButton.IconSize, t.C.IconButton.IconSize) })
 	return button
 }
@@ -456,7 +451,7 @@ func (a *app) transferRow(c *ui.Context, task *transferTask) {
 					speed, remaining = "传输失败", task.errorText
 				}
 				ui.Text(c, speed).FontSize(p.DetailSize).TextColor(tokenColor(p.SpeedText)).SingleLine()
-				ui.Text(c, remaining).FontSize(p.DetailSize).TextColor(tokenColor(t.C.FileList.Meta)).SingleLine().Tooltip(remaining)
+				tooltip(c, ui.Text(c, remaining).FontSize(p.DetailSize).TextColor(tokenColor(t.C.FileList.Meta)).SingleLine(), remaining)
 			})
 		}
 		ui.Row(c).Width(p.StatusWidth).Shrink(0).Justify(ui.End).AlignItems(ui.Center).Children(func() {
@@ -486,7 +481,7 @@ func (a *app) transferCompactDetail(c *ui.Context, task *transferTask) {
 	case transferDone:
 		text = transferBytes(task.total) + " · " + task.targetPath
 	}
-	ui.Text(c, text).FontSize(t.C.TransferRow.DetailSize).TextColor(tokenColor(foreground)).SingleLine().Tooltip(text)
+	tooltip(c, ui.Text(c, text).FontSize(t.C.TransferRow.DetailSize).TextColor(tokenColor(foreground)).SingleLine(), text)
 }
 
 func (a *app) taskProgress(c *ui.Context, task *transferTask) {
@@ -533,7 +528,7 @@ func (a *app) transferBadge(c *ui.Context, task *transferTask) {
 	}
 	badge := ui.Row(c).Shrink(0).Padding(t.C.Badge.PaddingYCompact, t.C.Badge.PaddingXCompact).
 		Gap(t.C.Badge.Gap).Radius(t.C.Badge.Radius).AlignItems(ui.Center)
-	badge.Background(badge.AnimateColor("state-bg", tokenColor(bg), ui.Animation{Duration: p.Transition})).Children(func() {
+	badge.Background(badge.AnimateColor("state-bg", tokenColor(bg), tokenTween(p.Transition))).Children(func() {
 		ui.Box(c).Size(t.C.ActivityBadge.DotSize, t.C.ActivityBadge.DotSize).Radius(t.C.Badge.Radius).
 			Background(tokenColor(dot))
 		ui.Text(c, label).FontSize(t.C.Badge.FontSizeCompact).TextColor(tokenColor(foreground)).SingleLine()
@@ -543,7 +538,7 @@ func (a *app) transferBadge(c *ui.Context, task *transferTask) {
 func (a *app) transferTaskActions(c *ui.Context, task *transferTask) {
 	q := &a.transfers
 	if task.state == transferDone {
-		transferAction(c, "在文件夹中显示", transferFolderIcon).OnClick(func() { a.revealTransferredFile(c, task) })
+		transferAction(c, "reveal", "在文件夹中显示", transferFolderIcon).OnClick(func() { a.revealTransferredFile(c, task) })
 		return
 	}
 	icon, label := transferPauseIcon, "暂停传输"
@@ -553,7 +548,7 @@ func (a *app) transferTaskActions(c *ui.Context, task *transferTask) {
 	case transferFailed:
 		icon, label = transferRetryIcon, "重试传输"
 	}
-	transferAction(c, label, icon).OnClick(func() {
+	transferAction(c, "toggle-transfer", label, icon).OnClick(func() {
 		switch task.state {
 		case transferRunning, transferQueued:
 			task.state = transferPaused
@@ -567,7 +562,7 @@ func (a *app) transferTaskActions(c *ui.Context, task *transferTask) {
 	if task.state == transferFailed {
 		label = "移除失败任务"
 	}
-	transferAction(c, label, closeIcon).OnClick(func() {
+	transferAction(c, "remove-transfer", label, closeIcon).OnClick(func() {
 		q.tasks = slices.DeleteFunc(q.tasks, func(candidate *transferTask) bool { return candidate == task })
 	})
 }

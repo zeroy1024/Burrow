@@ -188,6 +188,9 @@ func (a *app) terminalLines(c *ui.Context, session *remoteSession, focused bool)
 		for _, line := range session.output {
 			lineView(line)
 		}
+		if session.state != connected {
+			return
+		}
 		ui.Row(c).FillWidth().MinWidth(0).AlignItems(ui.End).Children(func() {
 			prompt := terminalLine{
 				{Text: h.user + "@" + h.name, Foreground: terminalIndexed(2), Bold: true},

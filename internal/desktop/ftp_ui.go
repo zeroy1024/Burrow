@@ -66,7 +66,7 @@ func (a *app) fileConnectionPage(c *ui.Context, session *fileSession) {
 			ui.Text(c, session.errorText).TextColor(tokenColor(t.Color.Danger.Text))
 		}
 		if session.state != connecting {
-			ui.Button(c, "重新连接").OnClick(func() { a.reconnectFileSession(session) })
+			button(c, "重新连接").OnClick(func() { a.reconnectFileSession(session) })
 		}
 		ui.Text(c, "演示会话 · 不连接真实服务器").FontSize(t.Font.Size.Caption).TextColor(tokenColor(t.Color.Text.Secondary))
 	})
@@ -246,8 +246,8 @@ func (a *app) fileToolbar(c *ui.Context, session *fileSession, pane *filePaneSta
 			if a.files.localOpen {
 				label = "隐藏本地面板 ⌘⇧L"
 			}
-			toggle := ui.ToggleBase(c, &a.files.localOpen).Size(t.C.PaneToggle.Size, t.C.PaneToggle.Size).
-				Radius(t.C.PaneToggle.Radius).Label(label).Tooltip(label)
+			toggle := tooltip(c, ui.ToggleBase(c, &a.files.localOpen).Size(t.C.PaneToggle.Size, t.C.PaneToggle.Size).
+				Radius(t.C.PaneToggle.Radius).Label(label), label)
 			bg, icon := ui.Transparent, tokenColor(t.C.PaneToggle.Icon)
 			glyph := sidebarIcon
 			if toggle.Hovered() {
@@ -256,7 +256,7 @@ func (a *app) fileToolbar(c *ui.Context, session *fileSession, pane *filePaneSta
 			if a.files.localOpen {
 				bg, icon, glyph = tokenColor(t.C.PaneToggle.BgOn), tokenColor(t.C.PaneToggle.IconOn), fileSidebarOnIcon
 			}
-			animation := ui.Animation{Duration: t.C.PaneToggle.Transition}
+			animation := tokenTween(t.C.PaneToggle.Transition)
 			toggle.Background(toggle.AnimateColor("bg", bg, animation)).TextColor(toggle.AnimateColor("fg", icon, animation)).
 				Children(func() { ui.Icon(c, glyph).Size(t.C.IconButton.IconSize, t.C.IconButton.IconSize) })
 			if toggle.Changed() {
@@ -277,7 +277,7 @@ func (a *app) fileToolbar(c *ui.Context, session *fileSession, pane *filePaneSta
 			if pane.searchOpen {
 				label = "收起搜索"
 			}
-			iconButton(c, "搜索当前文件夹", searchIcon).Label(label).Tooltip(label).
+			keyedIconButton(c, "file-search-toggle", label, searchIcon).
 				Expanded(pane.searchOpen).OnClick(func() {
 				pane.searchOpen = !pane.searchOpen
 				if pane.searchOpen {
@@ -312,22 +312,30 @@ func (a *app) fileSearchSlot(c *ui.Context, session *fileSession, pane *filePane
 		target = 1
 	}
 	progress := slot.AnimateTo("search-open", target, ui.Animation{
-		Duration: t.C.PaneToggle.Transition, Ease: ui.EaseInOut,
+		Duration: t.C.Search.Transition, Ease: tokenEasing(t.C.Search.Easing),
 	})
+	opacity := animateVisual(slot, "search-opacity", target, t.C.Search.Transition)
+	reduced := c.Preferences().ReduceMotion
 	slot.Children(func() {
-		ui.Box(c).Key("file-location").WidthPercent((1 - progress) * 100).Shrink(0).
-			Height(t.C.Breadcrumb.Height).MinWidth(0).ClipX().Opacity(1 - progress).
-			Disabled(pane.searchOpen).Children(func() { a.fileBreadcrumbs(c, session, pane) })
-		ui.Box(c).Key("file-search").WidthPercent(progress * 100).Shrink(0).
-			Height(t.C.Breadcrumb.Height).MinWidth(0).ClipX().Opacity(progress).
-			Disabled(!pane.searchOpen).Children(func() { fileSearchInput(c, pane).Fill() })
+		location := ui.Box(c).Key("file-location").WidthPercent((1 - progress) * 100).Shrink(0).
+			Height(t.C.Breadcrumb.Height).MinWidth(0).ClipX().Opacity(1 - opacity).Disabled(pane.searchOpen)
+		search := ui.Box(c).Key("file-search").WidthPercent(progress * 100).Shrink(0).
+			Height(t.C.Breadcrumb.Height).MinWidth(0).ClipX().Opacity(opacity).Disabled(!pane.searchOpen)
+		if reduced {
+			// Geometry switches immediately; both layers keep their width while fading.
+			location.Absolute().Top(0).Left(0).WidthPercent(100).Hidden(opacity == 1)
+			search.Absolute().Top(0).Left(0).WidthPercent(100).Hidden(opacity == 0)
+		}
+		location.Children(func() { a.fileBreadcrumbs(c, session, pane) })
+		search.Children(func() { fileSearchInput(c, pane).Fill() })
 	})
 }
 
 func fileSearchInput(c *ui.Context, pane *filePaneState) ui.Element {
 	t := theme.Current()
-	return ui.TextInput(c.Key("file-query"), &pane.query).Bind(&pane.search).
+	return textInput(c.Key("file-query"), &pane.query).Bind(&pane.search).
 		MinWidth(0).Height(t.C.Breadcrumb.Height).Padding(0, t.C.Search.PaddingX).
+		Radius(t.C.Search.Radius).Background(tokenColor(t.C.Search.Bg)).
 		FontSize(t.C.Search.FontSize).FixedLineHeight(t.Font.LineHeight.Body).
 		Label("搜索当前文件夹").Placeholder("搜索文件")
 }
@@ -348,7 +356,7 @@ func (a *app) filePaneLabel(c *ui.Context, pane *filePaneState) {
 		color, weight = tokenColor(t.Color.Text.Primary), focus.LabelWeightActive
 	}
 	badge := ui.Row(c).Height(t.C.Breadcrumb.Height).Padding(0, focus.LabelPaddingX).Radius(focus.LabelRadius).Shrink(0)
-	animation := ui.Animation{Duration: focus.Transition}
+	animation := tokenTween(focus.Transition)
 	badge.Background(badge.AnimateColor("label-bg", bg, animation)).Children(func() {
 		text := ui.Text(c, label).FontSize(t.Font.Size.Body).FontWeight(weight).SingleLine()
 		text.TextColor(text.AnimateColor("label-fg", color, animation))
@@ -391,9 +399,9 @@ func (a *app) fileBreadcrumbs(c *ui.Context, session *fileSession, pane *filePan
 	ellipsisWidth := measure("…")
 	// Absolute content leaves the available width to the toolbar, rather than
 	// letting a longer path or its collapsed form change its own width budget.
-	bar := ui.Box(c).Key("file-breadcrumbs").Grow(1).MinWidth(0).Clip().Height(t.C.Breadcrumb.Height).
+	bar := tooltip(c, ui.Box(c).Key("file-breadcrumbs").Grow(1).MinWidth(0).Clip().Height(t.C.Breadcrumb.Height).
 		Radius(t.C.Breadcrumb.Radius).Background(tokenColor(t.C.Breadcrumb.BgOnGlass)).
-		Font(family).FontSize(font.Size).FontWeight(font.Weight).Label("当前目录 " + pane.path).Tooltip(pane.path)
+		Font(family).FontSize(font.Size).FontWeight(font.Weight).Label("当前目录 "+pane.path), pane.path)
 	width := bar.LayoutBounds().W
 	available := max(0, width-2*t.C.Breadcrumb.PaddingX)
 	required := func(indices []int) float32 {
@@ -455,7 +463,7 @@ func (a *app) fileBreadcrumbs(c *ui.Context, session *fileSession, pane *filePan
 					target   string
 					overflow bool
 				}{target: target, overflow: index < 0}
-				item := ui.ButtonBase(c).Key(key).Label(label).Tooltip(target).Shrink(1).MinWidth(0).
+				item := tooltip(c, ui.ButtonBase(c).Key(key).Label(label), target).Shrink(1).MinWidth(0).
 					TextColor(tokenColor(t.C.Breadcrumb.Text))
 				if index == len(labels)-1 {
 					item.TextColor(tokenColor(t.C.Breadcrumb.Current))
@@ -546,7 +554,7 @@ func (a *app) fileRow(
 			bg, text = tokenColor(t.C.FilePaneFocus.SelBgInactive), tokenColor(t.C.FilePaneFocus.SelTextInactive)
 		}
 	}
-	animation := ui.Animation{Duration: t.C.FilePaneFocus.Transition}
+	animation := tokenTween(t.C.FilePaneFocus.Transition)
 	row.Background(row.AnimateColor("selection", bg, animation)).
 		TextColor(row.AnimateColor("selection-text", text, animation))
 	if row.Clicked() {
@@ -765,7 +773,7 @@ func (a *app) fileDropTarget(
 		return ""
 	}
 	if !writable {
-		element.Tooltip("此目录不可写")
+		tooltip(c, element, "此目录不可写")
 		return ""
 	}
 	element.DrawOver(func(p *ui.Painter, r ui.Rect) {

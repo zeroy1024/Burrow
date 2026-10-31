@@ -53,7 +53,10 @@ siderItem.nameColor             ← component，只能引用 semantic
 - 玻璃渐隐栏：`C.FadeBar` 给出 3 层 blur 半径与遮罩停点，以及着色起止 alpha（着色色 = 所在卡片底色）。如果 GPU 不支持 backdrop blur，退化为只画着色渐变。
 - 取当前主题：`theme.Current()`；切换：`theme.Set(theme.Dark())`；监听：`cancel := theme.OnChange(func(t *theme.Theme){{ /* 请求重绘 */ }})`。
 - 跟随系统外观：在系统外观变化回调里 `theme.Set(theme.ForAppearance(isDark))`（MyGo 的外观 API 以官方文档为准）。
-- 减少动态：`t.MotionDuration(d, c.Preferences().ReduceMotion)` 让位移动画变为 0，颜色/透明度过渡保留。
+- 控件接入：`uiadapt.go` 的按钮、输入框、弹窗、Tooltip 入口消费 component token；原生复合控件通过 `nativeTheme` 接入，内部布局保留框架行为。
+- 状态过渡：`tokenTween` 显式使用 `motion.easing.out`，状态时长为 `motion.duration.focus`（160ms）；搜索几何变化使用 `search.easing`，数字滚动使用 `groupHeader.countMotion`。
+- 减少动态：MyGo 自动将位移、缩放、旋转设为终值；`animateVisual` 使用颜色 alpha 通道保留透明度过渡，不让透明度依赖几何进度。
+- 图标：普通线性 SVG 初始化时读取 `iconButton.stroke`；修改几何 token 后需重启。品牌图形保留独立描边。
 - OS logo 底色：`t.OSLogoBg(brand)` = 品牌色按 `opacity.osTint` 混入卡片色（浅色 9%，深色 18%）。
 
 ## 4. 新增一个主题
@@ -61,7 +64,7 @@ siderItem.nameColor             ← component，只能引用 semantic
 1. 需要新的原始色时，先加到 `tokens_src.py` 的 `PALETTE`（例如 `PALETTE['solarized']`）。
 2. 像 `DARK` 一样写一个覆盖表：`{{'color.bg.window': P('solarized.base3'), ...}}`，只写 semantic 路径。
 3. 在 `gen.py` 中注册（或者直接在 Go 里：`s := theme.LightSemantic(); s.Color.Accent.Default = theme.Hex("#268bd2"); t := theme.New("solar", false, s)`）。
-4. `python3 gen.py && gofmt -w theme.go && go vet ./... && go test ./...`；`python3 preview.py` 重新渲染预览。
+4. 在 `internal/theme` 运行 `python3 -B gen.py && python3 -B mdgen.py && gofmt -w theme.go`，随后在仓库根目录运行已有构建、vet 和测试。
 5. 组件层不用改；如果某个组件在新主题下不对，说明缺一个 semantic token，应该加 semantic，而不是在组件里写死。
 
 ## 5. 推导值（derived）清单

@@ -3,10 +3,26 @@ package desktop
 import "slices"
 
 type hostGroup struct {
-	id        int
-	name      string
-	hosts     []hostID
-	collapsed bool
+	id             int
+	name           string
+	hosts          []hostID
+	collapsed      bool
+	filesCollapsed bool
+}
+
+func (a *app) groupCollapsed(group *hostGroup) bool {
+	if a.section == sectionFiles {
+		return group.filesCollapsed
+	}
+	return group.collapsed
+}
+
+func (a *app) setGroupCollapsed(group *hostGroup, collapsed bool) {
+	if a.section == sectionFiles {
+		group.filesCollapsed = collapsed
+		return
+	}
+	group.collapsed = collapsed
 }
 
 type hostDrag struct {

@@ -22,10 +22,11 @@ type catalogConfig struct {
 }
 
 type catalogConfigGroup struct {
-	ID        int    `json:"id"`
-	Name      string `json:"name"`
-	Order     int    `json:"order"`
-	Collapsed bool   `json:"collapsed"`
+	ID             int    `json:"id"`
+	Name           string `json:"name"`
+	Order          int    `json:"order"`
+	Collapsed      bool   `json:"collapsed"`
+	FilesCollapsed bool   `json:"files_collapsed,omitempty"`
 }
 
 type catalogConfigHost struct {
@@ -130,6 +131,7 @@ func (config catalogConfig) catalog(runtimeHosts []host) ([]host, []*hostGroup, 
 		}
 		group := &hostGroup{
 			id: value.ID, name: value.Name, collapsed: value.Collapsed, hosts: []hostID{},
+			filesCollapsed: value.FilesCollapsed,
 		}
 		groups[value.Order], byID[value.ID], names[value.Name] = group, group, true
 	}
@@ -203,6 +205,7 @@ func (a *app) saveCatalog() error {
 	for order, group := range a.groups {
 		config.Groups[order] = catalogConfigGroup{
 			ID: group.id, Name: group.name, Order: order, Collapsed: group.collapsed,
+			FilesCollapsed: group.filesCollapsed,
 		}
 		for position, id := range group.hosts {
 			config.Hosts[id].GroupID, config.Hosts[id].Order = group.id, position

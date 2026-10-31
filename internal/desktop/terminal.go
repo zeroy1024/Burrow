@@ -14,7 +14,7 @@ import (
 	"github.com/egoist/mygo/ui/shader"
 )
 
-func (a *app) terminals(c *ui.Context) {
+func (a *app) terminals(c *ui.Context, size ui.Point) {
 	t := theme.Current()
 	area := ui.Box(c).Key("terminals").Grow(1).MinWidth(0).MinHeight(0).Bind(&a.workArea)
 	tab := a.currentTab()
@@ -34,8 +34,9 @@ func (a *app) terminals(c *ui.Context) {
 		if dropped {
 			a.pendingDock = func() {
 				a.openHost(source.id)
+				startPaneReveal(a.currentTab().focused)
 				if catalogDropped {
-					a.catalogDrag.externalDrop = true
+					a.page().catalogDrag.externalDrop = true
 				}
 				if a.drag != nil {
 					a.drag.session, a.drag.phase = a.currentTab().focused, dragLanded
@@ -47,21 +48,22 @@ func (a *app) terminals(c *ui.Context) {
 				ui.Icon(c, terminalIcon).Size(t.C.Pane.EmptyIconSize, t.C.Pane.EmptyIconSize).TextColor(tokenColor(t.Color.Text.Secondary))
 				ui.Text(c, "选择一台主机，开始会话").FontSize(t.C.Pane.EmptyTitleSize).FontWeight(t.C.Pane.EmptyTitleWeight)
 				ui.Text(c, "左侧主机可拖入终端窗格").FontSize(t.Font.Size.Body).TextColor(tokenColor(t.Color.Text.Secondary))
-				ui.Button(c, "添加 SSH 主机").OnClick(func() { a.startHostDraft() })
+				button(c, "添加 SSH 主机").OnClick(func() { a.startHostDraft() })
 			})
 		})
 		return
 	}
 	minimum := tab.root.minimum()
 	area.MinWidth(minimum.X).MinHeight(minimum.Y)
-	bounds := area.Bounds()
-	if bounds.W <= 0 || bounds.H <= 0 {
-		c.AnimationFrame()
-		return
+	size.X, size.Y = max(size.X, minimum.X), max(size.Y, minimum.Y)
+	if tab.workspaceSize != size {
+		// MyGo can rebuild several times at the same frame time after input.
+		tab.workspaceSize, tab.workspaceResizedAt = size, c.Now()
 	}
+	bounds := ui.Rect{W: size.X, H: size.Y}
 	panes, splits := []panePlacement{}, []splitPlacement{}
 	a.terminalCellWidth()
-	tab.root.placements(ui.Rect{W: max(bounds.W, minimum.X), H: max(bounds.H, minimum.Y)}, &panes, &splits)
+	tab.root.placements(bounds, &panes, &splits)
 	a.zoomProgress(c, tab)
 	targets := make([]ui.Element, len(panes))
 	// Text selection can change focus during a pane build. Keep this frame's
@@ -155,8 +157,8 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 		MinWidth(0).MinHeight(0).Radius(p.Radius).Label(h.name + " 演示终端")
 	a.paneMotion(c, pane, tab, session)
 	_, catalogActive, _ := a.catalogHostTransfer()
-	frozen := a.drag != nil || catalogActive || a.resizing != nil ||
-		pane.Transitioning() || c.Now().Before(tab.layoutUntil)
+	frozen := !session.revealing && (a.drag != nil || catalogActive || a.resizing != nil ||
+		tab.workspaceResizedAt.Equal(c.Now()) || pane.Transitioning() || c.Now().Before(tab.layoutUntil))
 	if session.contentWidth == 0 || !frozen {
 		if session.contentWidth != rect.W || session.contentHeight != rect.H {
 			if session.scroll.offset.Y >= session.scroll.offset.MaxY {
@@ -197,8 +199,8 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 	if !multiple {
 		opacity, saturation, footerOpacity = 1, 1, 1
 	}
-	titleColor = pane.AnimateColor("host-color", titleColor, ui.Animation{Duration: f.Transition})
-	loginColor = pane.AnimateColor("login-color", loginColor, ui.Animation{Duration: f.Transition})
+	titleColor = pane.AnimateColor("host-color", titleColor, tokenTween(f.Transition))
+	loginColor = pane.AnimateColor("login-color", loginColor, tokenTween(f.Transition))
 	var card, hairline ui.Element
 	pane.Children(func() {
 		card = ui.Column(c).Key("card").Absolute().Top(0).Right(0).Bottom(0).Left(0).
@@ -256,9 +258,8 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 						FixedLineHeight(f.KbdLineHeight).SingleLine().Padding(f.KbdPaddingY, f.KbdPaddingX).Radius(f.KbdRadius).
 						Background(labelBackground).TextColor(labelColor)
 					statusDot(c, session.state, t.Size.Dot)
-					ui.Text(c, h.name).FontSize(p.HeaderFontSize).FontWeight(titleWeight).TextColor(titleColor).
-						SingleLine().Ellipsis("…").MinWidth(0).Shrink(1).
-						Tooltip(fmt.Sprintf("%s · %s@%s:%d", h.name, h.user, h.address, h.port))
+					tooltip(c, ui.Text(c, h.name).FontSize(p.HeaderFontSize).FontWeight(titleWeight).TextColor(titleColor).
+						SingleLine().Ellipsis("…").MinWidth(0).Shrink(1), fmt.Sprintf("%s · %s@%s:%d", h.name, h.user, h.address, h.port))
 					ui.Text(c, fmt.Sprintf("%s@%s:%d", h.user, h.address, h.port)).
 						Font(strings.Join(p.HostFamily, ", ")).FontSize(p.HostSize).TextColor(loginColor).
 						SingleLine().Ellipsis("…").Grow(1).MinWidth(0)
@@ -319,14 +320,21 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 				badge := surface.C.Badge
 				label, tint := "已连接", tokenColor(badge.OkBg)
 				color := tokenColor(badge.OkText)
-				if session.state != connected {
+				switch {
+				case session.state == connecting:
+					label, tint, color = "连接中", tokenColor(surface.Color.Warning.Subtle), tokenColor(surface.Color.Warning.Text)
+				case session.state != connected:
 					label, tint, color = "未连接", tokenColor(badge.NeutralBg), tokenColor(badge.NeutralText)
 				}
 				ui.Row(c).Padding(badge.PaddingY, badge.PaddingXCompact).Gap(badge.Gap).Radius(badge.Radius).Background(tint).Children(func() {
 					ui.Box(c).Size(t.Size.DotSm, t.Size.DotSm).Radius(badge.Radius).Background(color)
 					ui.Text(c, label).FontSize(badge.FontSizeCompact).TextColor(color)
 				})
-				ui.Text(c, fmt.Sprintf("延迟 %d ms", h.latency)).FontSize(status.FontSize).SingleLine()
+				latency := "延迟 —"
+				if session.state == connected {
+					latency = fmt.Sprintf("延迟 %d ms", h.latency)
+				}
+				ui.Text(c, latency).FontSize(status.FontSize).SingleLine()
 				ui.Spacer(c)
 				ui.Text(c, a.paneSizeLabel(session)).FontSize(status.FontSize).SingleLine()
 			})
@@ -335,12 +343,11 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 			Radius(p.Radius).PassThrough()
 		applyShadow(hairline, p.Outline)
 	})
+	paneReveal(c, card, session)
 	if a.lifted(session) {
 		card.Opacity(0)
 		hairline.Opacity(0)
-		if a.drag.phase != dragLanded {
-			a.dragPlaceholder(pane)
-		}
+		a.dragPlaceholder(pane)
 	} else {
 		paneFocusShadows(pane, focused, multiple, surface)
 	}
@@ -354,13 +361,10 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 }
 
 func terminalIconButton(c *ui.Context, label string, icon *ui.SVG, surface *theme.Theme) ui.Element {
-	button := iconButton(c, label, icon).TextColor(tokenColor(surface.C.IconButton.Icon))
-	switch {
-	case button.Pressed():
-		button.Background(tokenColor(surface.C.Button.BgPressed))
-	case button.Hovered():
-		button.Background(tokenColor(surface.C.IconButton.BgHover))
-	}
+	button := styleIconButton(ui.ButtonBase(c).Key(label).Label(label), surface)
+	tooltip(c, button, label)
+	size := surface.C.IconButton.IconSize
+	button.Children(func() { ui.Icon(c, icon).Size(size, size) })
 	return button
 }
 
