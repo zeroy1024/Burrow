@@ -2,7 +2,6 @@ package desktop
 
 import (
 	"math"
-	"strings"
 	"time"
 
 	"sshdesk/internal/theme"
@@ -48,7 +47,9 @@ type remoteSession struct {
 	state                       connectionState
 	scroll                      terminalScrollState
 	focus                       ui.Handle
-	output                      []string
+	transcript                  []terminalLine
+	output                      []terminalLine
+	textState                   terminalTextState
 	hasNewOutput                bool
 	hasBell                     bool
 	cursorStarted               time.Time
@@ -108,7 +109,8 @@ func (a *app) focusedHost() (hostID, bool) {
 func (a *app) newSession(id hostID) *remoteSession {
 	a.nextSession++
 	return &remoteSession{
-		id: a.nextSession, host: id, state: connected, output: []string{},
+		id: a.nextSession, host: id, state: connected,
+		transcript: demoTranscript(a.hosts[id]), output: []terminalLine{},
 		scroll: terminalScrollState{offset: ui.ScrollState{Y: math.MaxFloat32}},
 	}
 }
@@ -129,17 +131,17 @@ func (a *app) activateTab(index int) {
 // The prototype receives complete output lines; BEL is an activity event, not printable text.
 func (a *app) receiveSessionOutput(session *remoteSession, text string) {
 	background := a.currentTab().focused != session
-	if background && strings.ContainsRune(text, '\a') {
+	lines, bell := session.textState.parse(text)
+	if background && bell {
 		session.hasBell = true
 	}
-	text = strings.ReplaceAll(text, "\a", "")
-	if text == "" {
+	if len(lines) == 0 {
 		return
 	}
 	if session.scroll.offset.Y >= session.scroll.offset.MaxY {
 		session.scroll.offset.Y = math.MaxFloat32
 	}
-	session.output = append(session.output, strings.Split(strings.TrimSuffix(text, "\n"), "\n")...)
+	session.output = append(session.output, lines...)
 	if background {
 		session.hasNewOutput = true
 	}

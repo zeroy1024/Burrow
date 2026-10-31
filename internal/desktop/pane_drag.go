@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"math"
 	"slices"
+	"strings"
 	"time"
 
+	"sshdesk/internal/termtheme"
 	"sshdesk/internal/theme"
 
 	"github.com/egoist/mygo/ui"
@@ -251,6 +253,11 @@ func (a *app) dragPreview(c *ui.Context) {
 
 func (a *app) paneSnapshot(session *remoteSession, width, height float32) *ui.Bitmap {
 	t := theme.Current()
+	s := termtheme.Current()
+	prefs := a.terminal.prefs
+	terminalBackground := termtheme.TerminalBackground(s, t.C.Pane.Bg, prefs.Background)
+	background := tokenColor(terminalBackground)
+	surface := terminalSurface(terminalBackground)
 	h := a.hosts[session.host]
 	position := session.scroll.offset.Y
 	if position >= session.scroll.offset.MaxY {
@@ -259,23 +266,24 @@ func (a *app) paneSnapshot(session *remoteSession, width, height float32) *ui.Bi
 	offset := ui.ScrollState{Y: position}
 	image := ui.Render(func(c *ui.Context) {
 		c.SetTheme(a.theme)
-		ui.Column(c).Fill().Radius(t.C.Pane.Radius).Clip().Background(tokenColor(t.C.Pane.Bg)).Children(func() {
+		ui.Column(c).Fill().Radius(t.C.Pane.Radius).Clip().Background(background).Children(func() {
 			ui.Scroll(c.Key("preview-output")).Fill().TrackScroll(&offset).Padding(
-				38,
-				14,
-				50,
-				14,
-			).ScrollbarInsets(0, -12, 0, 0).Font("Menlo, monospace").FontSize(11).TextColor(ui.Hex(terminalPrimaryText)).Children(func() {
+				t.C.Pane.HeaderHeight+t.Space.N4,
+				t.C.Pane.ContentSide,
+				t.C.StatusBar.HeightPane+t.Space.N4,
+				t.C.Pane.ContentSide,
+			).ScrollbarInsets(0, -12, 0, 0).Font(strings.Join(prefs.FontFamily, ", ")).FontSize(prefs.FontSize).
+				LetterSpacing(prefs.Tracking).TextColor(tokenColor(s.Foreground)).Children(func() {
 				a.terminalLines(c, session, false)
 			})
 			ui.Row(c).Absolute().Top(0).Left(0).Right(0).Height(t.C.Pane.HeaderHeight).Padding(0, t.C.Pane.HeaderPaddingLeft).Gap(t.C.Pane.HeaderGap).
-				Background(tokenColor(t.C.Pane.Bg).Alpha(t.C.Desktop.PreviewHeaderOpacity)).Children(func() {
+				Background(background.Alpha(t.C.Desktop.PreviewHeaderOpacity)).Children(func() {
 				statusDot(c, session.state, t.C.SiderItem.DotSize)
-				ui.Text(c, h.name).FontSize(t.C.Pane.HeaderFontSize).FontWeight(t.C.Pane.NameWeight).TextColor(tokenColor(t.C.Pane.Name))
+				ui.Text(c, h.name).FontSize(t.C.Pane.HeaderFontSize).FontWeight(t.C.Pane.NameWeight).TextColor(tokenColor(surface.C.Pane.Name))
 			})
 			ui.Row(c).Absolute().Bottom(0).Left(0).Right(0).Height(t.C.StatusBar.HeightPane).Padding(0, t.C.StatusBar.PaddingX).
-				Background(tokenColor(t.C.Pane.Bg).Alpha(t.C.Desktop.PreviewHeaderOpacity)).Children(func() {
-				ui.Text(c, h.user+"@"+h.address).FontSize(t.C.StatusBar.FontSize).TextColor(tokenColor(t.C.StatusBar.Text))
+				Background(background.Alpha(t.C.Desktop.PreviewHeaderOpacity)).Children(func() {
+				ui.Text(c, h.user+"@"+h.address).FontSize(t.C.StatusBar.FontSize).TextColor(tokenColor(surface.C.StatusBar.Text))
 			})
 		})
 	}, int(math.Ceil(float64(width))), int(math.Ceil(float64(height))), 1)

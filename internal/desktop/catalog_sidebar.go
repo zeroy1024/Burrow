@@ -30,54 +30,63 @@ func (a *app) catalogTransition(kind catalogDragKind) ui.ElementTransition {
 
 func (a *app) catalogList(c *ui.Context) {
 	t := theme.Current()
-	ui.Scroll(c.Key("session-list")).TrackScroll(&a.catalogScroll).
-		Grow(1).MinHeight(0).Padding(t.C.Catalog.ListPaddingY, t.C.Catalog.ListPaddingX).Children(func() {
-		ui.Column(c).Key("catalog-items").FillWidth().Children(func() {
-			a.catalogSlots = a.catalogPlan(c)
-			for i, slot := range a.catalogSlots {
-				gap := t.C.Catalog.RowGap
-				if slot.key.kind == catalogGroupDrag {
-					gap = t.C.Catalog.GroupGap
-					if i == 0 {
-						gap = 0
+	viewport := ui.Box(c).Key("catalog-viewport").Grow(1).MinHeight(0).Clip()
+	viewport.Children(func() {
+		ui.Scroll(c.Key("session-list")).TrackScroll(&a.catalogScroll).Fill().MinHeight(0).
+			ScrollbarInsets(0, -t.C.Scrollbar.TrackWidth, 0, 0).
+			HandleInput(func(ev ui.InputEvent) bool {
+				return a.catalogScrollbar.input(ev, &a.catalogScroll)
+			}).Padding(t.C.Catalog.ListPaddingY, t.C.Catalog.ListPaddingX).Children(func() {
+			ui.Column(c).Key("catalog-items").FillWidth().Children(func() {
+				a.catalogSlots = a.catalogPlan(c)
+				for i, slot := range a.catalogSlots {
+					gap := t.C.Catalog.RowGap
+					if slot.key.kind == catalogGroupDrag {
+						gap = t.C.Catalog.GroupGap
+						if i == 0 {
+							gap = 0
+						}
+					}
+					if slot.placeholder {
+						a.catalogPlaceholder(c, slot).Margin(gap, 0, 0, 0)
+						continue
+					}
+					item := a.catalogItem(c, slot).Margin(gap, 0, 0, 0)
+					if slot.key.kind == catalogGroupDrag {
+						if bounds := item.Bounds(); bounds.W > 0 && bounds.H > 0 {
+							a.catalogSlots[i].headerRect = bounds
+						}
 					}
 				}
-				if slot.placeholder {
-					a.catalogPlaceholder(c, slot).Margin(gap, 0, 0, 0)
-					continue
-				}
-				item := a.catalogItem(c, slot).Margin(gap, 0, 0, 0)
-				if slot.key.kind == catalogGroupDrag {
-					if bounds := item.Bounds(); bounds.W > 0 && bounds.H > 0 {
-						a.catalogSlots[i].headerRect = bounds
+				if d := a.catalogDrag; d != nil && d.phase == catalogDragging {
+					// Keep the actual pressed node alive, under the same parent/key,
+					// while the placeholder alone takes part in the preview layout.
+					built := slices.ContainsFunc(a.catalogSlots, func(slot catalogSlot) bool {
+						return slot.key == d.key && !slot.placeholder
+					})
+					if !built {
+						slot := catalogSlot{key: d.key, group: d.group, rect: d.origin}
+						a.catalogItem(c, slot).Absolute().Left(0).Top(d.originContentY).FillWidth().Margin(0)
+					}
+					if d.kind == catalogGroupDrag && d.collapseFrames < 2 {
+						// Prime every row's collapse Exit before removing it, including
+						// rows built before the source header in the first drag frame.
+						newFrame := d.collapseFrames == 0 || !c.Now().Equal(d.collapseSample)
+						if newFrame {
+							d.collapseFrames++
+							d.collapseSample = c.Now()
+						}
+						c.AnimationFrame()
 					}
 				}
-			}
-			if d := a.catalogDrag; d != nil && d.phase == catalogDragging {
-				// Keep the actual pressed node alive, under the same parent/key,
-				// while the placeholder alone takes part in the preview layout.
-				built := slices.ContainsFunc(a.catalogSlots, func(slot catalogSlot) bool {
-					return slot.key == d.key && !slot.placeholder
-				})
-				if !built {
-					slot := catalogSlot{key: d.key, group: d.group, rect: d.origin}
-					a.catalogItem(c, slot).Absolute().Left(0).Top(d.originContentY).FillWidth().Margin(0)
+				if len(a.catalogSlots) == 0 && strings.TrimSpace(a.query) != "" {
+					ui.Text(c, "没有匹配的主机").FontSize(t.Font.Size.Small).TextColor(tokenColor(t.Color.Text.Secondary)).Padding(t.Space.N12)
 				}
-				if d.kind == catalogGroupDrag && d.collapseFrames < 2 {
-					// Prime every row's collapse Exit before removing it, including
-					// rows built before the source header in the first drag frame.
-					newFrame := d.collapseFrames == 0 || !c.Now().Equal(d.collapseSample)
-					if newFrame {
-						d.collapseFrames++
-						d.collapseSample = c.Now()
-					}
-					c.AnimationFrame()
-				}
-			}
-			if len(a.catalogSlots) == 0 && strings.TrimSpace(a.query) != "" {
-				ui.Text(c, "没有匹配的主机").FontSize(t.Font.Size.Small).TextColor(tokenColor(t.Color.Text.Secondary)).Padding(t.Space.N12)
-			}
+			})
 		})
+		fadingScrollbar(c, scrollbarView{
+			element: viewport, offset: &a.catalogScroll, label: "会话栏滚动条", color: tokenColor(t.C.Scrollbar.Color),
+		}, &a.catalogScrollbar)
 	})
 	a.syncCatalogWorkspacePreview(c)
 }

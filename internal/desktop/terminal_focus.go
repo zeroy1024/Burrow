@@ -4,15 +4,11 @@ import (
 	"slices"
 	"time"
 
+	"sshdesk/internal/termtheme"
 	"sshdesk/internal/theme"
 
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/shader"
-)
-
-const (
-	terminalPrimaryText   = "#1d1d1f"
-	terminalSecondaryText = "#8e8e93"
 )
 
 var terminalSaturation = shader.MustCompile(`package main
@@ -51,8 +47,8 @@ func (a *app) paneShortcuts(c *ui.Context) {
 	}
 }
 
-func paneFocusShadows(pane ui.Element, focused, multiple bool) {
-	t := theme.Current().C.PaneFocus
+func paneFocusShadows(pane ui.Element, focused, multiple bool, surface *theme.Theme) {
+	t := surface.C.PaneFocus
 	focusTarget, hoverTarget := float32(0), float32(0)
 	if multiple && focused {
 		focusTarget = 1
@@ -66,11 +62,12 @@ func paneFocusShadows(pane ui.Element, focused, multiple bool) {
 		return
 	}
 	applyShadowOpacity(pane, t.RingHover, hover)
-	applyShadowOpacity(pane, t.RingFocused, focus)
+	// The first layer is the blue outline; omit the halo and raised shadow.
+	applyShadowOpacity(pane, t.RingFocused[:1], focus)
 }
 
-func terminalActivity(c *ui.Context, session *remoteSession) {
-	t := theme.Current()
+func terminalActivity(c *ui.Context, session *remoteSession, surface *theme.Theme) {
+	t := surface
 	b := t.C.ActivityBadge
 	if session.hasNewOutput {
 		ui.Row(c).Shrink(0).Padding(b.PaddingY, b.PaddingRight, b.PaddingY, b.PaddingLeft).Gap(b.Gap).Radius(b.Radius).
@@ -87,25 +84,38 @@ func terminalActivity(c *ui.Context, session *remoteSession) {
 	}
 }
 
-func terminalCursor(c *ui.Context, session *remoteSession, focused bool) {
-	cursor := ui.Box(c).Key("terminal-cursor").Size(8, 16).Shrink(0).Radius(1).Margin(
-		0,
-		0,
-		1.5,
-		0,
-	)
+func (a *app) terminalCursor(c *ui.Context, session *remoteSession, focused bool, text string) {
+	prefs, scheme := a.terminal.prefs, termtheme.Current()
+	background := termtheme.TerminalBackground(scheme, theme.Current().C.Pane.Bg, prefs.Background)
+	surface := terminalSurface(background)
+	width := a.terminalCellWidth()
+	height := min(prefs.LineHeight, prefs.FontSize+3.5)
+	cursor := ui.Box(c).Key("terminal-cursor").Size(width, height).Shrink(0).
+		Radius(1).Margin(0, 0, 1.5, 0).Unselectable()
 	if !focused {
 		cursor.InsetShadow(
 			0,
 			0,
 			0,
 			1.2,
-			ui.Hex(terminalSecondaryText),
+			tokenColor(surface.C.PaneFocus.CursorRingUnfocused),
 		)
 		return
 	}
-	cursor.Background(ui.Hex(terminalPrimaryText))
-	if c.Preferences().ReduceMotion {
+	cursor.Children(func() {
+		mark := ui.Box(c).Absolute().Left(0).Bottom(0).Background(tokenColor(scheme.Cursor))
+		switch prefs.CursorShape {
+		case termtheme.CursorBar:
+			mark.Size(1.5, height)
+		case termtheme.CursorUnderline:
+			mark.Size(width, 2)
+		default:
+			mark.Size(width, height).Children(func() {
+				ui.Text(c, text).TextColor(tokenColor(scheme.CursorText)).SingleLine()
+			})
+		}
+	})
+	if !prefs.CursorBlink || c.Preferences().ReduceMotion {
 		return
 	}
 	if session.cursorStarted.IsZero() {

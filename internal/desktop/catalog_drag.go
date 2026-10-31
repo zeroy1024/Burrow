@@ -137,7 +137,10 @@ func (a *app) syncCatalogWorkspacePreview(c *ui.Context) {
 	if d.workspacePreview == nil {
 		area := a.workArea.Bounds(c)
 		size := ui.Rect{W: min(t.C.Desktop.DragPreviewWidth, area.W), H: min(t.C.Desktop.DragPreviewHeight, area.H)}
-		session := &remoteSession{host: d.host.id, state: connected, output: []string{}}
+		session := &remoteSession{
+			host: d.host.id, state: connected, output: []terminalLine{},
+			transcript: demoTranscript(a.hosts[d.host.id]),
+		}
 		d.workspacePreview = &paneDragState{
 			kind: dragHost, session: session, origin: d.origin, paneRect: size, detached: true,
 			grab: ui.Point{X: min(t.C.Desktop.DragGrabX, size.W/2), Y: t.C.Desktop.DragGrabY}, order: []*workspaceTab{},

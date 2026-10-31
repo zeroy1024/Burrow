@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 
+	"sshdesk/internal/termtheme"
 	"sshdesk/internal/theme"
 
 	"github.com/egoist/mygo/plugins/glass"
@@ -59,22 +60,23 @@ func (a *app) terminals(c *ui.Context) {
 		return
 	}
 	panes, splits := []panePlacement{}, []splitPlacement{}
-	if a.cellWidth == 0 {
-		a.cellWidth, _ = ui.ShapeText("M", ui.Font{Family: "Menlo, monospace", Size: 11}, 0).Size()
-	}
+	a.terminalCellWidth()
 	tab.root.placements(ui.Rect{W: max(bounds.W, minimum.X), H: max(bounds.H, minimum.Y)}, &panes, &splits)
 	a.zoomProgress(c, tab)
 	targets := make([]ui.Element, len(panes))
+	// Text selection can change focus during a pane build. Keep this frame's
+	// sibling order stable so that each session is built exactly once.
+	focusedSession := tab.focused
 	area.Children(func() {
 		// Stable siblings let layout transitions follow sessions across arbitrary tree edits.
 		for i, placement := range panes {
 			placement.session.layoutRect = placement.rect
-			if placement.session != tab.focused {
+			if placement.session != focusedSession {
 				targets[i] = a.terminalPane(c, tab, placement)
 			}
 		}
 		for i, placement := range panes {
-			if placement.session != tab.focused {
+			if placement.session != focusedSession {
 				continue
 			}
 			if tab.maximized {
@@ -117,18 +119,37 @@ func (a *app) terminals(c *ui.Context) {
 	}
 }
 
+func (a *app) terminalCellWidth() float32 {
+	prefs := a.terminal.prefs
+	font := ui.Font{Family: strings.Join(prefs.FontFamily, ", "), Size: prefs.FontSize}
+	if a.cellWidth == 0 || a.cellFont != font || a.cellTracking != prefs.Tracking {
+		a.cellFont = font
+		a.cellTracking = prefs.Tracking
+		a.cellWidth, _ = ui.ShapeText("M", font, 0).Size()
+		a.cellWidth += prefs.Tracking
+	}
+	return a.cellWidth
+}
+
 func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlacement) ui.Element {
 	t := theme.Current()
-	p, f, status := t.C.Pane, t.C.PaneFocus, t.C.StatusBar
+	s := termtheme.Current()
+	prefs := a.terminal.prefs
+	terminalBackground := termtheme.TerminalBackground(s, t.C.Pane.Bg, prefs.Background)
+	background := tokenColor(terminalBackground)
+	surface := terminalSurface(terminalBackground)
+	p, f, status := surface.C.Pane, surface.C.PaneFocus, surface.C.StatusBar
 	session, rect := placement.session, placement.rect
 	h := a.hosts[session.host]
 	count := tab.root.count()
 	multiple := count > 1
-	topPadding := p.ContentTop
+	contentGap := t.Space.N4
+	topPadding := contentGap
+	bottomPadding := status.HeightPane + contentGap
 	if multiple {
-		topPadding = p.HeaderHeight + t.Space.N2
+		topPadding += p.HeaderHeight
 	}
-	// Only the inner card clips. Its wrapper owns the focus halo and the overlay hairline.
+	// Only the inner card clips. Its wrapper owns the focus border and overlay hairline.
 	pane := ui.Box(c).Key(fmt.Sprintf("pane-wrap-%d", session.id)).Absolute().
 		Left(rect.X).Top(rect.Y).Size(rect.W, rect.H).Bind(&session.frame).
 		MinWidth(0).MinHeight(0).Radius(p.Radius).Label(h.name + " 演示终端")
@@ -142,9 +163,9 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 				session.scroll.offset.Y = math.MaxFloat32
 			}
 			session.contentWidth, session.contentHeight = rect.W, rect.H
-			session.columns = max(1, int((rect.W-2*p.ContentSide)/a.cellWidth))
-			session.rows = max(1, int((rect.H-topPadding-p.ContentBottom)/19))
 		}
+		session.columns = max(1, int((rect.W-2*p.ContentSide)/a.cellWidth))
+		session.rows = max(1, int((rect.H-topPadding-bottomPadding)/prefs.LineHeight))
 	} else {
 		c.After(p.FrameInterval)
 	}
@@ -181,10 +202,10 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 	var card, hairline ui.Element
 	pane.Children(func() {
 		card = ui.Column(c).Key("card").Absolute().Top(0).Right(0).Bottom(0).Left(0).
-			Radius(p.Radius).Background(tokenColor(p.Bg)).Clip().
+			Radius(p.Radius).Background(background).Clip().
 			Draw(func(p *ui.Painter, r ui.Rect) {
 				// Absolute children paint after the scroll content, so paint its backdrop here.
-				p.Fill(r, tokenColor(t.C.Pane.Bg), t.C.Pane.Radius)
+				p.Fill(r, background, t.C.Pane.Radius)
 			})
 		card.Children(func() {
 			// Move the native thumb outside the card's clip; the fading thumb is drawn below.
@@ -193,14 +214,15 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 				TrackScroll(&scroll.offset).Padding(
 				topPadding,
 				p.ContentSide,
-				p.ContentBottom,
+				bottomPadding,
 				p.ContentSide,
 			).ScrollbarInsets(
 				p.HeaderHeight,
 				-t.C.Scrollbar.TrackWidth,
 				status.HeightPane,
 				0,
-			).Font("Menlo, monospace").FontSize(11).TextColor(ui.Hex(terminalPrimaryText)).
+			).Font(strings.Join(prefs.FontFamily, ", ")).FontSize(prefs.FontSize).
+				LetterSpacing(prefs.Tracking).TextColor(tokenColor(s.Foreground)).
 				Opacity(opacity).Cache().HandleInput(scroll.input).
 				OnClick(func() { a.focusSession(tab, session) })
 			if saturation != 1 {
@@ -212,10 +234,10 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 				a.terminalLines(c, session, focused)
 			})
 			if multiple {
-				terminalScrollEdge(c, p.HeaderHeight, false)
+				terminalScrollEdge(c, p.HeaderHeight, false, background)
 			}
-			terminalScrollEdge(c, status.HeightPane, true)
-			terminalScrollbar(c, pane, scroll)
+			terminalScrollEdge(c, status.HeightPane, true, background)
+			terminalScrollbar(c, pane, scroll, terminalBackground)
 			var header ui.Element
 			if multiple {
 				header = ui.Row(c).Key("identity").Absolute().Top(0).Left(0).Height(p.HeaderHeight).Padding(
@@ -241,7 +263,7 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 						Font(strings.Join(p.HostFamily, ", ")).FontSize(p.HostSize).TextColor(loginColor).
 						SingleLine().Ellipsis("…").Grow(1).MinWidth(0)
 					if !focused {
-						terminalActivity(c, session)
+						terminalActivity(c, session, surface)
 					}
 					handle := ui.Box(c).Key("pane-drag-handle").Absolute().Top(0).Bottom(0).Left(0).Right(0).
 						Label("拖动窗格 " + h.name).OnClick(func() { a.focusSession(tab, session) })
@@ -264,19 +286,19 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 					ui.Box(c).Absolute().Top(0).Left(0).Size(actionsWidth, p.ActionHeight).Radius(p.ActionRadius).PassThrough().
 						Material(glass.Blur{Radius: p.ActionBlur})
 					ui.Box(c).Absolute().Top(0).Left(0).Size(actionsWidth, p.ActionHeight).Radius(p.ActionRadius).PassThrough().
-						Background(tokenColor(p.Bg).Alpha(p.ActionTint))
+						Background(background.Alpha(p.ActionTint))
 				}
-				split := iconButton(c, "分栏 "+h.name, sidebarIcon).Absolute().Top(0).Left(0).Size(p.ActionWidth, p.ActionHeight).
+				split := terminalIconButton(c, "分栏 "+h.name, sidebarIcon, surface).Absolute().Top(0).Left(0).Size(p.ActionWidth, p.ActionHeight).
 					Disabled(count >= maxTerminalPanes || session.closing || !canSplit(session.layoutRect, dropRight) && !canSplit(session.layoutRect, dropBottom))
 				keyboardFocus = split.FocusVisible()
 				split.OnClick(func() { a.splitSession(session, stacked) })
 				if multiple {
-					expand := iconButton(c, "放大或恢复 "+h.name, expandIcon).Absolute().Top(0).Left(p.ActionWidth+p.ActionGap).Size(p.ActionWidth, p.ActionHeight)
+					expand := terminalIconButton(c, "放大或恢复 "+h.name, expandIcon, surface).Absolute().Top(0).Left(p.ActionWidth+p.ActionGap).Size(p.ActionWidth, p.ActionHeight)
 					keyboardFocus = keyboardFocus || expand.FocusVisible()
 					expand.OnClick(func() {
 						a.togglePaneZoom(tab, session)
 					})
-					close := iconButton(c, "关闭窗格 "+h.name, closeIcon).Absolute().Top(0).Left(2*(p.ActionWidth+p.ActionGap)).Size(p.ActionWidth, p.ActionHeight)
+					close := terminalIconButton(c, "关闭窗格 "+h.name, closeIcon, surface).Absolute().Top(0).Left(2*(p.ActionWidth+p.ActionGap)).Size(p.ActionWidth, p.ActionHeight)
 					keyboardFocus = keyboardFocus || close.FocusVisible()
 					close.OnClick(func() { a.closePane(session) })
 				}
@@ -294,7 +316,7 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 			ui.Row(c).Key("status").Absolute().Bottom(0).Left(0).Right(0).Height(status.HeightPane).
 				Opacity(footerOpacity).
 				Padding(0, status.PaddingX).Gap(status.GapPane).PassThrough().TextColor(tokenColor(status.Text)).Children(func() {
-				badge := t.C.Badge
+				badge := surface.C.Badge
 				label, tint := "已连接", tokenColor(badge.OkBg)
 				color := tokenColor(badge.OkText)
 				if session.state != connected {
@@ -320,7 +342,7 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 			a.dragPlaceholder(pane)
 		}
 	} else {
-		paneFocusShadows(pane, focused, multiple)
+		paneFocusShadows(pane, focused, multiple, surface)
 	}
 	a.paneDrop(
 		c,
@@ -331,7 +353,18 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 	return pane
 }
 
-func terminalScrollEdge(c *ui.Context, barHeight float32, bottom bool) {
+func terminalIconButton(c *ui.Context, label string, icon *ui.SVG, surface *theme.Theme) ui.Element {
+	button := iconButton(c, label, icon).TextColor(tokenColor(surface.C.IconButton.Icon))
+	switch {
+	case button.Pressed():
+		button.Background(tokenColor(surface.C.Button.BgPressed))
+	case button.Hovered():
+		button.Background(tokenColor(surface.C.IconButton.BgHover))
+	}
+	return button
+}
+
+func terminalScrollEdge(c *ui.Context, barHeight float32, bottom bool, background ui.Color) {
 	t := theme.Current()
 	fade := t.C.FadeBar
 	angle := float32(180)
@@ -339,7 +372,7 @@ func terminalScrollEdge(c *ui.Context, barHeight float32, bottom bool) {
 		angle = 0
 	}
 	band := func() ui.Element {
-		element := ui.Box(c).Absolute().Left(0).Right(0).Height(barHeight + fade.ExtentPane).PassThrough()
+		element := ui.Box(c).Absolute().Left(0).Right(0).Height(barHeight).PassThrough()
 		if bottom {
 			return element.Bottom(0)
 		}
@@ -360,7 +393,6 @@ func terminalScrollEdge(c *ui.Context, barHeight float32, bottom bool) {
 			},
 		})
 	}
-	background := tokenColor(t.C.Pane.Bg)
 	band().LinearGradient(ui.LinearGradient{
 		Angle: angle,
 		Stops: []ui.GradientStop{

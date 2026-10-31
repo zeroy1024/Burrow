@@ -1,0 +1,25 @@
+# name: Nord
+# source: https://github.com/mbadolato/iTerm2-Color-Schemes (ghostty/Nord @ 3d8a6a1)
+# license: MIT, Copyright (c) 2016-present Sven Greb; collection MIT, Copyright (c) 2011 to Present Mark Badolato
+palette = 0=#3b4252
+palette = 1=#bf616a
+palette = 2=#a3be8c
+palette = 3=#ebcb8b
+palette = 4=#81a1c1
+palette = 5=#b48ead
+palette = 6=#88c0d0
+palette = 7=#e5e9f0
+palette = 8=#596377
+palette = 9=#bf616a
+palette = 10=#a3be8c
+palette = 11=#ebcb8b
+palette = 12=#81a1c1
+palette = 13=#b48ead
+palette = 14=#8fbcbb
+palette = 15=#eceff4
+background = #2e3440
+foreground = #d8dee9
+cursor-color = #eceff4
+cursor-text = #282828
+selection-background = #eceff4
+selection-foreground = #4c566a

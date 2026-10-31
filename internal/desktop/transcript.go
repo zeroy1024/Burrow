@@ -3,27 +3,31 @@ package desktop
 import (
 	"fmt"
 	"strings"
+	"time"
+
+	"sshdesk/internal/termtheme"
+	"sshdesk/internal/theme"
 
 	"github.com/egoist/mygo/ui"
 )
 
-func demoTranscript(h host) [][]ui.Span {
-	green := ui.Hex("#229f4a")
-	blue := ui.Hex("#087df0")
-	muted := ui.Hex(terminalSecondaryText)
-	lines := [][]ui.Span{}
+func demoTranscript(h host) []terminalLine {
+	green := terminalIndexed(2)
+	blue := terminalIndexed(4)
+	muted := terminalIndexed(8)
+	lines := []terminalLine{}
 	command := func(text string) {
-		lines = append(lines, []ui.Span{
-			{Text: h.user + "@" + h.name, Color: green, Weight: 600},
-			{Text: ":/srv/app", Color: blue, Weight: 600},
+		lines = append(lines, terminalLine{
+			{Text: h.user + "@" + h.name, Foreground: green, Bold: true},
+			{Text: ":/srv/app", Foreground: blue, Bold: true},
 			{Text: "# " + text},
 		})
 	}
 	output := func(text string) {
 		for _, line := range strings.Split(text, "\n") {
-			spans := []ui.Span{{Text: line}}
+			spans := terminalLine{{Text: line}}
 			if before, after, ok := strings.Cut(line, "Up "); ok {
-				spans = []ui.Span{{Text: before}, {Text: "Up " + after, Color: green}}
+				spans = terminalLine{{Text: before}, {Text: "Up " + after, Foreground: green}}
 			}
 			lines = append(lines, spans)
 		}
@@ -57,7 +61,7 @@ shop-# ORDER BY created_at DESC LIMIT 20;`)
 		command("systemctl status nginx | head -3")
 		output(`● nginx.service - A high performance web server
    Loaded: loaded (/usr/lib/systemd/system/nginx.service)`)
-		lines = append(lines, []ui.Span{{Text: "   Active: active (running) since Sat 2026-10-31", Color: green}})
+		lines = append(lines, terminalLine{{Text: "   Active: active (running) since Sat 2026-10-31", Foreground: green}})
 		output("")
 		command("tail -f /var/log/nginx/access.log")
 		for i, path := range []string{
@@ -65,10 +69,10 @@ shop-# ORDER BY created_at DESC LIMIT 20;`)
 			"/api/cart/812", "/api/orders/5521", "/favicon.ico", "/api/login", "/api/orders",
 			"/api/cart", "/api/products?p=3", "/healthz", "/api/orders/5522", "/static/main.css",
 		} {
-			lines = append(lines, []ui.Span{
-				{Text: fmt.Sprintf("10.0.0.%-2d  ", i%9+1), Color: muted},
+			lines = append(lines, terminalLine{
+				{Text: fmt.Sprintf("10.0.0.%-2d  ", i%9+1), Foreground: muted},
 				{Text: fmt.Sprintf("GET %-24s ", path)},
-				{Text: "200", Color: green},
+				{Text: "200", Foreground: green},
 				{Text: fmt.Sprintf("  %dms", 12+i*3)},
 			})
 		}
@@ -78,7 +82,7 @@ shop-# ORDER BY created_at DESC LIMIT 20;`)
   Mem[|||||               27.3%]  Load average: 0.42 0.38 0.35
   Swp[                     0.0%]  Uptime: 12 days, 04:11
 `)
-		lines = append(lines, []ui.Span{{Text: "  PID USER      CPU% MEM%    TIME+ COMMAND", Color: green}})
+		lines = append(lines, terminalLine{{Text: "  PID USER      CPU% MEM%    TIME+ COMMAND", Foreground: green}})
 		output(` 1823 ubuntu    18.2  6.1  2:14.33 node dist/server.js
  1907 ubuntu     6.4  3.8  0:48.02 node dist/worker.js
   812 root       2.1  1.2  5:02.11 /usr/bin/dockerd
@@ -126,19 +130,19 @@ Swap:         2.0Gi       0B    2.0Gi
 		} {
 			level, color := "INFO", green
 			if i == 2 {
-				level, color = "WARN", ui.Hex("#c58b13")
+				level, color = "WARN", terminalIndexed(3)
 			}
-			lines = append(lines, []ui.Span{
-				{Text: fmt.Sprintf("2026-10-31T16:09:%02dZ ", 11+i), Color: muted},
-				{Text: level + " ", Color: color},
+			lines = append(lines, terminalLine{
+				{Text: fmt.Sprintf("2026-10-31T16:09:%02dZ ", 11+i), Foreground: muted},
+				{Text: level + " ", Foreground: color},
 				{Text: line},
 			})
 		}
 		output("")
 		command("git log --oneline -2")
 		lines = append(lines,
-			[]ui.Span{{Text: "a1f9c3e ", Color: ui.Hex("#a060e8")}, {Text: "(HEAD -> main) fix: checkout retry on timeout"}},
-			[]ui.Span{{Text: "7be2d10 ", Color: ui.Hex("#a060e8")}, {Text: "feat: order export to CSV"}},
+			terminalLine{{Text: "a1f9c3e ", Foreground: terminalIndexed(5)}, {Text: "(HEAD -> main) fix: checkout retry on timeout"}},
+			terminalLine{{Text: "7be2d10 ", Foreground: terminalIndexed(5)}, {Text: "feat: order export to CSV"}},
 		)
 		output("")
 		command("df -h / /data")
@@ -152,24 +156,50 @@ Swap:         2.0Gi       0B    2.0Gi
 
 func (a *app) terminalLines(c *ui.Context, session *remoteSession, focused bool) {
 	h := a.hosts[session.host]
-	column := ui.Column(c).FillWidth().MinWidth(0)
+	scheme, prefs := termtheme.Current(), a.terminal.prefs
+	column := ui.Column(c).FillWidth().MinWidth(0).Selectable().SelectionColor(tokenColor(scheme.SelectionBg))
 	if session.contentWidth > 0 {
-		column.Width(max(1, session.contentWidth-28)).Shrink(0)
+		column.Width(max(1, session.contentWidth-2*theme.Current().C.Pane.ContentSide)).Shrink(0)
+	}
+	// Native text selection owns keyboard focus. Sync the pane without moving
+	// that focus to the scroll view, which would hide the selection.
+	if column.FocusWithin() && a.currentTab().focused != session {
+		a.currentTab().focused = session
+		session.hasNewOutput, session.hasBell = false, false
+		session.cursorStarted = time.Time{}
+		c.AnimationFrame()
+	}
+	selected := make(map[uint64]ui.SelectedText)
+	if column.FocusWithin() {
+		for _, part := range column.SelectedTexts() {
+			selected[part.ID] = part
+		}
+	}
+	lineView := func(line terminalLine) {
+		paragraph := ui.RichText(c).FillWidth().MinWidth(0).FixedLineHeight(prefs.LineHeight).Shrink(0)
+		selection := selected[paragraph.ID()]
+		spans := terminalSpans(line, scheme, prefs, selection.Start, selection.End)
+		paragraph.Children(func() { ui.RichText(c, spans...) })
 	}
 	column.Children(func() {
-		for _, line := range demoTranscript(h) {
-			ui.RichText(c, line...).FillWidth().MinWidth(0).FixedLineHeight(19).Shrink(0)
+		for _, line := range session.transcript {
+			lineView(line)
 		}
 		for _, line := range session.output {
-			ui.Text(c, line).FillWidth().MinWidth(0).FixedLineHeight(19).Shrink(0)
+			lineView(line)
 		}
 		ui.Row(c).FillWidth().MinWidth(0).AlignItems(ui.End).Children(func() {
-			ui.RichText(c,
-				ui.Span{Text: h.user + "@" + h.name, Color: ui.Hex("#229f4a"), Weight: 600},
-				ui.Span{Text: ":/srv/app", Color: ui.Hex("#087df0"), Weight: 600},
-				ui.Span{Text: "# "},
-			).MinWidth(0).Shrink(1).FixedLineHeight(19)
-			terminalCursor(c, session, focused)
+			prompt := terminalLine{
+				{Text: h.user + "@" + h.name, Foreground: terminalIndexed(2), Bold: true},
+				{Text: ":/srv/app", Foreground: terminalIndexed(4), Bold: true},
+				{Text: "# "},
+			}
+			paragraph := ui.RichText(c).MinWidth(0).Shrink(1).FixedLineHeight(prefs.LineHeight)
+			selection := selected[paragraph.ID()]
+			paragraph.Children(func() {
+				ui.RichText(c, terminalSpans(prompt, scheme, prefs, selection.Start, selection.End)...)
+			})
+			a.terminalCursor(c, session, focused, " ")
 		})
 	})
 }

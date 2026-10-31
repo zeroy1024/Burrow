@@ -3,6 +3,7 @@ package desktop
 import (
 	"time"
 
+	"sshdesk/internal/termtheme"
 	"sshdesk/internal/theme"
 
 	"github.com/egoist/mygo"
@@ -43,6 +44,10 @@ type app struct {
 	workArea          ui.Handle
 	pointer           ui.Point
 	cellWidth         float32
+	cellFont          ui.Font
+	cellTracking      float32
+	terminal          terminalSettingsState
+	terminalError     error
 	drag              *paneDragState
 	dragSeen          bool
 	pendingDock       func()
@@ -51,6 +56,9 @@ type app struct {
 	catalogConfig     catalogConfigState
 	catalogError      error
 	catalogScroll     ui.ScrollState
+	catalogScrollbar  scrollbarState
+	statusScroll      ui.ScrollState
+	statusScrollbar   scrollbarState
 	catalogItems      map[catalogKey]*catalogItemMotion
 	catalogDrag       *catalogDragState
 	catalogSlots      []catalogSlot
@@ -62,13 +70,13 @@ type app struct {
 // Run starts the native desktop application and its main window.
 func Run() error {
 	a := &app{
-		sidebarWidth:  theme.Current().C.Sider.Width,
-		hosts:         demoHosts(),
-		groups:        demoGroups(),
-		tabs:          []*workspaceTab{},
-		statusVisible: true,
+		sidebarWidth: theme.Current().C.Sider.Width,
+		hosts:        demoHosts(),
+		groups:       demoGroups(),
+		tabs:         []*workspaceTab{},
 	}
 	a.catalogError = a.loadCatalog()
+	a.terminalError = a.loadTerminalSettings()
 	for _, id := range []hostID{0, 4, 1} {
 		if int(id) < len(a.hosts) {
 			a.openHost(id)
@@ -87,6 +95,12 @@ func Run() error {
 		}
 	})
 	defer stopTokens()
+	stopTerminal := termtheme.OnChange(func(*termtheme.Scheme) {
+		if a.window != nil {
+			a.window.Invalidate()
+		}
+	})
+	defer stopTerminal()
 	stopAppearance := mygo.Theme.OnUpdated(func() { a.syncAppearance() })
 	defer stopAppearance()
 	mygo.App.WhenReady(func() {
@@ -155,6 +169,10 @@ func (a *app) view(c *ui.Context) {
 	if a.catalogError != nil {
 		c.Toast("无法加载主机配置：" + a.catalogError.Error())
 		a.catalogError = nil
+	}
+	if a.terminalError != nil {
+		c.Toast("终端设置：" + a.terminalError.Error())
+		a.terminalError = nil
 	}
 	a.hostDialog(c)
 	a.groupDialog(c)
