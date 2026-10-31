@@ -13,20 +13,20 @@ import (
 
 func statusDot(c *ui.Context, state connectionState, size float32) {
 	t := theme.Current()
-	color := tokenColor(t.C.SiderItem.DotOffline)
-	halo := tokenColor(t.C.SiderItem.DotOffline)
+	color := tokenColor(t.C.ConnectionIndicator.Offline)
+	halo := tokenColor(t.C.ConnectionIndicator.Offline)
 	if state == connected {
-		color = tokenColor(t.C.SiderItem.DotOnline)
-		halo = tokenColor(t.C.SiderItem.DotOnlineHalo)
+		color = tokenColor(t.C.ConnectionIndicator.Connected)
+		halo = tokenColor(t.C.ConnectionIndicator.ConnectedHalo)
 	}
 	if state == connecting {
-		color = tokenColor(t.C.SiderItem.DotConnecting)
-		halo = tokenColor(t.C.SiderItem.DotConnectingHalo)
+		color = tokenColor(t.C.ConnectionIndicator.Connecting)
+		halo = tokenColor(t.C.ConnectionIndicator.ConnectingHalo)
 	}
-	ui.Box(c).Size(size+2*t.C.SiderItem.DotHalo, size+2*t.C.SiderItem.DotHalo).Center().Children(func() {
+	ui.Box(c).Size(size+2*t.C.ConnectionIndicator.Halo, size+2*t.C.ConnectionIndicator.Halo).Center().Children(func() {
 		dot := ui.Box(c).Size(size, size).Radius(t.Radius.Pill).Background(color)
 		if state != disconnected {
-			dot.Border(t.C.SiderItem.DotHalo, halo).Size(size+2*t.C.SiderItem.DotHalo, size+2*t.C.SiderItem.DotHalo).
+			dot.Border(t.C.ConnectionIndicator.Halo, halo).Size(size+2*t.C.ConnectionIndicator.Halo, size+2*t.C.ConnectionIndicator.Halo).
 				Background(ui.Transparent).Children(func() {
 				ui.Box(c).Fill().Radius(t.Radius.Pill).Background(color)
 			})
@@ -44,14 +44,22 @@ func (a *app) sidebar(c *ui.Context, shown float32) {
 			t.C.Sider.HeaderPaddingBottom,
 			t.C.Sider.HeaderPaddingLeft,
 		).Children(func() {
-			ui.Text(c, "远程会话").FontSize(t.C.Sider.TitleSize).FontWeight(t.C.Sider.TitleWeight)
+			title := "远程会话"
+			if a.section == sectionFiles {
+				title = "文件传输"
+			}
+			ui.Text(c, title).FontSize(t.C.Sider.TitleSize).FontWeight(t.C.Sider.TitleWeight)
 			ui.Spacer(c)
 			iconButton(c, "添加", plusIcon).Size(t.C.Sider.AddButtonSize, t.C.Sider.AddButtonSize).
 				Radius(t.C.Sider.AddButtonRadius).Background(tokenColor(t.C.Sider.AddButtonBg)).Menu(func(m *ui.Menu) {
 				if m.Item("新建分组").Chosen() {
 					a.startGroupDraft()
 				}
-				if m.Item("添加主机").Chosen() {
+				label := "添加主机"
+				if a.section == sectionFiles {
+					label = "添加站点"
+				}
+				if m.Item(label).Chosen() {
 					a.startHostDraft()
 				}
 			})
@@ -73,17 +81,27 @@ func (a *app) sidebar(c *ui.Context, shown float32) {
 			BorderWidth(t.Size.Hairline, 0, 0, 0).BorderColor(tokenColor(t.C.Sider.FooterBorder)).
 			TextColor(tokenColor(t.C.Sider.FooterText)).Children(func() {
 			ui.Icon(c, serverIcon).Size(t.Size.IconSm, t.Size.IconSm)
-			ui.Text(c, fmt.Sprintf("%d 台主机", len(a.hosts))).FontSize(t.C.Sider.FooterSize)
+			summary := fmt.Sprintf("%d 台主机", len(a.hosts))
+			if a.section == sectionFiles {
+				summary = fmt.Sprintf("%d 个站点", len(a.hosts))
+			}
+			ui.Text(c, summary).FontSize(t.C.Sider.FooterSize)
 		})
 	})
 }
 
 type hostDraft struct {
 	name, address, user, port, group, system string
+	protocol                                 string
+	id                                       hostID
+	editing, deleting, files                 bool
 }
 
 func (a *app) startHostDraft() {
-	a.draft = hostDraft{user: "root", port: "22", group: a.groups[0].name, system: systems[0].name}
+	a.draft = hostDraft{
+		user: "root", port: "22", group: a.groups[0].name, system: systems[0].name,
+		protocol: "SFTP", files: a.section == sectionFiles,
+	}
 	a.addHostOpen = true
 }
 
@@ -91,8 +109,29 @@ func (a *app) hostDialog(c *ui.Context) {
 	t := theme.Current()
 	ui.Modal(c, &a.addHostOpen, func() {
 		ui.Column(c).Width(t.C.Dialog.HostWidth).Gap(t.Space.N14).Children(func() {
-			ui.Text(c, "添加 SSH 主机").FontSize(t.C.Dialog.TitleSize).FontWeight(t.Font.Weight.Semibold)
+			if a.draft.deleting {
+				a.deleteSiteDialogContents(c)
+				return
+			}
+			title := "添加 SSH 主机"
+			if a.draft.files {
+				title = "添加文件站点"
+				if a.draft.editing {
+					title = "编辑文件站点"
+				}
+			}
+			ui.Text(c, title).FontSize(t.C.Dialog.TitleSize).FontWeight(t.Font.Weight.Semibold)
 			ui.Text(c, "保存到主机目录，不会连接服务器。").FontSize(t.Font.Size.Small).TextColor(tokenColor(t.Color.Text.Secondary))
+			if a.draft.files {
+				ui.Text(c, "协议").FontSize(t.Font.Size.Small)
+				ui.Select(c, &a.draft.protocol, []string{"SFTP", "FTP"}).OnChange(func() {
+					if a.draft.protocol == "FTP" {
+						a.draft.port = "21"
+					} else {
+						a.draft.port = "22"
+					}
+				})
+			}
 			draftField(c, "名称", &a.draft.name)
 			draftField(c, "主机地址", &a.draft.address)
 			ui.Row(c).Gap(t.Space.N12).Children(func() {
@@ -115,17 +154,42 @@ func (a *app) hostDialog(c *ui.Context) {
 			canAdd := validPort && validHost && validUser
 			ui.Row(c).Justify(ui.End).Gap(t.Space.N8).Children(func() {
 				ui.Button(c, "取消").OnClick(func() { a.addHostOpen = false })
-				ui.PrimaryButton(c, "添加").Disabled(!canAdd).
+				label := "添加"
+				if a.draft.editing {
+					label = "保存"
+				}
+				ui.PrimaryButton(c, label).Disabled(!canAdd).
 					OnClick(func() {
 						err := a.commitCatalogMove(func() {
-							id := hostID(len(a.hosts))
-							a.hosts = append(a.hosts, host{
+							protocol := ""
+							if a.draft.files {
+								protocol = strings.ToLower(a.draft.protocol)
+							}
+							h := host{
 								name: strings.TrimSpace(a.draft.name), address: strings.TrimSpace(a.draft.address),
 								user: strings.TrimSpace(a.draft.user), port: port,
-								os: slices.Index(names, a.draft.system), system: a.draft.system,
-							})
+								os: slices.Index(names, a.draft.system), system: a.draft.system, protocol: protocol,
+							}
+							id := hostID(len(a.hosts))
 							group := a.groups[slices.Index(groupNames, a.draft.group)]
-							group.hosts = append(group.hosts, id)
+							if a.draft.editing {
+								id = a.draft.id
+								previous := a.hosts[id]
+								previous.name, previous.address, previous.user = h.name, h.address, h.user
+								previous.port, previous.os, previous.system = h.port, h.os, h.system
+								previous.protocol = h.protocol
+								a.hosts[id] = previous
+								for _, group := range a.groups {
+									if group.name != a.draft.group {
+										group.hosts = slices.DeleteFunc(group.hosts, func(candidate hostID) bool { return candidate == id })
+									}
+								}
+							} else {
+								a.hosts = append(a.hosts, h)
+							}
+							if !slices.Contains(group.hosts, id) {
+								group.hosts = append(group.hosts, id)
+							}
 							group.collapsed = false
 						})
 						if err != nil {

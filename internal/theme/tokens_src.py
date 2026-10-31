@@ -434,3 +434,199 @@ COMP['catalog']={
  'rowGap':'space.2','groupGap':'space.10',
 }
 COMP['dragLift']['stackBg']='color.surface.liftStack'
+
+# FTP v3: raw additions live in the palette; semantic and component additions
+# only reference the preceding tier.
+PALETTE['red']={
+ '50':C('#fdecec','Apple systemRed 浅底',True),
+ '500':C('#ff3b30','Apple systemRed',True),
+ '700':C('#d70015','Apple systemRed 文字',True),
+}
+PALETTE['darkTint'].update({
+ 'red400':C('#ff453a','深色 danger',True),
+ 'red300':C('#ff6961','深色 danger 文字',True),
+ 'redSubtle':C('#3a1d1c','深色 danger 浅底',True),
+})
+for value in [10,42,50,80,90,100,120,140,160,180,240,300,320,384,420,720]:
+ PALETTE['size'].setdefault(str(value),D(value))
+PALETTE['duration'].update({'800':MS(800),'3000':MS(3000)})
+PALETTE['ratio'].update({'0_9':N(.9),'0_96':N(.96)})
+PALETTE['speed']['demoTransfer']=N(13002342.4,'演示传输字节/秒，12.4 MiB/s',True)
+PALETTE['shadow']={
+ 'popover':SH([
+  L(0,0,0,.5,A('0,0,0','.10')),L(0,10,28,0,A('0,0,0','.12')),
+  L(0,2,6,0,A('0,0,0','.06')),L(0,.5,0,0,A('255,255,255','.90'),True),
+ ],'传输浮层'),
+ 'popoverDark':SH([
+  L(0,0,0,.5,A('255,255,255','.14')),L(0,10,28,0,A('0,0,0','.45')),
+  L(0,2,6,0,A('0,0,0','.25')),
+ ],'深色传输浮层',True),
+}
+
+SEM['color']['danger']={
+ 'default':C(P('red.500'),'失败圆点、失败图标',True),
+ 'text':C(P('red.700'),'失败文字',True),
+ 'subtle':C(P('red.50'),'失败图标底、失败徽章底',True),
+}
+SEM['color']['protocol']={
+ 'sftpBg':C(P('blue.50'),'SFTP 图标块底'),
+ 'sftpGlyph':C(P('blue.500'),'SFTP 字形'),
+ 'ftpBg':C(P('gray.100'),'FTP 图标块底'),
+ 'ftpGlyph':C(P('gray.600'),'FTP 字形'),
+}
+SEM['color']['fill']['quietHover']=C(P('black.a08'),'传输胶囊悬停')
+SEM['radius']['popover']=D(P('radius.12'))
+SEM['opacity']['revealFrom']=N(P('ratio.0_6'),'本地面板展开起始透明度')
+SEM['opacity']['capsuleEnterScale']=N(P('ratio.0_9'))
+SEM['opacity']['popoverEnterScale']=N(P('ratio.0_96'))
+SEM['motion']['duration'].update({
+ 'exit':MS(P('duration.120'),'浮层退出、胶囊淡出'),
+ 'autoHide':MS(P('duration.3000'),'全部完成后胶囊停留'),
+ 'spin':MS(P('duration.800'),'连接中转圈一周'),
+})
+SEM['size'].update({
+ 'paneMinLocal':D(P('size.320')), 'paneMinRemote':D(P('size.420')),
+ 'popover':D(P('size.384')), 'capsuleBarWidth':D(P('size.32')),
+ 'capsuleBarHeight':D(P('size.3')), 'dockHeader':D(P('size.42')),
+ 'dockRow':D(P('size.50')), 'tabSpinner':D(P('size.10')),
+ 'fileToolbar':D(P('size.44')), 'fileCompactWidth':D(P('size.720')),
+ 'fileSearchWidth':D(P('size.160')), 'fileSizeWidth':D(P('size.80')),
+ 'fileDateWidth':D(P('size.140')), 'filePermissionsWidth':D(P('size.100')),
+ 'fileOwnerWidth':D(P('size.90')), 'fileGridCellWidth':D(P('size.120')),
+ 'fileGridCellHeight':D(P('size.100')), 'transferProgressWidth':D(P('size.180')),
+ 'transferSpeedWidth':D(P('size.120')), 'transferNameMinWidth':D(P('size.120')),
+ 'transferStatusWidth':D(P('size.80'),'传输状态列固定宽度',True),
+ 'splitGripHeight':D(P('size.32')), 'transferPopoverHeader':D(P('size.32')),
+ 'fileNameMinWidth':D(P('size.100')), 'fileGridIconSize':D(P('size.32')),
+})
+SEM['opacity']['splitDefaultRatio']=N(P('ratio.0_5'))
+SEM['size']['transferDockMaxRows']=N(P('size.5'))
+SEM['size']['transferPopoverMaxRows']=N(P('size.6'))
+SEM['size']['transferConcurrency']=N(P('size.3'))
+SEM['motion']['demoTransferSpeed']=N(P('speed.demoTransfer'),'演示传输吞吐',True)
+SEM['shadow']['popover']=SH(P('shadow.popover'),'传输浮层')
+DARK.update({
+ 'color.danger.default':P('darkTint.red400'),
+ 'color.danger.text':P('darkTint.red300'),
+ 'color.danger.subtle':P('darkTint.redSubtle'),
+ 'color.protocol.sftpBg':P('darkTint.blueSubtle'),
+ 'color.protocol.ftpBg':P('graphite.700'),
+ 'color.protocol.ftpGlyph':P('graphite.250'),
+ 'color.fill.quietHover':P('whiteA.a12'),
+ 'shadow.popover':P('shadow.popoverDark'),
+})
+COMP['protocolIcon']={
+ 'size':'size.osLogo','radius':'radius.control','glyph':'size.osGlyph',
+ 'sftpBg':'color.protocol.sftpBg','sftpGlyph':'color.protocol.sftpGlyph',
+ 'ftpBg':'color.protocol.ftpBg','ftpGlyph':'color.protocol.ftpGlyph',
+}
+COMP['connectionIndicator']={
+ 'offline':'color.status.offline','connected':'color.success.default',
+ 'connectedHalo':'color.success.halo','connecting':'color.warning.default',
+ 'connectingHalo':'color.warning.halo','halo':'size.dotHalo',
+}
+COMP['tab'].update({
+ 'dotConnected':'color.success.default','dotError':'color.danger.default',
+ 'ringDisconnected':'color.text.tertiary','ringWidth':'size.focusRing',
+ 'spinner':'color.warning.default','spinnerTrack':'color.warning.halo',
+ 'spinnerSize':'size.tabSpinner','spinnerStroke':'size.iconStroke',
+ 'spinnerPeriod':'motion.duration.spin','textDisconnected':'color.text.tertiary',
+ 'textErrorSelected':'color.danger.text','stateTransition':'motion.duration.focus',
+})
+COMP['paneToggle']={
+ 'size':'size.controlMd','radius':'radius.controlSm','icon':'color.text.muted',
+ 'bgHover':'color.state.hover','bgOn':'color.state.pressed','iconOn':'color.text.primary',
+ 'transition':'motion.duration.focus',
+}
+COMP['filePaneFocus']={
+ 'labelBgActive':'color.accent.subtle','labelTextActive':'color.text.accent',
+ 'labelWeightActive':'font.weight.semibold','labelTextInactive':'color.text.muted',
+ 'labelWeightInactive':'font.weight.medium','labelPaddingX':'space.8',
+ 'labelRadius':'radius.controlSm','selBgActive':'color.state.selectedAccent',
+ 'selTextActive':'color.text.accentStrong','selBgInactive':'color.state.selected',
+ 'selTextInactive':'color.text.primary','transition':'motion.duration.focus',
+}
+COMP['FTPSplit']={
+ 'gutter':'space.8','expand':'motion.spring.displace',
+ 'revealOpacityFrom':'opacity.revealFrom','crossfade':'motion.duration.focus',
+ 'minLocal':'size.paneMinLocal','minRemote':'size.paneMinRemote',
+ 'defaultRatio':'opacity.splitDefaultRatio','gripW':'space.4','gripH':'size.splitGripHeight',
+ 'grip':'color.text.placeholder','gripActive':'color.accent.default',
+}
+COMP['transferCapsule']={
+ 'height':'size.controlXs','radius':'radius.pill','bg':'color.fill.quiet',
+ 'bgHover':'color.fill.quietHover','bgOpen':'color.accent.subtle',
+ 'textOpen':'color.text.accent','text':'color.text.muted','arrow':'color.accent.default',
+ 'barWidth':'size.capsuleBarWidth','barHeight':'size.capsuleBarHeight',
+ 'barTrack':'color.accent.tint15','barFill':'color.accent.default',
+ 'doneArrow':'color.success.default','doneFill':'color.success.default',
+ 'error':'color.danger.text','enter':'motion.spring.smooth','exit':'motion.duration.exit',
+ 'autoHide':'motion.duration.autoHide','enterScale':'opacity.capsuleEnterScale',
+ 'paddingLeft':'space.7','paddingRight':'space.9','gap':'space.6',
+ 'paddingX':'space.8','paddingY':'space.2',
+ 'fontSize':'font.size.footnote','weight':'font.weight.medium',
+ 'speedInterval':'motion.duration.autoExpand',
+}
+COMP['transferPopover']={
+ 'width':'size.popover','radius':'radius.popover','bg':'color.glass.float',
+ 'blur':'glass.float.blur','saturate':'glass.float.saturate','shadow':'shadow.popover',
+ 'offset':'space.8','enter':'motion.spring.smooth','exit':'motion.duration.exit',
+ 'enterScale':'opacity.popoverEnterScale','enterY':'space.6',
+ 'padding':'space.6','headerHeight':'size.transferPopoverHeader','maxRows':'size.transferPopoverMaxRows',
+ 'dismissY':'space.24',
+ 'rowHeight':'size.queueRow','exitY':'space.24',
+}
+COMP['transferDock']={
+ 'bg':'color.surface.card','radius':'radius.card','headerHeight':'size.dockHeader',
+ 'rowHeight':'size.dockRow','maxRows':'size.transferDockMaxRows',
+ 'grow':'motion.spring.smooth','collapse':'motion.spring.smooth',
+ 'concurrency':'size.transferConcurrency',
+ 'progressWidth':'size.transferProgressWidth','compactBreakpoint':'size.fileCompactWidth',
+}
+COMP['transferRow']={
+ 'iconTile':'size.control','iconRadius':'radius.control',
+ 'upBg':'color.accent.subtle','upIcon':'color.accent.default',
+ 'downBg':'color.surface.control','downIcon':'color.text.muted',
+ 'doneBg':'color.success.subtle','doneIcon':'color.success.text',
+ 'errBg':'color.danger.subtle','errIcon':'color.danger.text',
+ 'speedText':'color.text.accent','errorText':'color.danger.text',
+ 'runBg':'color.accent.subtle','runText':'color.text.accent','runDot':'color.accent.default',
+ 'pausedBg':'color.surface.control','pausedText':'color.text.muted','pausedDot':'color.status.paused',
+ 'doneBadgeBg':'color.success.subtle','doneBadgeText':'color.success.text','doneDot':'color.success.default',
+ 'errBadgeBg':'color.danger.subtle','errBadgeText':'color.danger.text','errDot':'color.danger.default',
+ 'progressWidth':'size.transferProgressWidth','speedWidth':'size.transferSpeedWidth',
+ 'statusWidth':'size.transferStatusWidth',
+ 'nameMinWidth':'size.transferNameMinWidth','nameSize':'font.size.body',
+ 'pathSize':'font.size.caption','rowHeight':'size.queueRow',
+ 'detailSize':'font.size.caption','progressHeight':'size.progress',
+ 'gap':'space.8','paddingX':'space.12',
+ 'demoBytesPerSecond':'motion.demoTransferSpeed','speedInterval':'motion.duration.autoExpand',
+ 'transition':'motion.duration.focus',
+}
+COMP['filePane']={
+ 'headerHeight':'size.fileToolbar','statusHeight':'size.statusBar',
+ 'compactWidth':'size.fileCompactWidth','searchWidth':'size.fileSearchWidth',
+ 'sizeWidth':'size.fileSizeWidth','dateWidth':'size.fileDateWidth',
+ 'permissionsWidth':'size.filePermissionsWidth','ownerWidth':'size.fileOwnerWidth',
+ 'gridCellWidth':'size.fileGridCellWidth','gridCellHeight':'size.fileGridCellHeight',
+ 'rowInset':'space.8','toolGap':'space.4','contentPadding':'space.8',
+ 'nameMinWidth':'size.fileNameMinWidth','gridIconSize':'size.fileGridIconSize',
+}
+DERIVED_COMP.update({
+ 'filePane':'FTP v3 原生文件面板布局补全',
+ 'transferRow.progressWidth':'FTP v3 停靠传输进度列宽',
+ 'transferRow.speedWidth':'FTP v3 停靠传输速度列宽',
+ 'transferRow.statusWidth':'FTP v3 停靠传输状态列固定宽度',
+ 'transferRow.nameMinWidth':'FTP v3 传输名称最小宽度',
+})
+
+# deprecated: 侧栏不再显示状态/选中。保留生成以兼容已有主题；新 UI 不得使用。
+DEPRECATED_COMP={
+ **{'siderItem.'+key:'侧栏不再显示状态/选中' for key in (
+  'bgSelected','dotSize','dotHalo','dotOnline','dotOnlineHalo','dotOffline',
+  'dotConnecting','dotConnectingHalo','connectingText')},
+ 'osLogo.bgSelected':'侧栏不再显示状态/选中',
+ 'osLogo.shadowSelected':'侧栏不再显示状态/选中',
+}
+for key in ['dotOnline','dotConnecting','osSelected']:
+ SEM['shadow'][key].desc += ' [deprecated: 侧栏不再显示状态/选中]'

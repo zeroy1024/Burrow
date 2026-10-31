@@ -68,14 +68,19 @@ func (a *app) enforcePaneMinimum(c *ui.Context) {
 		return
 	}
 	minimum := ui.Point{X: t.C.Desktop.PaneMinWidth, Y: t.C.Desktop.PaneMinHeight}
-	if tab := a.currentTab(); tab != nil {
+	if a.section == sectionFiles {
+		minimum.X = t.C.FTPSplit.MinRemote
+		if a.files.localOpen {
+			minimum.X += t.C.FTPSplit.MinLocal + t.C.FTPSplit.Gutter
+		}
+	} else if tab := a.currentTab(); tab != nil {
 		minimum = tab.root.minimum()
 	}
 	width := minimum.X + t.C.Rail.Width + t.C.Window.Gutter
 	if !a.sidebarCollapsed {
 		width += a.sidebarWidth + t.C.Window.Gutter
 	}
-	if a.statusVisible {
+	if a.section != sectionFiles && a.statusVisible {
 		width += t.Size.StatsPanel + t.C.Window.Gutter
 	}
 	size := [2]int{

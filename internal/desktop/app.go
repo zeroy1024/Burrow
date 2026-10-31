@@ -65,6 +65,12 @@ type app struct {
 	catalogFlash      *catalogKey
 	catalogFlashSeed  int
 	catalogFlashUntil time.Time
+	fileSessions      []*fileSession
+	activeFile        int
+	nextFileSession   int
+	files             fileWorkspaceState
+	filePrefs         filePreferencesState
+	transfers         transferQueueState
 }
 
 // Run starts the native desktop application and its main window.
@@ -77,6 +83,12 @@ func Run() error {
 	}
 	a.catalogError = a.loadCatalog()
 	a.terminalError = a.loadTerminalSettings()
+	a.files.ratio = theme.Current().C.FTPSplit.DefaultRatio
+	a.files.activeRemote = true
+	a.files.localPaths = map[string]string{}
+	if err := a.loadFilePreferences(); err != nil {
+		a.files.notice = "无法读取文件传输偏好：" + err.Error()
+	}
 	for _, id := range []hostID{0, 4, 1} {
 		if int(id) < len(a.hosts) {
 			a.openHost(id)
@@ -130,17 +142,21 @@ func (a *app) view(c *ui.Context) {
 	a.pointer = ui.Point{X: x, Y: y}
 	a.beginWorkspaceFrame(c)
 	a.beginCatalogFrame(c)
+	a.files.dragSeen = false
+	a.tickTransfers(c)
 	target := float32(1)
 	if a.sidebarCollapsed {
 		target = 0
 	}
 	shown := root.Animate("sidebar", target, t.MotionDuration(t.C.Desktop.SidebarDuration, c.Preferences().ReduceMotion))
-	a.paneShortcuts(c)
+	if a.section == sectionSSH {
+		a.paneShortcuts(c)
+	}
 	if c.Shortcut(ui.Super, ui.KeyK) {
 		a.sidebarCollapsed = false
 		a.search.Focus()
 	}
-	if c.Shortcut(ui.Super, ui.KeyD) && a.currentTab() != nil {
+	if a.section == sectionSSH && c.Shortcut(ui.Super, ui.KeyD) && a.currentTab() != nil {
 		tab := a.currentTab()
 		bounds := tab.focused.scroll.offset.Bounds(c)
 		stacked := tab.root.count() > 1 && bounds.H > bounds.W
@@ -176,6 +192,15 @@ func (a *app) view(c *ui.Context) {
 	}
 	a.hostDialog(c)
 	a.groupDialog(c)
+	a.fileDialogs(c)
+	if a.files.drag != nil && !a.files.dragSeen {
+		a.files.drag = nil
+		c.AnimationFrame()
+	}
+	if a.files.notice != "" {
+		c.Toast(a.files.notice)
+		a.files.notice = ""
+	}
 }
 
 func (a *app) navigation(c *ui.Context) {
@@ -214,9 +239,12 @@ func (a *app) navigationButton(c *ui.Context, target section, label string, icon
 	r := t.C.Rail
 	button := ui.ButtonBase(c).Key(label).Size(r.ButtonSize, r.ButtonSize).Radius(r.ButtonRadius).
 		Label(label).Description(label).Selected(a.section == target).
-		TextColor(tokenColor(r.Icon)).Disabled(target == sectionFiles)
+		TextColor(tokenColor(r.Icon))
 	button.OnClick(func() {
 		a.section = target
+		if target == sectionFiles && len(a.fileSessions) == 0 && len(a.hosts) > 0 {
+			a.openFileHost(0)
+		}
 	})
 	switch {
 	case button.Pressed():
@@ -258,6 +286,11 @@ func (a *app) workspace(c *ui.Context, shown float32) {
 			MarginEnd(t.C.Window.Gutter * shown).Hidden(shown == 0).Children(func() {
 			a.sidebar(c, shown)
 		})
+		if a.section == sectionFiles {
+			a.fileWorkspace(c)
+			a.sidebarResizeHandle(c, shown)
+			return
+		}
 		a.terminals(c)
 		status := workspaceCard(c).Key("status").Width(t.Size.StatsPanel * statusShown).Shrink(0).
 			MarginStart(t.C.Window.Gutter * statusShown).Hidden(statusShown == 0 && statusOpacity == 0)

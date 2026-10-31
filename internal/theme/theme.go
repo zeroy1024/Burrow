@@ -196,6 +196,9 @@ type PaletteTokensDarkTint struct {
 	Amber400    color.NRGBA // 深色主题 [derived]
 	Amber300    color.NRGBA // 深色主题 [derived]
 	AmberSubtle color.NRGBA // 深色主题 [derived]
+	Red400      color.NRGBA // 深色 danger [derived]
+	Red300      color.NRGBA // 深色 danger 文字 [derived]
+	RedSubtle   color.NRGBA // 深色 danger 浅底 [derived]
 }
 
 // PaletteTokensWhiteA groups tokens.
@@ -295,6 +298,22 @@ type PaletteTokensSize struct {
 	N204  float32
 	N236  float32
 	N296  float32
+	N10   float32
+	N42   float32
+	N50   float32
+	N80   float32
+	N90   float32
+	N100  float32
+	N120  float32
+	N140  float32
+	N160  float32
+	N180  float32
+	N240  float32
+	N300  float32
+	N320  float32
+	N384  float32
+	N420  float32
+	N720  float32
 }
 
 // PaletteTokensFontSize groups tokens.
@@ -367,25 +386,30 @@ type PaletteTokensRatio struct {
 	N1_03 float32
 	N1_5  float32
 	N1_8  float32
+	N0_9  float32
+	N0_96 float32
 }
 
 // PaletteTokensDuration groups tokens.
 type PaletteTokensDuration struct {
-	N0   time.Duration
-	N120 time.Duration
-	N150 time.Duration
-	N160 time.Duration
-	N180 time.Duration
-	N220 time.Duration
-	N300 time.Duration
-	N320 time.Duration
-	N500 time.Duration
-	N600 time.Duration
+	N0    time.Duration
+	N120  time.Duration
+	N150  time.Duration
+	N160  time.Duration
+	N180  time.Duration
+	N220  time.Duration
+	N300  time.Duration
+	N320  time.Duration
+	N500  time.Duration
+	N600  time.Duration
+	N800  time.Duration
+	N3000 time.Duration
 }
 
 // PaletteTokensSpeed groups tokens.
 type PaletteTokensSpeed struct {
-	AutoScroll float32 // px/s
+	AutoScroll   float32 // px/s
+	DemoTransfer float32 // 演示传输字节/秒，12.4 MiB/s [derived]
 }
 
 // PaletteTokensSpring groups tokens.
@@ -399,6 +423,19 @@ type PaletteTokensSpring struct {
 type PaletteTokensEasing struct {
 	EaseOut  Bezier
 	Standard Bezier // CSS ease [derived]
+}
+
+// PaletteTokensRed groups tokens.
+type PaletteTokensRed struct {
+	N50  color.NRGBA // Apple systemRed 浅底 [derived]
+	N500 color.NRGBA // Apple systemRed [derived]
+	N700 color.NRGBA // Apple systemRed 文字 [derived]
+}
+
+// PaletteTokensShadow groups tokens.
+type PaletteTokensShadow struct {
+	Popover     Shadow // 传输浮层
+	PopoverDark Shadow // 深色传输浮层 [derived]
 }
 
 // PaletteTokens 原始色板与刻度（primitives）。主题不应直接修改。
@@ -433,6 +470,8 @@ type PaletteTokens struct {
 	Speed         PaletteTokensSpeed
 	Spring        PaletteTokensSpring
 	Easing        PaletteTokensEasing
+	Red           PaletteTokensRed
+	Shadow        PaletteTokensShadow
 }
 
 // ColorsBg groups tokens.
@@ -559,6 +598,7 @@ type ColorsFill struct {
 	Placeholder     color.NRGBA // 拖动占位
 	PlaceholderEdge color.NRGBA
 	Strong          color.NRGBA // 资源条填充
+	QuietHover      color.NRGBA // 传输胶囊悬停
 }
 
 // ColorsTraffic groups tokens.
@@ -584,22 +624,39 @@ type ColorsGlass struct {
 	Highlight color.NRGBA // 玻璃顶部内高光
 }
 
+// ColorsDanger groups tokens.
+type ColorsDanger struct {
+	Default color.NRGBA // 失败圆点、失败图标 [derived]
+	Text    color.NRGBA // 失败文字 [derived]
+	Subtle  color.NRGBA // 失败图标底、失败徽章底 [derived]
+}
+
+// ColorsProtocol groups tokens.
+type ColorsProtocol struct {
+	SftpBg    color.NRGBA // SFTP 图标块底
+	SftpGlyph color.NRGBA // SFTP 字形
+	FtpBg     color.NRGBA // FTP 图标块底
+	FtpGlyph  color.NRGBA // FTP 字形
+}
+
 // Colors groups tokens.
 type Colors struct {
-	Bg      ColorsBg
-	Surface ColorsSurface
-	State   ColorsState
-	Border  ColorsBorder
-	Text    ColorsText
-	Icon    ColorsIcon
-	Accent  ColorsAccent
-	Success ColorsSuccess
-	Warning ColorsWarning
-	Status  ColorsStatus
-	Fill    ColorsFill
-	Traffic ColorsTraffic
-	Tooltip ColorsTooltip
-	Glass   ColorsGlass
+	Bg       ColorsBg
+	Surface  ColorsSurface
+	State    ColorsState
+	Border   ColorsBorder
+	Text     ColorsText
+	Icon     ColorsIcon
+	Accent   ColorsAccent
+	Success  ColorsSuccess
+	Warning  ColorsWarning
+	Status   ColorsStatus
+	Fill     ColorsFill
+	Traffic  ColorsTraffic
+	Tooltip  ColorsTooltip
+	Glass    ColorsGlass
+	Danger   ColorsDanger
+	Protocol ColorsProtocol
 }
 
 // Radii groups tokens.
@@ -619,6 +676,7 @@ type Radii struct {
 	Badge      float32
 	Hair       float32
 	TabTop     float32
+	Popover    float32
 }
 
 // Spacing groups tokens.
@@ -726,6 +784,34 @@ type Sizes struct {
 	EmptyPaneIcon           float32
 	BellIcon                float32
 	CatalogRowHeight        float32
+	PaneMinLocal            float32
+	PaneMinRemote           float32
+	Popover                 float32
+	CapsuleBarWidth         float32
+	CapsuleBarHeight        float32
+	DockHeader              float32
+	DockRow                 float32
+	TabSpinner              float32
+	FileToolbar             float32
+	FileCompactWidth        float32
+	FileSearchWidth         float32
+	FileSizeWidth           float32
+	FileDateWidth           float32
+	FilePermissionsWidth    float32
+	FileOwnerWidth          float32
+	FileGridCellWidth       float32
+	FileGridCellHeight      float32
+	TransferProgressWidth   float32
+	TransferSpeedWidth      float32
+	TransferNameMinWidth    float32
+	TransferStatusWidth     float32 // 传输状态列固定宽度 [derived]
+	SplitGripHeight         float32
+	TransferPopoverHeader   float32
+	FileNameMinWidth        float32
+	FileGridIconSize        float32
+	TransferDockMaxRows     float32
+	TransferPopoverMaxRows  float32
+	TransferConcurrency     float32
 }
 
 // TypographyFamily groups tokens.
@@ -796,10 +882,11 @@ type Shadows struct {
 	Flash             Shadow // 落位闪光内描边
 	Placeholder       Shadow
 	PlaceholderAccent Shadow
-	OsSelected        Shadow
+	OsSelected        Shadow //  [deprecated: 侧栏不再显示状态/选中]
 	GlassHighlight    Shadow
-	DotOnline         Shadow
-	DotConnecting     Shadow
+	DotOnline         Shadow //  [deprecated: 侧栏不再显示状态/选中]
+	DotConnecting     Shadow //  [deprecated: 侧栏不再显示状态/选中]
+	Popover           Shadow // 传输浮层
 }
 
 // GlassFade groups tokens.
@@ -856,6 +943,10 @@ type Opacities struct {
 	PaneCloseScale        float32
 	DropEdgeRatio         float32
 	PaneActionTint        float32
+	RevealFrom            float32 // 本地面板展开起始透明度
+	CapsuleEnterScale     float32
+	PopoverEnterScale     float32
+	SplitDefaultRatio     float32
 }
 
 // MotionDuration groups tokens.
@@ -879,6 +970,9 @@ type MotionDuration struct {
 	ScrollbarHold  time.Duration
 	ScrollbarFade  time.Duration
 	InstantNonzero time.Duration // 1 ns: MyGo zero Animation selects a default spring
+	Exit           time.Duration // 浮层退出、胶囊淡出
+	AutoHide       time.Duration // 全部完成后胶囊停留
+	Spin           time.Duration // 连接中转圈一周
 }
 
 // MotionEasing groups tokens.
@@ -905,10 +999,11 @@ type MotionDrag struct {
 
 // Motion groups tokens.
 type Motion struct {
-	Duration MotionDuration
-	Easing   MotionEasing
-	Spring   MotionSpring
-	Drag     MotionDrag
+	Duration          MotionDuration
+	Easing            MotionEasing
+	Spring            MotionSpring
+	Drag              MotionDrag
+	DemoTransferSpeed float32 // 演示传输吞吐 [derived]
 }
 
 // Semantic 语义层：主题只覆盖这一层。
@@ -953,26 +1048,38 @@ type TitlebarTokens struct {
 
 // TabTokens groups tokens.
 type TabTokens struct {
-	Height          float32     // ← size.control
-	Radius          float32     // ← radius.control
-	PaddingLeft     float32     // ← space.10
-	PaddingRight    float32     // ← space.8
-	Gap             float32     // ← space.7
-	FontSize        float32     // ← font.size.body
-	Text            color.NRGBA // ← color.text.muted
-	TextSelected    color.NRGBA // ← color.text.primary
-	WeightSelected  int         // ← font.weight.medium
-	BgSelected      color.NRGBA // ← color.glass.titleTab
-	ShadowSelected  Shadow      // ← shadow.titleTab
-	Close           color.NRGBA // ← color.text.tertiary
-	DotSize         float32     // ← size.dotSm
-	AddIcon         color.NRGBA // ← color.text.secondary
-	ContentHeight   float32     // ← size.tabContentHeight
-	StripHeight     float32     // ← size.tabStripHeight
-	DragHandleInset float32     // ← size.tabDragHandleInset
-	TitleOffset     float32     // ← size.tabTitleOffset
-	CountOffset     float32     // ← size.tabCountOffset
-	BgHover         color.NRGBA // ← color.state.tabHover
+	Height            float32       // ← size.control
+	Radius            float32       // ← radius.control
+	PaddingLeft       float32       // ← space.10
+	PaddingRight      float32       // ← space.8
+	Gap               float32       // ← space.7
+	FontSize          float32       // ← font.size.body
+	Text              color.NRGBA   // ← color.text.muted
+	TextSelected      color.NRGBA   // ← color.text.primary
+	WeightSelected    int           // ← font.weight.medium
+	BgSelected        color.NRGBA   // ← color.glass.titleTab
+	ShadowSelected    Shadow        // ← shadow.titleTab
+	Close             color.NRGBA   // ← color.text.tertiary
+	DotSize           float32       // ← size.dotSm
+	AddIcon           color.NRGBA   // ← color.text.secondary
+	ContentHeight     float32       // ← size.tabContentHeight
+	StripHeight       float32       // ← size.tabStripHeight
+	DragHandleInset   float32       // ← size.tabDragHandleInset
+	TitleOffset       float32       // ← size.tabTitleOffset
+	CountOffset       float32       // ← size.tabCountOffset
+	BgHover           color.NRGBA   // ← color.state.tabHover
+	DotConnected      color.NRGBA   // ← color.success.default
+	DotError          color.NRGBA   // ← color.danger.default
+	RingDisconnected  color.NRGBA   // ← color.text.tertiary
+	RingWidth         float32       // ← size.focusRing
+	Spinner           color.NRGBA   // ← color.warning.default
+	SpinnerTrack      color.NRGBA   // ← color.warning.halo
+	SpinnerSize       float32       // ← size.tabSpinner
+	SpinnerStroke     float32       // ← size.iconStroke
+	SpinnerPeriod     time.Duration // ← motion.duration.spin
+	TextDisconnected  color.NRGBA   // ← color.text.tertiary
+	TextErrorSelected color.NRGBA   // ← color.danger.text
+	StateTransition   time.Duration // ← motion.duration.focus
 }
 
 // TitleActionTokens groups tokens.
@@ -1079,7 +1186,7 @@ type SiderItemTokens struct {
 	Radius            float32     // ← radius.control
 	Spacing           float32     // ← space.1
 	BgHover           color.NRGBA // ← color.state.hover
-	BgSelected        color.NRGBA // ← color.state.selected
+	BgSelected        color.NRGBA // ← color.state.selected; Deprecated: 侧栏不再显示状态/选中
 	NameSize          float32     // ← font.size.bodyLg
 	NameWeight        int         // ← font.weight.medium
 	NameLineHeight    float32     // ← font.lineHeight.name
@@ -1089,14 +1196,14 @@ type SiderItemTokens struct {
 	SubLineHeight     float32     // ← font.lineHeight.sub
 	SubTracking       float32     // ← font.tracking.mono
 	SubColor          color.NRGBA // ← color.text.secondary
-	DotSize           float32     // ← size.dot
-	DotHalo           float32     // ← size.dotHalo
-	DotOnline         color.NRGBA // ← color.success.default
-	DotOnlineHalo     color.NRGBA // ← color.success.halo
-	DotOffline        color.NRGBA // ← color.status.offline
-	DotConnecting     color.NRGBA // ← color.warning.default
-	DotConnectingHalo color.NRGBA // ← color.warning.halo
-	ConnectingText    color.NRGBA // ← color.warning.text
+	DotSize           float32     // ← size.dot; Deprecated: 侧栏不再显示状态/选中
+	DotHalo           float32     // ← size.dotHalo; Deprecated: 侧栏不再显示状态/选中
+	DotOnline         color.NRGBA // ← color.success.default; Deprecated: 侧栏不再显示状态/选中
+	DotOnlineHalo     color.NRGBA // ← color.success.halo; Deprecated: 侧栏不再显示状态/选中
+	DotOffline        color.NRGBA // ← color.status.offline; Deprecated: 侧栏不再显示状态/选中
+	DotConnecting     color.NRGBA // ← color.warning.default; Deprecated: 侧栏不再显示状态/选中
+	DotConnectingHalo color.NRGBA // ← color.warning.halo; Deprecated: 侧栏不再显示状态/选中
+	ConnectingText    color.NRGBA // ← color.warning.text; Deprecated: 侧栏不再显示状态/选中
 	MoreSize          float32     // ← size.controlSm
 	MoreRadius        float32     // ← radius.controlSm
 	MoreBg            color.NRGBA // ← color.surface.controlStrong
@@ -1110,8 +1217,8 @@ type OsLogoTokens struct {
 	GlyphSize      float32     // ← size.osGlyph
 	TintMix        float32     // ← opacity.osTint
 	BgBase         color.NRGBA // ← color.surface.card
-	BgSelected     color.NRGBA // ← color.surface.card
-	ShadowSelected Shadow      // ← shadow.osSelected
+	BgSelected     color.NRGBA // ← color.surface.card; Deprecated: 侧栏不再显示状态/选中
+	ShadowSelected Shadow      // ← shadow.osSelected; Deprecated: 侧栏不再显示状态/选中
 }
 
 // CardTokens groups tokens.
@@ -1553,44 +1660,244 @@ type CatalogTokens struct {
 	GroupGap     float32 // ← space.10
 }
 
+// ProtocolIconTokens groups tokens.
+type ProtocolIconTokens struct {
+	Size      float32     // ← size.osLogo
+	Radius    float32     // ← radius.control
+	Glyph     float32     // ← size.osGlyph
+	SftpBg    color.NRGBA // ← color.protocol.sftpBg
+	SftpGlyph color.NRGBA // ← color.protocol.sftpGlyph
+	FtpBg     color.NRGBA // ← color.protocol.ftpBg
+	FtpGlyph  color.NRGBA // ← color.protocol.ftpGlyph
+}
+
+// ConnectionIndicatorTokens groups tokens.
+type ConnectionIndicatorTokens struct {
+	Offline        color.NRGBA // ← color.status.offline
+	Connected      color.NRGBA // ← color.success.default
+	ConnectedHalo  color.NRGBA // ← color.success.halo
+	Connecting     color.NRGBA // ← color.warning.default
+	ConnectingHalo color.NRGBA // ← color.warning.halo
+	Halo           float32     // ← size.dotHalo
+}
+
+// PaneToggleTokens groups tokens.
+type PaneToggleTokens struct {
+	Size       float32       // ← size.controlMd
+	Radius     float32       // ← radius.controlSm
+	Icon       color.NRGBA   // ← color.text.muted
+	BgHover    color.NRGBA   // ← color.state.hover
+	BgOn       color.NRGBA   // ← color.state.pressed
+	IconOn     color.NRGBA   // ← color.text.primary
+	Transition time.Duration // ← motion.duration.focus
+}
+
+// FilePaneFocusTokens groups tokens.
+type FilePaneFocusTokens struct {
+	LabelBgActive       color.NRGBA   // ← color.accent.subtle
+	LabelTextActive     color.NRGBA   // ← color.text.accent
+	LabelWeightActive   int           // ← font.weight.semibold
+	LabelTextInactive   color.NRGBA   // ← color.text.muted
+	LabelWeightInactive int           // ← font.weight.medium
+	LabelPaddingX       float32       // ← space.8
+	LabelRadius         float32       // ← radius.controlSm
+	SelBgActive         color.NRGBA   // ← color.state.selectedAccent
+	SelTextActive       color.NRGBA   // ← color.text.accentStrong
+	SelBgInactive       color.NRGBA   // ← color.state.selected
+	SelTextInactive     color.NRGBA   // ← color.text.primary
+	Transition          time.Duration // ← motion.duration.focus
+}
+
+// FTPSplitTokens groups tokens.
+type FTPSplitTokens struct {
+	Gutter            float32       // ← space.8
+	Expand            Spring        // ← motion.spring.displace
+	RevealOpacityFrom float32       // ← opacity.revealFrom
+	Crossfade         time.Duration // ← motion.duration.focus
+	MinLocal          float32       // ← size.paneMinLocal
+	MinRemote         float32       // ← size.paneMinRemote
+	DefaultRatio      float32       // ← opacity.splitDefaultRatio
+	GripW             float32       // ← space.4
+	GripH             float32       // ← size.splitGripHeight
+	Grip              color.NRGBA   // ← color.text.placeholder
+	GripActive        color.NRGBA   // ← color.accent.default
+}
+
+// TransferCapsuleTokens groups tokens.
+type TransferCapsuleTokens struct {
+	Height        float32       // ← size.controlXs
+	Radius        float32       // ← radius.pill
+	Bg            color.NRGBA   // ← color.fill.quiet
+	BgHover       color.NRGBA   // ← color.fill.quietHover
+	BgOpen        color.NRGBA   // ← color.accent.subtle
+	TextOpen      color.NRGBA   // ← color.text.accent
+	Text          color.NRGBA   // ← color.text.muted
+	Arrow         color.NRGBA   // ← color.accent.default
+	BarWidth      float32       // ← size.capsuleBarWidth
+	BarHeight     float32       // ← size.capsuleBarHeight
+	BarTrack      color.NRGBA   // ← color.accent.tint15
+	BarFill       color.NRGBA   // ← color.accent.default
+	DoneArrow     color.NRGBA   // ← color.success.default
+	DoneFill      color.NRGBA   // ← color.success.default
+	Error         color.NRGBA   // ← color.danger.text
+	Enter         Spring        // ← motion.spring.smooth
+	Exit          time.Duration // ← motion.duration.exit
+	AutoHide      time.Duration // ← motion.duration.autoHide
+	EnterScale    float32       // ← opacity.capsuleEnterScale
+	PaddingLeft   float32       // ← space.7
+	PaddingRight  float32       // ← space.9
+	Gap           float32       // ← space.6
+	PaddingX      float32       // ← space.8
+	PaddingY      float32       // ← space.2
+	FontSize      float32       // ← font.size.footnote
+	Weight        int           // ← font.weight.medium
+	SpeedInterval time.Duration // ← motion.duration.autoExpand
+}
+
+// TransferPopoverTokens groups tokens.
+type TransferPopoverTokens struct {
+	Width        float32       // ← size.popover
+	Radius       float32       // ← radius.popover
+	Bg           color.NRGBA   // ← color.glass.float
+	Blur         float32       // ← glass.float.blur
+	Saturate     float32       // ← glass.float.saturate
+	Shadow       Shadow        // ← shadow.popover
+	Offset       float32       // ← space.8
+	Enter        Spring        // ← motion.spring.smooth
+	Exit         time.Duration // ← motion.duration.exit
+	EnterScale   float32       // ← opacity.popoverEnterScale
+	EnterY       float32       // ← space.6
+	Padding      float32       // ← space.6
+	HeaderHeight float32       // ← size.transferPopoverHeader
+	MaxRows      float32       // ← size.transferPopoverMaxRows
+	DismissY     float32       // ← space.24
+	RowHeight    float32       // ← size.queueRow
+	ExitY        float32       // ← space.24
+}
+
+// TransferDockTokens groups tokens.
+type TransferDockTokens struct {
+	Bg                color.NRGBA // ← color.surface.card
+	Radius            float32     // ← radius.card
+	HeaderHeight      float32     // ← size.dockHeader
+	RowHeight         float32     // ← size.dockRow
+	MaxRows           float32     // ← size.transferDockMaxRows
+	Grow              Spring      // ← motion.spring.smooth
+	Collapse          Spring      // ← motion.spring.smooth
+	Concurrency       float32     // ← size.transferConcurrency
+	ProgressWidth     float32     // ← size.transferProgressWidth
+	CompactBreakpoint float32     // ← size.fileCompactWidth
+}
+
+// TransferRowTokens groups tokens.
+type TransferRowTokens struct {
+	IconTile           float32       // ← size.control
+	IconRadius         float32       // ← radius.control
+	UpBg               color.NRGBA   // ← color.accent.subtle
+	UpIcon             color.NRGBA   // ← color.accent.default
+	DownBg             color.NRGBA   // ← color.surface.control
+	DownIcon           color.NRGBA   // ← color.text.muted
+	DoneBg             color.NRGBA   // ← color.success.subtle
+	DoneIcon           color.NRGBA   // ← color.success.text
+	ErrBg              color.NRGBA   // ← color.danger.subtle
+	ErrIcon            color.NRGBA   // ← color.danger.text
+	SpeedText          color.NRGBA   // ← color.text.accent
+	ErrorText          color.NRGBA   // ← color.danger.text
+	RunBg              color.NRGBA   // ← color.accent.subtle
+	RunText            color.NRGBA   // ← color.text.accent
+	RunDot             color.NRGBA   // ← color.accent.default
+	PausedBg           color.NRGBA   // ← color.surface.control
+	PausedText         color.NRGBA   // ← color.text.muted
+	PausedDot          color.NRGBA   // ← color.status.paused
+	DoneBadgeBg        color.NRGBA   // ← color.success.subtle
+	DoneBadgeText      color.NRGBA   // ← color.success.text
+	DoneDot            color.NRGBA   // ← color.success.default
+	ErrBadgeBg         color.NRGBA   // ← color.danger.subtle
+	ErrBadgeText       color.NRGBA   // ← color.danger.text
+	ErrDot             color.NRGBA   // ← color.danger.default
+	ProgressWidth      float32       // ← size.transferProgressWidth
+	SpeedWidth         float32       // ← size.transferSpeedWidth
+	StatusWidth        float32       // ← size.transferStatusWidth
+	NameMinWidth       float32       // ← size.transferNameMinWidth
+	NameSize           float32       // ← font.size.body
+	PathSize           float32       // ← font.size.caption
+	RowHeight          float32       // ← size.queueRow
+	DetailSize         float32       // ← font.size.caption
+	ProgressHeight     float32       // ← size.progress
+	Gap                float32       // ← space.8
+	PaddingX           float32       // ← space.12
+	DemoBytesPerSecond float32       // ← motion.demoTransferSpeed
+	SpeedInterval      time.Duration // ← motion.duration.autoExpand
+	Transition         time.Duration // ← motion.duration.focus
+}
+
+// FilePaneTokens groups tokens.
+type FilePaneTokens struct {
+	HeaderHeight     float32 // ← size.fileToolbar
+	StatusHeight     float32 // ← size.statusBar
+	CompactWidth     float32 // ← size.fileCompactWidth
+	SearchWidth      float32 // ← size.fileSearchWidth
+	SizeWidth        float32 // ← size.fileSizeWidth
+	DateWidth        float32 // ← size.fileDateWidth
+	PermissionsWidth float32 // ← size.filePermissionsWidth
+	OwnerWidth       float32 // ← size.fileOwnerWidth
+	GridCellWidth    float32 // ← size.fileGridCellWidth
+	GridCellHeight   float32 // ← size.fileGridCellHeight
+	RowInset         float32 // ← space.8
+	ToolGap          float32 // ← space.4
+	ContentPadding   float32 // ← space.8
+	NameMinWidth     float32 // ← size.fileNameMinWidth
+	GridIconSize     float32 // ← size.fileGridIconSize
+}
+
 // Components 组件层：只由 Semantic 计算得出（见 buildComponents）。
 type Components struct {
-	Window        WindowTokens
-	Titlebar      TitlebarTokens
-	Tab           TabTokens
-	TitleAction   TitleActionTokens
-	Rail          RailTokens
-	Sider         SiderTokens
-	Search        SearchTokens
-	GroupHeader   GroupHeaderTokens
-	SiderItem     SiderItemTokens
-	OsLogo        OsLogoTokens
-	Card          CardTokens
-	Pane          PaneTokens
-	PaneFocus     PaneFocusTokens
-	ActivityBadge ActivityBadgeTokens
-	FadeBar       FadeBarTokens
-	StatusBar     StatusBarTokens
-	Badge         BadgeTokens
-	Button        ButtonTokens
-	IconButton    IconButtonTokens
-	FloatButton   FloatButtonTokens
-	Segmented     SegmentedTokens
-	Breadcrumb    BreadcrumbTokens
-	FileList      FileListTokens
-	Progress      ProgressTokens
-	Tooltip       TooltipTokens
-	Menu          MenuTokens
-	FloatPill     FloatPillTokens
-	DragLift      DragLiftTokens
-	DropIndicator DropIndicatorTokens
-	DragGhost     DragGhostTokens
-	ReorderMotion ReorderMotionTokens
-	Desktop       DesktopTokens
-	Scrollbar     ScrollbarTokens
-	Dialog        DialogTokens
-	Stats         StatsTokens
-	Catalog       CatalogTokens
+	Window              WindowTokens
+	Titlebar            TitlebarTokens
+	Tab                 TabTokens
+	TitleAction         TitleActionTokens
+	Rail                RailTokens
+	Sider               SiderTokens
+	Search              SearchTokens
+	GroupHeader         GroupHeaderTokens
+	SiderItem           SiderItemTokens
+	OsLogo              OsLogoTokens
+	Card                CardTokens
+	Pane                PaneTokens
+	PaneFocus           PaneFocusTokens
+	ActivityBadge       ActivityBadgeTokens
+	FadeBar             FadeBarTokens
+	StatusBar           StatusBarTokens
+	Badge               BadgeTokens
+	Button              ButtonTokens
+	IconButton          IconButtonTokens
+	FloatButton         FloatButtonTokens
+	Segmented           SegmentedTokens
+	Breadcrumb          BreadcrumbTokens
+	FileList            FileListTokens
+	Progress            ProgressTokens
+	Tooltip             TooltipTokens
+	Menu                MenuTokens
+	FloatPill           FloatPillTokens
+	DragLift            DragLiftTokens
+	DropIndicator       DropIndicatorTokens
+	DragGhost           DragGhostTokens
+	ReorderMotion       ReorderMotionTokens
+	Desktop             DesktopTokens
+	Scrollbar           ScrollbarTokens
+	Dialog              DialogTokens
+	Stats               StatsTokens
+	Catalog             CatalogTokens
+	ProtocolIcon        ProtocolIconTokens
+	ConnectionIndicator ConnectionIndicatorTokens
+	PaneToggle          PaneToggleTokens
+	FilePaneFocus       FilePaneFocusTokens
+	FTPSplit            FTPSplitTokens
+	TransferCapsule     TransferCapsuleTokens
+	TransferPopover     TransferPopoverTokens
+	TransferDock        TransferDockTokens
+	TransferRow         TransferRowTokens
+	FilePane            FilePaneTokens
 }
 
 // Palette is the primitive tier.
@@ -1725,6 +2032,9 @@ var Palette = PaletteTokens{
 		Amber400:    color.NRGBA{R: 0xff, G: 0xb3, B: 0x40, A: 0xff},
 		Amber300:    color.NRGBA{R: 0xff, G: 0xc1, B: 0x5c, A: 0xff},
 		AmberSubtle: color.NRGBA{R: 0x3d, G: 0x2e, B: 0x12, A: 0xff},
+		Red400:      color.NRGBA{R: 0xff, G: 0x45, B: 0x3a, A: 0xff},
+		Red300:      color.NRGBA{R: 0xff, G: 0x69, B: 0x61, A: 0xff},
+		RedSubtle:   color.NRGBA{R: 0x3a, G: 0x1d, B: 0x1c, A: 0xff},
 	},
 	WhiteA: PaletteTokensWhiteA{
 		A06: color.NRGBA{R: 0xff, G: 0xff, B: 0xff, A: 0x0f},
@@ -1812,6 +2122,22 @@ var Palette = PaletteTokens{
 		N204:  204,
 		N236:  236,
 		N296:  296,
+		N10:   10,
+		N42:   42,
+		N50:   50,
+		N80:   80,
+		N90:   90,
+		N100:  100,
+		N120:  120,
+		N140:  140,
+		N160:  160,
+		N180:  180,
+		N240:  240,
+		N300:  300,
+		N320:  320,
+		N384:  384,
+		N420:  420,
+		N720:  720,
 	},
 	FontSize: PaletteTokensFontSize{
 		N10_5: 10.5,
@@ -1870,21 +2196,26 @@ var Palette = PaletteTokens{
 		N1_03: 1.03,
 		N1_5:  1.5,
 		N1_8:  1.8,
+		N0_9:  0.9,
+		N0_96: 0.96,
 	},
 	Duration: PaletteTokensDuration{
-		N0:   0,
-		N120: 120 * time.Millisecond,
-		N150: 150 * time.Millisecond,
-		N160: 160 * time.Millisecond,
-		N180: 180 * time.Millisecond,
-		N220: 220 * time.Millisecond,
-		N300: 300 * time.Millisecond,
-		N320: 320 * time.Millisecond,
-		N500: 500 * time.Millisecond,
-		N600: 600 * time.Millisecond,
+		N0:    0,
+		N120:  120 * time.Millisecond,
+		N150:  150 * time.Millisecond,
+		N160:  160 * time.Millisecond,
+		N180:  180 * time.Millisecond,
+		N220:  220 * time.Millisecond,
+		N300:  300 * time.Millisecond,
+		N320:  320 * time.Millisecond,
+		N500:  500 * time.Millisecond,
+		N600:  600 * time.Millisecond,
+		N800:  800 * time.Millisecond,
+		N3000: 3000 * time.Millisecond,
 	},
 	Speed: PaletteTokensSpeed{
-		AutoScroll: 900,
+		AutoScroll:   900,
+		DemoTransfer: 13002342.4,
 	},
 	Spring: PaletteTokensSpring{
 		Snappy: Spring{Stiffness: 420, Damping: 34},
@@ -1894,6 +2225,15 @@ var Palette = PaletteTokens{
 	Easing: PaletteTokensEasing{
 		EaseOut:  Bezier{0, 0, 0.58, 1},
 		Standard: Bezier{0.25, 0.1, 0.25, 1},
+	},
+	Red: PaletteTokensRed{
+		N50:  color.NRGBA{R: 0xfd, G: 0xec, B: 0xec, A: 0xff},
+		N500: color.NRGBA{R: 0xff, G: 0x3b, B: 0x30, A: 0xff},
+		N700: color.NRGBA{R: 0xd7, G: 0x00, B: 0x15, A: 0xff},
+	},
+	Shadow: PaletteTokensShadow{
+		Popover:     Shadow{{X: 0, Y: 0, Blur: 0, Spread: 0.5, Color: color.NRGBA{R: 0x00, G: 0x00, B: 0x00, A: 0x1a}}, {X: 0, Y: 10, Blur: 28, Spread: 0, Color: color.NRGBA{R: 0x00, G: 0x00, B: 0x00, A: 0x1f}}, {X: 0, Y: 2, Blur: 6, Spread: 0, Color: color.NRGBA{R: 0x00, G: 0x00, B: 0x00, A: 0x0f}}, {X: 0, Y: 0.5, Blur: 0, Spread: 0, Color: color.NRGBA{R: 0xff, G: 0xff, B: 0xff, A: 0xe6}, Inset: true}},
+		PopoverDark: Shadow{{X: 0, Y: 0, Blur: 0, Spread: 0.5, Color: color.NRGBA{R: 0xff, G: 0xff, B: 0xff, A: 0x24}}, {X: 0, Y: 10, Blur: 28, Spread: 0, Color: color.NRGBA{R: 0x00, G: 0x00, B: 0x00, A: 0x73}}, {X: 0, Y: 2, Blur: 6, Spread: 0, Color: color.NRGBA{R: 0x00, G: 0x00, B: 0x00, A: 0x40}}},
 	},
 }
 
@@ -2003,6 +2343,7 @@ func lightSemantic() Semantic {
 				Placeholder:     Palette.Black.A035,
 				PlaceholderEdge: Palette.Black.A05,
 				Strong:          Palette.Gray.N900,
+				QuietHover:      Palette.Black.A08,
 			},
 			Traffic: ColorsTraffic{
 				Close:    Palette.Traffic.Red,
@@ -2021,6 +2362,17 @@ func lightSemantic() Semantic {
 				Bar:       Palette.White.A42,
 				Highlight: Palette.White.A90,
 			},
+			Danger: ColorsDanger{
+				Default: Palette.Red.N500,
+				Text:    Palette.Red.N700,
+				Subtle:  Palette.Red.N50,
+			},
+			Protocol: ColorsProtocol{
+				SftpBg:    Palette.Blue.N50,
+				SftpGlyph: Palette.Blue.N500,
+				FtpBg:     Palette.Gray.N100,
+				FtpGlyph:  Palette.Gray.N600,
+			},
 		},
 		Radius: Radii{
 			Window:     Palette.Radius.N12,
@@ -2038,6 +2390,7 @@ func lightSemantic() Semantic {
 			Badge:      Palette.Radius.N9,
 			Hair:       Palette.Radius.N2,
 			TabTop:     Palette.Radius.N8,
+			Popover:    Palette.Radius.N12,
 		},
 		Space: Spacing{
 			N0:  Palette.Space.N0,
@@ -2141,6 +2494,34 @@ func lightSemantic() Semantic {
 			EmptyPaneIcon:           32,
 			BellIcon:                13,
 			CatalogRowHeight:        40,
+			PaneMinLocal:            Palette.Size.N320,
+			PaneMinRemote:           Palette.Size.N420,
+			Popover:                 Palette.Size.N384,
+			CapsuleBarWidth:         Palette.Size.N32,
+			CapsuleBarHeight:        Palette.Size.N3,
+			DockHeader:              Palette.Size.N42,
+			DockRow:                 Palette.Size.N50,
+			TabSpinner:              Palette.Size.N10,
+			FileToolbar:             Palette.Size.N44,
+			FileCompactWidth:        Palette.Size.N720,
+			FileSearchWidth:         Palette.Size.N160,
+			FileSizeWidth:           Palette.Size.N80,
+			FileDateWidth:           Palette.Size.N140,
+			FilePermissionsWidth:    Palette.Size.N100,
+			FileOwnerWidth:          Palette.Size.N90,
+			FileGridCellWidth:       Palette.Size.N120,
+			FileGridCellHeight:      Palette.Size.N100,
+			TransferProgressWidth:   Palette.Size.N180,
+			TransferSpeedWidth:      Palette.Size.N120,
+			TransferNameMinWidth:    Palette.Size.N120,
+			TransferStatusWidth:     Palette.Size.N80,
+			SplitGripHeight:         Palette.Size.N32,
+			TransferPopoverHeader:   Palette.Size.N32,
+			FileNameMinWidth:        Palette.Size.N100,
+			FileGridIconSize:        Palette.Size.N32,
+			TransferDockMaxRows:     Palette.Size.N5,
+			TransferPopoverMaxRows:  Palette.Size.N6,
+			TransferConcurrency:     Palette.Size.N3,
 		},
 		Font: Typography{
 			Family: TypographyFamily{
@@ -2196,6 +2577,7 @@ func lightSemantic() Semantic {
 			GlassHighlight:    Shadow{{X: 0, Y: 0.5, Blur: 0, Spread: 0, Color: Palette.White.A90, Inset: true}},
 			DotOnline:         Shadow{{X: 0, Y: 0, Blur: 0, Spread: 3, Color: Palette.GreenA.A14}},
 			DotConnecting:     Shadow{{X: 0, Y: 0, Blur: 0, Spread: 3, Color: Palette.AmberA.A18}},
+			Popover:           Palette.Shadow.Popover,
 		},
 		Glass: Glass{
 			Fade: GlassFade{
@@ -2239,6 +2621,10 @@ func lightSemantic() Semantic {
 			PaneCloseScale:        0.97,
 			DropEdgeRatio:         0.3,
 			PaneActionTint:        0.9,
+			RevealFrom:            Palette.Ratio.N0_6,
+			CapsuleEnterScale:     Palette.Ratio.N0_9,
+			PopoverEnterScale:     Palette.Ratio.N0_96,
+			SplitDefaultRatio:     Palette.Ratio.N0_5,
 		},
 		Motion: Motion{
 			Duration: MotionDuration{
@@ -2261,6 +2647,9 @@ func lightSemantic() Semantic {
 				ScrollbarHold:  700 * time.Millisecond,
 				ScrollbarFade:  180 * time.Millisecond,
 				InstantNonzero: 1 * time.Nanosecond,
+				Exit:           Palette.Duration.N120,
+				AutoHide:       Palette.Duration.N3000,
+				Spin:           Palette.Duration.N800,
 			},
 			Easing: MotionEasing{
 				Out:  Palette.Easing.EaseOut,
@@ -2278,6 +2667,7 @@ func lightSemantic() Semantic {
 				AutoScrollMax:  Palette.Speed.AutoScroll,
 				AutoScrollZone: Palette.Size.N48,
 			},
+			DemoTransferSpeed: Palette.Speed.DemoTransfer,
 		},
 	}
 }
@@ -2371,6 +2761,14 @@ func darkOverrides(s *Semantic) {
 	s.Color.Status.DividerHandle = Palette.Graphite.N500
 	s.Color.Status.Danger = color.NRGBA{R: 0xef, G: 0x44, B: 0x44, A: 0xff}
 	s.Color.Surface.LiftStack = Palette.Graphite.N650
+	s.Color.Danger.Default = Palette.DarkTint.Red400
+	s.Color.Danger.Text = Palette.DarkTint.Red300
+	s.Color.Danger.Subtle = Palette.DarkTint.RedSubtle
+	s.Color.Protocol.SftpBg = Palette.DarkTint.BlueSubtle
+	s.Color.Protocol.FtpBg = Palette.Graphite.N700
+	s.Color.Protocol.FtpGlyph = Palette.Graphite.N250
+	s.Color.Fill.QuietHover = Palette.WhiteA.A12
+	s.Shadow.Popover = Palette.Shadow.PopoverDark
 }
 
 func buildComponents(s *Semantic) Components {
@@ -2399,26 +2797,38 @@ func buildComponents(s *Semantic) Components {
 			ActionsPaddingRight: s.Space.N10,
 		},
 		Tab: TabTokens{
-			Height:          s.Size.Control,
-			Radius:          s.Radius.Control,
-			PaddingLeft:     s.Space.N10,
-			PaddingRight:    s.Space.N8,
-			Gap:             s.Space.N7,
-			FontSize:        s.Font.Size.Body,
-			Text:            s.Color.Text.Muted,
-			TextSelected:    s.Color.Text.Primary,
-			WeightSelected:  s.Font.Weight.Medium,
-			BgSelected:      s.Color.Glass.TitleTab,
-			ShadowSelected:  s.Shadow.TitleTab,
-			Close:           s.Color.Text.Tertiary,
-			DotSize:         s.Size.DotSm,
-			AddIcon:         s.Color.Text.Secondary,
-			ContentHeight:   s.Size.TabContentHeight,
-			StripHeight:     s.Size.TabStripHeight,
-			DragHandleInset: s.Size.TabDragHandleInset,
-			TitleOffset:     s.Size.TabTitleOffset,
-			CountOffset:     s.Size.TabCountOffset,
-			BgHover:         s.Color.State.TabHover,
+			Height:            s.Size.Control,
+			Radius:            s.Radius.Control,
+			PaddingLeft:       s.Space.N10,
+			PaddingRight:      s.Space.N8,
+			Gap:               s.Space.N7,
+			FontSize:          s.Font.Size.Body,
+			Text:              s.Color.Text.Muted,
+			TextSelected:      s.Color.Text.Primary,
+			WeightSelected:    s.Font.Weight.Medium,
+			BgSelected:        s.Color.Glass.TitleTab,
+			ShadowSelected:    s.Shadow.TitleTab,
+			Close:             s.Color.Text.Tertiary,
+			DotSize:           s.Size.DotSm,
+			AddIcon:           s.Color.Text.Secondary,
+			ContentHeight:     s.Size.TabContentHeight,
+			StripHeight:       s.Size.TabStripHeight,
+			DragHandleInset:   s.Size.TabDragHandleInset,
+			TitleOffset:       s.Size.TabTitleOffset,
+			CountOffset:       s.Size.TabCountOffset,
+			BgHover:           s.Color.State.TabHover,
+			DotConnected:      s.Color.Success.Default,
+			DotError:          s.Color.Danger.Default,
+			RingDisconnected:  s.Color.Text.Tertiary,
+			RingWidth:         s.Size.FocusRing,
+			Spinner:           s.Color.Warning.Default,
+			SpinnerTrack:      s.Color.Warning.Halo,
+			SpinnerSize:       s.Size.TabSpinner,
+			SpinnerStroke:     s.Size.IconStroke,
+			SpinnerPeriod:     s.Motion.Duration.Spin,
+			TextDisconnected:  s.Color.Text.Tertiary,
+			TextErrorSelected: s.Color.Danger.Text,
+			StateTransition:   s.Motion.Duration.Focus,
 		},
 		TitleAction: TitleActionTokens{
 			Size:             s.Size.Control,
@@ -2932,6 +3342,176 @@ func buildComponents(s *Semantic) Components {
 			RowGap:       s.Space.N2,
 			GroupGap:     s.Space.N10,
 		},
+		ProtocolIcon: ProtocolIconTokens{
+			Size:      s.Size.OsLogo,
+			Radius:    s.Radius.Control,
+			Glyph:     s.Size.OsGlyph,
+			SftpBg:    s.Color.Protocol.SftpBg,
+			SftpGlyph: s.Color.Protocol.SftpGlyph,
+			FtpBg:     s.Color.Protocol.FtpBg,
+			FtpGlyph:  s.Color.Protocol.FtpGlyph,
+		},
+		ConnectionIndicator: ConnectionIndicatorTokens{
+			Offline:        s.Color.Status.Offline,
+			Connected:      s.Color.Success.Default,
+			ConnectedHalo:  s.Color.Success.Halo,
+			Connecting:     s.Color.Warning.Default,
+			ConnectingHalo: s.Color.Warning.Halo,
+			Halo:           s.Size.DotHalo,
+		},
+		PaneToggle: PaneToggleTokens{
+			Size:       s.Size.ControlMd,
+			Radius:     s.Radius.ControlSm,
+			Icon:       s.Color.Text.Muted,
+			BgHover:    s.Color.State.Hover,
+			BgOn:       s.Color.State.Pressed,
+			IconOn:     s.Color.Text.Primary,
+			Transition: s.Motion.Duration.Focus,
+		},
+		FilePaneFocus: FilePaneFocusTokens{
+			LabelBgActive:       s.Color.Accent.Subtle,
+			LabelTextActive:     s.Color.Text.Accent,
+			LabelWeightActive:   s.Font.Weight.Semibold,
+			LabelTextInactive:   s.Color.Text.Muted,
+			LabelWeightInactive: s.Font.Weight.Medium,
+			LabelPaddingX:       s.Space.N8,
+			LabelRadius:         s.Radius.ControlSm,
+			SelBgActive:         s.Color.State.SelectedAccent,
+			SelTextActive:       s.Color.Text.AccentStrong,
+			SelBgInactive:       s.Color.State.Selected,
+			SelTextInactive:     s.Color.Text.Primary,
+			Transition:          s.Motion.Duration.Focus,
+		},
+		FTPSplit: FTPSplitTokens{
+			Gutter:            s.Space.N8,
+			Expand:            s.Motion.Spring.Displace,
+			RevealOpacityFrom: s.Opacity.RevealFrom,
+			Crossfade:         s.Motion.Duration.Focus,
+			MinLocal:          s.Size.PaneMinLocal,
+			MinRemote:         s.Size.PaneMinRemote,
+			DefaultRatio:      s.Opacity.SplitDefaultRatio,
+			GripW:             s.Space.N4,
+			GripH:             s.Size.SplitGripHeight,
+			Grip:              s.Color.Text.Placeholder,
+			GripActive:        s.Color.Accent.Default,
+		},
+		TransferCapsule: TransferCapsuleTokens{
+			Height:        s.Size.ControlXs,
+			Radius:        s.Radius.Pill,
+			Bg:            s.Color.Fill.Quiet,
+			BgHover:       s.Color.Fill.QuietHover,
+			BgOpen:        s.Color.Accent.Subtle,
+			TextOpen:      s.Color.Text.Accent,
+			Text:          s.Color.Text.Muted,
+			Arrow:         s.Color.Accent.Default,
+			BarWidth:      s.Size.CapsuleBarWidth,
+			BarHeight:     s.Size.CapsuleBarHeight,
+			BarTrack:      s.Color.Accent.Tint15,
+			BarFill:       s.Color.Accent.Default,
+			DoneArrow:     s.Color.Success.Default,
+			DoneFill:      s.Color.Success.Default,
+			Error:         s.Color.Danger.Text,
+			Enter:         s.Motion.Spring.Smooth,
+			Exit:          s.Motion.Duration.Exit,
+			AutoHide:      s.Motion.Duration.AutoHide,
+			EnterScale:    s.Opacity.CapsuleEnterScale,
+			PaddingLeft:   s.Space.N7,
+			PaddingRight:  s.Space.N9,
+			Gap:           s.Space.N6,
+			PaddingX:      s.Space.N8,
+			PaddingY:      s.Space.N2,
+			FontSize:      s.Font.Size.Footnote,
+			Weight:        s.Font.Weight.Medium,
+			SpeedInterval: s.Motion.Duration.AutoExpand,
+		},
+		TransferPopover: TransferPopoverTokens{
+			Width:        s.Size.Popover,
+			Radius:       s.Radius.Popover,
+			Bg:           s.Color.Glass.Float,
+			Blur:         s.Glass.Float.Blur,
+			Saturate:     s.Glass.Float.Saturate,
+			Shadow:       s.Shadow.Popover,
+			Offset:       s.Space.N8,
+			Enter:        s.Motion.Spring.Smooth,
+			Exit:         s.Motion.Duration.Exit,
+			EnterScale:   s.Opacity.PopoverEnterScale,
+			EnterY:       s.Space.N6,
+			Padding:      s.Space.N6,
+			HeaderHeight: s.Size.TransferPopoverHeader,
+			MaxRows:      s.Size.TransferPopoverMaxRows,
+			DismissY:     s.Space.N24,
+			RowHeight:    s.Size.QueueRow,
+			ExitY:        s.Space.N24,
+		},
+		TransferDock: TransferDockTokens{
+			Bg:                s.Color.Surface.Card,
+			Radius:            s.Radius.Card,
+			HeaderHeight:      s.Size.DockHeader,
+			RowHeight:         s.Size.DockRow,
+			MaxRows:           s.Size.TransferDockMaxRows,
+			Grow:              s.Motion.Spring.Smooth,
+			Collapse:          s.Motion.Spring.Smooth,
+			Concurrency:       s.Size.TransferConcurrency,
+			ProgressWidth:     s.Size.TransferProgressWidth,
+			CompactBreakpoint: s.Size.FileCompactWidth,
+		},
+		TransferRow: TransferRowTokens{
+			IconTile:           s.Size.Control,
+			IconRadius:         s.Radius.Control,
+			UpBg:               s.Color.Accent.Subtle,
+			UpIcon:             s.Color.Accent.Default,
+			DownBg:             s.Color.Surface.Control,
+			DownIcon:           s.Color.Text.Muted,
+			DoneBg:             s.Color.Success.Subtle,
+			DoneIcon:           s.Color.Success.Text,
+			ErrBg:              s.Color.Danger.Subtle,
+			ErrIcon:            s.Color.Danger.Text,
+			SpeedText:          s.Color.Text.Accent,
+			ErrorText:          s.Color.Danger.Text,
+			RunBg:              s.Color.Accent.Subtle,
+			RunText:            s.Color.Text.Accent,
+			RunDot:             s.Color.Accent.Default,
+			PausedBg:           s.Color.Surface.Control,
+			PausedText:         s.Color.Text.Muted,
+			PausedDot:          s.Color.Status.Paused,
+			DoneBadgeBg:        s.Color.Success.Subtle,
+			DoneBadgeText:      s.Color.Success.Text,
+			DoneDot:            s.Color.Success.Default,
+			ErrBadgeBg:         s.Color.Danger.Subtle,
+			ErrBadgeText:       s.Color.Danger.Text,
+			ErrDot:             s.Color.Danger.Default,
+			ProgressWidth:      s.Size.TransferProgressWidth,
+			SpeedWidth:         s.Size.TransferSpeedWidth,
+			StatusWidth:        s.Size.TransferStatusWidth,
+			NameMinWidth:       s.Size.TransferNameMinWidth,
+			NameSize:           s.Font.Size.Body,
+			PathSize:           s.Font.Size.Caption,
+			RowHeight:          s.Size.QueueRow,
+			DetailSize:         s.Font.Size.Caption,
+			ProgressHeight:     s.Size.Progress,
+			Gap:                s.Space.N8,
+			PaddingX:           s.Space.N12,
+			DemoBytesPerSecond: s.Motion.DemoTransferSpeed,
+			SpeedInterval:      s.Motion.Duration.AutoExpand,
+			Transition:         s.Motion.Duration.Focus,
+		},
+		FilePane: FilePaneTokens{
+			HeaderHeight:     s.Size.FileToolbar,
+			StatusHeight:     s.Size.StatusBar,
+			CompactWidth:     s.Size.FileCompactWidth,
+			SearchWidth:      s.Size.FileSearchWidth,
+			SizeWidth:        s.Size.FileSizeWidth,
+			DateWidth:        s.Size.FileDateWidth,
+			PermissionsWidth: s.Size.FilePermissionsWidth,
+			OwnerWidth:       s.Size.FileOwnerWidth,
+			GridCellWidth:    s.Size.FileGridCellWidth,
+			GridCellHeight:   s.Size.FileGridCellHeight,
+			RowInset:         s.Space.N8,
+			ToolGap:          s.Space.N4,
+			ContentPadding:   s.Space.N8,
+			NameMinWidth:     s.Size.FileNameMinWidth,
+			GridIconSize:     s.Size.FileGridIconSize,
+		},
 	}
 }
 
@@ -3029,7 +3609,7 @@ func Mix(a, b color.NRGBA, t float64) color.NRGBA {
 }
 
 // OSLogoBg returns the tinted square behind an OS logo: brand color mixed into
-// the card surface (color-mix(in srgb, brand 9%, card)). Selected rows use C.OsLogo.BgSelected.
+// the card surface (color-mix(in srgb, brand 9%, card)).
 func (t *Theme) OSLogoBg(brand color.NRGBA) color.NRGBA {
 	return Mix(t.C.OsLogo.BgBase, brand, float64(t.C.OsLogo.TintMix))
 }

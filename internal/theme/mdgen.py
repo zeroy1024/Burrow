@@ -10,11 +10,11 @@ A(f'''# SSH 客户端 UI Design Tokens
 范围：整个 App 的界面（窗口、标题栏、rail、sider、分组、主机行、tab、分屏窗格及焦点、状态栏、玻璃渐隐栏、按钮、输入、徽章、tooltip、文件列表、传输队列、拖动排序）。
 **不包含终端内容**：终端文字颜色、ANSI 调色板、终端字体、光标形状不在这里（只有焦点方案里非焦点窗格的空心光标描边色 `paneFocus.cursorRingUnfocused` 作为状态 token 保留）。终端卡片的*容器*（底色、圆角、描边）属于 surface token。
 
-数值来源：`ssh-v6.html`、`common.css`、`parts/split_style.css`、`focus.py`（焦点方案 D）、`sider-drag.html`（拖动参数速查）、`ftp.html`、`logo/`（品牌蓝 #0a84ff）。设计稿里没有、为补全体系推导的值都标了 **derived**（JSON 中 `$extensions.app.derived = true`，Go 注释 `[derived]`）。
+数值来源：`ssh-v6.html`、`common.css`、`parts/split_style.css`、`focus.py`（焦点方案 D）、`sider-drag.html`（拖动参数速查）、`ftp.html`、`logo/`（品牌蓝 #0a84ff），以及 `SSH-Tool-FTP-v3` 设计包。设计稿里没有、为补全体系推导的值都标了 **derived**（JSON 中 `$extensions.app.derived = true`，Go 注释 `[derived]`）。
 
 | 层 | 数量 | 说明 |
 |---|---|---|
-| palette（primitives） | {COUNTS["palette"]} | 原始色值与刻度，其中 {COUNTS["derivedPalette"]} 个是深色主题新增的（derived） |
+| palette（primitives） | {COUNTS["palette"]} | 原始色值与刻度，其中 {COUNTS["derivedPalette"]} 个为推导值（derived） |
 | semantic（每个主题一份） | {COUNTS["semantic"]} | Light = 当前设计；Dark 覆盖其中 {COUNTS["darkOverrides"]} 个（全部 derived） |
 | component | {COUNTS["component"]} | 只引用 semantic；换主题时自动跟随 |
 
@@ -69,6 +69,7 @@ siderItem.nameColor             ← component，只能引用 semantic
 - 设计稿没画：`color.state.pressed`（按下）、`size.dropLine`（MyGo `ListState.Reorder` 插入线 2px）、组件 `menu.*`（按浮起层/拖动卡片推导）、`button.bgHover/bgPressed`、`iconButton.bgHover`。
 - tab 拖动、窗格拖动没有单独设计：`reorderMotion.tabDisplace / paneDisplace / paneDrop` 沿用 sider 拖动的弹簧参数。
 - 整个 Dark 主题（{COUNTS["darkOverrides"]} 项覆盖 + `palette.graphite / darkTint / whiteA / blackA / inkDark`）。
+- FTP v3 danger 红色、原生文件面板补充尺寸与演示传输吞吐标记为 **derived**。侧栏状态与选中 token 已标 `deprecated`，保留生成供已有主题兼容，新组件不得引用。
 - 同一含义在稿子里出现过两个值时，取主稿：sider 选中行用 `common.css` 的 `#efeff1`（`sider-drag.html` 里是 `#f2f2f4`）；图标线宽用 `icons.js` 默认 1.75（拖动稿用 1.7）。
 - 已知限制：深色下部分深色品牌 logo（CentOS、Debian 的深色字形）对比度偏低，实现时可以给 OS glyph 加一个 `Mix(brand, white, .35)` 提亮。
 
@@ -95,6 +96,7 @@ for g,d in COMP.items():
     rows=[]
     for k,r in d.items():
         note=DERIVED_COMP.get(f'{g}.{k}') or DERIVED_COMP.get(g) or sem_leaf('light',r).desc
+        if f'{g}.{k}' in DEPRECATED_COMP: note='**deprecated** '+DEPRECATED_COMP[f'{g}.{k}']
         der=f'{g}.{k}' in DERIVED_COMP or g in DERIVED_COMP
         rows.append((f'`{g}.{k}`',f'`{{{r}}}`',RES['light'][r],('**derived** ' if der else '')+note))
     tbl(rows,['token','引用','Light 值','说明'])

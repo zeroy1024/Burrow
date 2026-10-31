@@ -26,6 +26,10 @@ func iconButton(c *ui.Context, label string, icon *ui.SVG) ui.Element {
 }
 
 func (a *app) titleBar(c *ui.Context, shown float32) {
+	if a.section == sectionFiles {
+		a.fileTitleBar(c, shown)
+		return
+	}
 	t := theme.Current()
 	bar := c.TitleBar()
 	ui.Row(c).Height(max(t.C.Titlebar.Height, bar.Height)).Shrink(0).Gap(t.Space.N6).DragWindow().Children(func() {
@@ -113,6 +117,9 @@ func (a *app) tabButton(c *ui.Context, index int, tab *workspaceTab) func() {
 	} else if button.Hovered() {
 		button.Background(tokenColor(t.C.Tab.BgHover))
 	}
+	if session.state == disconnected {
+		button.TextColor(tokenColor(t.C.Tab.TextDisconnected)).Tooltip("已断开 · 可从菜单重新连接")
+	}
 	button.OnClick(func() { a.activateTab(slices.Index(a.tabs, tab)) })
 	button.ContextMenu(func(m *ui.Menu) {
 		current := tab.focused
@@ -129,12 +136,8 @@ func (a *app) tabButton(c *ui.Context, index int, tab *workspaceTab) func() {
 		}
 	})
 	button.Children(func() {
-		ui.Box(c).Size(t.Size.Icon, contentHeight).Shrink(0).Center().Children(func() {
-			if tab.root.count() > 1 {
-				ui.Icon(c, gridIcon).Size(t.Size.TrafficLight, t.Size.TrafficLight).TextColor(tokenColor(t.C.Tab.Text))
-				return
-			}
-			statusDot(c, session.state, t.C.Tab.DotSize)
+		ui.Box(c).Width(t.C.Tab.SpinnerSize).Height(contentHeight).Shrink(0).Center().Children(func() {
+			tabConnectionIndicator(c, session.state)
 		})
 		// Center the visible glyphs as well as their font line boxes.
 		ui.Text(c, h.name).FontSize(t.C.Tab.FontSize).FontWeight(t.C.Tab.WeightSelected).FixedLineHeight(contentHeight).Top(t.C.Tab.TitleOffset).SingleLine()
@@ -142,7 +145,12 @@ func (a *app) tabButton(c *ui.Context, index int, tab *workspaceTab) func() {
 			ui.Text(c, "+"+strconv.Itoa(tab.root.count()-1)).FontSize(t.Font.Size.Caption).
 				FixedLineHeight(contentHeight).Top(t.C.Tab.CountOffset).TextColor(tokenColor(t.C.Tab.Text))
 		}
-		iconButton(c, "关闭标签 "+h.name, closeIcon).Size(t.Size.Icon, contentHeight).
+		close := iconButton(c, "关闭标签 "+h.name, closeIcon).Size(t.Size.Icon, contentHeight)
+		closeVisible := float32(0)
+		if a.activeTab == index || button.Hovered() || close.Focused() {
+			closeVisible = 1
+		}
+		close.Opacity(animateVisual(close, "visible", closeVisible, t.C.Tab.StateTransition)).
 			OnClick(func() { a.closeTab(slices.Index(a.tabs, tab)) })
 		handle := ui.Box(c).Key("tab-drag-handle").Absolute().Top(0).Bottom(0).Left(0).Right(t.C.Tab.DragHandleInset).
 			Label("拖动标签 " + h.name).OnClick(func() { a.activateTab(slices.Index(a.tabs, tab)) })

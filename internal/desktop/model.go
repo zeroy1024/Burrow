@@ -15,12 +15,14 @@ const (
 	disconnected connectionState = iota
 	connected
 	connecting
+	connectionFailed
 )
 
 type hostID int
 
 type host struct {
 	name, user, address string
+	protocol            string
 	system, uptime      string
 	os, port            int
 	latency             int

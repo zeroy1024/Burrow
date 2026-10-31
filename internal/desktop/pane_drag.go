@@ -278,7 +278,7 @@ func (a *app) paneSnapshot(session *remoteSession, width, height float32) *ui.Bi
 			})
 			ui.Row(c).Absolute().Top(0).Left(0).Right(0).Height(t.C.Pane.HeaderHeight).Padding(0, t.C.Pane.HeaderPaddingLeft).Gap(t.C.Pane.HeaderGap).
 				Background(background.Alpha(t.C.Desktop.PreviewHeaderOpacity)).Children(func() {
-				statusDot(c, session.state, t.C.SiderItem.DotSize)
+				statusDot(c, session.state, t.Size.Dot)
 				ui.Text(c, h.name).FontSize(t.C.Pane.HeaderFontSize).FontWeight(t.C.Pane.NameWeight).TextColor(tokenColor(surface.C.Pane.Name))
 			})
 			ui.Row(c).Absolute().Bottom(0).Left(0).Right(0).Height(t.C.StatusBar.HeightPane).Padding(0, t.C.StatusBar.PaddingX).

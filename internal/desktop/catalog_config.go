@@ -29,15 +29,16 @@ type catalogConfigGroup struct {
 }
 
 type catalogConfigHost struct {
-	ID      hostID `json:"id"`
-	GroupID int    `json:"group_id"`
-	Order   int    `json:"order"`
-	Name    string `json:"name"`
-	User    string `json:"user"`
-	Address string `json:"address"`
-	Port    int    `json:"port"`
-	OS      int    `json:"os"`
-	System  string `json:"system"`
+	ID       hostID `json:"id"`
+	GroupID  int    `json:"group_id"`
+	Order    int    `json:"order"`
+	Name     string `json:"name"`
+	User     string `json:"user"`
+	Address  string `json:"address"`
+	Port     int    `json:"port"`
+	OS       int    `json:"os"`
+	System   string `json:"system"`
+	Protocol string `json:"protocol,omitempty"`
 }
 
 type catalogSnapshot struct {
@@ -163,6 +164,10 @@ func (config catalogConfig) catalog(runtimeHosts []host) ([]host, []*hostGroup, 
 		h := &hosts[value.ID]
 		h.name, h.user, h.address = value.Name, value.User, value.Address
 		h.port, h.os, h.system = value.Port, value.OS, value.System
+		if value.Protocol != "" && value.Protocol != "sftp" && value.Protocol != "ftp" {
+			return nil, nil, errors.New("invalid file transfer protocol")
+		}
+		h.protocol = value.Protocol
 		seen[value.ID] = true
 		ordered[value.GroupID] = append(ordered[value.GroupID], value)
 	}
@@ -192,7 +197,7 @@ func (a *app) saveCatalog() error {
 	for id, h := range a.hosts {
 		config.Hosts[id] = catalogConfigHost{
 			ID: hostID(id), Name: h.name, User: h.user, Address: h.address,
-			Port: h.port, OS: h.os, System: h.system,
+			Port: h.port, OS: h.os, System: h.system, Protocol: h.protocol,
 		}
 	}
 	for order, group := range a.groups {

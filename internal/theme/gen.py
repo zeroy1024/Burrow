@@ -73,6 +73,7 @@ comp_json={}
 for g,k,r in comp_leaves():
     lf=sem_leaf('light',r); o={'$type':lf.type,'$value':'{'+r+'}'}
     if f'{g}.{k}' in DERIVED_COMP or g in DERIVED_COMP: o['$extensions']={'app.derived':True}; o['$description']=DERIVED_COMP.get(f'{g}.{k}',DERIVED_COMP.get(g))
+    if f'{g}.{k}' in DEPRECATED_COMP: o['$description']='deprecated: '+DEPRECATED_COMP[f'{g}.{k}']
     nest(comp_json,f'{g}.{k}',o)
 J={'$description':'SSH/SFTP/FTP 客户端 UI design tokens（不含终端内容配色）。三层：palette → theme.<name>（semantic）→ component。component 只引用 semantic 路径（不带主题前缀），由当前主题解析；semantic 只引用 {palette.*}。',
    '$extensions':{'app.referenceRules':{'palette':'raw values only','theme':'values or {palette.*}','component':'semantic paths only, e.g. {color.text.primary}'},'app.derivedFlag':'$extensions.app.derived = true 表示设计稿中没有、为补全体系推导的值'},
@@ -145,7 +146,9 @@ compfields=[]
 for g,d in COMP.items():
     tn=camel(g)+'Tokens'; fs=[]
     for k,r in d.items():
-        lf=sem_leaf('light',r); fs.append((camel(k),GOT[lf.type],'← '+r))
+        lf=sem_leaf('light',r); comment='← '+r
+        if f'{g}.{k}' in DEPRECATED_COMP: comment+='; Deprecated: '+DEPRECATED_COMP[f'{g}.{k}']
+        fs.append((camel(k),GOT[lf.type],comment))
     types.append((tn,fs,'')); compfields.append((camel(g),tn,''))
 types.append(('Components',compfields,'组件层：只由 Semantic 计算得出（见 buildComponents）。'))
 def semexpr(path):
@@ -300,7 +303,7 @@ func Mix(a, b color.NRGBA, t float64) color.NRGBA {
 }
 
 // OSLogoBg returns the tinted square behind an OS logo: brand color mixed into
-// the card surface (color-mix(in srgb, brand 9%, card)). Selected rows use C.OsLogo.BgSelected.
+// the card surface (color-mix(in srgb, brand 9%, card)).
 func (t *Theme) OSLogoBg(brand color.NRGBA) color.NRGBA {
 	return Mix(t.C.OsLogo.BgBase, brand, float64(t.C.OsLogo.TintMix))
 }

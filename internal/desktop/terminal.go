@@ -255,7 +255,7 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 					ui.Text(c, fmt.Sprintf("⌘%d", number)).FontSize(f.KbdSize).FontWeight(f.KbdWeight).
 						FixedLineHeight(f.KbdLineHeight).SingleLine().Padding(f.KbdPaddingY, f.KbdPaddingX).Radius(f.KbdRadius).
 						Background(labelBackground).TextColor(labelColor)
-					statusDot(c, session.state, t.C.SiderItem.DotSize)
+					statusDot(c, session.state, t.Size.Dot)
 					ui.Text(c, h.name).FontSize(p.HeaderFontSize).FontWeight(titleWeight).TextColor(titleColor).
 						SingleLine().Ellipsis("…").MinWidth(0).Shrink(1).
 						Tooltip(fmt.Sprintf("%s · %s@%s:%d", h.name, h.user, h.address, h.port))

@@ -88,7 +88,9 @@ func (a *app) catalogList(c *ui.Context) {
 			element: viewport, offset: &a.catalogScroll, label: "会话栏滚动条", color: tokenColor(t.C.Scrollbar.Color),
 		}, &a.catalogScrollbar)
 	})
-	a.syncCatalogWorkspacePreview(c)
+	if a.section == sectionSSH {
+		a.syncCatalogWorkspacePreview(c)
+	}
 }
 
 func (a *app) catalogItem(c *ui.Context, slot catalogSlot) ui.Element {
@@ -194,6 +196,10 @@ func (a *app) catalogHeader(c *ui.Context, slot catalogSlot) ui.Element {
 func (a *app) catalogHostMenu(c *ui.Context, id hostID) func(*ui.Menu) {
 	h := a.hosts[id]
 	return func(m *ui.Menu) {
+		if a.section == sectionFiles {
+			a.fileSiteMenu(c, m, id)
+			return
+		}
 		if m.Item("新建会话").Chosen() {
 			a.openHost(id)
 		}
@@ -241,10 +247,10 @@ func (a *app) catalogHostRow(c *ui.Context, slot catalogSlot) ui.Element {
 		c.AnimationFrame()
 	}
 	if a.catalogDrag == nil {
-		row.OnClick(func() { a.openHost(id) })
+		row.OnClick(func() { a.openCatalogHost(id) })
 		row.ContextMenu(a.catalogHostMenu(c, id))
 		if row.Focused() && row.Shortcut(0, ui.KeyEnter) {
-			a.openHost(id)
+			a.openCatalogHost(id)
 		}
 	}
 	row.Children(func() {
@@ -258,10 +264,10 @@ func (a *app) catalogHostRow(c *ui.Context, slot catalogSlot) ui.Element {
 		}
 		action.Background(action.AnimateColor("background", actionBackground, catalogColorAnimation()))
 		target := float32(0)
-		if a.catalogDrag == nil && (row.Hovered() || action.FocusVisible()) {
+		if a.catalogDrag == nil && (row.Hovered() || row.Focused() || action.Focused()) {
 			target = 1
 		}
-		action.Opacity(animateVisual(action, "more", target, t.C.PaneFocus.Transition)).
+		action.Opacity(animateVisual(action, "more", target, t.C.DragLift.LiftDuration)).
 			Disabled(a.catalogDrag != nil).Children(func() { ui.Icon(c, moreIcon).Size(t.Size.Icon, t.Size.Icon) })
 		if a.catalogDrag == nil {
 			action.Menu(a.catalogHostMenu(c, id))
@@ -273,11 +279,7 @@ func (a *app) catalogHostRow(c *ui.Context, slot catalogSlot) ui.Element {
 func (a *app) catalogHostContents(c *ui.Context, id hostID) {
 	t := theme.Current()
 	h := a.hosts[id]
-	style := systems[h.os]
-	ui.Box(c).Size(t.C.OsLogo.Size, t.C.OsLogo.Size).Shrink(0).Radius(t.C.OsLogo.Radius).Background(tokenColor(t.OSLogoBg(style.color))).Center().
-		Children(func() {
-			ui.Image(c, style.icon).Size(t.C.OsLogo.GlyphSize, t.C.OsLogo.GlyphSize).TextColor(tokenColor(style.color))
-		})
+	a.catalogHostIcon(c, id)
 	ui.Column(c).Grow(1).MinWidth(0).Gap(t.Space.N1).Children(func() {
 		ui.Text(c, h.name).FontSize(t.C.SiderItem.NameSize).FontWeight(t.C.SiderItem.NameWeight).FixedLineHeight(t.C.SiderItem.NameLineHeight).SingleLine().Ellipsis("…")
 		ui.Text(c, h.user+"@"+h.address).Font(strings.Join(t.C.SiderItem.SubFamily, ", ")).FontSize(t.C.SiderItem.SubSize).FixedLineHeight(t.C.SiderItem.SubLineHeight).
