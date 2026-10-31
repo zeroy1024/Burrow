@@ -28,6 +28,8 @@ go tool mygo build -skip-dmg
 
 当前机器架构的应用位于 `build/darwin-<架构>/SSH Desk.app`。移除 `-skip-dmg` 可同时生成磁盘映像；本地构建默认使用 ad-hoc 签名。
 
+应用图标采用双窗格 Logo B，资源位于 `assets/`，由 `mygo.json` 配置：开发模式使用 `icon.png`，macOS 正式构建使用保留各尺寸专用图形的 `AppIcon.icns`。直接运行 `go run .` 不经过应用打包，不会应用这里配置的图标。
+
 ## 当前界面
 
 - 窗口和卡片间隙使用固定底色 `#e7e7e8`，保留原生红绿灯与窗口拖动区域。
