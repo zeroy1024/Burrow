@@ -82,41 +82,28 @@ func (a *app) paneDragHandle(c *ui.Context, source ui.Element, transfer paneTran
 		d.order = slices.Clone(a.tabs)
 		d.tabImage = a.tabSnapshot(transfer.tab, r.W, r.H)
 		bar := a.tabScroll.Bounds(c)
+		d.grab = ui.Point{X: a.tabPress.X + bar.X - r.X, Y: a.tabPress.Y + bar.Y - r.Y}
 		d.detached = a.pointer.Y > bar.Y+bar.H+8
 	}
 	a.drag = d
 }
 
 func (a *app) tabStripTarget(c *ui.Context, strip ui.Element) {
-	value, over := ui.DragOver[paneTransfer](strip)
-	dropped, released := ui.Drop[paneTransfer](strip)
-	if released {
-		value = dropped
-	}
+	_, over := ui.DragOver[paneTransfer](strip)
+	_, released := ui.Drop[paneTransfer](strip)
 	d := a.drag
 	if d == nil || d.kind != dragTab || d.detached || d.phase != dragActive {
 		return
 	}
-	if over && value.fromTab && value.tab != a.tabs[len(a.tabs)-1] {
-		a.pendingTabMove = func() {
-			active := a.currentTab()
-			index := slices.Index(a.tabs, value.tab)
-			a.tabs = append(slices.Delete(a.tabs, index, index+1), value.tab)
-			a.activeTab = slices.Index(a.tabs, active)
-		}
-	}
-	if released {
-		d.phase, d.returnStarted, d.returnRect = dragReturning, c.Now(), value.tab.frame.Bounds(c)
-	}
-	r := strip.Bounds()
-	if a.pointer.Y < r.Y || a.pointer.Y > r.Y+r.H {
+	if !over && !released {
 		return
 	}
+	r := strip.Bounds()
 	var delta float32
-	if a.pointer.X < r.X+28 {
+	if over && a.pointer.X < r.X+28 {
 		delta = -4
 	}
-	if a.pointer.X > r.X+r.W-28 {
+	if over && a.pointer.X > r.X+r.W-28 {
 		delta = 4
 	}
 	if delta != 0 {
@@ -126,6 +113,42 @@ func (a *app) tabStripTarget(c *ui.Context, strip ui.Element) {
 			c.After(16 * time.Millisecond)
 		}
 	}
+
+	// Reconstruct the slots from their widths, independent of position animations.
+	from := slices.Index(a.tabs, d.originTab)
+	to := from
+	center := a.pointer.X - d.grab.X + d.origin.W/2
+	x := r.X - a.tabScroll.X
+	for i, tab := range a.tabs {
+		width := tab.frame.Bounds(c).W
+		if i < from && center < x+width/2 {
+			to = min(to, i)
+		}
+		if i > from && center > x+width/2 {
+			to = max(to, i)
+		}
+		x += width + sessionTabGap
+	}
+	if to != from {
+		active := a.currentTab()
+		a.tabs = slices.Delete(a.tabs, from, from+1)
+		a.tabs = slices.Insert(a.tabs, to, d.originTab)
+		a.activeTab = slices.Index(a.tabs, active)
+		c.AnimationFrame()
+	}
+	if released {
+		d.phase, d.returnStarted = dragReturning, c.Now()
+		d.returnRect = a.tabSlot(c, d.originTab)
+	}
+}
+
+func (a *app) tabSlot(c *ui.Context, tab *workspaceTab) ui.Rect {
+	r := tab.frame.Bounds(c)
+	r.X = a.tabScroll.Bounds(c).X - a.tabScroll.X
+	for _, before := range a.tabs[:slices.Index(a.tabs, tab)] {
+		r.X += before.frame.Bounds(c).W + sessionTabGap
+	}
+	return r
 }
 
 func (a *app) lifted(session *remoteSession) bool {
@@ -144,7 +167,10 @@ func (a *app) finishWorkspaceDrag(c *ui.Context) {
 		a.activeTab = slices.Index(a.tabs, active)
 	}
 	d.phase, d.returnStarted, d.returnRect = dragReturning, c.Now(), d.origin
-	if d.kind == dragPane {
+	switch d.kind {
+	case dragTab:
+		d.returnRect = a.tabSlot(c, d.originTab)
+	case dragPane:
 		d.returnRect = d.session.frame.Bounds(c)
 	}
 	c.AnimationFrame()
@@ -435,35 +461,6 @@ func (a *app) dockSession(tab *workspaceTab, target *remoteSession, value any, p
 	a.markPaneLayout(tab, 220*time.Millisecond)
 	if a.drag != nil {
 		a.drag.session, a.drag.phase = session, dragLanded
-	}
-}
-
-func (a *app) tabDragTarget(c *ui.Context, button ui.Element, tab *workspaceTab) {
-	ui.DragOver[paneTransfer](button)
-	dropped, released := ui.Drop[paneTransfer](button)
-	d := a.drag
-	if d == nil || d.kind != dragTab || d.detached || d.phase != dragActive {
-		return
-	}
-	bounds := button.Bounds()
-	over := a.pointer.X >= bounds.X && a.pointer.X <= bounds.X+bounds.W && a.pointer.Y >= bounds.Y && a.pointer.Y <= bounds.Y+bounds.H
-	if over && d.originTab != tab {
-		after := a.pointer.X >= bounds.X+bounds.W/2
-		a.pendingTabMove = func() {
-			active := a.currentTab()
-			from := slices.Index(a.tabs, d.originTab)
-			a.tabs = slices.Delete(a.tabs, from, from+1)
-			to := slices.Index(a.tabs, tab)
-			if after {
-				to++
-			}
-			a.tabs = slices.Insert(a.tabs, to, d.originTab)
-			a.activeTab = slices.Index(a.tabs, active)
-		}
-	}
-	if released && dropped.fromTab {
-		a.drag.phase, a.drag.returnStarted = dragReturning, c.Now()
-		a.drag.returnRect = dropped.tab.frame.Bounds(c)
 	}
 }
 
