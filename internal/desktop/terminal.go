@@ -20,12 +20,22 @@ func (a *app) terminals(c *ui.Context) {
 	area := ui.Box(c).Key("terminals").Grow(1).MinWidth(0).MinHeight(0).Bind(&a.workArea)
 	tab := a.currentTab()
 	if tab == nil {
-		if _, over := ui.DragOver[hostDrag](area); over {
+		_, over := ui.DragOver[hostDrag](area)
+		source, dropped := ui.Drop[hostDrag](area)
+		catalogSource, catalogOver, catalogDropped := a.catalogHostDropTarget(area)
+		if catalogOver {
+			source, over, dropped = catalogSource, true, catalogDropped
+			area.Cursor(ui.CursorGrabbing)
+		}
+		if over {
 			area.DrawOver(func(p *ui.Painter, r ui.Rect) { p.Fill(r, a.theme.Accent.Alpha(.12), 10) })
 		}
-		if source, dropped := ui.Drop[hostDrag](area); dropped {
+		if dropped {
 			a.pendingDock = func() {
 				a.openHost(source.id)
+				if catalogDropped {
+					a.catalogDrag.externalDrop = true
+				}
 				if a.drag != nil {
 					a.drag.session, a.drag.phase = a.currentTab().focused, dragLanded
 				}
@@ -78,12 +88,21 @@ func (a *app) terminals(c *ui.Context) {
 			}
 		}
 		// Register after every source has been built, including a source rendered last for focus.
-		if a.drag != nil && a.drag.phase == dragActive {
+		_, catalogActive, _ := a.catalogHostTransfer()
+		if a.drag != nil && a.drag.phase == dragActive || catalogActive {
 			for i, placement := range panes {
+				if tab.maximized && placement.session != tab.focused {
+					continue
+				}
 				targets[i].Children(func() {
 					// Keep the scroll container out of the drag hit chain: MyGo auto-scrolls its ancestors.
 					surface := ui.Box(c).Key("pane-drop-surface").Absolute().Top(0).Right(0).Bottom(0).Left(0)
-					a.paneDrop(c, surface, placement.session)
+					a.paneDrop(
+						c,
+						surface,
+						placement.session,
+						false,
+					)
 				})
 			}
 		}
@@ -112,7 +131,9 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 		Left(rect.X).Top(rect.Y).Size(rect.W, rect.H).Bind(&session.frame).
 		MinWidth(0).MinHeight(0).Radius(terminalPaneRadius).Label(h.name + " 演示终端")
 	a.paneMotion(c, pane, tab, session)
-	frozen := a.drag != nil || a.resizing != nil || pane.Transitioning() || c.Now().Before(tab.layoutUntil)
+	_, catalogActive, _ := a.catalogHostTransfer()
+	frozen := a.drag != nil || catalogActive || a.resizing != nil ||
+		pane.Transitioning() || c.Now().Before(tab.layoutUntil)
 	if session.contentWidth == 0 || !frozen {
 		if session.contentWidth != rect.W || session.contentHeight != rect.H {
 			if session.scroll.offset.Y >= session.scroll.offset.MaxY {
@@ -303,7 +324,12 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 	} else {
 		paneFocusShadows(pane, focused, multiple)
 	}
-	a.paneDrop(c, pane, session)
+	a.paneDrop(
+		c,
+		pane,
+		session,
+		true,
+	)
 	return pane
 }
 

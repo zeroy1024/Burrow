@@ -24,7 +24,11 @@ func (a *app) beginWorkspaceFrame(c *ui.Context) {
 		if d.phase == dragLanded && d.returnStarted.IsZero() {
 			d.returnStarted = c.Now()
 		}
-		if d.phase != dragActive && c.Now().Sub(d.returnStarted) >= 220*time.Millisecond {
+		duration := 220 * time.Millisecond
+		if d.kind == dragHost && d.phase == dragReturning {
+			duration = 300 * time.Millisecond
+		}
+		if d.phase != dragActive && c.Now().Sub(d.returnStarted) >= duration {
 			a.drag = nil
 		} else if d.kind == dragTab && d.phase == dragActive {
 			bar := a.tabScroll.Bounds(c)

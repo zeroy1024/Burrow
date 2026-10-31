@@ -30,35 +30,44 @@ const (
 )
 
 type app struct {
-	section          section
-	theme            *ui.Theme
-	sidebarCollapsed bool
-	sidebarWidth     float32
-	hosts            []host
-	groups           []*hostGroup
-	tabs             []*workspaceTab
-	activeTab        int
-	nextTab          int
-	nextSession      int
-	query            string
-	search           ui.Handle
-	tabScroll        ui.ScrollState
-	statusVisible    bool
-	addHostOpen      bool
-	draft            hostDraft
-	groupDialogOpen  bool
-	groupDraft       string
-	window           *mygo.Window
-	minimumWindow    [2]int
-	workArea         ui.Handle
-	pointer          ui.Point
-	cellWidth        float32
-	drag             *paneDragState
-	dragSeen         bool
-	pendingDock      func()
-	dockPreview      *ui.Rect
-	pendingTabMove   func()
-	resizing         *terminalLayout
+	section           section
+	theme             *ui.Theme
+	sidebarCollapsed  bool
+	sidebarWidth      float32
+	hosts             []host
+	groups            []*hostGroup
+	tabs              []*workspaceTab
+	activeTab         int
+	nextTab           int
+	nextSession       int
+	query             string
+	search            ui.Handle
+	tabScroll         ui.ScrollState
+	statusVisible     bool
+	addHostOpen       bool
+	draft             hostDraft
+	groupDialogOpen   bool
+	groupDraft        string
+	window            *mygo.Window
+	minimumWindow     [2]int
+	workArea          ui.Handle
+	pointer           ui.Point
+	cellWidth         float32
+	drag              *paneDragState
+	dragSeen          bool
+	pendingDock       func()
+	dockPreview       *ui.Rect
+	pendingTabMove    func()
+	resizing          *terminalLayout
+	catalogConfig     catalogConfigState
+	catalogError      error
+	catalogScroll     ui.ScrollState
+	catalogItems      map[catalogKey]*catalogItemMotion
+	catalogDrag       *catalogDragState
+	catalogSlots      []catalogSlot
+	catalogFlash      *catalogKey
+	catalogFlashSeed  int
+	catalogFlashUntil time.Time
 }
 
 // Run starts the native desktop application and its main window.
@@ -75,10 +84,15 @@ func Run() error {
 	a.theme.TextMuted = ui.Hex(secondaryText)
 	a.theme.Border = ui.Hex("#eeeef0")
 	a.theme.Accent = ui.Hex("#0a84ff")
+	a.catalogError = a.loadCatalog()
 	for _, id := range []hostID{0, 4, 1} {
-		a.openHost(id)
+		if int(id) < len(a.hosts) {
+			a.openHost(id)
+		}
 	}
-	a.activateTab(0)
+	if len(a.tabs) > 0 {
+		a.activateTab(0)
+	}
 	mygo.Theme.SetSource(mygo.ThemeLight)
 	mygo.App.WhenReady(func() {
 		a.window = mygo.NewWindow(mygo.WindowOptions{
@@ -103,6 +117,7 @@ func (a *app) view(c *ui.Context) {
 	x, y, _ := root.PointerPosition()
 	a.pointer = ui.Point{X: x, Y: y}
 	a.beginWorkspaceFrame(c)
+	a.beginCatalogFrame(c)
 	target := float32(1)
 	if a.sidebarCollapsed {
 		target = 0
@@ -132,7 +147,13 @@ func (a *app) view(c *ui.Context) {
 		}
 		a.finishWorkspaceDrag(c)
 		a.dragPreview(c)
+		a.finishCatalogDrag(c)
+		a.catalogDragPreview(c)
 	})
+	if a.catalogError != nil {
+		c.Toast("无法加载主机配置：" + a.catalogError.Error())
+		a.catalogError = nil
+	}
 	a.hostDialog(c)
 	a.groupDialog(c)
 }

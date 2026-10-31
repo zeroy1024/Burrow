@@ -30,24 +30,15 @@ func (a *app) groupNames() []string {
 	return names
 }
 
-func (a *app) moveGroup(source, destination *hostGroup, after bool) {
-	if source == destination {
-		return
-	}
+func (a *app) moveGroup(source *hostGroup, position int) {
 	from := slices.Index(a.groups, source)
 	a.groups = slices.Delete(a.groups, from, from+1)
-	to := slices.Index(a.groups, destination)
-	if after {
-		to++
-	}
-	a.groups = slices.Insert(a.groups, to, source)
+	a.groups = slices.Insert(a.groups, position, source)
 }
 
+// position is the destination index after removing the source from its group.
 func moveHost(drag hostDrag, destination *hostGroup, position int) {
 	from := slices.Index(drag.group.hosts, drag.id)
-	if drag.group == destination && from < position {
-		position--
-	}
 	drag.group.hosts = slices.Delete(drag.group.hosts, from, from+1)
 	destination.hosts = slices.Insert(destination.hosts, position, drag.id)
 }

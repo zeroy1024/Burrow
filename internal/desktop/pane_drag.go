@@ -48,7 +48,8 @@ func (a *app) paneDragHandle(c *ui.Context, source ui.Element, transfer paneTran
 	if transfer.session.closing {
 		return
 	}
-	if d := a.drag; d != nil && transfer.fromTab && d.kind == dragTab && d.originTab == transfer.tab {
+	if d := a.drag; d != nil && d.phase == dragActive && transfer.fromTab &&
+		d.kind == dragTab && d.originTab == transfer.tab {
 		transfer.session = d.session
 	}
 	source.Drag(transfer).Cursor(ui.CursorGrab).FocusRing(false)
@@ -57,7 +58,10 @@ func (a *app) paneDragHandle(c *ui.Context, source ui.Element, transfer paneTran
 	}
 	a.dragSeen = true
 	if a.drag != nil {
-		return
+		if a.drag.phase == dragActive {
+			return
+		}
+		a.drag = nil
 	}
 	area := a.workArea.Bounds(c)
 	r := transfer.session.frame.Bounds(c)
@@ -124,25 +128,6 @@ func (a *app) tabStripTarget(c *ui.Context, strip ui.Element) {
 	}
 }
 
-func (a *app) hostDragHandle(c *ui.Context, source ui.Element, value hostDrag) {
-	source.Drag(value).Cursor(ui.CursorGrab).FocusRing(false)
-	if !source.Dragging() {
-		return
-	}
-	a.dragSeen = true
-	if a.drag != nil {
-		return
-	}
-	area, r := a.workArea.Bounds(c), source.Bounds()
-	session := &remoteSession{host: value.id, state: connected, output: []string{}}
-	size := ui.Rect{W: min(360, area.W), H: min(260, area.H)}
-	a.drag = &paneDragState{
-		kind: dragHost, session: session, origin: r, paneRect: size, detached: true,
-		grab: ui.Point{X: min(30, size.W/2), Y: 18}, order: []*workspaceTab{},
-		paneImage: a.paneSnapshot(session, size.W, size.H),
-	}
-}
-
 func (a *app) lifted(session *remoteSession) bool {
 	d := a.drag
 	return d != nil && d.session == session && (d.phase == dragLanded || d.kind != dragHost && (d.kind == dragPane || d.detached))
@@ -182,7 +167,13 @@ func (a *app) dragPreview(c *ui.Context) {
 	scale, rotate, opacity := float32(.96), float32(-1), float32(.9)
 	if d.phase == dragReturning {
 		r, animation, scale, rotate, opacity = d.returnRect, paneSpring, 1, 0, 1
-		c.After(220*time.Millisecond - min(c.Now().Sub(d.returnStarted), 220*time.Millisecond))
+		duration := 220 * time.Millisecond
+		if d.kind == dragHost {
+			duration = 300 * time.Millisecond
+			animation = ui.Smooth
+			animation.Spring.Duration = duration
+		}
+		c.After(duration - min(c.Now().Sub(d.returnStarted), duration))
 	}
 	if d.phase == dragLanded && !d.returnStarted.IsZero() {
 		area := a.workArea.Bounds(c)
@@ -192,7 +183,7 @@ func (a *app) dragPreview(c *ui.Context) {
 		c.After(220*time.Millisecond - min(c.Now().Sub(d.returnStarted), 220*time.Millisecond))
 	}
 	transition := ui.ElementTransition{Position: true, Size: true, Animation: &animation}
-	ghost := ui.Box(c).Key("workspace-drag-preview").Absolute().Left(r.X).Top(r.Y).Size(r.W, r.H).
+	ghost := ui.Box(c).Key(d).Absolute().Left(r.X).Top(r.Y).Size(r.W, r.H).
 		Radius(terminalPaneRadius).PassThrough().Transition(transition)
 	ghost.Scale(ghost.Animate("lift-scale", scale, 220*time.Millisecond), ghost.Animate("lift-scale-y", scale, 220*time.Millisecond)).
 		Rotate(ghost.Animate("lift-angle", rotate, 220*time.Millisecond)).
@@ -256,11 +247,19 @@ func (a *app) tabSnapshot(tab *workspaceTab, width, height float32) *ui.Bitmap {
 	return ui.NewBitmap(image)
 }
 
-func (a *app) paneDrop(c *ui.Context, pane ui.Element, target *remoteSession) {
+func (a *app) paneDrop(c *ui.Context, pane ui.Element, target *remoteSession, catalog bool) {
 	payload, over := ui.DragOver[any](pane)
 	value, dropped := ui.Drop[any](pane)
 	if dropped {
 		payload = value
+	}
+	var source hostDrag
+	var catalogOver, catalogDropped bool
+	if catalog {
+		source, catalogOver, catalogDropped = a.catalogPaneDropTarget(c, target)
+		if catalogOver {
+			payload, over, dropped = source, true, catalogDropped
+		}
 	}
 	if !over && !dropped {
 		return
@@ -274,6 +273,9 @@ func (a *app) paneDrop(c *ui.Context, pane ui.Element, target *remoteSession) {
 		return
 	}
 	pane.Cursor(ui.CursorDefault)
+	if catalogOver {
+		pane.Cursor(ui.CursorGrabbing)
+	}
 	if over {
 		r := plan.target
 		r.X, r.Y, r.W, r.H = r.X+4, r.Y+4, r.W-8, r.H-8
@@ -292,8 +294,55 @@ func (a *app) paneDrop(c *ui.Context, pane ui.Element, target *remoteSession) {
 		a.dockPreview = &r
 	}
 	if dropped {
-		a.pendingDock = func() { a.dockSession(tab, target, payload, plan) }
+		a.pendingDock = func() {
+			a.dockSession(tab, target, payload, plan)
+			if catalogDropped {
+				a.catalogDrag.externalDrop = true
+			}
+		}
 	}
+}
+
+// Catalog drags use Draggable rather than Drag, so their own preview and
+// edge scrolling remain in control while the same hosts can dock in a pane.
+func (a *app) catalogHostDropTarget(element ui.Element) (hostDrag, bool, bool) {
+	source, active, released := a.catalogHostTransfer()
+	if !active {
+		return source, false, false
+	}
+	r := element.Bounds()
+	inside := a.pointer.X >= r.X && a.pointer.X < r.X+r.W &&
+		a.pointer.Y >= r.Y && a.pointer.Y < r.Y+r.H
+	return source, inside, inside && released
+}
+
+func (a *app) catalogPaneDropTarget(c *ui.Context, target *remoteSession) (hostDrag, bool, bool) {
+	source, active, released := a.catalogHostTransfer()
+	if !active {
+		return source, false, false
+	}
+	tab := a.currentTab()
+	sessions := tab.root.sessions()
+	focused := slices.Index(sessions, tab.focused)
+	sessions = slices.Delete(sessions, focused, focused+1)
+	sessions = append(sessions, tab.focused)
+	// The focused wrapper paints last. Select one target in reverse paint
+	// order, using persistent wrappers rather than newly created drop shields.
+	for i := len(sessions) - 1; i >= 0; i-- {
+		candidate := sessions[i]
+		if tab.maximized && candidate != tab.focused {
+			continue
+		}
+		r := candidate.frame.Bounds(c)
+		insideX := a.pointer.X >= r.X && a.pointer.X < r.X+r.W
+		insideY := a.pointer.Y >= r.Y && a.pointer.Y < r.Y+r.H
+		if !insideX || !insideY {
+			continue
+		}
+		selected := candidate == target
+		return source, selected, selected && released
+	}
+	return source, false, false
 }
 
 type paneDropPlan struct {
