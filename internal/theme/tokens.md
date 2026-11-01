@@ -7,9 +7,9 @@
 
 | 层 | 数量 | 说明 |
 |---|---|---|
-| palette（primitives） | 273 | 原始色值与刻度，其中 49 个为推导值（derived） |
-| semantic（每个主题一份） | 371 | Light = 当前设计；Dark 覆盖其中 98 个（全部 derived） |
-| component | 693 | 只引用 semantic；换主题时自动跟随 |
+| palette（primitives） | 279 | 原始色值与刻度，其中 49 个为推导值（derived） |
+| semantic（每个主题一份） | 426 | Light = 当前设计；Dark 覆盖其中 104 个（全部 derived） |
+| component | 881 | 只引用 semantic；换主题时自动跟随 |
 
 ## 1. 三层结构与引用规则
 
@@ -64,7 +64,7 @@ siderItem.nameColor             ← component，只能引用 semantic
 
 - 设计稿没画：`color.state.pressed`（按下）、`size.dropLine`（MyGo `ListState.Reorder` 插入线 2px）、组件 `menu.*`（按浮起层/拖动卡片推导）、`button.bgHover/bgPressed`、`iconButton.bgHover`。
 - tab 拖动、窗格拖动没有单独设计：`reorderMotion.tabDisplace / paneDisplace / paneDrop` 沿用 sider 拖动的弹簧参数。
-- 整个 Dark 主题（98 项覆盖 + `palette.graphite / darkTint / whiteA / blackA / inkDark`）。
+- 整个 Dark 主题（104 项覆盖 + `palette.graphite / darkTint / whiteA / blackA / inkDark`）。
 - FTP v3 danger 红色、原生文件面板补充尺寸与演示传输吞吐标记为 **derived**。侧栏状态与选中 token 已标 `deprecated`，保留生成供已有主题兼容，新组件不得引用。
 - 同一含义在稿子里出现过两个值时，取主稿：sider 选中行用 `common.css` 的 `#efeff1`（`sider-drag.html` 里是 `#f2f2f4`）；图标线宽用 `icons.js` 默认 1.75（拖动稿用 1.7）。
 - 已知限制：深色下部分深色品牌 logo（CentOS、Debian 的深色字形）对比度偏低，实现时可以给 OS glyph 加一个 `Mix(brand, white, .35)` 提亮。
@@ -176,6 +176,7 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `palette.blueA.a28` | rgba(10,132,255,0.28) |  |
 | `palette.blueA.a35` | rgba(10,132,255,0.35) |  |
 | `palette.blueA.a50` | rgba(10,132,255,0.5) |  |
+| `palette.blueA.a24` | rgba(10,132,255,0.24) |  |
 
 ### palette.greenA
 | token | 值 | 备注 |
@@ -365,6 +366,7 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `palette.lineHeight.15` | 15px |  |
 | `palette.lineHeight.16` | 16px |  |
 | `palette.lineHeight.17` | 17px |  |
+| `palette.lineHeight.18` | 18px |  |
 
 ### palette.fontWeight
 | token | 值 | 备注 |
@@ -472,6 +474,14 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `palette.shadow.popover` | 0px 0px 0px 0.5px rgba(0,0,0,0.1), 0px 10px 28px 0px rgba(0,0,0,0.12), 0px 2px 6px 0px rgba(0,0,0,0.06), inset 0px 0.5px 0px 0px rgba(255,255,255,0.9) | 传输浮层 |
 | `palette.shadow.popoverDark` | 0px 0px 0px 0.5px rgba(255,255,255,0.14), 0px 10px 28px 0px rgba(0,0,0,0.45), 0px 2px 6px 0px rgba(0,0,0,0.25) | **derived** 深色传输浮层 |
 
+### palette.accentChoice
+| token | 值 | 备注 |
+|---|---|---|
+| `palette.accentChoice.purple` | #8e5cf7 |  |
+| `palette.accentChoice.pink` | #ec4899 |  |
+| `palette.accentChoice.orange` | #ff9500 |  |
+| `palette.accentChoice.yellow` | #f5b400 |  |
+
 ## 7. Semantic（Light / Dark）
 
 ### color
@@ -534,7 +544,7 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `color.accent.tint10` | rgba(10,132,255,0.1) | rgba(10,132,255,0.18) | 新输出徽章 / 闪光 |
 | `color.accent.tint13` | rgba(10,132,255,0.13) | ＝ | 自动滚动区渐变 |
 | `color.accent.tint15` | rgba(10,132,255,0.15) | ＝ | 进度条轨道（自动展开） |
-| `color.accent.tint16` | rgba(10,132,255,0.16) | rgba(10,132,255,0.28) | 焦点光晕 |
+| `color.accent.tint16` | rgba(10,132,255,0.16) | rgba(10,132,255,0.24) | 焦点光晕 |
 | `color.accent.tint18` | rgba(10,132,255,0.18) | ＝ | 闪光内描边 |
 | `color.accent.tint28` | rgba(10,132,255,0.28) | ＝ | 占位内描边 |
 | `color.accent.tint35` | rgba(10,132,255,0.35) | ＝ | 标注描边 |
@@ -573,14 +583,24 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `color.glass.float` | rgba(255,255,255,0.7) | rgba(255,255,255,0.1) | 悬浮胶囊（回到底部） |
 | `color.glass.bar` | rgba(255,255,255,0.42) | rgba(255,255,255,0.08) | v4 玻璃栏（无渐隐时） |
 | `color.glass.highlight` | rgba(255,255,255,0.9) | rgba(255,255,255,0.1) | 玻璃顶部内高光 |
-| `color.danger.default` | #ff3b30 | #ff453a | **derived** 失败圆点、失败图标 |
-| `color.danger.text` | #d70015 | #ff6961 | **derived** 失败文字 |
-| `color.danger.subtle` | #fdecec | #3a1d1c | **derived** 失败图标底、失败徽章底 |
+| `color.danger.default` | #ff3b30 | #ff453a | 失败圆点、失败图标 |
+| `color.danger.text` | #d70015 | #ff6961 | 失败文字 |
+| `color.danger.subtle` | #fdecec | #3a1d1c | 失败图标底、失败徽章底 |
+| `color.danger.tint14` | rgba(255,59,48,0.14) | rgba(255,69,58,0.22) | 错误输入框外光晕 |
 | `color.protocol.sftpBg` | #eaf3fe | #16304d | SFTP 图标块底 |
 | `color.protocol.sftpGlyph` | #0a84ff | ＝ | SFTP 字形 |
 | `color.protocol.ftpBg` | #f2f2f4 | #2e2e31 | FTP 图标块底 |
 | `color.protocol.ftpGlyph` | #8e8e93 | #98989d | FTP 字形 |
 | `color.overlay.backdrop` | rgba(0,0,0,0.4) | ＝ | 弹窗遮罩 |
+| `color.accentChoices.blue` | #0a84ff | ＝ |  |
+| `color.accentChoices.purple` | #8e5cf7 | ＝ |  |
+| `color.accentChoices.pink` | #ec4899 | ＝ |  |
+| `color.accentChoices.red` | #ff3b30 | ＝ |  |
+| `color.accentChoices.orange` | #ff9500 | ＝ |  |
+| `color.accentChoices.yellow` | #f5b400 | ＝ |  |
+| `color.accentChoices.green` | #30c45a | ＝ |  |
+| `color.accentChoices.graphite` | #8e8e93 | ＝ |  |
+| `color.scrim` | rgba(0,0,0,0.18) | rgba(0,0,0,0.45) | 会话弹窗遮罩，覆盖标题栏 |
 
 ### radius
 | token | Light | Dark（derived） | 用途 |
@@ -742,6 +762,38 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `size.previewLineLong` | 0.78 | ＝ |  |
 | `size.previewLineMedium` | 0.6 | ＝ |  |
 | `size.previewLineShort` | 0.45 | ＝ |  |
+| `size.modal` | 560px | ＝ |  |
+| `size.formLabel` | 72px | ＝ |  |
+| `size.settingsContent` | 720px | ＝ |  |
+| `size.modalTopRatio` | 0.12 | ＝ |  |
+| `size.modalTopMin` | 72px | ＝ |  |
+| `size.modalIconTile` | 32px | ＝ |  |
+| `size.inputMonoSize` | 12px | ＝ |  |
+| `size.formErrorIcon` | 12px | ＝ |  |
+| `size.testSpinner` | 13px | ＝ |  |
+| `size.collapseChevron` | 12px | ＝ |  |
+| `size.collapseChevronStroke` | 2.25px | ＝ |  |
+| `size.collapseChevronRotate` | 90px | ＝ |  |
+| `size.switchWidth` | 32px | ＝ |  |
+| `size.switchHeight` | 19px | ＝ |  |
+| `size.switchKnob` | 15px | ＝ |  |
+| `size.settingsHeaderPaddingX` | 32px | ＝ |  |
+| `size.settingsRowHeight` | 48px | ＝ |  |
+| `size.settingsFadeHeight` | 40px | ＝ |  |
+| `size.schemePreviewHeight` | 66px | ＝ |  |
+| `size.schemePreviewFont` | 10px | ＝ |  |
+| `size.schemePreviewLineHeight` | 16px | ＝ |  |
+| `size.schemeBadgeIcon` | 10px | ＝ |  |
+| `size.themeAspect` | 1.6 | ＝ |  |
+| `size.themeRadio` | 14px | ＝ |  |
+| `size.themeRadioRing` | 4.5px | ＝ |  |
+| `size.accentSwatch` | 20px | ＝ |  |
+| `size.accentRing` | 1.5px | ＝ |  |
+| `size.accentRingGap` | 2px | ＝ |  |
+| `size.credentialModal` | 420px | ＝ |  |
+| `size.settingsSelect` | 220px | ＝ |  |
+| `size.settingsNumber` | 64px | ＝ |  |
+| `size.settingsScrollback` | 96px | ＝ |  |
 
 ### font
 | token | Light | Dark（derived） | 用途 |
@@ -764,9 +816,11 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `font.lineHeight.body` | 16px | ＝ |  |
 | `font.lineHeight.name` | 17px | ＝ |  |
 | `font.lineHeight.keycap` | 12px | ＝ |  |
+| `font.lineHeight.input` | 18px | ＝ | 统一空输入与中文占位文字行高，避免字体回退造成基线偏移 |
 | `font.tracking.mono` | -0.2px | ＝ |  |
 | `font.tracking.normal` | 0px | ＝ |  |
 | `font.tracking.caps` | 0.3px | ＝ |  |
+| `font.tracking.inputMono` | -0.1px | ＝ |  |
 
 ### shadow
 | token | Light | Dark（derived） | 用途 |
@@ -793,6 +847,11 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `shadow.dotConnecting` | 0px 0px 0px 3px rgba(245,166,35,0.18) | ＝ |  [deprecated: 侧栏不再显示状态/选中] |
 | `shadow.popover` | 0px 0px 0px 0.5px rgba(0,0,0,0.1), 0px 10px 28px 0px rgba(0,0,0,0.12), 0px 2px 6px 0px rgba(0,0,0,0.06), inset 0px 0.5px 0px 0px rgba(255,255,255,0.9) | 0px 0px 0px 0.5px rgba(255,255,255,0.14), 0px 10px 28px 0px rgba(0,0,0,0.45), 0px 2px 6px 0px rgba(0,0,0,0.25) | 传输浮层 |
 | `shadow.dialog` | 0px 10px 30px 0px rgba(0,0,0,0.3) | 0px 10px 30px 0px rgba(0,0,0,0.5) | 弹窗阴影 |
+| `shadow.modal` | 0px 0px 0px 0.5px rgba(0,0,0,0.12), 0px 24px 64px 0px rgba(0,0,0,0.22), 0px 4px 16px 0px rgba(0,0,0,0.08) | 0px 0px 0px 0.5px rgba(255,255,255,0.12), 0px 24px 64px 0px rgba(0,0,0,0.55), 0px 4px 16px 0px rgba(0,0,0,0.3) | 会话弹窗 |
+| `shadow.inputFocus` | inset 0px 0px 0px 1.5px #0a84ff, 0px 0px 0px 3px rgba(10,132,255,0.16) | inset 0px 0px 0px 1.5px #0a84ff, 0px 0px 0px 3px rgba(10,132,255,0.24) | 输入框焦点：内环与外光晕 |
+| `shadow.inputError` | inset 0px 0px 0px 1.5px #ff3b30, 0px 0px 0px 3px rgba(255,59,48,0.14) | inset 0px 0px 0px 1.5px #ff453a, 0px 0px 0px 3px rgba(255,69,58,0.22) | 输入框错误：优先于焦点 |
+| `shadow.switchKnob` | 0px 1px 2px 0px rgba(0,0,0,0.2) | ＝ | 开关滑块 |
+| `shadow.themeSelected` | 0px 0px 0px 3px rgba(10,132,255,0.16) | 0px 0px 0px 3px rgba(10,132,255,0.24) | 外观主题卡片选中光晕 |
 
 ### glass
 | token | Light | Dark（derived） | 用途 |
@@ -839,6 +898,10 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `opacity.capsuleEnterScale` | 0.9 | ＝ |  |
 | `opacity.popoverEnterScale` | 0.96 | ＝ |  |
 | `opacity.splitDefaultRatio` | 0.5 | ＝ |  |
+| `opacity.disabled` | 0.4 | ＝ |  |
+| `opacity.modalEnterScale` | 0.96 | ＝ |  |
+| `opacity.modalExitScale` | 0.98 | ＝ |  |
+| `opacity.collapseContentFadeFactor` | 1.6 | ＝ |  |
 
 ### motion
 | token | Light | Dark（derived） | 用途 |
@@ -863,13 +926,15 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `motion.duration.scrollbarFade` | 180ms | ＝ |  |
 | `motion.duration.instantNonzero` | 1e-06ms | ＝ | 1 ns: MyGo zero Animation selects a default spring |
 | `motion.duration.exit` | 120ms | ＝ | 浮层退出、胶囊淡出 |
-| `motion.duration.autoHide` | 3000ms | ＝ | 全部完成后胶囊停留 |
 | `motion.duration.spin` | 800ms | ＝ | 连接中转圈一周 |
 | `motion.duration.paneReveal` | 220ms | ＝ |  |
 | `motion.duration.connectionStage` | 300ms | ＝ | SSH 演示连接每个阶段的停留时间 |
+| `motion.duration.test` | 10000ms | ＝ |  |
+| `motion.duration.settingsSwitchOut` | 80ms | ＝ |  |
 | `motion.easing.out` | cubic-bezier(0,0,0.58,1) | ＝ |  |
 | `motion.easing.pane` | cubic-bezier(0.2,0.8,0.2,1) | ＝ |  |
 | `motion.easing.search` | cubic-bezier(0.42,0,0.58,1) | ＝ |  |
+| `motion.easing.in` | cubic-bezier(0.42,0,1,1) | ＝ |  |
 | `motion.spring.displace` | stiffness 420 · damping 34 | ＝ | 让位（≈ Snappy, 220ms） |
 | `motion.spring.drop` | duration 320ms · bounce 0.15 | ＝ | 落位 |
 | `motion.spring.smooth` | duration 300ms · bounce 0 | ＝ | 取消 / 平滑（ui.Smooth） |
@@ -1022,6 +1087,7 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `search.kbdRadius` | `{radius.keycap}` | 4px |  |
 | `search.transition` | `{motion.duration.focus}` | 160ms | 焦点/悬停切换 |
 | `search.easing` | `{motion.easing.search}` | cubic-bezier(0.42,0,0.58,1) |  |
+| `search.lineHeight` | `{font.lineHeight.input}` | 18px | 统一空输入与中文占位文字行高，避免字体回退造成基线偏移 |
 
 ### groupHeader
 | token | 引用 | Light 值 | 说明 |
@@ -1641,7 +1707,6 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `transferCapsule.error` | `{color.danger.text}` | #d70015 | 失败文字 |
 | `transferCapsule.enter` | `{motion.spring.smooth}` | duration 300ms · bounce 0 | 取消 / 平滑（ui.Smooth） |
 | `transferCapsule.exit` | `{motion.duration.exit}` | 120ms | 浮层退出、胶囊淡出 |
-| `transferCapsule.autoHide` | `{motion.duration.autoHide}` | 3000ms | 全部完成后胶囊停留 |
 | `transferCapsule.enterScale` | `{opacity.capsuleEnterScale}` | 0.9 |  |
 | `transferCapsule.paddingLeft` | `{space.7}` | 7px |  |
 | `transferCapsule.paddingRight` | `{space.9}` | 9px |  |
@@ -1754,14 +1819,34 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `input.height` | `{size.control}` | 28px |  |
 | `input.paddingX` | `{space.9}` | 9px |  |
 | `input.radius` | `{radius.control}` | 7px |  |
-| `input.bg` | `{color.surface.control}` | #f2f2f4 | 中性控件底：图标按钮 bg、分段控件、中性徽章、队列图标 |
+| `input.bg` | `{color.surface.card}` | #ffffff | 内容卡片 / sider / FTP 面板 |
 | `input.text` | `{color.text.primary}` | #1d1d1f |  |
 | `input.fontSize` | `{font.size.body}` | 12.5px | tab、按钮、列表 |
 | `input.border` | `{color.border.control}` | #e6e6e9 | 按钮描边、状态栏竖分隔 |
-| `input.borderHover` | `{color.border.controlHover}` | #c7c7cc | 输入框悬停描边 |
+| `input.borderHover` | `{color.border.separatorWindow}` | #d2d2d6 | 标题栏按钮组分隔线 |
 | `input.borderFocus` | `{color.accent.default}` | #0a84ff | 主强调色 #0a84ff |
 | `input.borderWidth` | `{size.divider}` | 1px |  |
 | `input.transition` | `{motion.duration.focus}` | 160ms | 焦点/悬停切换 |
+| `input.gap` | `{space.7}` | 7px |  |
+| `input.focusShadow` | `{shadow.inputFocus}` | inset 0px 0px 0px 1.5px #0a84ff, 0px 0px 0px 3px rgba(10,132,255,0.16) | 输入框焦点：内环与外光晕 |
+| `input.errorShadow` | `{shadow.inputError}` | inset 0px 0px 0px 1.5px #ff3b30, 0px 0px 0px 3px rgba(255,59,48,0.14) | 输入框错误：优先于焦点 |
+| `input.placeholder` | `{color.text.placeholder}` | #c7c7cc | 面包屑分隔符 |
+| `input.icon` | `{color.text.tertiary}` | #a1a1a6 | 关闭 ×、kbd、caption |
+| `input.monoFont` | `{font.family.mono}` | JetBrains Mono, Menlo, monospace |  |
+| `input.monoSize` | `{size.inputMonoSize}` | 12px |  |
+| `input.monoTracking` | `{font.tracking.inputMono}` | -0.1px |  |
+| `input.disabledBg` | `{color.surface.field}` | #f6f6f7 | 面包屑路径框 |
+| `input.disabledText` | `{color.text.disabled}` | #aeaeb2 | 非焦点窗格主机 |
+| `input.disabledBorder` | `{color.border.subtle}` | #f0f0f2 | 卡片内分隔线（sider footer、状态栏、进度轨道） |
+| `input.caret` | `{color.accent.default}` | #0a84ff | 主强调色 #0a84ff |
+| `input.chipHeight` | `{size.controlXs}` | 22px |  |
+| `input.chipRadius` | `{radius.chip}` | 5px |  |
+| `input.chipBg` | `{color.surface.control}` | #f2f2f4 | 中性控件底：图标按钮 bg、分段控件、中性徽章、队列图标 |
+| `input.chipFontSize` | `{font.size.footnote}` | 11.5px | 分组头、副标题、状态栏 |
+| `input.selectWidth` | `{size.transferProgressWidth}` | 180px |  |
+| `input.portWidth` | `{size.formLabel}` | 72px |  |
+| `input.numberWidth` | `{size.formLabel}` | 72px |  |
+| `input.lineHeight` | `{font.lineHeight.input}` | 18px | 统一空输入与中文占位文字行高，避免字体回退造成基线偏移 |
 
 ### paneReveal
 | token | 引用 | Light 值 | 说明 |
@@ -1769,3 +1854,207 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `paneReveal.blur` | `{glass.paneRevealBlur}` | 8px |  |
 | `paneReveal.duration` | `{motion.duration.paneReveal}` | 220ms |  |
 | `paneReveal.easing` | `{motion.easing.out}` | cubic-bezier(0,0,0.58,1) |  |
+
+### modal
+| token | 引用 | Light 值 | 说明 |
+|---|---|---|---|
+| `modal.width` | `{size.modal}` | 560px |  |
+| `modal.radius` | `{radius.window}` | 12px |  |
+| `modal.bg` | `{color.surface.card}` | #ffffff | 内容卡片 / sider / FTP 面板 |
+| `modal.shadow` | `{shadow.modal}` | 0px 0px 0px 0.5px rgba(0,0,0,0.12), 0px 24px 64px 0px rgba(0,0,0,0.22), 0px 4px 16px 0px rgba(0,0,0,0.08) | 会话弹窗 |
+| `modal.scrim` | `{color.scrim}` | rgba(0,0,0,0.18) | 会话弹窗遮罩，覆盖标题栏 |
+| `modal.topRatio` | `{size.modalTopRatio}` | 0.12 |  |
+| `modal.topMin` | `{size.modalTopMin}` | 72px |  |
+| `modal.bottomMargin` | `{space.24}` | 24px |  |
+| `modal.headerPaddingTop` | `{space.18}` | 18px |  |
+| `modal.headerPaddingRight` | `{space.16}` | 16px |  |
+| `modal.headerPaddingBottom` | `{space.14}` | 14px |  |
+| `modal.headerPaddingLeft` | `{space.24}` | 24px |  |
+| `modal.headerGap` | `{space.12}` | 12px |  |
+| `modal.iconTile` | `{size.modalIconTile}` | 32px |  |
+| `modal.iconTileRadius` | `{radius.railButton}` | 8px |  |
+| `modal.titleSize` | `{font.size.title}` | 15px | 大标题（sider-drag 版 sider 标题） |
+| `modal.titleWeight` | `{font.weight.semibold}` | 600 |  |
+| `modal.subtitleSize` | `{font.size.footnote}` | 11.5px | 分组头、副标题、状态栏 |
+| `modal.subtitle` | `{color.text.secondary}` | #8e8e93 | 次要文字、主机副标题、状态栏 |
+| `modal.bodyPaddingX` | `{space.24}` | 24px |  |
+| `modal.divider` | `{color.border.divider}` | #f2f2f4 | 头部底线、表头底线 |
+| `modal.footerPaddingTop` | `{space.14}` | 14px |  |
+| `modal.footerPaddingRight` | `{space.16}` | 16px |  |
+| `modal.footerPaddingBottom` | `{space.16}` | 16px |  |
+| `modal.footerPaddingLeft` | `{space.24}` | 24px |  |
+| `modal.footerGap` | `{space.8}` | 8px |  |
+| `modal.buttonPaddingX` | `{space.12}` | 12px |  |
+| `modal.enterScale` | `{opacity.modalEnterScale}` | 0.96 |  |
+| `modal.exitScale` | `{opacity.modalExitScale}` | 0.98 |  |
+| `modal.enter` | `{motion.spring.smooth}` | duration 300ms · bounce 0 | 取消 / 平滑（ui.Smooth） |
+| `modal.fade` | `{motion.duration.focus}` | 160ms | 焦点/悬停切换 |
+| `modal.exit` | `{motion.duration.exit}` | 120ms | 浮层退出、胶囊淡出 |
+| `modal.reduceFade` | `{motion.duration.focus}` | 160ms | 焦点/悬停切换 |
+| `modal.generateWidth` | `{size.credentialModal}` | 420px |  |
+| `modal.protocolRadius` | `{radius.lift}` | 9px |  |
+| `modal.protocolPadding` | `{space.3}` | 3px |  |
+| `modal.protocolIcon` | `{size.controlXs}` | 22px |  |
+
+### formRow
+| token | 引用 | Light 值 | 说明 |
+|---|---|---|---|
+| `formRow.labelWidth` | `{size.formLabel}` | 72px |  |
+| `formRow.labelGap` | `{space.12}` | 12px |  |
+| `formRow.rowGap` | `{space.12}` | 12px |  |
+| `formRow.label` | `{color.text.muted}` | #6e6e73 | 未选中 tab、rail 图标、按钮图标 |
+| `formRow.labelSize` | `{font.size.body}` | 12.5px | tab、按钮、列表 |
+| `formRow.labelHeight` | `{size.control}` | 28px |  |
+| `formRow.error` | `{color.danger.text}` | #d70015 | 失败文字 |
+| `formRow.errorSize` | `{font.size.footnote}` | 11.5px | 分组头、副标题、状态栏 |
+| `formRow.errorIcon` | `{size.formErrorIcon}` | 12px |  |
+| `formRow.errorGap` | `{space.5}` | 5px |  |
+| `formRow.description` | `{color.text.tertiary}` | #a1a1a6 | 关闭 ×、kbd、caption |
+| `formRow.descriptionSize` | `{font.size.footnote}` | 11.5px | 分组头、副标题、状态栏 |
+| `formRow.descGap` | `{space.4}` | 4px |  |
+
+### testResult
+| token | 引用 | Light 值 | 说明 |
+|---|---|---|---|
+| `testResult.gap` | `{space.6}` | 6px |  |
+| `testResult.fontSize` | `{font.size.small}` | 12px | sider footer、主机副信息 |
+| `testResult.icon` | `{size.iconSm}` | 14px |  |
+| `testResult.spinnerSize` | `{size.testSpinner}` | 13px |  |
+| `testResult.testing` | `{color.text.secondary}` | #8e8e93 | 次要文字、主机副标题、状态栏 |
+| `testResult.success` | `{color.success.text}` | #1f8a3f |  |
+| `testResult.successIcon` | `{color.success.default}` | #30c45a | 在线点、完成进度 |
+| `testResult.fail` | `{color.danger.text}` | #d70015 | 失败文字 |
+| `testResult.failIcon` | `{color.danger.default}` | #ff3b30 | 失败圆点、失败图标 |
+| `testResult.info` | `{color.text.tertiary}` | #a1a1a6 | 关闭 ×、kbd、caption |
+| `testResult.infoSize` | `{size.formErrorIcon}` | 12px |  |
+| `testResult.crossfade` | `{motion.duration.focus}` | 160ms | 焦点/悬停切换 |
+
+### collapse
+| token | 引用 | Light 值 | 说明 |
+|---|---|---|---|
+| `collapse.headerHeight` | `{size.titlebar}` | 44px |  |
+| `collapse.chevron` | `{size.collapseChevron}` | 12px |  |
+| `collapse.chevronStroke` | `{size.collapseChevronStroke}` | 2.25px |  |
+| `collapse.chevronColor` | `{color.text.secondary}` | #8e8e93 | 次要文字、主机副标题、状态栏 |
+| `collapse.title` | `{color.text.primary}` | #1d1d1f |  |
+| `collapse.titleSize` | `{font.size.bodyLg}` | 13px | 主机名、标题 |
+| `collapse.titleWeight` | `{font.weight.semibold}` | 600 |  |
+| `collapse.summary` | `{color.text.tertiary}` | #a1a1a6 | 关闭 ×、kbd、caption |
+| `collapse.summarySize` | `{font.size.small}` | 12px | sider footer、主机副信息 |
+| `collapse.duration` | `{motion.duration.collapse}` | 180ms | 分组拖动时全部收起 |
+| `collapse.chevronRotate` | `{size.collapseChevronRotate}` | 90px |  |
+| `collapse.contentFadeFactor` | `{opacity.collapseContentFadeFactor}` | 1.6 |  |
+
+### switch
+| token | 引用 | Light 值 | 说明 |
+|---|---|---|---|
+| `switch.w` | `{size.switchWidth}` | 32px |  |
+| `switch.h` | `{size.switchHeight}` | 19px |  |
+| `switch.knobSize` | `{size.switchKnob}` | 15px |  |
+| `switch.inset` | `{space.2}` | 2px |  |
+| `switch.off` | `{color.border.keycap}` | #e3e3e6 | kbd 描边 |
+| `switch.on` | `{color.accent.default}` | #0a84ff | 主强调色 #0a84ff |
+| `switch.knob` | `{color.text.onAccent}` | #ffffff |  |
+| `switch.knobShadow` | `{shadow.switchKnob}` | 0px 1px 2px 0px rgba(0,0,0,0.2) | 开关滑块 |
+| `switch.animation` | `{motion.spring.smooth}` | duration 300ms · bounce 0 | 取消 / 平滑（ui.Smooth） |
+
+### settings
+| token | 引用 | Light 值 | 说明 |
+|---|---|---|---|
+| `settings.navWidth` | `{size.sider}` | 236px |  |
+| `settings.navItemHeight` | `{size.modalIconTile}` | 32px |  |
+| `settings.navItemRadius` | `{radius.control}` | 7px |  |
+| `settings.navItemOn` | `{color.accent.subtle}` | #eaf3fe | 浅蓝底（上传、运行中、提示） |
+| `settings.navTextOn` | `{color.text.accentStrong}` | #0a5bc4 | 选中文件名 |
+| `settings.navIconOn` | `{color.accent.default}` | #0a84ff | 主强调色 #0a84ff |
+| `settings.navIconTile` | `{size.controlXs}` | 22px |  |
+| `settings.headerPaddingTop` | `{space.16}` | 16px |  |
+| `settings.headerPaddingRight` | `{space.14}` | 14px |  |
+| `settings.headerPaddingBottom` | `{space.14}` | 14px |  |
+| `settings.headerPaddingLeft` | `{size.settingsHeaderPaddingX}` | 32px |  |
+| `settings.titleSize` | `{font.size.title}` | 15px | 大标题（sider-drag 版 sider 标题） |
+| `settings.titleWeight` | `{font.weight.semibold}` | 600 |  |
+| `settings.subtitleSize` | `{font.size.footnote}` | 11.5px | 分组头、副标题、状态栏 |
+| `settings.subtitle` | `{color.text.secondary}` | #8e8e93 | 次要文字、主机副标题、状态栏 |
+| `settings.close` | `{size.control}` | 28px |  |
+| `settings.contentMax` | `{size.settingsContent}` | 720px |  |
+| `settings.contentPaddingY` | `{space.20}` | 20px |  |
+| `settings.contentPaddingX` | `{size.settingsHeaderPaddingX}` | 32px |  |
+| `settings.groupTitleSize` | `{font.size.small}` | 12px | sider footer、主机副信息 |
+| `settings.groupTitleWeight` | `{font.weight.semibold}` | 600 |  |
+| `settings.groupTitle` | `{color.text.muted}` | #6e6e73 | 未选中 tab、rail 图标、按钮图标 |
+| `settings.groupTitleGap` | `{space.8}` | 8px |  |
+| `settings.groupGap` | `{space.22}` | 22px |  |
+| `settings.groupBg` | `{color.surface.zebra}` | #fafafb | 列表斑马纹 |
+| `settings.groupRadius` | `{radius.card}` | 10px |  |
+| `settings.groupBorder` | `{color.border.raised}` | rgba(0,0,0,0.08) | 浮起层 0.5px 描边 |
+| `settings.groupBorderWidth` | `{size.hairline}` | 0.5px | 0.5px 描边 |
+| `settings.rowMinHeight` | `{size.settingsRowHeight}` | 48px |  |
+| `settings.rowPaddingY` | `{space.9}` | 9px |  |
+| `settings.rowPaddingX` | `{space.14}` | 14px |  |
+| `settings.rowDivider` | `{color.border.subtle}` | #f0f0f2 | 卡片内分隔线（sider footer、状态栏、进度轨道） |
+| `settings.rowDividerInset` | `{space.14}` | 14px |  |
+| `settings.rowLabelSize` | `{font.size.bodyLg}` | 13px | 主机名、标题 |
+| `settings.rowLabel` | `{color.text.primary}` | #1d1d1f |  |
+| `settings.rowDescSize` | `{font.size.footnote}` | 11.5px | 分组头、副标题、状态栏 |
+| `settings.rowDesc` | `{color.text.secondary}` | #8e8e93 | 次要文字、主机副标题、状态栏 |
+| `settings.groupFootnoteSize` | `{font.size.footnote}` | 11.5px | 分组头、副标题、状态栏 |
+| `settings.groupFootnote` | `{color.text.tertiary}` | #a1a1a6 | 关闭 ×、kbd、caption |
+| `settings.fadeHeight` | `{size.settingsFadeHeight}` | 40px |  |
+| `settings.enterY` | `{space.8}` | 8px |  |
+| `settings.exitY` | `{space.4}` | 4px |  |
+| `settings.enter` | `{motion.spring.smooth}` | duration 300ms · bounce 0 | 取消 / 平滑（ui.Smooth） |
+| `settings.fade` | `{motion.duration.focus}` | 160ms | 焦点/悬停切换 |
+| `settings.exit` | `{motion.duration.exit}` | 120ms | 浮层退出、胶囊淡出 |
+| `settings.switchY` | `{space.4}` | 4px |  |
+| `settings.switchFadeOut` | `{motion.duration.settingsSwitchOut}` | 80ms |  |
+| `settings.switchFadeIn` | `{motion.duration.exit}` | 120ms | 浮层退出、胶囊淡出 |
+| `settings.selectWidth` | `{size.settingsSelect}` | 220px |  |
+| `settings.numberWidth` | `{size.settingsNumber}` | 64px |  |
+| `settings.scrollbackWidth` | `{size.settingsScrollback}` | 96px |  |
+
+### schemeCard
+| token | 引用 | Light 值 | 说明 |
+|---|---|---|---|
+| `schemeCard.radius` | `{radius.lift}` | 9px |  |
+| `schemeCard.padding` | `{space.5}` | 5px |  |
+| `schemeCard.border` | `{color.surface.controlStrong}` | #ececef | sider 行内「更多」按钮 |
+| `schemeCard.borderWidth` | `{size.divider}` | 1px |  |
+| `schemeCard.selected` | `{color.accent.default}` | #0a84ff | 主强调色 #0a84ff |
+| `schemeCard.selectedWidth` | `{size.progressThin}` | 2px |  |
+| `schemeCard.previewHeight` | `{size.schemePreviewHeight}` | 66px |  |
+| `schemeCard.previewRadius` | `{radius.controlSm}` | 6px |  |
+| `schemeCard.previewFontSize` | `{size.schemePreviewFont}` | 10px |  |
+| `schemeCard.previewLineHeight` | `{size.schemePreviewLineHeight}` | 16px |  |
+| `schemeCard.stripeHeight` | `{size.progress}` | 5px |  |
+| `schemeCard.stripeRadius` | `{radius.hair}` | 2px |  |
+| `schemeCard.stripeGap` | `{space.2}` | 2px |  |
+| `schemeCard.nameSize` | `{font.size.small}` | 12px | sider footer、主机副信息 |
+| `schemeCard.nameWeight` | `{font.weight.medium}` | 500 |  |
+| `schemeCard.badgeSize` | `{font.size.caption2}` | 10.5px | ⌘N 芯片、计数胶囊 |
+| `schemeCard.badgeWeight` | `{font.weight.semibold}` | 600 |  |
+| `schemeCard.badgeBg` | `{color.accent.subtle}` | #eaf3fe | 浅蓝底（上传、运行中、提示） |
+| `schemeCard.badgeText` | `{color.text.accent}` | #0a6fd6 | 蓝色文字（徽章、提示、高亮分组） |
+| `schemeCard.badgeIcon` | `{size.schemeBadgeIcon}` | 10px |  |
+
+### themeCard
+| token | 引用 | Light 值 | 说明 |
+|---|---|---|---|
+| `themeCard.aspect` | `{size.themeAspect}` | 1.6 |  |
+| `themeCard.radius` | `{radius.lift}` | 9px |  |
+| `themeCard.border` | `{color.surface.controlStrong}` | #ececef | sider 行内「更多」按钮 |
+| `themeCard.borderWidth` | `{size.divider}` | 1px |  |
+| `themeCard.selected` | `{color.accent.default}` | #0a84ff | 主强调色 #0a84ff |
+| `themeCard.selectedWidth` | `{size.progressThin}` | 2px |  |
+| `themeCard.selectedShadow` | `{shadow.themeSelected}` | 0px 0px 0px 3px rgba(10,132,255,0.16) | 外观主题卡片选中光晕 |
+| `themeCard.radio` | `{size.themeRadio}` | 14px |  |
+| `themeCard.radioRing` | `{size.themeRadioRing}` | 4.5px |  |
+
+### accentSwatch
+| token | 引用 | Light 值 | 说明 |
+|---|---|---|---|
+| `accentSwatch.size` | `{size.accentSwatch}` | 20px |  |
+| `accentSwatch.gap` | `{space.10}` | 10px |  |
+| `accentSwatch.ringGap` | `{size.accentRingGap}` | 2px |  |
+| `accentSwatch.ringWidth` | `{size.accentRing}` | 1.5px |  |
+| `accentSwatch.ringInset` | `{color.surface.card}` | #ffffff | 内容卡片 / sider / FTP 面板 |

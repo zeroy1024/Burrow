@@ -256,6 +256,10 @@ func (a *app) requestFileTransfer(c *ui.Context, drag fileDrag, target *filePane
 	a.files.conflict = &fileConflict{
 		session: drag.session, sourceRemote: drag.remote, entries: slices.Clone(drag.entries), target: directory,
 	}
+	if a.prefs.ConflictPolicy != "ask" {
+		a.files.conflict.choice = map[string]int{"overwrite": 1, "skip": 2, "rename": 3}[a.prefs.ConflictPolicy]
+		a.files.conflict.applyAll = true
+	}
 	a.resolveFileConflicts(c)
 }
 

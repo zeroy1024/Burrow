@@ -135,7 +135,7 @@ func (a *app) terminalCellWidth() float32 {
 
 func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlacement) ui.Element {
 	t := theme.Current()
-	s := termtheme.Current()
+	s := a.sessionScheme(placement.session)
 	prefs := a.terminal.prefs
 	terminalBackground := termtheme.TerminalBackground(s, t.C.Pane.Bg, prefs.Background)
 	background := tokenColor(terminalBackground)
@@ -236,9 +236,9 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 				a.terminalLines(c, session, focused)
 			})
 			if multiple {
-				terminalScrollEdge(c, p.HeaderHeight, false, background)
+				a.terminalScrollEdge(c, p.HeaderHeight, false, background)
 			}
-			terminalScrollEdge(c, status.HeightPane, true, background)
+			a.terminalScrollEdge(c, status.HeightPane, true, background)
 			terminalScrollbar(c, pane, scroll, terminalBackground)
 			var header ui.Element
 			if multiple {
@@ -285,7 +285,7 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 			actions.Children(func() {
 				if !multiple {
 					ui.Box(c).Absolute().Top(0).Left(0).Size(actionsWidth, p.ActionHeight).Radius(p.ActionRadius).PassThrough().
-						Material(glass.Blur{Radius: p.ActionBlur})
+						Material(glass.Blur{Radius: a.glassRadius(c, p.ActionBlur)})
 					ui.Box(c).Absolute().Top(0).Left(0).Size(actionsWidth, p.ActionHeight).Radius(p.ActionRadius).PassThrough().
 						Background(background.Alpha(p.ActionTint))
 				}
@@ -368,7 +368,7 @@ func terminalIconButton(c *ui.Context, label string, icon *ui.SVG, surface *them
 	return button
 }
 
-func terminalScrollEdge(c *ui.Context, barHeight float32, bottom bool, background ui.Color) {
+func (a *app) terminalScrollEdge(c *ui.Context, barHeight float32, bottom bool, background ui.Color) {
 	t := theme.Current()
 	fade := t.C.FadeBar
 	angle := float32(180)
@@ -387,6 +387,10 @@ func terminalScrollEdge(c *ui.Context, barHeight float32, bottom bool, backgroun
 		{radius: fade.Blur1, solid: fade.Mask1Solid, end: fade.Mask1End},
 		{radius: fade.Blur2, solid: fade.Mask2Solid, end: fade.Mask2End},
 		{radius: fade.Blur3, solid: fade.Mask3Solid, end: fade.Mask3End},
+	}
+	if !a.translucencyEnabled(c) {
+		band().Background(background)
+		return
 	}
 	for _, layer := range layers {
 		band().Material(glass.Blur{

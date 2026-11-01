@@ -62,11 +62,12 @@ func ParseMode(s string) Mode {
 }
 
 var (
-	regMu    sync.RWMutex
-	registry = map[string]*Scheme{}
-	pairMu   sync.RWMutex
-	lightDef = DefaultLight
-	darkDef  = DefaultDark
+	regMu        sync.RWMutex
+	registry     = map[string]*Scheme{}
+	bundledNames = map[string]bool{}
+	pairMu       sync.RWMutex
+	lightDef     = DefaultLight
+	darkDef      = DefaultDark
 )
 
 func init() {
@@ -88,6 +89,7 @@ func init() {
 			s.Name = path.Base(p)
 		}
 		registry[s.Name] = s
+		bundledNames[s.Name] = true
 	}
 	cur = registry[DefaultLight]
 }
@@ -100,6 +102,28 @@ func Register(s *Scheme) {
 	regMu.Lock()
 	registry[s.Name] = s.Clone()
 	regMu.Unlock()
+}
+
+// IsBundled reports whether the app ships this scheme.
+func IsBundled(name string) bool {
+	regMu.RLock()
+	defer regMu.RUnlock()
+	return bundledNames[name]
+}
+
+// Unregister removes an imported scheme after the caller removes its persisted file.
+// The caller must first check settings and session references.
+func Unregister(name string) error {
+	regMu.Lock()
+	defer regMu.Unlock()
+	if bundledNames[name] {
+		return fmt.Errorf("cannot remove bundled scheme %q", name)
+	}
+	if _, ok := registry[name]; !ok {
+		return fmt.Errorf("unknown scheme %q", name)
+	}
+	delete(registry, name)
+	return nil
 }
 
 // Import loads a Ghostty theme file and registers it. The caller should

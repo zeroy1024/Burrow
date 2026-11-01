@@ -14,7 +14,7 @@ import (
 
 func (a *app) catalogTransition(kind catalogDragKind) ui.ElementTransition {
 	t := theme.Current()
-	animation := catalogDisplaceAnimation()
+	animation := a.catalogDisplaceAnimation()
 	if d := a.page().catalogDrag; d != nil && d.kind == catalogGroupDrag && kind == catalogHostDrag {
 		duration := t.C.ReorderMotion.GroupCollapse
 		if d.phase != catalogDragging {
@@ -111,7 +111,7 @@ func (a *app) catalogItem(c *ui.Context, slot catalogSlot) ui.Element {
 
 func (a *app) catalogPlaceholder(c *ui.Context, slot catalogSlot) ui.Element {
 	t := theme.Current()
-	animation := catalogDisplaceAnimation()
+	animation := a.catalogDisplaceAnimation()
 	row := ui.Box(c).Key("catalog-placeholder").FillWidth().Height(slot.rect.H).Shrink(0).
 		Radius(t.C.DropIndicator.ZoneRadius).Transition(ui.ElementTransition{
 		Position: true, Size: true, Animation: &animation,
@@ -150,6 +150,7 @@ func (a *app) catalogHeader(c *ui.Context, slot catalogSlot) ui.Element {
 	header.Background(header.AnimateColor("header-bg", background, animation))
 	if a.page().catalogDrag == nil {
 		header.OnClick(func() {
+			a.page().lastGroup = group
 			if err := a.commitCatalogMove(func() { a.setGroupCollapsed(group, !a.groupCollapsed(group)) }); err != nil {
 				c.Toast("保存分组状态失败：" + err.Error())
 			}
@@ -171,12 +172,12 @@ func (a *app) catalogHeader(c *ui.Context, slot catalogSlot) ui.Element {
 		}
 		arrow := ui.Icon(c, chevronIcon).Key("chevron").Size(t.Font.Size.Caption, t.Font.Size.Caption)
 		arrow.TextColor(arrow.AnimateColor("color", chevron, animation)).
-			AnimatePose(ui.Pose{Rotate: rotation}, catalogDisplaceAnimation())
+			AnimatePose(ui.Pose{Rotate: rotation}, a.catalogDisplaceAnimation())
 		label := ui.Text(c, group.name).FontSize(t.C.GroupHeader.FontSize).FontWeight(t.C.GroupHeader.Weight)
 		label.TextColor(label.AnimateColor("color", text, animation))
 		ui.Spacer(c)
 		motion := a.catalogMotion(slot.key)
-		count := len(group.hosts)
+		count := a.catalogModeCount(group.hosts)
 		if count != motion.count {
 			motion.down, motion.count = count < motion.count, count
 		}
@@ -198,15 +199,44 @@ func (a *app) catalogHeader(c *ui.Context, slot catalogSlot) ui.Element {
 func (a *app) catalogHostMenu(c *ui.Context, id hostID) func(*ui.Menu) {
 	h := a.hosts[id]
 	return func(m *ui.Menu) {
-		if a.section == sectionFiles {
-			a.fileSiteMenu(c, m, id)
-			return
+		if m.Item("连接").Chosen() {
+			a.openCatalogHost(id)
+			if a.section == sectionFiles {
+				session := a.currentFileSession()
+				if session.state == disconnected || session.state == connectionFailed {
+					a.reconnectFileSession(session)
+				}
+			}
 		}
-		if m.Item("新建会话").Chosen() {
-			a.openHost(id)
+		m.Separator()
+		if m.Item("编辑").Chosen() {
+			for _, group := range a.catalogGroups() {
+				if slices.Contains(group.hosts, id) {
+					a.page().lastGroup = group
+					break
+				}
+			}
+			a.startEditHostDraft(id)
 		}
-		if m.Item("复制连接地址").Chosen() {
-			mygo.Clipboard.WriteText(fmt.Sprintf("%s@%s:%d", h.user, h.address, h.port))
+		if m.Item("复制").Chosen() {
+			address := fmt.Sprintf("%s@%s:%d", h.user, h.address, h.port)
+			if a.section == sectionFiles {
+				protocol := "sftp"
+				if h.protocol == "ftp" {
+					protocol = "ftp"
+				}
+				address = protocol + "://" + address
+			}
+			mygo.Clipboard.WriteText(address)
+		}
+		m.Separator()
+		if m.Item("删除").Chosen() {
+			if a.fileSiteBusy(id) {
+				c.Toast("请先取消或清除该会话的传输任务")
+				return
+			}
+			a.page().draft = hostDraft{id: id, deleting: true}
+			a.page().addHostOpen = true
 		}
 	}
 }
@@ -217,6 +247,9 @@ func (a *app) catalogHostRow(c *ui.Context, slot catalogSlot) ui.Element {
 	row := ui.ButtonBase(c).Key(slot.key).Height(t.C.Catalog.RowHeight).Shrink(0).FillWidth().
 		Padding(0, t.C.SiderItem.PaddingRight, 0, t.C.SiderItem.PaddingLeft).Gap(t.C.SiderItem.Gap).Radius(t.C.SiderItem.Radius).
 		Role(ui.RoleListItem).Label(h.name).Description(h.user + "@" + h.address).TextColor(tokenColor(t.C.SiderItem.NameColor))
+	if row.Clicked() {
+		a.page().lastGroup = slot.group
+	}
 	a.trackCatalogDrag(c, row, slot)
 	background := ui.Transparent
 	if a.page().catalogDrag == nil && row.Hovered() {
@@ -308,7 +341,7 @@ func (a *app) catalogDragPreview(c *ui.Context) {
 			scale, shadow = t.C.DragLift.Scale, 1
 		}
 	} else {
-		animation := catalogLandingAnimation()
+		animation := a.catalogLandingAnimation()
 		if d.phase == catalogCanceling {
 			animation = ui.Animation{Spring: tokenSpring(t.C.ReorderMotion.Cancel)}
 		}
@@ -333,7 +366,10 @@ func (a *app) catalogDragPreview(c *ui.Context) {
 			c.AnimationFrame()
 		}
 	}
-	lift := tokenTween(t.C.DragLift.LiftDuration)
+	if a.reduceMotion(c) {
+		scale = 1
+	}
+	lift := a.positionAnimation(tokenTween(t.C.DragLift.LiftDuration))
 	ghost.AnimatePose(ui.Pose{Scale: scale}, lift)
 	alpha := animateVisual(ghost, "shadow", shadow, t.C.DragLift.LiftDuration)
 	applyShadowOpacity(ghost, t.C.DragLift.Shadow, alpha)

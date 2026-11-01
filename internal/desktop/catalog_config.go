@@ -9,6 +9,9 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
+
+	"github.com/egoist/mygo"
 )
 
 type catalogConfigState struct {
@@ -17,12 +20,30 @@ type catalogConfigState struct {
 }
 
 type catalogConfig struct {
-	Groups []catalogConfigGroup `json:"groups"`
-	Hosts  []catalogConfigHost  `json:"hosts"`
+	Version   int                  `json:"version"`
+	Groups    []catalogConfigGroup `json:"groups"`
+	Hosts     []catalogConfigHost  `json:"hosts,omitempty"`
+	Sessions  []storedSession      `json:"sessions,omitempty"`
+	Keys      []managedKey         `json:"keys,omitempty"`
+	Workspace *storedWorkspace     `json:"workspace,omitempty"`
+}
+
+type storedSession struct {
+	sessionConfig
+	Protocol string `json:"protocol"`
+	Name     string `json:"name"`
+	Host     string `json:"host"`
+	Port     int    `json:"port"`
+	User     string `json:"user"`
+	GroupID  int    `json:"groupId"`
+	Order    int    `json:"order"`
+	OS       int    `json:"os"`
+	System   string `json:"system,omitempty"`
 }
 
 type catalogConfigGroup struct {
 	ID             int    `json:"id"`
+	Scope          string `json:"scope"`
 	Name           string `json:"name"`
 	Order          int    `json:"order"`
 	Collapsed      bool   `json:"collapsed"`
@@ -30,16 +51,17 @@ type catalogConfigGroup struct {
 }
 
 type catalogConfigHost struct {
-	ID       hostID `json:"id"`
-	GroupID  int    `json:"group_id"`
-	Order    int    `json:"order"`
-	Name     string `json:"name"`
-	User     string `json:"user"`
-	Address  string `json:"address"`
-	Port     int    `json:"port"`
-	OS       int    `json:"os"`
-	System   string `json:"system"`
-	Protocol string `json:"protocol,omitempty"`
+	Session  sessionConfig `json:"session,omitempty"`
+	ID       hostID        `json:"id"`
+	GroupID  int           `json:"group_id"`
+	Order    int           `json:"order"`
+	Name     string        `json:"name"`
+	User     string        `json:"user"`
+	Address  string        `json:"address"`
+	Port     int           `json:"port"`
+	OS       int           `json:"os"`
+	System   string        `json:"system"`
+	Protocol string        `json:"protocol,omitempty"`
 }
 
 type catalogSnapshot struct {
@@ -86,14 +108,25 @@ func (a *app) loadCatalog() error {
 }
 
 func (a *app) readCatalog() error {
-	directory, err := os.UserConfigDir()
+	directory, err := mygo.App.Path(mygo.PathUserData)
 	if err != nil {
 		return fmt.Errorf("locate catalog configuration directory: %w", err)
 	}
-	a.catalogConfig.path = filepath.Join(directory, "SSH Desk", "catalog.json")
+	a.catalogConfig.path = filepath.Join(directory, "sessions.json")
 	data, err := os.ReadFile(a.catalogConfig.path)
 	if errors.Is(err, os.ErrNotExist) {
-		return nil
+		// Read the existing prototype catalog once; subsequent writes use sessions.json.
+		legacy, pathErr := os.UserConfigDir()
+		if pathErr != nil {
+			return pathErr
+		}
+		data, err = os.ReadFile(filepath.Join(legacy, "SSH Desk", "catalog.json"))
+		if errors.Is(err, os.ErrNotExist) {
+			for i := range a.hosts {
+				initializeSession(&a.hosts[i])
+			}
+			return nil
+		}
 	}
 	if err != nil {
 		return fmt.Errorf("read catalog configuration: %w", err)
@@ -102,11 +135,45 @@ func (a *app) readCatalog() error {
 	if err := json.Unmarshal(data, &config); err != nil {
 		return fmt.Errorf("decode catalog configuration: %w", err)
 	}
+	if config.Version != 0 && config.Version != 1 {
+		return errors.New("unsupported sessions version")
+	}
+	if config.Sessions != nil {
+		config.Hosts = make([]catalogConfigHost, len(config.Sessions))
+		ids := map[string]bool{}
+		for i, s := range config.Sessions {
+			if s.ID == "" || ids[s.ID] {
+				return errors.New("empty or duplicate session id")
+			}
+			ids[s.ID] = true
+			protocol := s.Protocol
+			if protocol == "ssh" {
+				protocol = ""
+			}
+			config.Hosts[i] = catalogConfigHost{ID: hostID(i), GroupID: s.GroupID, Order: s.Order, Name: s.Name, User: s.User, Address: s.Host, Port: s.Port, OS: s.OS, System: s.System, Protocol: protocol, Session: s.sessionConfig}
+		}
+	}
 	hosts, groups, err := config.catalog(a.hosts)
 	if err != nil {
 		return fmt.Errorf("validate catalog configuration: %w", err)
 	}
-	a.hosts, a.groups = hosts, groups
+	for i := range hosts {
+		initializeSession(&hosts[i])
+	}
+	if err := validateSessionCatalog(hosts, config.Keys); err != nil {
+		return err
+	}
+	for i := range config.Keys {
+		expected := filepath.Join(directory, "keys", config.Keys[i].ID)
+		if filepath.Clean(config.Keys[i].Path) != expected {
+			return errors.New("managed key path must be inside the application's keys directory")
+		}
+		if info, err := os.Lstat(expected); err == nil && info.Mode()&os.ModeSymlink != 0 {
+			return errors.New("managed key must not be a symbolic link")
+		}
+	}
+	a.hosts, a.groups, a.keys = hosts, groups, config.Keys
+	a.savedWorkspace = config.Workspace
 	return nil
 }
 
@@ -116,7 +183,13 @@ func (config catalogConfig) catalog(runtimeHosts []host) ([]host, []*hostGroup, 
 	}
 	groups := make([]*hostGroup, len(config.Groups))
 	byID := make(map[int]*hostGroup, len(groups))
-	names := make(map[string]bool, len(groups))
+	type groupName struct {
+		scope section
+		name  string
+	}
+	names := make(map[groupName]bool, len(groups))
+	legacyGroups := make(map[int]bool)
+	legacyFilesCollapsed := make(map[int]bool)
 	for _, value := range config.Groups {
 		validID := value.ID >= 0 && value.ID < len(groups)
 		validOrder := value.Order >= 0 && value.Order < len(groups)
@@ -126,14 +199,27 @@ func (config catalogConfig) catalog(runtimeHosts []host) ([]host, []*hostGroup, 
 		if byID[value.ID] != nil || groups[value.Order] != nil {
 			return nil, nil, errors.New("duplicate group id or order")
 		}
-		if strings.TrimSpace(value.Name) == "" || names[value.Name] {
+		var scope section
+		switch value.Scope {
+		case "":
+			scope = sectionSSH
+			legacyGroups[value.ID] = true
+			legacyFilesCollapsed[value.ID] = value.FilesCollapsed
+		case "ssh":
+			scope = sectionSSH
+		case "files":
+			scope = sectionFiles
+		default:
+			return nil, nil, errors.New("invalid group scope")
+		}
+		name := groupName{scope: scope, name: value.Name}
+		if strings.TrimSpace(value.Name) == "" || names[name] {
 			return nil, nil, errors.New("empty or duplicate group name")
 		}
 		group := &hostGroup{
-			id: value.ID, name: value.Name, collapsed: value.Collapsed, hosts: []hostID{},
-			filesCollapsed: value.FilesCollapsed,
+			id: value.ID, scope: scope, name: value.Name, collapsed: value.Collapsed, hosts: []hostID{},
 		}
-		groups[value.Order], byID[value.ID], names[value.Name] = group, group, true
+		groups[value.Order], byID[value.ID], names[name] = group, group, true
 	}
 	hosts := make([]host, len(config.Hosts))
 	seen := make([]bool, len(hosts))
@@ -155,9 +241,8 @@ func (config catalogConfig) catalog(runtimeHosts []host) ([]host, []*hostGroup, 
 			return nil, nil, errors.New("invalid host port")
 		}
 		validName := strings.TrimSpace(value.Name) != ""
-		validUser := strings.TrimSpace(value.User) != ""
 		validAddress := strings.TrimSpace(value.Address) != ""
-		if !validName || !validUser || !validAddress {
+		if !validName || !validAddress {
 			return nil, nil, errors.New("host connection fields must not be empty")
 		}
 		if int(value.ID) < len(runtimeHosts) {
@@ -169,7 +254,15 @@ func (config catalogConfig) catalog(runtimeHosts []host) ([]host, []*hostGroup, 
 		if value.Protocol != "" && value.Protocol != "sftp" && value.Protocol != "ftp" {
 			return nil, nil, errors.New("invalid file transfer protocol")
 		}
+		scope := sectionSSH
+		if value.Protocol == "sftp" || value.Protocol == "ftp" {
+			scope = sectionFiles
+		}
+		if !legacyGroups[value.GroupID] && byID[value.GroupID].scope != scope {
+			return nil, nil, errors.New("host protocol must match its group scope")
+		}
 		h.protocol = value.Protocol
+		h.session = value.Session
 		seen[value.ID] = true
 		ordered[value.GroupID] = append(ordered[value.GroupID], value)
 	}
@@ -182,6 +275,42 @@ func (config catalogConfig) catalog(runtimeHosts []host) ([]host, []*hostGroup, 
 			byID[id].hosts = append(byID[id].hosts, value.ID)
 		}
 	}
+	for _, group := range groups {
+		if !legacyGroups[group.id] {
+			continue
+		}
+		name := groupName{scope: sectionFiles, name: group.name}
+		if names[name] {
+			return nil, nil, errors.New("duplicate file transfer group name")
+		}
+		filesGroup := &hostGroup{
+			id: len(groups), scope: sectionFiles, name: group.name,
+			collapsed: legacyFilesCollapsed[group.id], hosts: []hostID{},
+		}
+		// Split the old shared group without duplicating sessions or their credentials.
+		sshHosts := make([]hostID, 0, len(group.hosts))
+		for _, id := range group.hosts {
+			if hosts[id].protocol == "sftp" || hosts[id].protocol == "ftp" {
+				filesGroup.hosts = append(filesGroup.hosts, id)
+			} else {
+				sshHosts = append(sshHosts, id)
+			}
+		}
+		group.hosts = sshHosts
+		groups = append(groups, filesGroup)
+		names[name] = true
+	}
+	sshGroups, filesGroups := 0, 0
+	for _, group := range groups {
+		if group.scope == sectionFiles {
+			filesGroups++
+		} else {
+			sshGroups++
+		}
+	}
+	if sshGroups == 0 || filesGroups == 0 {
+		return nil, nil, errors.New("catalog must contain a group for SSH and file transfer")
+	}
 	return hosts, groups, nil
 }
 
@@ -193,22 +322,32 @@ func (a *app) saveCatalog() error {
 		return errors.New("catalog configuration has not been loaded")
 	}
 	config := catalogConfig{
-		Groups: make([]catalogConfigGroup, len(a.groups)),
-		Hosts:  make([]catalogConfigHost, len(a.hosts)),
+		Version: 1, Keys: a.keys, Workspace: a.savedWorkspace,
+		Groups:   make([]catalogConfigGroup, len(a.groups)),
+		Sessions: make([]storedSession, len(a.hosts)),
 	}
-	for id, h := range a.hosts {
-		config.Hosts[id] = catalogConfigHost{
-			ID: hostID(id), Name: h.name, User: h.user, Address: h.address,
-			Port: h.port, OS: h.os, System: h.system, Protocol: h.protocol,
+	for id := range a.hosts {
+		h := &a.hosts[id]
+		initializeSession(h)
+		if h.session.UpdatedAt.IsZero() {
+			h.session.UpdatedAt = time.Now().UTC()
 		}
+		protocol := h.protocol
+		if protocol == "" {
+			protocol = "ssh"
+		}
+		config.Sessions[id] = storedSession{sessionConfig: h.session, Name: h.name, User: h.user, Host: h.address, Port: h.port, OS: h.os, System: h.system, Protocol: protocol}
 	}
 	for order, group := range a.groups {
+		scope := "ssh"
+		if group.scope == sectionFiles {
+			scope = "files"
+		}
 		config.Groups[order] = catalogConfigGroup{
-			ID: group.id, Name: group.name, Order: order, Collapsed: group.collapsed,
-			FilesCollapsed: group.filesCollapsed,
+			ID: group.id, Scope: scope, Name: group.name, Order: order, Collapsed: group.collapsed,
 		}
 		for position, id := range group.hosts {
-			config.Hosts[id].GroupID, config.Hosts[id].Order = group.id, position
+			config.Sessions[id].GroupID, config.Sessions[id].Order = group.id, position
 		}
 	}
 	data, err := json.MarshalIndent(config, "", "  ")

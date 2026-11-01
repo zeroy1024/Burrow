@@ -34,6 +34,15 @@ func (a *app) beginWorkspaceFrame(c *ui.Context) {
 		}
 	}
 	for _, tab := range a.tabs {
+		if tab.layoutPending {
+			tab.layoutUntil, tab.layoutPending = c.Now().Add(tab.layoutDuration), false
+		}
+	}
+}
+
+func (a *app) updatePaneClosures(c *ui.Context) {
+	t := theme.Current()
+	for _, tab := range a.tabs {
 		for _, session := range tab.root.sessions() {
 			if !session.closing {
 				continue
@@ -47,9 +56,6 @@ func (a *app) beginWorkspaceFrame(c *ui.Context) {
 				c.AnimationFrame()
 			}
 		}
-		if tab.layoutPending {
-			tab.layoutUntil, tab.layoutPending = c.Now().Add(tab.layoutDuration), false
-		}
 	}
 }
 
@@ -62,22 +68,23 @@ func (a *app) enforcePaneMinimum(c *ui.Context) {
 	if a.window == nil {
 		return
 	}
+	active := a.activeSection()
 	minimum := ui.Point{X: t.C.Desktop.PaneMinWidth, Y: t.C.Desktop.PaneMinHeight}
-	if a.section == sectionFiles {
+	if active == sectionFiles {
 		minimum.X = t.C.FTPSplit.MinRemote
 		if a.files.localOpen {
 			minimum.X += t.C.FTPSplit.MinLocal + t.C.FTPSplit.Gutter
 		}
-	} else if a.section == sectionSSH {
+	} else if active == sectionSSH {
 		if tab := a.currentTab(); tab != nil {
 			minimum = tab.root.minimum()
 		}
 	}
 	width := minimum.X + t.C.Rail.Width + t.C.Window.Gutter
-	if !a.page().sidebarCollapsed {
+	if active != sectionSettings && !a.page().sidebarCollapsed {
 		width += a.page().sidebarWidth + t.C.Window.Gutter
 	}
-	if a.section == sectionSSH && a.statusVisible {
+	if active == sectionSSH && a.statusVisible {
 		width += t.Size.StatsPanel + t.C.Window.Gutter
 	}
 	size := [2]int{
@@ -118,7 +125,7 @@ func (a *app) zoomProgress(c *ui.Context, tab *workspaceTab) float32 {
 	if tab.maximized {
 		target = 1
 	}
-	if tab.zoomStarted.IsZero() {
+	if tab.zoomStarted.IsZero() || a.reduceMotion(c) {
 		return target
 	}
 	progress := min(1, float32(c.Now().Sub(tab.zoomStarted))/float32(t.C.Desktop.ZoomDuration))
@@ -137,6 +144,7 @@ func (a *app) paneMotion(c *ui.Context, pane ui.Element, tab *workspaceTab, sess
 	if tab.layoutDuration == t.C.Desktop.ZoomDuration {
 		animation = ui.Animation{Spring: tokenSpring(t.C.Desktop.ZoomSpring)}
 	}
+	animation = a.positionAnimation(animation)
 	transition := ui.ElementTransition{Position: true, Size: true, Animation: &animation}
 	instant := ui.Animation{Duration: t.C.Desktop.InstantDuration}
 	if a.resizing != nil {
@@ -149,7 +157,7 @@ func (a *app) paneMotion(c *ui.Context, pane ui.Element, tab *workspaceTab, sess
 	alpha := float32(1)
 	if tab.focused != session {
 		alpha *= 1 - tab.zoomMix
-	} else if !session.revealing && c.Preferences().ReduceMotion && !tab.zoomStarted.IsZero() {
+	} else if !session.revealing && a.reduceMotion(c) && !tab.zoomStarted.IsZero() {
 		alpha *= min(1, float32(c.Now().Sub(tab.zoomStarted))/float32(t.C.Desktop.ZoomDuration))
 	}
 	if session.entering {
@@ -160,7 +168,7 @@ func (a *app) paneMotion(c *ui.Context, pane ui.Element, tab *workspaceTab, sess
 		curve := t.C.Desktop.MotionEasing
 		progress = ui.CubicBezier(curve[0], curve[1], curve[2], curve[3])(progress)
 		alpha *= progress
-		if !c.Preferences().ReduceMotion {
+		if !a.reduceMotion(c) {
 			x, y := float32(0), float32(0)
 			switch session.enter {
 			case dropLeft:
@@ -183,7 +191,7 @@ func (a *app) paneMotion(c *ui.Context, pane ui.Element, tab *workspaceTab, sess
 	if session.closing {
 		progress := min(1, float32(c.Now().Sub(session.closeStarted))/float32(t.C.Desktop.PaneCloseDuration))
 		alpha *= 1 - progress
-		if !c.Preferences().ReduceMotion {
+		if !a.reduceMotion(c) {
 			scale := 1 - (1-t.C.Desktop.PaneCloseScale)*progress
 			pane.Scale(scale, scale)
 		}
@@ -258,6 +266,7 @@ func (a *app) terminalDivider(c *ui.Context, split splitPlacement) {
 	if held {
 		animation = ui.Animation{Duration: t.C.Desktop.InstantDuration}
 	}
+	animation = a.positionAnimation(animation)
 	if !a.currentTab().workspaceResizedAt.Equal(c.Now()) {
 		edge.Transition(ui.ElementTransition{Position: true, Size: true, Animation: &animation})
 	}

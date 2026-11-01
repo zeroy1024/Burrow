@@ -83,7 +83,7 @@ func terminalActivity(c *ui.Context, session *remoteSession, surface *theme.Them
 }
 
 func (a *app) terminalCursor(c *ui.Context, session *remoteSession, focused bool, text string) {
-	prefs, scheme := a.terminal.prefs, termtheme.Current()
+	prefs, scheme := a.terminal.prefs, a.sessionScheme(session)
 	background := termtheme.TerminalBackground(scheme, theme.Current().C.Pane.Bg, prefs.Background)
 	surface := terminalSurface(background)
 	width := a.terminalCellWidth()
@@ -113,7 +113,7 @@ func (a *app) terminalCursor(c *ui.Context, session *remoteSession, focused bool
 			})
 		}
 	})
-	if !prefs.CursorBlink || c.Preferences().ReduceMotion {
+	if !prefs.CursorBlink || a.reduceMotion(c) {
 		return
 	}
 	if session.cursorStarted.IsZero() {

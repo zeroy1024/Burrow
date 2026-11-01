@@ -111,7 +111,8 @@ func styledButton(c *ui.Context, label string, primary bool) ui.Element {
 func textInput(c *ui.Context, value *string) ui.Element {
 	p := theme.Current().C.Input
 	e := ui.TextInputBase(c, value).Height(p.Height).Padding(0, p.PaddingX).
-		Radius(p.Radius).FontSize(p.FontSize).TextColor(tokenColor(p.Text)).Background(tokenColor(p.Bg))
+		Radius(p.Radius).FontSize(p.FontSize).FixedLineHeight(p.LineHeight).
+		TextColor(tokenColor(p.Text)).Background(tokenColor(p.Bg))
 	border := p.Border
 	switch {
 	case e.Focused():
@@ -120,6 +121,33 @@ func textInput(c *ui.Context, value *string) ui.Element {
 		border = p.BorderHover
 	}
 	return e.Border(p.BorderWidth, e.AnimateColor("border", tokenColor(border), tokenTween(p.Transition)))
+}
+
+func (a *app) sidebarSearch(c *ui.Context, value *string, focus *ui.Handle, label, placeholder string) {
+	t := theme.Current()
+	p := t.C.Search
+	hint := shortcutDisplay(a.shortcutBinding("host.search"))
+	rightPadding := p.PaddingX
+	if hint != "" {
+		width, _ := ui.ShapeText(hint, ui.Font{Family: strings.Join(t.Font.Family.Ui, ", "), Size: p.KbdSize}, 0).Size()
+		rightPadding += width + p.Gap
+	}
+	ui.Box(c).Height(p.Height).Shrink(0).Margin(0, p.MarginX, p.MarginBottom, p.MarginX).
+		Radius(p.Radius).Background(tokenColor(p.Bg)).Children(func() {
+		ui.TextInputBase(c.Key("input"), value).Bind(focus).Fill().MinWidth(0).
+			Padding(0, rightPadding, 0, p.PaddingX+t.Size.Icon+p.Gap).Radius(p.Radius).
+			FontSize(p.FontSize).FixedLineHeight(p.LineHeight).TextColor(tokenColor(t.Color.Text.Primary)).
+			Placeholder(placeholder).Label(label)
+		// Decorations share the field's bounds; every pixel still targets the input.
+		ui.Row(c).Absolute().Top(0).Right(0).Bottom(0).Left(0).Padding(0, p.PaddingX).
+			Gap(p.Gap).AlignItems(ui.Center).PassThrough().Children(func() {
+			ui.Icon(c, searchIcon).Size(t.Size.Icon, t.Size.Icon).Shrink(0).TextColor(tokenColor(p.Text)).PassThrough()
+			ui.Spacer(c).PassThrough()
+			if hint != "" {
+				ui.Text(c, hint).FontSize(p.KbdSize).TextColor(tokenColor(p.KbdText)).Shrink(0).PassThrough()
+			}
+		})
+	})
 }
 
 func modal(c *ui.Context, open *bool, content func()) {

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math"
 	"slices"
-	"strconv"
 	"time"
 
 	"sshdesk/internal/theme"
@@ -14,6 +13,7 @@ import (
 )
 
 type fileSession struct {
+	config      sessionConfig
 	id          int
 	host        hostID
 	state       connectionState
@@ -30,6 +30,13 @@ func (a *app) currentFileSession() *fileSession {
 	return a.fileSessions[a.activeFile]
 }
 
+func (a *app) activateFileTab(index int) {
+	a.settingsUI.previousFocus = ui.Handle{}
+	a.closeSettings()
+	a.activeFile = index
+	a.focusWorkspace()
+}
+
 func (a *app) openCatalogHost(id hostID) {
 	if a.section == sectionFiles {
 		a.openFileHost(id)
@@ -39,28 +46,40 @@ func (a *app) openCatalogHost(id hostID) {
 }
 
 func (a *app) openFileHost(id hostID) {
+	a.closeSettings()
 	for i, session := range a.fileSessions {
 		if session.host == id {
-			a.activeFile = i
+			a.activateFileTab(i)
 			return
 		}
 	}
+	a.openNewFileHost(id)
+}
+
+func (a *app) openNewFileHost(id hostID) {
 	a.nextFileSession++
 	session := &fileSession{
-		id: a.nextFileSession, host: id, state: connecting, connectedAt: time.Now(),
+		config: a.hosts[id].session,
+		id:     a.nextFileSession, host: id, state: connecting, connectedAt: time.Now(),
 		local: newFilePane(false), remote: newFilePane(true),
 	}
 	a.restoreFileSession(session)
 	a.fileSessions = append(a.fileSessions, session)
 	a.activeFile = len(a.fileSessions) - 1
+	if a.activeSection() == sectionFiles {
+		a.focusWorkspace()
+	}
 }
 
 func (a *app) reconnectFileSession(session *fileSession) {
+	session.config = a.hosts[session.host].session
+	a.restoreFileSession(session)
 	session.state, session.errorText = connecting, ""
 	session.connectedAt = time.Now()
 }
 
 func (a *app) closeFileSession(index int) {
+	closedActive := index == a.activeFile
 	a.fileSessions = slices.Delete(a.fileSessions, index, index+1)
 	switch {
 	case len(a.fileSessions) == 0:
@@ -69,6 +88,9 @@ func (a *app) closeFileSession(index int) {
 		a.activeFile--
 	case a.activeFile >= len(a.fileSessions):
 		a.activeFile = len(a.fileSessions) - 1
+	}
+	if closedActive && len(a.fileSessions) > 0 && a.activeSection() == sectionFiles {
+		a.focusWorkspace()
 	}
 }
 
@@ -88,7 +110,6 @@ func (a *app) updateFileConnections(c *ui.Context) {
 
 func (a *app) fileTitleBar(c *ui.Context, shown float32) {
 	t := theme.Current()
-	a.updateFileConnections(c)
 	bar := c.TitleBar()
 	ui.Row(c).Height(max(t.C.Titlebar.Height, bar.Height)).Shrink(0).
 		Gap(t.Space.N6).DragWindow().Children(func() {
@@ -99,6 +120,7 @@ func (a *app) fileTitleBar(c *ui.Context, shown float32) {
 				label = "展开站点栏"
 			}
 			keyedIconButton(c, "sidebar-toggle", label, sidebarIcon).
+				Disabled(a.activeSection() == sectionSettings).
 				OnClick(func() { a.page().sidebarCollapsed = !a.page().sidebarCollapsed })
 		})
 		ui.Box(c).Grow(1).MinWidth(0).Height(t.C.Tab.StripHeight).Clip().Children(func() {
@@ -116,7 +138,7 @@ func (a *app) fileTitleBar(c *ui.Context, shown float32) {
 						}
 					}
 					iconButton(c, "新建文件会话", plusIcon).Menu(func(m *ui.Menu) {
-						for _, group := range a.groups {
+						for _, group := range a.catalogGroups() {
 							m.Submenu(group.name, func(sub *ui.Menu) {
 								for _, id := range group.hosts {
 									if sub.Item(a.hosts[id].name).Chosen() {
@@ -127,7 +149,7 @@ func (a *app) fileTitleBar(c *ui.Context, shown float32) {
 						}
 					})
 					if closing != nil {
-						a.closeFileSession(slices.Index(a.fileSessions, closing))
+						a.requestCloseFileTab(slices.Index(a.fileSessions, closing))
 					}
 				})
 			})
@@ -170,9 +192,15 @@ func (a *app) fileTabButton(c *ui.Context, index int, session *fileSession) bool
 		background = tokenColor(t.C.Tab.BgHover)
 	}
 	button.Background(button.AnimateColor("background", background, tokenTween(t.C.Tab.StateTransition)))
-	button.OnClick(func() { a.activeFile = slices.Index(a.fileSessions, session) })
+	button.OnClick(func() {
+		a.activateFileTab(slices.Index(a.fileSessions, session))
+	})
 	closing := false
 	button.ContextMenu(func(m *ui.Menu) {
+		if m.Item("编辑会话…").Chosen() {
+			a.startEditHostDraft(session.host)
+		}
+		m.Separator()
 		if session.state == connected || session.state == connecting {
 			if m.Item("断开文件会话").Chosen() {
 				session.state = disconnected
@@ -200,7 +228,7 @@ func (a *app) fileTabButton(c *ui.Context, index int, session *fileSession) bool
 			visible = 1
 		}
 		close.Opacity(animateVisual(close, "visible", visible, t.C.Tab.StateTransition)).
-			OnClick(func() { a.closeFileSession(slices.Index(a.fileSessions, session)) })
+			OnClick(func() { a.requestCloseFileTab(slices.Index(a.fileSessions, session)) })
 	})
 	return closing
 }
@@ -292,69 +320,13 @@ func (a *app) catalogHostIcon(c *ui.Context, id hostID) {
 	})
 }
 
-func (a *app) fileSiteMenu(c *ui.Context, m *ui.Menu, id hostID) {
-	sessionIndex := slices.IndexFunc(a.fileSessions, func(session *fileSession) bool { return session.host == id })
-	if sessionIndex < 0 {
-		if m.Item("连接站点").Chosen() {
-			a.openFileHost(id)
-		}
-	} else {
-		session := a.fileSessions[sessionIndex]
-		if m.Item("切换到文件会话").Chosen() {
-			a.activeFile = sessionIndex
-		}
-		if session.state == connected || session.state == connecting {
-			if m.Item("断开连接").Chosen() {
-				session.state = disconnected
-			}
-		} else if m.Item("重新连接").Chosen() {
-			a.reconnectFileSession(session)
-		}
-	}
-	m.Separator()
-	if m.Item("编辑站点").Chosen() {
-		a.startEditHostDraft(id)
-	}
-	if m.Item("复制连接地址").Chosen() {
-		h := a.hosts[id]
-		protocol := "sftp"
-		if h.protocol == "ftp" {
-			protocol = "ftp"
-		}
-		mygo.Clipboard.WriteText(fmt.Sprintf("%s://%s@%s:%d", protocol, h.user, h.address, h.port))
-	}
-	m.Separator()
-	if m.Item("删除站点…").Chosen() {
-		if a.fileSiteBusy(id) {
-			c.Toast("请先取消或清除该站点的传输任务")
-			return
-		}
-		a.page().draft = hostDraft{id: id, deleting: true}
-		a.page().addHostOpen = true
-	}
-}
-
-func (a *app) startEditHostDraft(id hostID) {
-	h := a.hosts[id]
-	group := ""
-	for _, candidate := range a.groups {
-		if slices.Contains(candidate.hosts, id) {
-			group = candidate.name
-			break
-		}
-	}
-	protocol := "SFTP"
-	if h.protocol == "ftp" {
-		protocol = "FTP"
-	}
-	a.page().draft = hostDraft{
-		id: id, editing: true, files: true, name: h.name, address: h.address,
-		user: h.user, port: strconv.Itoa(h.port), group: group, system: systems[h.os].name, protocol: protocol,
-	}
-	a.page().addHostOpen = true
-}
-
 func (a *app) deleteFileSite(id hostID) error {
+	deleted := a.hosts[id]
+	for _, h := range a.hosts {
+		if h.session.SSH != nil && h.session.SSH.JumpHostID != "" && h.session.SSH.JumpHostID == deleted.session.ID {
+			return fmt.Errorf("会话正被「%s」用作跳板机，请先修改该会话", h.name)
+		}
+	}
 	if err := a.commitCatalogMove(func() {
 		a.hosts = slices.Delete(a.hosts, int(id), int(id)+1)
 		for _, group := range a.groups {
@@ -367,6 +339,19 @@ func (a *app) deleteFileSite(id hostID) error {
 		}
 	}); err != nil {
 		return err
+	}
+	// Hidden page drafts still refer to the compacted host array.
+	for i := range a.pages {
+		page := &a.pages[i]
+		if !page.draft.editing && !page.draft.deleting {
+			continue
+		}
+		if page.draft.id == id {
+			page.draft.cancelTest()
+			page.draft, page.addHostOpen = hostDraft{}, false
+		} else if page.draft.id > id {
+			page.draft.id--
+		}
 	}
 	for i := len(a.fileSessions) - 1; i >= 0; i-- {
 		session := a.fileSessions[i]
@@ -402,6 +387,17 @@ func (a *app) deleteFileSite(id hostID) error {
 			a.closeTab(i)
 		}
 	}
+	a.closedTabs = slices.DeleteFunc(a.closedTabs, func(candidate closedWorkspaceTab) bool { return candidate.host == id })
+	for i, candidate := range a.closedTabs {
+		if candidate.host > id {
+			a.closedTabs[i].host--
+		}
+	}
+	if deleted.session.PasswordSaved {
+		if err := mygo.Secrets.Delete("session/" + deleted.session.ID + "/password"); err != nil {
+			a.files.notice = "会话已移除，但钥匙串清理失败：" + err.Error()
+		}
+	}
 	return nil
 }
 
@@ -409,19 +405,19 @@ func (a *app) deleteSiteDialogContents(c *ui.Context) {
 	t := theme.Current()
 	id := a.page().draft.id
 	h := a.hosts[id]
-	ui.Text(c, "删除站点「"+h.name+"」？").FontSize(t.C.Dialog.TitleSize).
+	ui.Text(c, "删除会话「"+h.name+"」？").FontSize(t.C.Dialog.TitleSize).
 		FontWeight(t.Font.Weight.Semibold)
-	ui.Text(c, "将从共享主机目录移除，并关闭此主机的 SSH 与文件会话。服务器文件不受影响。").
+	ui.Text(c, "将从当前页面的目录移除，并关闭此条目的会话。服务器文件不受影响。").
 		FontSize(t.Font.Size.Small).TextColor(tokenColor(t.Color.Text.Secondary))
 	ui.Row(c).Justify(ui.End).Gap(t.Space.N8).Children(func() {
 		button(c, "取消").OnClick(func() { a.page().addHostOpen = false })
-		button(c, "删除站点").TextColor(tokenColor(t.C.Tab.TextErrorSelected)).OnClick(func() {
+		button(c, "删除").TextColor(tokenColor(t.C.Tab.TextErrorSelected)).OnClick(func() {
 			if a.fileSiteBusy(id) {
-				c.Toast("请先取消或清除该站点的传输任务")
+				c.Toast("请先取消或清除该会话的传输任务")
 				return
 			}
 			if err := a.deleteFileSite(id); err != nil {
-				c.Toast("删除站点失败：" + err.Error())
+				c.Toast("删除会话失败：" + err.Error())
 				return
 			}
 			a.page().addHostOpen = false

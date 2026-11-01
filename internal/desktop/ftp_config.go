@@ -21,17 +21,31 @@ type filePreferences struct {
 	LocalPaneOpen         bool              `json:"localPaneOpen"`
 	LocalRatio            float32           `json:"localRatio"`
 	LocalPaths            map[string]string `json:"localPaths"`
+	LocalPathKeysVersion  int               `json:"localPathKeysVersion"`
 	TransferDockCollapsed bool              `json:"transferDockCollapsed"`
 	TransferFilter        int               `json:"transferFilter"`
 	TransferDockHeight    float32           `json:"transferDockHeight,omitempty"`
 }
 
 func (a *app) fileSiteKey(session *fileSession) string {
-	h := a.hosts[session.host]
-	return fmt.Sprintf("%s@%s:%d", h.user, h.address, h.port)
+	return a.hosts[session.host].session.ID
 }
 
 func (a *app) restoreFileSession(session *fileSession) {
+	local := a.prefs.DefaultLocalDir
+	if options := session.config.Files; options != nil {
+		if options.LocalDir != "" {
+			local = options.LocalDir
+		}
+		if options.RemoteDir != "" {
+			session.remote.path = options.RemoteDir
+			session.remote.history = []string{options.RemoteDir}
+		}
+	}
+	if local != "" {
+		session.local.path = local
+		session.local.history = []string{local}
+	}
 	if local := a.files.localPaths[a.fileSiteKey(session)]; local != "" {
 		session.local.path = local
 		session.local.history = []string{local}
@@ -69,12 +83,35 @@ func (a *app) readFilePreferences() error {
 	if prefs.TransferDockHeight < 0 {
 		return fmt.Errorf("transferDockHeight 不能为负数")
 	}
+	if prefs.LocalPathKeysVersion == 0 && a.catalogConfig.loadErr != nil {
+		return fmt.Errorf("会话配置读取失败，无法迁移站点本地路径：%w", a.catalogConfig.loadErr)
+	}
 	a.files.localOpen, a.files.ratio = prefs.LocalPaneOpen, prefs.LocalRatio
 	if prefs.LocalPaths != nil {
 		a.files.localPaths = prefs.LocalPaths
+		if prefs.LocalPathKeysVersion == 0 {
+			for _, h := range a.hosts {
+				if h.protocol != "sftp" && h.protocol != "ftp" {
+					continue
+				}
+				if _, exists := a.files.localPaths[h.session.ID]; exists {
+					continue
+				}
+				address := fmt.Sprintf("%s@%s:%d", h.user, h.address, h.port)
+				if path, exists := a.files.localPaths[address]; exists {
+					a.files.localPaths[h.session.ID] = path
+				}
+			}
+		}
 	}
 	a.transfers.collapsed, a.transfers.filter = prefs.TransferDockCollapsed, prefs.TransferFilter
 	a.transfers.dockHeight = prefs.TransferDockHeight
+	// Finish migration before newly created sites could inherit an old address key.
+	if prefs.LocalPathKeysVersion == 0 {
+		if err := a.writeFilePreferences(); err != nil {
+			return fmt.Errorf("迁移站点本地路径失败：%w", err)
+		}
+	}
 	return nil
 }
 
@@ -93,6 +130,7 @@ func (a *app) writeFilePreferences() error {
 	}
 	prefs := filePreferences{
 		LocalPaneOpen: a.files.localOpen, LocalRatio: a.files.ratio, LocalPaths: a.files.localPaths,
+		LocalPathKeysVersion:  1,
 		TransferDockCollapsed: a.transfers.collapsed, TransferFilter: a.transfers.filter,
 		TransferDockHeight: a.transfers.dockHeight,
 	}

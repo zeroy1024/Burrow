@@ -1,6 +1,7 @@
 package desktop
 
 import (
+	"errors"
 	"slices"
 	"time"
 
@@ -29,6 +30,7 @@ const (
 )
 
 type pageState struct {
+	lastGroup         *hostGroup
 	sidebarCollapsed  bool
 	sidebarWidth      float32
 	query             string
@@ -48,54 +50,105 @@ type pageState struct {
 }
 
 type app struct {
-	section          section
-	pages            [sectionSettings + 1]pageState
-	appearance       int
-	theme            *ui.Theme
-	hosts            []host
-	groups           []*hostGroup
-	tabs             []*workspaceTab
-	activeTab        int
-	nextTab          int
-	nextSession      int
-	tabScroll        ui.ScrollState
-	tabPress         ui.Point
-	statusVisible    bool
-	window           *mygo.Window
-	minimumWindow    [2]int
-	workArea         ui.Handle
-	pointer          ui.Point
-	cellWidth        float32
-	cellFont         ui.Font
-	cellTracking     float32
-	terminal         terminalSettingsState
-	terminalError    error
-	drag             *paneDragState
-	dragSeen         bool
-	pendingDock      func()
-	dockPreview      *ui.Rect
-	resizing         *terminalLayout
-	catalogConfig    catalogConfigState
-	catalogError     error
-	statusScroll     ui.ScrollState
-	statusScrollbar  scrollbarState
-	fileSessions     []*fileSession
-	activeFile       int
-	nextFileSession  int
-	files            fileWorkspaceState
-	filePrefs        filePreferencesState
-	transfers        transferQueueState
-	settingsCategory int
+	section            section
+	settingsButton     ui.Handle
+	pages              [sectionSettings + 1]pageState
+	appearance         int
+	theme              *ui.Theme
+	hosts              []host
+	groups             []*hostGroup
+	tabs               []*workspaceTab
+	activeTab          int
+	nextTab            int
+	nextSession        int
+	tabScroll          ui.ScrollState
+	tabPress           ui.Point
+	statusVisible      bool
+	window             *mygo.Window
+	minimumWindow      [2]int
+	workArea           ui.Handle
+	pointer            ui.Point
+	cellWidth          float32
+	cellFont           ui.Font
+	cellTracking       float32
+	terminal           terminalSettingsState
+	terminalError      error
+	drag               *paneDragState
+	dragSeen           bool
+	pendingDock        func()
+	dockPreview        *ui.Rect
+	resizing           *terminalLayout
+	catalogConfig      catalogConfigState
+	catalogError       error
+	statusScroll       ui.ScrollState
+	statusScrollbar    scrollbarState
+	fileSessions       []*fileSession
+	activeFile         int
+	nextFileSession    int
+	files              fileWorkspaceState
+	filePrefs          filePreferencesState
+	transfers          transferQueueState
+	settingsCategory   int
+	prefs              appPreferences
+	prefsSave          preferenceSaveState
+	settingsUI         settingsState
+	prefsPath          string
+	prefsLoadErr       error
+	keys               []managedKey
+	credentials        credentialState
+	closedTabs         []closedWorkspaceTab
+	closeRequest       *workspaceTab
+	savedWorkspace     *storedWorkspace
+	reduceTransparency bool
 }
 
 func (a *app) page() *pageState {
 	return &a.pages[a.section]
 }
 
+// Settings is a peer page; section keeps the selected workspace for its tabs.
+func (a *app) activeSection() section {
+	if a.settingsUI.open {
+		return sectionSettings
+	}
+	return a.section
+}
+
 func (a *app) switchSection(target section) {
-	if a.section == target {
+	if target == sectionSettings {
+		a.openSettings()
 		return
 	}
+	if a.activeSection() == target {
+		return
+	}
+	if a.settingsUI.open {
+		a.settingsUI.previousFocus = ui.Handle{}
+		a.closeSettings()
+	}
+	a.clearWorkspaceGestures()
+	a.section = target
+	a.focusWorkspace()
+}
+
+func (a *app) focusWorkspace() {
+	switch a.activeSection() {
+	case sectionSSH:
+		if tab := a.currentTab(); tab != nil {
+			a.focusSession(tab, tab.focused)
+		}
+	case sectionFiles:
+		if session := a.currentFileSession(); session != nil {
+			pane := session.remote
+			if a.files.localOpen && !a.files.activeRemote {
+				pane = session.local
+			}
+			pane.focus.Focus()
+		}
+	}
+}
+
+func (a *app) clearWorkspaceGestures() {
 	// Drag previews belong to the page being left; catalog data is only changed on drop.
 	page := a.page()
 	page.catalogDrag, page.catalogFlash = nil, nil
@@ -109,14 +162,12 @@ func (a *app) switchSection(target section) {
 	}
 	a.drag, a.resizing, a.pendingDock, a.dockPreview = nil, nil, nil, nil
 	a.files.drag = nil
-	a.section = target
-	if target == sectionFiles && len(a.fileSessions) == 0 && len(a.hosts) > 0 {
-		a.openFileHost(0)
-	}
 }
 
 // Run starts the native desktop application and its main window.
 func Run() error {
+	mygo.App.SetName("SSH Desk")
+	mygo.App.SetLanguages("zh-Hans", "en")
 	a := &app{
 		hosts:  demoHosts(),
 		groups: demoGroups(),
@@ -133,16 +184,16 @@ func Run() error {
 	if err := a.loadFilePreferences(); err != nil {
 		a.files.notice = "无法读取文件传输偏好：" + err.Error()
 	}
-	for _, id := range []hostID{0, 4, 1} {
-		if int(id) < len(a.hosts) {
-			a.openHost(id)
-		}
+	if err := a.loadAppPreferences(); err != nil {
+		a.terminalError = errors.Join(a.terminalError, err)
 	}
-	if len(a.tabs) > 0 {
-		a.activateTab(0)
+	a.restoreWorkspace()
+	if len(a.tabs) > 0 && a.section == sectionSSH {
+		a.activateTab(a.activeTab)
 	}
-	mygo.Theme.SetSource(mygo.ThemeLight)
+	mygo.Theme.SetSource([]mygo.ThemeSource{mygo.ThemeLight, mygo.ThemeDark, mygo.ThemeSystem}[a.appearance])
 	stopTokens := theme.OnChange(func(t *theme.Theme) {
+		updateTerminalSurfaceAccent(t)
 		if a.window != nil {
 			if err := a.window.SetBackgroundColor(windowColor(t.C.Window.Bg)); err != nil {
 				panic(err)
@@ -159,7 +210,14 @@ func Run() error {
 	defer stopTerminal()
 	stopAppearance := mygo.Theme.OnUpdated(func() { a.syncAppearance() })
 	defer stopAppearance()
+	var stopMenuLocale func()
+	defer func() {
+		if stopMenuLocale != nil {
+			stopMenuLocale()
+		}
+	}()
 	mygo.App.WhenReady(func() {
+		a.syncAppearance()
 		t := theme.Current()
 		a.window = mygo.NewWindow(mygo.WindowOptions{
 			Title:                "SSH Desk",
@@ -172,7 +230,47 @@ func Run() error {
 			BackgroundColor:      windowColor(t.C.Window.Bg),
 			Content:              ui.View(a.view),
 		})
+		a.window.OnClose(func(e *mygo.CloseEvent) {
+			if a.credentials.busy || a.savingSession() {
+				e.PreventDefault()
+				a.files.notice = "正在保存凭据，完成后再关闭窗口。"
+				a.window.Invalidate()
+				return
+			}
+			if err := a.persistBeforeClose(); err != nil {
+				e.PreventDefault()
+				a.files.notice = "关闭前保存失败：" + err.Error()
+				a.window.Invalidate()
+				return
+			}
+			for i := range a.pages {
+				a.pages[i].draft.cancelTest()
+			}
+		})
+		stopMenuLocale = a.installAppMenu()
 	})
+	stopQuit := mygo.App.OnBeforeQuit(func(e *mygo.QuitEvent) {
+		if a.credentials.busy || a.savingSession() {
+			e.PreventDefault()
+			a.files.notice = "密钥操作进行中，完成后再退出。"
+			if a.window != nil {
+				a.window.Invalidate()
+			}
+			return
+		}
+		a.cancelCredentialWork()
+		if err := a.persistBeforeClose(); err != nil {
+			e.PreventDefault()
+			a.files.notice = "退出前保存失败：" + err.Error()
+			if a.window != nil {
+				a.window.Invalidate()
+			}
+		}
+		for i := range a.pages {
+			a.pages[i].draft.cancelTest()
+		}
+	})
+	defer stopQuit()
 	return mygo.App.Run()
 }
 
@@ -184,34 +282,27 @@ func (a *app) view(c *ui.Context) {
 	root := ui.Column(c).Fill()
 	x, y, _ := root.PointerPosition()
 	a.pointer = ui.Point{X: x, Y: y}
-	if a.section == sectionSSH {
+	a.appShortcuts(c)
+	active := a.activeSection()
+	a.updatePaneClosures(c)
+	if active == sectionSSH {
 		a.beginWorkspaceFrame(c)
 	}
-	if a.section != sectionSettings {
+	if active != sectionSettings {
 		a.beginCatalogFrame(c)
 	}
 	a.enforcePaneMinimum(c)
 	a.files.dragSeen = false
 	a.updateSSHConnections(c)
+	a.updateFileConnections(c)
+	a.enforceScrollback()
 	a.tickTransfers(c)
+	a.tickPreferences(c)
 	target := float32(1)
 	if a.page().sidebarCollapsed {
 		target = 0
 	}
-	shown := root.AnimateTo(sidebarMotionKey(a.section), target, tokenTween(t.C.Desktop.SidebarDuration))
-	if a.section == sectionSSH {
-		a.paneShortcuts(c)
-	}
-	if a.section != sectionSettings && c.Shortcut(ui.Super, ui.KeyK) {
-		a.page().sidebarCollapsed = false
-		a.page().search.Focus()
-	}
-	if a.section == sectionSSH && c.Shortcut(ui.Super, ui.KeyD) && a.currentTab() != nil {
-		tab := a.currentTab()
-		bounds := tab.focused.scroll.offset.Bounds(c)
-		stacked := tab.root.count() > 1 && bounds.H > bounds.W
-		a.splitSession(tab.focused, stacked)
-	}
+	shown := root.AnimateTo(sidebarMotionKey(a.section), target, a.positionAnimation(tokenTween(t.C.Desktop.SidebarDuration)))
 	root.Children(func() {
 		ui.Column(c).Key(pageHeaderKey(a.section)).FillWidth().Shrink(0).Children(func() {
 			switch a.section {
@@ -219,15 +310,21 @@ func (a *app) view(c *ui.Context) {
 				a.titleBar(c, shown)
 			case sectionFiles:
 				a.fileTitleBar(c, shown)
-			case sectionSettings:
-				a.settingsTitleBar(c, shown)
 			}
 		})
 		ui.Row(c).Grow(1).MinHeight(0).AlignItems(ui.Stretch).Children(func() {
 			a.navigation(c)
-			a.workspace(c, shown)
+			ui.Box(c).Key(active).Grow(1).MinWidth(0).FillHeight().Children(func() {
+				switch active {
+				case sectionSSH, sectionFiles:
+					a.workspace(c, shown)
+				case sectionSettings:
+					ui.Box(c).Fill().Padding(0, t.C.Window.Gutter, t.C.Window.Gutter, 0).
+						Children(func() { a.settingsPage(c) })
+				}
+			})
 		})
-		if a.section == sectionSSH {
+		if active == sectionSSH {
 			if a.pendingDock != nil {
 				a.pendingDock()
 				a.pendingDock = nil
@@ -236,7 +333,7 @@ func (a *app) view(c *ui.Context) {
 			a.finishWorkspaceDrag(c)
 			a.dragPreview(c)
 		}
-		if a.section != sectionSettings {
+		if active != sectionSettings {
 			a.finishCatalogDrag(c)
 			a.catalogDragPreview(c)
 		}
@@ -249,7 +346,7 @@ func (a *app) view(c *ui.Context) {
 		c.Toast("终端设置：" + a.terminalError.Error())
 		a.terminalError = nil
 	}
-	if a.section != sectionSettings {
+	if active != sectionSettings {
 		if a.page().addHostOpen {
 			a.hostDialog(c.Key(pageDialogKey{section: a.section, kind: "host"}))
 		}
@@ -257,9 +354,11 @@ func (a *app) view(c *ui.Context) {
 			a.groupDialog(c.Key(pageDialogKey{section: a.section, kind: "group"}))
 		}
 	}
-	if a.section == sectionFiles {
+	if active == sectionFiles {
 		a.fileDialogs(c)
 	}
+	a.credentialDialogs(c)
+	a.closeTabDialog(c)
 	if a.files.drag != nil && !a.files.dragSeen {
 		a.files.drag = nil
 		c.AnimationFrame()
@@ -305,16 +404,23 @@ func (a *app) navigationButton(c *ui.Context, target section, label string, icon
 	t := theme.Current()
 	r := t.C.Rail
 	button := ui.ButtonBase(c).Key(label).Size(r.ButtonSize, r.ButtonSize).Radius(r.ButtonRadius).
-		Label(label).Description(label).Selected(a.section == target).
+		Label(label).Description(label).Selected(a.navigationSelected(target)).
 		TextColor(tokenColor(r.Icon))
+	if target == sectionSettings {
+		button.Bind(&a.settingsButton)
+	}
 	button.OnClick(func() {
+		opening := target == sectionSettings && !a.settingsUI.open
 		a.switchSection(target)
+		if opening {
+			a.settingsUI.previousFocus = a.settingsButton
+		}
 	})
 	background := ui.Transparent
 	switch {
 	case button.Pressed():
 		background = tokenColor(t.C.Desktop.RailPressed)
-	case a.section == target:
+	case a.navigationSelected(target):
 		background = tokenColor(r.BgOn)
 	case button.Hovered():
 		background = tokenColor(t.C.Desktop.RailHover)
@@ -332,8 +438,8 @@ func (a *app) navigationButton(c *ui.Context, target section, label string, icon
 
 func (a *app) workspace(c *ui.Context, shown float32) {
 	t := theme.Current()
-	panel := ui.Row(c).Key(a.section).Grow(1).MinWidth(0).AlignItems(ui.Stretch).
-		Margin(
+	panel := ui.Row(c).Key(a.section).Fill().MinWidth(0).AlignItems(ui.Stretch).
+		Padding(
 			0,
 			t.C.Window.Gutter,
 			t.C.Window.Gutter,
@@ -343,22 +449,13 @@ func (a *app) workspace(c *ui.Context, shown float32) {
 	if a.section != sectionSSH || !a.statusVisible {
 		statusTarget = 0
 	}
-	statusShown := panel.AnimateTo("status", statusTarget, tokenTween(t.C.Desktop.SidebarDuration))
+	statusShown := panel.AnimateTo("status", statusTarget, a.positionAnimation(tokenTween(t.C.Desktop.SidebarDuration)))
 	statusOpacity := animateVisual(panel, "status-opacity", statusTarget, t.C.Desktop.SidebarDuration)
 	panel.Children(func() {
 		workspaceCard(c).Key("sessions").Width(a.page().sidebarWidth * shown).Shrink(0).
 			MarginEnd(t.C.Window.Gutter * shown).Hidden(shown == 0).Children(func() {
-			if a.section == sectionSettings {
-				a.settingsSidebar(c, shown)
-			} else {
-				a.sidebar(c, shown)
-			}
+			a.sidebar(c, shown)
 		})
-		if a.section == sectionSettings {
-			a.settings(c)
-			a.sidebarResizeHandle(c, shown)
-			return
-		}
 		if a.section == sectionFiles {
 			a.fileWorkspace(c)
 			a.sidebarResizeHandle(c, shown)
@@ -374,7 +471,7 @@ func (a *app) workspace(c *ui.Context, shown float32) {
 		})
 		status := workspaceCard(c).Key("status").Width(t.Size.StatsPanel * statusShown).Shrink(0).
 			MarginStart(t.C.Window.Gutter * statusShown).Hidden(statusShown == 0 && statusOpacity == 0)
-		if c.Preferences().ReduceMotion && !a.statusVisible && statusOpacity > 0 {
+		if a.reduceMotion(c) && !a.statusVisible && statusOpacity > 0 {
 			// Geometry changes immediately; the old panel can still fade over the
 			// expanded workspace without animating its width.
 			status.Absolute().Top(0).Right(0).Bottom(0).Width(t.Size.StatsPanel)

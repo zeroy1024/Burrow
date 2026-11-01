@@ -51,6 +51,9 @@ type paneDragState struct {
 }
 
 func (a *app) paneDragHandle(c *ui.Context, source ui.Element, transfer paneTransfer) {
+	if a.activeSection() != sectionSSH {
+		return
+	}
 	t := theme.Current()
 	if transfer.session.closing {
 		return
@@ -60,10 +63,11 @@ func (a *app) paneDragHandle(c *ui.Context, source ui.Element, transfer paneTran
 		transfer.session = d.session
 	}
 	// MyGo v0.7.3 fixes its native threshold at 4 DIPs; it exposes no hold-delay option.
-	source.Drag(transfer).Cursor(ui.CursorGrab).FocusRing(false)
+	source.Drag(transfer).Cursor(ui.CursorDefault).FocusRing(false)
 	if !source.Dragging() {
 		return
 	}
+	source.Cursor(ui.CursorGrabbing)
 	a.dragSeen = true
 	if a.drag != nil {
 		if a.drag.phase == dragActive {
@@ -90,6 +94,9 @@ func (a *app) paneDragHandle(c *ui.Context, source ui.Element, transfer paneTran
 }
 
 func (a *app) tabStripTarget(c *ui.Context, strip ui.Element) {
+	if a.activeSection() != sectionSSH {
+		return
+	}
 	_, over := ui.DragOver[paneTransfer](strip)
 	_, released := ui.Drop[paneTransfer](strip)
 	d := a.drag
@@ -227,7 +234,7 @@ func (a *app) dragPreview(c *ui.Context) {
 
 func (a *app) paneDragPreview(c *ui.Context, session *remoteSession) {
 	t := theme.Current()
-	background := termtheme.TerminalBackground(termtheme.Current(), t.C.Pane.Bg, a.terminal.prefs.Background)
+	background := termtheme.TerminalBackground(a.sessionScheme(session), t.C.Pane.Bg, a.terminal.prefs.Background)
 	surface := terminalSurface(background)
 	p := surface.C.DragGhost
 	// PassThrough is per element in MyGo; every preview descendant must opt out of hit testing.

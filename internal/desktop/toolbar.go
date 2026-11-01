@@ -34,6 +34,7 @@ func (a *app) titleBar(c *ui.Context, shown float32) {
 				label = "展开会话栏"
 			}
 			keyedIconButton(c, "sidebar-toggle", label, sidebarIcon).
+				Disabled(a.activeSection() == sectionSettings).
 				OnClick(func() { a.page().sidebarCollapsed = !a.page().sidebarCollapsed })
 		})
 		ui.Box(c).Grow(1).MinWidth(0).Height(t.C.Tab.StripHeight).Clip().Children(func() {
@@ -62,9 +63,12 @@ func (a *app) titleBar(c *ui.Context, shown float32) {
 						}
 					}
 					iconButton(c, "新建会话", plusIcon).Menu(func(m *ui.Menu) {
-						for _, group := range a.groups {
+						for _, group := range a.catalogGroups() {
 							m.Submenu(group.name, func(sub *ui.Menu) {
 								for _, id := range group.hosts {
+									if a.hosts[id].protocol != "" {
+										continue
+									}
 									if sub.Item(a.hosts[id].name).Chosen() {
 										a.openHost(id)
 									}
@@ -80,7 +84,8 @@ func (a *app) titleBar(c *ui.Context, shown float32) {
 			a.tabStripTarget(c, strip)
 		})
 		ui.Row(c).Padding(0, t.C.Titlebar.ActionsPaddingRight).Gap(t.C.Titlebar.ActionsGap).Shrink(0).Children(func() {
-			status := iconButton(c, "服务器监控", activityIcon).Expanded(a.statusVisible)
+			status := iconButton(c, "服务器监控", activityIcon).Expanded(a.statusVisible).
+				Disabled(a.activeSection() == sectionSettings)
 			if a.statusVisible {
 				status.Background(tokenColor(t.C.TitleAction.BgOn))
 			}
@@ -124,6 +129,10 @@ func (a *app) tabButton(c *ui.Context, index int, tab *workspaceTab) func() {
 	button.OnClick(func() { a.activateTab(slices.Index(a.tabs, tab)) })
 	button.ContextMenu(func(m *ui.Menu) {
 		current := tab.focused
+		if m.Item("编辑会话…").Chosen() {
+			a.startEditHostDraft(current.host)
+		}
+		m.Separator()
 		if current.state == connected || current.state == connecting {
 			label := "断开当前会话"
 			if current.state == connecting {
@@ -137,7 +146,7 @@ func (a *app) tabButton(c *ui.Context, index int, tab *workspaceTab) func() {
 		}
 		m.Separator()
 		if m.Item("关闭选项卡").Chosen() {
-			pendingClose = func() { a.closeTab(slices.Index(a.tabs, tab)) }
+			pendingClose = func() { a.requestCloseTab(slices.Index(a.tabs, tab)) }
 		}
 	})
 	button.Children(func() {
@@ -156,7 +165,7 @@ func (a *app) tabButton(c *ui.Context, index int, tab *workspaceTab) func() {
 			closeVisible = 1
 		}
 		close.Opacity(animateVisual(close, "visible", closeVisible, t.C.Tab.StateTransition)).
-			OnClick(func() { a.closeTab(slices.Index(a.tabs, tab)) })
+			OnClick(func() { a.requestCloseTab(slices.Index(a.tabs, tab)) })
 		handle := ui.Box(c).Key("tab-drag-handle").Absolute().Top(0).Bottom(0).Left(0).Right(t.C.Tab.DragHandleInset).
 			Label("拖动标签 " + h.name).OnClick(func() { a.activateTab(slices.Index(a.tabs, tab)) })
 		a.paneDragHandle(c, handle, paneTransfer{tab: tab, session: tab.focused, fromTab: true})

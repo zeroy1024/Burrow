@@ -3,6 +3,8 @@ package main
 import (
 	"log"
 
+	_ "github.com/egoist/mygo/locales/zh-Hans"
+
 	"sshdesk/internal/desktop"
 )
 

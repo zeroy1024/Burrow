@@ -481,7 +481,6 @@ SEM['opacity']['capsuleEnterScale']=N(P('ratio.0_9'))
 SEM['opacity']['popoverEnterScale']=N(P('ratio.0_96'))
 SEM['motion']['duration'].update({
  'exit':MS(P('duration.120'),'浮层退出、胶囊淡出'),
- 'autoHide':MS(P('duration.3000'),'全部完成后胶囊停留'),
  'spin':MS(P('duration.800'),'连接中转圈一周'),
 })
 SEM['size'].update({
@@ -561,7 +560,7 @@ COMP['transferCapsule']={
  'barTrack':'color.accent.tint15','barFill':'color.accent.default',
  'doneArrow':'color.success.default','doneFill':'color.success.default',
  'error':'color.danger.text','enter':'motion.spring.smooth','exit':'motion.duration.exit',
- 'autoHide':'motion.duration.autoHide','enterScale':'opacity.capsuleEnterScale',
+ 'enterScale':'opacity.capsuleEnterScale',
  'paddingLeft':'space.7','paddingRight':'space.9','gap':'space.6',
  'paddingX':'space.8','paddingY':'space.2',
  'fontSize':'font.size.footnote','weight':'font.weight.medium',
@@ -683,3 +682,116 @@ COMP['paneReveal']={'blur':'glass.paneRevealBlur','duration':'motion.duration.pa
 
 SEM['motion']['duration']['connectionStage']=MS(P('duration.300'),'SSH 演示连接每个阶段的停留时间')
 COMP['connectionIndicator']['stageDuration']='motion.duration.connectionStage'
+
+# Session forms and settings; components reference semantic values only.
+PALETTE['accentChoice']={
+ 'purple':C('#8e5cf7'), 'pink':C('#ec4899'), 'orange':C('#ff9500'), 'yellow':C('#f5b400'),
+}
+PALETTE['blueA']['a24']=C(A('10,132,255','.24'))
+SEM['color']['accentChoices']={
+ 'blue':C(P('blue.500')), 'purple':C(P('accentChoice.purple')), 'pink':C(P('accentChoice.pink')), 'red':C(P('red.500')),
+ 'orange':C(P('accentChoice.orange')), 'yellow':C(P('accentChoice.yellow')), 'green':C(P('green.500')), 'graphite':C(P('gray.600')),
+}
+for leaf in SEM['color']['danger'].values(): leaf.derived=False
+SEM['color']['danger']['tint14']=C(A('255,59,48','.14'),'错误输入框外光晕')
+SEM['color']['scrim']=C(P('black.a18'),'会话弹窗遮罩，覆盖标题栏')
+DARK.update({'color.danger.tint14':A('255,69,58','.22'),'color.scrim':P('blackA.a45'),'color.accent.tint16':P('blueA.a24')})
+SEM['shadow'].update({
+ 'modal':SH([L(0,0,0,.5,P('black.a12')),L(0,24,64,0,A('0,0,0','.22')),L(0,4,16,0,P('black.a08'))],'会话弹窗'),
+ 'inputFocus':SH([L(0,0,0,1.5,P('blue.500'),True),L(0,0,0,3,P('blueA.a16'))],'输入框焦点：内环与外光晕'),
+ 'inputError':SH([L(0,0,0,1.5,P('red.500'),True),L(0,0,0,3,A('255,59,48','.14'))],'输入框错误：优先于焦点'),
+ 'switchKnob':SH([L(0,1,2,0,A('0,0,0','.2'))],'开关滑块'),
+ 'themeSelected':SH([L(0,0,0,3,P('blueA.a16'))],'外观主题卡片选中光晕'),
+})
+DARK.update({
+ 'shadow.modal':[L(0,0,0,.5,P('whiteA.a12')),L(0,24,64,0,A('0,0,0','.55')),L(0,4,16,0,P('blackA.a30'))],
+ 'shadow.inputFocus':[L(0,0,0,1.5,P('blue.500'),True),L(0,0,0,3,P('blueA.a24'))],
+ 'shadow.inputError':[L(0,0,0,1.5,P('darkTint.red400'),True),L(0,0,0,3,A('255,69,58','.22'))],
+ 'shadow.themeSelected':[L(0,0,0,3,P('blueA.a24'))],
+})
+SEM['opacity'].update({'disabled':N(.4),'modalEnterScale':N(.96),'modalExitScale':N(.98)})
+SEM['size'].update({
+ 'modal':D(560),'formLabel':D(72),'settingsContent':D(720),'modalTopRatio':N(.12),'modalTopMin':D(72),'modalIconTile':D(32),
+ 'inputMonoSize':D(12),'formErrorIcon':D(12),'testSpinner':D(13),'collapseChevron':D(12),'collapseChevronStroke':D(2.25),'collapseChevronRotate':D(90),
+ 'switchWidth':D(32),'switchHeight':D(19),'switchKnob':D(15),'settingsHeaderPaddingX':D(32),'settingsRowHeight':D(48),'settingsFadeHeight':D(40),
+ 'schemePreviewHeight':D(66),'schemePreviewFont':D(10),'schemePreviewLineHeight':D(16),'schemeBadgeIcon':D(10),
+ 'themeAspect':N(1.6),'themeRadio':D(14),'themeRadioRing':D(4.5),'accentSwatch':D(20),'accentRing':D(1.5),'accentRingGap':D(2),
+})
+SEM['font']['tracking']['inputMono']=D(-.1)
+SEM['motion']['duration'].update({'test':MS(10000),'settingsSwitchOut':MS(80)})
+SEM['motion']['easing']['in']=BZ([.42,0,1,1])
+COMP['modal']={
+ 'width':'size.modal','radius':'radius.window','bg':'color.surface.card','shadow':'shadow.modal','scrim':'color.scrim',
+ 'topRatio':'size.modalTopRatio','topMin':'size.modalTopMin','bottomMargin':'space.24',
+ 'headerPaddingTop':'space.18','headerPaddingRight':'space.16','headerPaddingBottom':'space.14','headerPaddingLeft':'space.24',
+ 'headerGap':'space.12','iconTile':'size.modalIconTile','iconTileRadius':'radius.railButton',
+ 'titleSize':'font.size.title','titleWeight':'font.weight.semibold','subtitleSize':'font.size.footnote','subtitle':'color.text.secondary',
+ 'bodyPaddingX':'space.24','divider':'color.border.divider',
+ 'footerPaddingTop':'space.14','footerPaddingRight':'space.16','footerPaddingBottom':'space.16','footerPaddingLeft':'space.24',
+ 'footerGap':'space.8','buttonPaddingX':'space.12','enterScale':'opacity.modalEnterScale','exitScale':'opacity.modalExitScale','enter':'motion.spring.smooth',
+ 'fade':'motion.duration.focus','exit':'motion.duration.exit','reduceFade':'motion.duration.focus',
+}
+COMP['input'].update({
+ 'gap':'space.7','bg':'color.surface.card','borderHover':'color.border.separatorWindow','focusShadow':'shadow.inputFocus','errorShadow':'shadow.inputError',
+ 'placeholder':'color.text.placeholder','icon':'color.text.tertiary','monoFont':'font.family.mono','monoSize':'size.inputMonoSize','monoTracking':'font.tracking.inputMono',
+ 'disabledBg':'color.surface.field','disabledText':'color.text.disabled','disabledBorder':'color.border.subtle','caret':'color.accent.default',
+ 'chipHeight':'size.controlXs','chipRadius':'radius.chip','chipBg':'color.surface.control','chipFontSize':'font.size.footnote',
+})
+COMP['formRow']={
+ 'labelWidth':'size.formLabel','labelGap':'space.12','rowGap':'space.12','label':'color.text.muted','labelSize':'font.size.body','labelHeight':'size.control',
+ 'error':'color.danger.text','errorSize':'font.size.footnote','errorIcon':'size.formErrorIcon','errorGap':'space.5',
+ 'description':'color.text.tertiary','descriptionSize':'font.size.footnote','descGap':'space.4',
+}
+COMP['testResult']={
+ 'gap':'space.6','fontSize':'font.size.small','icon':'size.iconSm','spinnerSize':'size.testSpinner','testing':'color.text.secondary',
+ 'success':'color.success.text','successIcon':'color.success.default','fail':'color.danger.text','failIcon':'color.danger.default',
+ 'info':'color.text.tertiary','infoSize':'size.formErrorIcon','crossfade':'motion.duration.focus',
+}
+COMP['collapse']={
+ 'headerHeight':'size.titlebar','chevron':'size.collapseChevron','chevronStroke':'size.collapseChevronStroke','chevronColor':'color.text.secondary',
+ 'title':'color.text.primary','titleSize':'font.size.bodyLg','titleWeight':'font.weight.semibold','summary':'color.text.tertiary',
+ 'summarySize':'font.size.small','duration':'motion.duration.collapse','chevronRotate':'size.collapseChevronRotate',
+}
+COMP['switch']={
+ 'w':'size.switchWidth','h':'size.switchHeight','knobSize':'size.switchKnob','inset':'space.2','off':'color.border.keycap','on':'color.accent.default',
+ 'knob':'color.text.onAccent','knobShadow':'shadow.switchKnob','animation':'motion.spring.smooth',
+}
+COMP['settings']={
+ 'navWidth':'size.sider','navItemHeight':'size.modalIconTile','navItemRadius':'radius.control','navItemOn':'color.accent.subtle',
+ 'navTextOn':'color.text.accentStrong','navIconOn':'color.accent.default','navIconTile':'size.controlXs',
+ 'headerPaddingTop':'space.16','headerPaddingRight':'space.14','headerPaddingBottom':'space.14','headerPaddingLeft':'size.settingsHeaderPaddingX',
+ 'titleSize':'font.size.title','titleWeight':'font.weight.semibold','subtitleSize':'font.size.footnote','subtitle':'color.text.secondary','close':'size.control',
+ 'contentMax':'size.settingsContent','contentPaddingY':'space.20','contentPaddingX':'size.settingsHeaderPaddingX',
+ 'groupTitleSize':'font.size.small','groupTitleWeight':'font.weight.semibold','groupTitle':'color.text.muted','groupTitleGap':'space.8',
+ 'groupGap':'space.22','groupBg':'color.surface.zebra','groupRadius':'radius.card','groupBorder':'color.border.raised','groupBorderWidth':'size.hairline',
+ 'rowMinHeight':'size.settingsRowHeight','rowPaddingY':'space.9','rowPaddingX':'space.14','rowDivider':'color.border.subtle','rowDividerInset':'space.14',
+ 'rowLabelSize':'font.size.bodyLg','rowLabel':'color.text.primary','rowDescSize':'font.size.footnote','rowDesc':'color.text.secondary',
+ 'groupFootnoteSize':'font.size.footnote','groupFootnote':'color.text.tertiary','fadeHeight':'size.settingsFadeHeight',
+ 'enterY':'space.8','exitY':'space.4','enter':'motion.spring.smooth','fade':'motion.duration.focus','exit':'motion.duration.exit',
+ 'switchY':'space.4','switchFadeOut':'motion.duration.settingsSwitchOut','switchFadeIn':'motion.duration.exit',
+}
+COMP['schemeCard']={
+ 'radius':'radius.lift','padding':'space.5','border':'color.surface.controlStrong','borderWidth':'size.divider','selected':'color.accent.default','selectedWidth':'size.progressThin',
+ 'previewHeight':'size.schemePreviewHeight','previewRadius':'radius.controlSm','previewFontSize':'size.schemePreviewFont','previewLineHeight':'size.schemePreviewLineHeight',
+ 'stripeHeight':'size.progress','stripeRadius':'radius.hair','stripeGap':'space.2','nameSize':'font.size.small','nameWeight':'font.weight.medium',
+ 'badgeSize':'font.size.caption2','badgeWeight':'font.weight.semibold','badgeBg':'color.accent.subtle','badgeText':'color.text.accent','badgeIcon':'size.schemeBadgeIcon',
+}
+COMP['themeCard']={
+ 'aspect':'size.themeAspect','radius':'radius.lift','border':'color.surface.controlStrong','borderWidth':'size.divider',
+ 'selected':'color.accent.default','selectedWidth':'size.progressThin','selectedShadow':'shadow.themeSelected','radio':'size.themeRadio','radioRing':'size.themeRadioRing',
+}
+COMP['accentSwatch']={'size':'size.accentSwatch','gap':'space.10','ringGap':'size.accentRingGap','ringWidth':'size.accentRing','ringInset':'color.surface.card'}
+
+# Key generation sheet and protocol-switch metrics used by the session forms.
+SEM['size']['credentialModal']=D(P('size.420'))
+SEM['opacity']['collapseContentFadeFactor']=N(1.6)
+COMP['modal'].update({'generateWidth':'size.credentialModal','protocolRadius':'radius.lift','protocolPadding':'space.3','protocolIcon':'size.controlXs'})
+COMP['collapse']['contentFadeFactor']='opacity.collapseContentFadeFactor'
+COMP['input']['selectWidth']='size.transferProgressWidth'
+COMP['input'].update({'portWidth':'size.formLabel','numberWidth':'size.formLabel'})
+PALETTE['lineHeight']['18']=D(18)
+SEM['font']['lineHeight']['input']=D(P('lineHeight.18'),'统一空输入与中文占位文字行高，避免字体回退造成基线偏移')
+COMP['input']['lineHeight']='font.lineHeight.input'
+COMP['search']['lineHeight']='font.lineHeight.input'
+SEM['size'].update({'settingsSelect':D(220),'settingsNumber':D(64),'settingsScrollback':D(96)})
+COMP['settings'].update({'selectWidth':'size.settingsSelect','numberWidth':'size.settingsNumber','scrollbackWidth':'size.settingsScrollback'})

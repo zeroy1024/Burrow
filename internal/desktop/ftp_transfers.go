@@ -152,7 +152,7 @@ func (a *app) tickTransfers(c *ui.Context) {
 		running++
 	}
 	for _, task := range q.tasks {
-		if running >= int(theme.Current().C.TransferDock.Concurrency) {
+		if running >= a.prefs.TransferParallel {
 			break
 		}
 		if task.state == transferQueued {
@@ -213,7 +213,7 @@ func (a *app) transferDock(c *ui.Context, maxHeight float32) {
 	if q.collapsed {
 		rowsTarget = 0
 	}
-	rowsShown := dock.AnimateTo("rows", rowsTarget, ui.Animation{Spring: tokenSpring(p.Collapse)})
+	rowsShown := dock.AnimateTo("rows", rowsTarget, a.positionAnimation(ui.Animation{Spring: tokenSpring(p.Collapse)}))
 	minHeight := p.HeaderHeight + p.RowHeight
 	maxHeight = max(minHeight, maxHeight)
 	height := p.HeaderHeight + min(float32(max(len(rows), 1)), p.MaxRows)*p.RowHeight
@@ -341,7 +341,7 @@ func (a *app) transferHeader(c *ui.Context) {
 		if q.collapsed {
 			rotation = 180
 		}
-		button.AnimatePose(ui.Pose{Rotate: rotation}, ui.Animation{Spring: tokenSpring(t.C.TransferDock.Collapse)})
+		button.AnimatePose(ui.Pose{Rotate: rotation}, a.positionAnimation(ui.Animation{Spring: tokenSpring(t.C.TransferDock.Collapse)}))
 		button.OnClick(func() {
 			q.collapsed = !q.collapsed
 			a.saveFilePreferences(c)

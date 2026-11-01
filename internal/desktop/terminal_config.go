@@ -25,6 +25,7 @@ type terminalSettingsState struct {
 	loadErr     error
 	scroll      ui.ScrollState
 	importing   bool
+	imported    map[string]string
 }
 
 type terminalConfig struct {
@@ -69,6 +70,7 @@ func (a *app) loadTerminalSettings() error {
 }
 
 func (a *app) loadTerminalThemes() error {
+	a.terminal.imported = map[string]string{}
 	directory := filepath.Join(filepath.Dir(a.terminal.path), "themes")
 	files, err := os.ReadDir(directory)
 	if errors.Is(err, os.ErrNotExist) {
@@ -82,8 +84,12 @@ func (a *app) loadTerminalThemes() error {
 		if file.IsDir() || strings.HasPrefix(file.Name(), ".terminal-") {
 			continue
 		}
-		if _, err := termtheme.Import(filepath.Join(directory, file.Name())); err != nil {
+		path := filepath.Join(directory, file.Name())
+		scheme, err := termtheme.Import(path)
+		if err != nil {
 			importErr = errors.Join(importErr, fmt.Errorf("import %s: %w", file.Name(), err))
+		} else {
+			a.terminal.imported[scheme.Name] = path
 		}
 	}
 	return importErr
@@ -162,6 +168,13 @@ func (a *app) changeTerminalSettings(change func()) {
 }
 
 func (a *app) saveTerminalSettings() error {
+	if a.prefsPath != "" {
+		if err := a.terminal.config().validate(); err != nil {
+			return err
+		}
+		a.preferencesChanged()
+		return nil
+	}
 	if a.terminal.loadErr != nil {
 		return fmt.Errorf("terminal settings were not loaded: %w", a.terminal.loadErr)
 	}
@@ -212,6 +225,9 @@ func (a *app) importTerminalTheme(path string) error {
 	if err != nil {
 		return fmt.Errorf("read terminal theme: %w", err)
 	}
+	if termtheme.IsBundled(source.Name) {
+		return fmt.Errorf("内置配色 %q 不能覆盖，请修改 name 后导入", source.Name)
+	}
 	// Retain the filename: themes without a name comment derive their name from it.
 	destination := filepath.Join(filepath.Dir(a.terminal.path), "themes", filepath.Base(path))
 	if err := checkTerminalThemeName(destination, source.Name); err != nil {
@@ -234,6 +250,10 @@ func (a *app) importTerminalTheme(path string) error {
 	if err != nil {
 		return fmt.Errorf("import terminal theme: %w", err)
 	}
+	if a.terminal.imported == nil {
+		a.terminal.imported = map[string]string{}
+	}
+	a.terminal.imported[scheme.Name] = destination
 	previous := a.terminal.mode
 	a.terminal.mode = termtheme.Fixed(scheme.Name)
 	if err := a.saveTerminalSettings(); err != nil {

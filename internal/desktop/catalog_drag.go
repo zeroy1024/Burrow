@@ -10,12 +10,12 @@ import (
 	"github.com/egoist/mygo/ui"
 )
 
-func catalogDisplaceAnimation() ui.Animation {
-	return ui.Animation{Spring: tokenSpring(theme.Current().C.ReorderMotion.Displace)}
+func (a *app) catalogDisplaceAnimation() ui.Animation {
+	return a.positionAnimation(ui.Animation{Spring: tokenSpring(theme.Current().C.ReorderMotion.Displace)})
 }
 
-func catalogLandingAnimation() ui.Animation {
-	return ui.Animation{Spring: tokenSpring(theme.Current().C.ReorderMotion.Drop)}
+func (a *app) catalogLandingAnimation() ui.Animation {
+	return a.positionAnimation(ui.Animation{Spring: tokenSpring(theme.Current().C.ReorderMotion.Drop)})
 }
 
 func catalogColorAnimation() ui.Animation {
@@ -162,7 +162,7 @@ func (a *app) trackCatalogDrag(c *ui.Context, row ui.Element, slot catalogSlot) 
 		}
 	}
 	idle := !held && !released
-	options := ui.DraggableOptions{Axis: ui.Vertical, Animation: catalogLandingAnimation()}
+	options := ui.DraggableOptions{Axis: ui.Vertical, Animation: a.catalogLandingAnimation()}
 	if idle || blockGesture {
 		// Only the root overlay animates a landing or return. Keep the native
 		// gesture current, and clear its own offset before another press catches it.
@@ -206,8 +206,8 @@ func (a *app) trackCatalogDrag(c *ui.Context, row ui.Element, slot catalogSlot) 
 			d.host = hostDrag{id: hostID(slot.key.id), group: slot.group}
 			d.targetIndex = slices.Index(slot.group.hosts, d.host.id)
 		} else {
-			d.targetIndex = slices.Index(a.groups, slot.group)
-			if c.Preferences().ReduceMotion {
+			d.targetIndex = slices.Index(a.catalogGroups(), slot.group)
+			if a.reduceMotion(c) {
 				d.collapseFrames = 2
 			}
 		}
@@ -244,6 +244,9 @@ func (a *app) catalogExpanded(group *hostGroup) bool {
 func (a *app) catalogMatches(group *hostGroup, id hostID) bool {
 	query := strings.ToLower(strings.TrimSpace(a.page().query))
 	h := a.hosts[id]
+	if !a.catalogModeMatches(h) {
+		return false
+	}
 	text := h.name + " " + h.user + " " + h.address + " " + systems[h.os].name + " " + group.name
 	return strings.Contains(strings.ToLower(text), query)
 }
@@ -268,7 +271,7 @@ func (a *app) catalogPlan(c *ui.Context) []catalogSlot {
 	slots := []catalogSlot{}
 	d := a.page().catalogDrag
 	draggingGroup := d != nil && d.phase == catalogDragging && d.kind == catalogGroupDrag
-	groups := slices.Clone(a.groups)
+	groups := a.catalogGroups()
 	if draggingGroup {
 		index := slices.Index(groups, d.group)
 		groups = slices.Delete(groups, index, index+1)
@@ -331,7 +334,7 @@ func (a *app) updateCatalogDestination(c *ui.Context) {
 	// The first drag frame still has the pre-drag slots. Exclude the source
 	// by its key even before the preview replaces it with a placeholder.
 	if d.kind == catalogGroupDrag {
-		groups := slices.Clone(a.groups)
+		groups := a.catalogGroups()
 		from := slices.Index(groups, d.group)
 		groups = slices.Delete(groups, from, from+1)
 		index := d.targetIndex

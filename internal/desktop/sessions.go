@@ -3,7 +3,6 @@ package desktop
 import (
 	"fmt"
 	"slices"
-	"strconv"
 	"strings"
 
 	"sshdesk/internal/theme"
@@ -68,142 +67,23 @@ func (a *app) sidebar(c *ui.Context, shown float32) {
 				}
 			})
 		})
-		ui.Row(c).Height(t.C.Search.Height).Shrink(0).
-			Margin(0, t.C.Search.MarginX, t.C.Search.MarginBottom, t.C.Search.MarginX).
-			Radius(t.C.Search.Radius).Background(tokenColor(t.C.Search.Bg)).Children(func() {
-			ui.TextInputBase(c.Key("host-search"), &a.page().query).Bind(&a.page().search).Fill().MinWidth(0).
-				Padding(0, t.C.Search.PaddingX, 0, t.C.Search.Height).Radius(t.C.Search.Radius).
-				FontSize(t.C.Search.FontSize).Placeholder(placeholder).Label(searchLabel)
-			// The icon shares the input's bounds without intercepting text editing.
-			ui.Row(c).Absolute().Top(0).Right(0).Bottom(0).Left(0).
-				Padding(0, t.C.Search.PaddingX).PassThrough().Children(func() {
-				ui.Icon(c, searchIcon).Size(t.Size.IconMd, t.Size.IconMd).TextColor(tokenColor(t.C.Search.Text)).PassThrough()
-			})
-		})
+		a.sidebarSearch(c.Key("host-search"), &a.page().query, &a.page().search, searchLabel, placeholder)
 		a.catalogList(c)
 		ui.Row(c).Shrink(0).Gap(t.Space.N8).Padding(t.C.Sider.FooterPaddingY, t.C.Sider.FooterPaddingX).
 			BorderWidth(t.Size.Hairline, 0, 0, 0).BorderColor(tokenColor(t.C.Sider.FooterBorder)).
 			TextColor(tokenColor(t.C.Sider.FooterText)).Children(func() {
 			ui.Icon(c, serverIcon).Size(t.Size.IconSm, t.Size.IconSm)
-			summary := fmt.Sprintf("%d 台主机", len(a.hosts))
+			count := 0
+			for _, h := range a.hosts {
+				if a.catalogModeMatches(h) {
+					count++
+				}
+			}
+			summary := fmt.Sprintf("%d 台主机", count)
 			if a.section == sectionFiles {
-				summary = fmt.Sprintf("%d 个站点", len(a.hosts))
+				summary = fmt.Sprintf("%d 个站点", count)
 			}
 			ui.Text(c, summary).FontSize(t.C.Sider.FooterSize)
-		})
-	})
-}
-
-type hostDraft struct {
-	name, address, user, port, group, system string
-	protocol                                 string
-	id                                       hostID
-	editing, deleting, files                 bool
-}
-
-func (a *app) startHostDraft() {
-	a.page().draft = hostDraft{
-		user: "root", port: "22", group: a.groups[0].name, system: systems[0].name,
-		protocol: "SFTP", files: a.section == sectionFiles,
-	}
-	a.page().addHostOpen = true
-}
-
-func (a *app) hostDialog(c *ui.Context) {
-	t := theme.Current()
-	modal(c, &a.page().addHostOpen, func() {
-		ui.Column(c).Width(t.C.Dialog.HostWidth).Gap(t.Space.N14).Children(func() {
-			if a.page().draft.deleting {
-				a.deleteSiteDialogContents(c)
-				return
-			}
-			title := "添加 SSH 主机"
-			if a.page().draft.files {
-				title = "添加文件站点"
-				if a.page().draft.editing {
-					title = "编辑文件站点"
-				}
-			}
-			ui.Text(c, title).FontSize(t.C.Dialog.TitleSize).FontWeight(t.Font.Weight.Semibold)
-			ui.Text(c, "保存到主机目录，不会连接服务器。").FontSize(t.Font.Size.Small).TextColor(tokenColor(t.Color.Text.Secondary))
-			if a.page().draft.files {
-				ui.Text(c, "协议").FontSize(t.Font.Size.Small)
-				ui.Select(c, &a.page().draft.protocol, []string{"SFTP", "FTP"}).OnChange(func() {
-					if a.page().draft.protocol == "FTP" {
-						a.page().draft.port = "21"
-					} else {
-						a.page().draft.port = "22"
-					}
-				})
-			}
-			draftField(c, "名称", &a.page().draft.name)
-			draftField(c, "主机地址", &a.page().draft.address)
-			ui.Row(c).Gap(t.Space.N12).Children(func() {
-				ui.Column(c).Grow(1).Gap(t.Space.N6).Children(func() { draftField(c, "用户名", &a.page().draft.user) })
-				ui.Column(c).Width(t.C.Dialog.PortWidth).Gap(t.Space.N6).Children(func() { draftField(c, "端口", &a.page().draft.port) })
-			})
-			ui.Text(c, "分组").FontSize(t.Font.Size.Small)
-			groupNames := a.groupNames()
-			ui.Select(c, &a.page().draft.group, groupNames)
-			names := []string{}
-			for _, system := range systems {
-				names = append(names, system.name)
-			}
-			ui.Text(c, "系统").FontSize(t.Font.Size.Small)
-			ui.Select(c, &a.page().draft.system, names)
-			port, err := strconv.Atoi(a.page().draft.port)
-			validPort := err == nil && port > 0 && port <= 65535
-			validHost := strings.TrimSpace(a.page().draft.name) != "" && strings.TrimSpace(a.page().draft.address) != ""
-			validUser := strings.TrimSpace(a.page().draft.user) != ""
-			canAdd := validPort && validHost && validUser
-			ui.Row(c).Justify(ui.End).Gap(t.Space.N8).Children(func() {
-				button(c, "取消").OnClick(func() { a.page().addHostOpen = false })
-				label := "添加"
-				if a.page().draft.editing {
-					label = "保存"
-				}
-				primaryButton(c, label).Disabled(!canAdd).
-					OnClick(func() {
-						err := a.commitCatalogMove(func() {
-							protocol := ""
-							if a.page().draft.files {
-								protocol = strings.ToLower(a.page().draft.protocol)
-							}
-							h := host{
-								name: strings.TrimSpace(a.page().draft.name), address: strings.TrimSpace(a.page().draft.address),
-								user: strings.TrimSpace(a.page().draft.user), port: port,
-								os: slices.Index(names, a.page().draft.system), system: a.page().draft.system, protocol: protocol,
-							}
-							id := hostID(len(a.hosts))
-							group := a.groups[slices.Index(groupNames, a.page().draft.group)]
-							if a.page().draft.editing {
-								id = a.page().draft.id
-								previous := a.hosts[id]
-								previous.name, previous.address, previous.user = h.name, h.address, h.user
-								previous.port, previous.os, previous.system = h.port, h.os, h.system
-								previous.protocol = h.protocol
-								a.hosts[id] = previous
-								for _, group := range a.groups {
-									if group.name != a.page().draft.group {
-										group.hosts = slices.DeleteFunc(group.hosts, func(candidate hostID) bool { return candidate == id })
-									}
-								}
-							} else {
-								a.hosts = append(a.hosts, h)
-							}
-							if !slices.Contains(group.hosts, id) {
-								group.hosts = append(group.hosts, id)
-							}
-							a.setGroupCollapsed(group, false)
-						})
-						if err != nil {
-							c.Toast("保存主机失败：" + err.Error())
-							return
-						}
-						a.page().query = ""
-						a.page().addHostOpen = false
-					})
-			})
 		})
 	})
 }
@@ -229,7 +109,7 @@ func (a *app) groupDialog(c *ui.Context) {
 				button(c, "取消").OnClick(func() { a.page().groupDialogOpen = false })
 				primaryButton(c, "创建").Disabled(name == "" || duplicate).OnClick(func() {
 					if err := a.commitCatalogMove(func() {
-						a.groups = append(a.groups, &hostGroup{id: len(a.groups), name: name, hosts: []hostID{}})
+						a.groups = append(a.groups, a.newCatalogGroup(name))
 					}); err != nil {
 						c.Toast("保存分组失败：" + err.Error())
 						return

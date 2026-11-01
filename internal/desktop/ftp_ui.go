@@ -107,9 +107,9 @@ func (a *app) filePanels(c *ui.Context, session *fileSession) {
 	if a.files.localOpen && canExpand {
 		target = 1
 	}
-	progress := area.AnimateTo("local-open", target, ui.Animation{Spring: tokenSpring(split.Expand)})
+	progress := area.AnimateTo("local-open", target, a.positionAnimation(ui.Animation{Spring: tokenSpring(split.Expand)}))
 	opacity := split.RevealOpacityFrom + (1-split.RevealOpacityFrom)*min(max(progress, 0), 1)
-	if c.Preferences().ReduceMotion {
+	if a.reduceMotion(c) {
 		opacity = animateVisual(area, "local-fade", target, split.Crossfade)
 	}
 	remoteLeft := max(progress, 0) * (localWidth + split.Gutter)
@@ -118,11 +118,11 @@ func (a *app) filePanels(c *ui.Context, session *fileSession) {
 		remoteTargetWidth -= localWidth + split.Gutter
 	}
 	area.Children(func() {
-		localVisible := target != 0 || !area.Settled("local-open") || c.Preferences().ReduceMotion && opacity > 0
-		localOverlay := c.Preferences().ReduceMotion && target == 0 && opacity > 0
+		localVisible := target != 0 || !area.Settled("local-open") || a.reduceMotion(c) && opacity > 0
+		localOverlay := a.reduceMotion(c) && target == 0 && opacity > 0
 		localPane := func() {
 			x := -(1 - progress) * (localWidth + split.Gutter)
-			if c.Preferences().ReduceMotion {
+			if a.reduceMotion(c) {
 				x = 0
 			}
 			local := ui.Box(c).Key("local-card").Absolute().Left(x).Top(0).Bottom(0).
@@ -211,8 +211,8 @@ func (a *app) filePane(c *ui.Context, session *fileSession, pane *filePaneState,
 				ui.Text(c, "此文件夹为空").FillWidth().Padding(t.Space.N24).TextColor(tokenColor(t.Color.Text.Secondary))
 			}
 		})
-		fileScrollEdge(c, headHeight, false)
-		fileScrollEdge(c, footerHeight, true)
+		a.fileScrollEdge(c, headHeight, false)
+		a.fileScrollEdge(c, footerHeight, true)
 		ui.Column(c).Absolute().Top(0).Left(0).Right(0).PassThrough().Children(func() {
 			a.fileToolbar(c, session, pane, compact)
 			a.fileColumns(c, pane, compact)
@@ -315,7 +315,7 @@ func (a *app) fileSearchSlot(c *ui.Context, session *fileSession, pane *filePane
 		Duration: t.C.Search.Transition, Ease: tokenEasing(t.C.Search.Easing),
 	})
 	opacity := animateVisual(slot, "search-opacity", target, t.C.Search.Transition)
-	reduced := c.Preferences().ReduceMotion
+	reduced := a.reduceMotion(c)
 	slot.Children(func() {
 		location := ui.Box(c).Key("file-location").WidthPercent((1 - progress) * 100).Shrink(0).
 			Height(t.C.Breadcrumb.Height).MinWidth(0).ClipX().Opacity(1 - opacity).Disabled(pane.searchOpen)
@@ -336,7 +336,7 @@ func fileSearchInput(c *ui.Context, pane *filePaneState) ui.Element {
 	return textInput(c.Key("file-query"), &pane.query).Bind(&pane.search).
 		MinWidth(0).Height(t.C.Breadcrumb.Height).Padding(0, t.C.Search.PaddingX).
 		Radius(t.C.Search.Radius).Background(tokenColor(t.C.Search.Bg)).
-		FontSize(t.C.Search.FontSize).FixedLineHeight(t.Font.LineHeight.Body).
+		FontSize(t.C.Search.FontSize).FixedLineHeight(t.C.Search.LineHeight).
 		Label("搜索当前文件夹").Placeholder("搜索文件")
 }
 
@@ -839,7 +839,7 @@ func (a *app) uploadFinderPaths(c *ui.Context, session *fileSession, paths []str
 	a.requestFileTransfer(c, fileDrag{session: session, entries: entries}, session.remote, target)
 }
 
-func fileScrollEdge(c *ui.Context, height float32, bottom bool) {
+func (a *app) fileScrollEdge(c *ui.Context, height float32, bottom bool) {
 	t := theme.Current()
 	fade := t.C.FadeBar
 	angle := float32(180)
@@ -852,6 +852,10 @@ func fileScrollEdge(c *ui.Context, height float32, bottom bool) {
 			return e.Bottom(0)
 		}
 		return e.Top(0)
+	}
+	if !a.translucencyEnabled(c) {
+		band().Background(tokenColor(t.C.Card.Bg))
+		return
 	}
 	for _, layer := range []struct{ radius, solid, end float32 }{
 		{radius: fade.Blur1, solid: fade.Mask1Solid, end: fade.Mask1End},

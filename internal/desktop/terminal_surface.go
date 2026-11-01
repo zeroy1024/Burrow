@@ -19,6 +19,12 @@ var (
 	}
 )
 
+func updateTerminalSurfaceAccent(t *theme.Theme) {
+	terminalLightSurface = theme.WithAccent(theme.Light(), t.Color.Accent.Default)
+	terminalDarkSurface = theme.WithAccent(theme.Dark(), t.Color.Accent.Default)
+	terminalSurfaceCache.theme = nil
+}
+
 // Terminal chrome follows its rendered surface, independently of the app appearance.
 func terminalSurface(background color.NRGBA) *theme.Theme {
 	if terminalSurfaceCache.theme != nil && terminalSurfaceCache.background == background {

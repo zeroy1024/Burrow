@@ -145,6 +145,7 @@ type PaletteTokensBlueA struct {
 	A28  color.NRGBA
 	A35  color.NRGBA
 	A50  color.NRGBA
+	A24  color.NRGBA
 }
 
 // PaletteTokensGreenA groups tokens.
@@ -334,6 +335,7 @@ type PaletteTokensLineHeight struct {
 	N15 float32
 	N16 float32
 	N17 float32
+	N18 float32
 }
 
 // PaletteTokensFontWeight groups tokens.
@@ -442,6 +444,14 @@ type PaletteTokensShadow struct {
 	PopoverDark Shadow // 深色传输浮层 [derived]
 }
 
+// PaletteTokensAccentChoice groups tokens.
+type PaletteTokensAccentChoice struct {
+	Purple color.NRGBA
+	Pink   color.NRGBA
+	Orange color.NRGBA
+	Yellow color.NRGBA
+}
+
 // PaletteTokens 原始色板与刻度（primitives）。主题不应直接修改。
 type PaletteTokens struct {
 	Gray          PaletteTokensGray
@@ -476,6 +486,7 @@ type PaletteTokens struct {
 	Easing        PaletteTokensEasing
 	Red           PaletteTokensRed
 	Shadow        PaletteTokensShadow
+	AccentChoice  PaletteTokensAccentChoice
 }
 
 // ColorsBg groups tokens.
@@ -632,9 +643,10 @@ type ColorsGlass struct {
 
 // ColorsDanger groups tokens.
 type ColorsDanger struct {
-	Default color.NRGBA // 失败圆点、失败图标 [derived]
-	Text    color.NRGBA // 失败文字 [derived]
-	Subtle  color.NRGBA // 失败图标底、失败徽章底 [derived]
+	Default color.NRGBA // 失败圆点、失败图标
+	Text    color.NRGBA // 失败文字
+	Subtle  color.NRGBA // 失败图标底、失败徽章底
+	Tint14  color.NRGBA // 错误输入框外光晕
 }
 
 // ColorsProtocol groups tokens.
@@ -650,25 +662,39 @@ type ColorsOverlay struct {
 	Backdrop color.NRGBA // 弹窗遮罩
 }
 
+// ColorsAccentChoices groups tokens.
+type ColorsAccentChoices struct {
+	Blue     color.NRGBA
+	Purple   color.NRGBA
+	Pink     color.NRGBA
+	Red      color.NRGBA
+	Orange   color.NRGBA
+	Yellow   color.NRGBA
+	Green    color.NRGBA
+	Graphite color.NRGBA
+}
+
 // Colors groups tokens.
 type Colors struct {
-	Bg       ColorsBg
-	Surface  ColorsSurface
-	State    ColorsState
-	Border   ColorsBorder
-	Text     ColorsText
-	Icon     ColorsIcon
-	Accent   ColorsAccent
-	Success  ColorsSuccess
-	Warning  ColorsWarning
-	Status   ColorsStatus
-	Fill     ColorsFill
-	Traffic  ColorsTraffic
-	Tooltip  ColorsTooltip
-	Glass    ColorsGlass
-	Danger   ColorsDanger
-	Protocol ColorsProtocol
-	Overlay  ColorsOverlay
+	Bg            ColorsBg
+	Surface       ColorsSurface
+	State         ColorsState
+	Border        ColorsBorder
+	Text          ColorsText
+	Icon          ColorsIcon
+	Accent        ColorsAccent
+	Success       ColorsSuccess
+	Warning       ColorsWarning
+	Status        ColorsStatus
+	Fill          ColorsFill
+	Traffic       ColorsTraffic
+	Tooltip       ColorsTooltip
+	Glass         ColorsGlass
+	Danger        ColorsDanger
+	Protocol      ColorsProtocol
+	Overlay       ColorsOverlay
+	AccentChoices ColorsAccentChoices
+	Scrim         color.NRGBA // 会话弹窗遮罩，覆盖标题栏
 }
 
 // Radii groups tokens.
@@ -830,6 +856,38 @@ type Sizes struct {
 	PreviewLineLong         float32
 	PreviewLineMedium       float32
 	PreviewLineShort        float32
+	Modal                   float32
+	FormLabel               float32
+	SettingsContent         float32
+	ModalTopRatio           float32
+	ModalTopMin             float32
+	ModalIconTile           float32
+	InputMonoSize           float32
+	FormErrorIcon           float32
+	TestSpinner             float32
+	CollapseChevron         float32
+	CollapseChevronStroke   float32
+	CollapseChevronRotate   float32
+	SwitchWidth             float32
+	SwitchHeight            float32
+	SwitchKnob              float32
+	SettingsHeaderPaddingX  float32
+	SettingsRowHeight       float32
+	SettingsFadeHeight      float32
+	SchemePreviewHeight     float32
+	SchemePreviewFont       float32
+	SchemePreviewLineHeight float32
+	SchemeBadgeIcon         float32
+	ThemeAspect             float32
+	ThemeRadio              float32
+	ThemeRadioRing          float32
+	AccentSwatch            float32
+	AccentRing              float32
+	AccentRingGap           float32
+	CredentialModal         float32
+	SettingsSelect          float32
+	SettingsNumber          float32
+	SettingsScrollback      float32
 }
 
 // TypographyFamily groups tokens.
@@ -864,13 +922,15 @@ type TypographyLineHeight struct {
 	Body   float32
 	Name   float32
 	Keycap float32
+	Input  float32 // 统一空输入与中文占位文字行高，避免字体回退造成基线偏移
 }
 
 // TypographyTracking groups tokens.
 type TypographyTracking struct {
-	Mono   float32
-	Normal float32
-	Caps   float32
+	Mono      float32
+	Normal    float32
+	Caps      float32
+	InputMono float32
 }
 
 // Typography groups tokens.
@@ -906,6 +966,11 @@ type Shadows struct {
 	DotConnecting     Shadow //  [deprecated: 侧栏不再显示状态/选中]
 	Popover           Shadow // 传输浮层
 	Dialog            Shadow // 弹窗阴影
+	Modal             Shadow // 会话弹窗
+	InputFocus        Shadow // 输入框焦点：内环与外光晕
+	InputError        Shadow // 输入框错误：优先于焦点
+	SwitchKnob        Shadow // 开关滑块
+	ThemeSelected     Shadow // 外观主题卡片选中光晕
 }
 
 // GlassFade groups tokens.
@@ -948,53 +1013,58 @@ type Glass struct {
 
 // Opacities groups tokens.
 type Opacities struct {
-	PaneUnfocusedContent  float32
-	PaneUnfocusedSaturate float32
-	PaneUnfocusedStatus   float32
-	PaneHoverContent      float32
-	PaneHoverSaturate     float32
-	DragSource            float32 // 拖走后源行（折叠时）
-	LiftStackBack         float32
-	Hidden                float32
-	OsTint                float32 // OS logo 底 = 品牌色 9% 混入卡片色
-	DragRotation          float32
-	DragPreview           float32
-	PreviewHeader         float32
-	PaneCloseScale        float32
-	DropEdgeRatio         float32
-	PaneActionTint        float32
-	RevealFrom            float32 // 本地面板展开起始透明度
-	CapsuleEnterScale     float32
-	PopoverEnterScale     float32
-	SplitDefaultRatio     float32
+	PaneUnfocusedContent      float32
+	PaneUnfocusedSaturate     float32
+	PaneUnfocusedStatus       float32
+	PaneHoverContent          float32
+	PaneHoverSaturate         float32
+	DragSource                float32 // 拖走后源行（折叠时）
+	LiftStackBack             float32
+	Hidden                    float32
+	OsTint                    float32 // OS logo 底 = 品牌色 9% 混入卡片色
+	DragRotation              float32
+	DragPreview               float32
+	PreviewHeader             float32
+	PaneCloseScale            float32
+	DropEdgeRatio             float32
+	PaneActionTint            float32
+	RevealFrom                float32 // 本地面板展开起始透明度
+	CapsuleEnterScale         float32
+	PopoverEnterScale         float32
+	SplitDefaultRatio         float32
+	Disabled                  float32
+	ModalEnterScale           float32
+	ModalExitScale            float32
+	CollapseContentFadeFactor float32
 }
 
 // MotionDuration groups tokens.
 type MotionDuration struct {
-	Instant         time.Duration
-	Lift            time.Duration // 拿起
-	Hold            time.Duration // 长按拿起
-	Focus           time.Duration // 焦点/悬停切换
-	Collapse        time.Duration // 分组拖动时全部收起
-	Restore         time.Duration // 恢复展开
-	Cancel          time.Duration // 取消飞回
-	Drop            time.Duration // 落位
-	AutoExpand      time.Duration // 悬停自动展开
-	Flash           time.Duration // 落位闪光
-	FrameInterval   time.Duration
-	Zoom            time.Duration
-	PaneEnter       time.Duration
-	PaneClose       time.Duration
-	DividerFade     time.Duration
-	Sidebar         time.Duration
-	ScrollbarHold   time.Duration
-	ScrollbarFade   time.Duration
-	InstantNonzero  time.Duration // 1 ns: MyGo zero Animation selects a default spring
-	Exit            time.Duration // 浮层退出、胶囊淡出
-	AutoHide        time.Duration // 全部完成后胶囊停留
-	Spin            time.Duration // 连接中转圈一周
-	PaneReveal      time.Duration
-	ConnectionStage time.Duration // SSH 演示连接每个阶段的停留时间
+	Instant           time.Duration
+	Lift              time.Duration // 拿起
+	Hold              time.Duration // 长按拿起
+	Focus             time.Duration // 焦点/悬停切换
+	Collapse          time.Duration // 分组拖动时全部收起
+	Restore           time.Duration // 恢复展开
+	Cancel            time.Duration // 取消飞回
+	Drop              time.Duration // 落位
+	AutoExpand        time.Duration // 悬停自动展开
+	Flash             time.Duration // 落位闪光
+	FrameInterval     time.Duration
+	Zoom              time.Duration
+	PaneEnter         time.Duration
+	PaneClose         time.Duration
+	DividerFade       time.Duration
+	Sidebar           time.Duration
+	ScrollbarHold     time.Duration
+	ScrollbarFade     time.Duration
+	InstantNonzero    time.Duration // 1 ns: MyGo zero Animation selects a default spring
+	Exit              time.Duration // 浮层退出、胶囊淡出
+	Spin              time.Duration // 连接中转圈一周
+	PaneReveal        time.Duration
+	ConnectionStage   time.Duration // SSH 演示连接每个阶段的停留时间
+	Test              time.Duration
+	SettingsSwitchOut time.Duration
 }
 
 // MotionEasing groups tokens.
@@ -1002,6 +1072,7 @@ type MotionEasing struct {
 	Out    Bezier
 	Pane   Bezier
 	Search Bezier
+	In     Bezier
 }
 
 // MotionSpring groups tokens.
@@ -1179,6 +1250,7 @@ type SearchTokens struct {
 	KbdRadius    float32       // ← radius.keycap
 	Transition   time.Duration // ← motion.duration.focus
 	Easing       Bezier        // ← motion.easing.search
+	LineHeight   float32       // ← font.lineHeight.input
 }
 
 // GroupHeaderTokens groups tokens.
@@ -1798,7 +1870,6 @@ type TransferCapsuleTokens struct {
 	Error         color.NRGBA   // ← color.danger.text
 	Enter         Spring        // ← motion.spring.smooth
 	Exit          time.Duration // ← motion.duration.exit
-	AutoHide      time.Duration // ← motion.duration.autoHide
 	EnterScale    float32       // ← opacity.capsuleEnterScale
 	PaddingLeft   float32       // ← space.7
 	PaddingRight  float32       // ← space.9
@@ -1908,17 +1979,37 @@ type FilePaneTokens struct {
 
 // InputTokens groups tokens.
 type InputTokens struct {
-	Height      float32       // ← size.control
-	PaddingX    float32       // ← space.9
-	Radius      float32       // ← radius.control
-	Bg          color.NRGBA   // ← color.surface.control
-	Text        color.NRGBA   // ← color.text.primary
-	FontSize    float32       // ← font.size.body
-	Border      color.NRGBA   // ← color.border.control
-	BorderHover color.NRGBA   // ← color.border.controlHover
-	BorderFocus color.NRGBA   // ← color.accent.default
-	BorderWidth float32       // ← size.divider
-	Transition  time.Duration // ← motion.duration.focus
+	Height         float32       // ← size.control
+	PaddingX       float32       // ← space.9
+	Radius         float32       // ← radius.control
+	Bg             color.NRGBA   // ← color.surface.card
+	Text           color.NRGBA   // ← color.text.primary
+	FontSize       float32       // ← font.size.body
+	Border         color.NRGBA   // ← color.border.control
+	BorderHover    color.NRGBA   // ← color.border.separatorWindow
+	BorderFocus    color.NRGBA   // ← color.accent.default
+	BorderWidth    float32       // ← size.divider
+	Transition     time.Duration // ← motion.duration.focus
+	Gap            float32       // ← space.7
+	FocusShadow    Shadow        // ← shadow.inputFocus
+	ErrorShadow    Shadow        // ← shadow.inputError
+	Placeholder    color.NRGBA   // ← color.text.placeholder
+	Icon           color.NRGBA   // ← color.text.tertiary
+	MonoFont       []string      // ← font.family.mono
+	MonoSize       float32       // ← size.inputMonoSize
+	MonoTracking   float32       // ← font.tracking.inputMono
+	DisabledBg     color.NRGBA   // ← color.surface.field
+	DisabledText   color.NRGBA   // ← color.text.disabled
+	DisabledBorder color.NRGBA   // ← color.border.subtle
+	Caret          color.NRGBA   // ← color.accent.default
+	ChipHeight     float32       // ← size.controlXs
+	ChipRadius     float32       // ← radius.chip
+	ChipBg         color.NRGBA   // ← color.surface.control
+	ChipFontSize   float32       // ← font.size.footnote
+	SelectWidth    float32       // ← size.transferProgressWidth
+	PortWidth      float32       // ← size.formLabel
+	NumberWidth    float32       // ← size.formLabel
+	LineHeight     float32       // ← font.lineHeight.input
 }
 
 // PaneRevealTokens groups tokens.
@@ -1926,6 +2017,210 @@ type PaneRevealTokens struct {
 	Blur     float32       // ← glass.paneRevealBlur
 	Duration time.Duration // ← motion.duration.paneReveal
 	Easing   Bezier        // ← motion.easing.out
+}
+
+// ModalTokens groups tokens.
+type ModalTokens struct {
+	Width               float32       // ← size.modal
+	Radius              float32       // ← radius.window
+	Bg                  color.NRGBA   // ← color.surface.card
+	Shadow              Shadow        // ← shadow.modal
+	Scrim               color.NRGBA   // ← color.scrim
+	TopRatio            float32       // ← size.modalTopRatio
+	TopMin              float32       // ← size.modalTopMin
+	BottomMargin        float32       // ← space.24
+	HeaderPaddingTop    float32       // ← space.18
+	HeaderPaddingRight  float32       // ← space.16
+	HeaderPaddingBottom float32       // ← space.14
+	HeaderPaddingLeft   float32       // ← space.24
+	HeaderGap           float32       // ← space.12
+	IconTile            float32       // ← size.modalIconTile
+	IconTileRadius      float32       // ← radius.railButton
+	TitleSize           float32       // ← font.size.title
+	TitleWeight         int           // ← font.weight.semibold
+	SubtitleSize        float32       // ← font.size.footnote
+	Subtitle            color.NRGBA   // ← color.text.secondary
+	BodyPaddingX        float32       // ← space.24
+	Divider             color.NRGBA   // ← color.border.divider
+	FooterPaddingTop    float32       // ← space.14
+	FooterPaddingRight  float32       // ← space.16
+	FooterPaddingBottom float32       // ← space.16
+	FooterPaddingLeft   float32       // ← space.24
+	FooterGap           float32       // ← space.8
+	ButtonPaddingX      float32       // ← space.12
+	EnterScale          float32       // ← opacity.modalEnterScale
+	ExitScale           float32       // ← opacity.modalExitScale
+	Enter               Spring        // ← motion.spring.smooth
+	Fade                time.Duration // ← motion.duration.focus
+	Exit                time.Duration // ← motion.duration.exit
+	ReduceFade          time.Duration // ← motion.duration.focus
+	GenerateWidth       float32       // ← size.credentialModal
+	ProtocolRadius      float32       // ← radius.lift
+	ProtocolPadding     float32       // ← space.3
+	ProtocolIcon        float32       // ← size.controlXs
+}
+
+// FormRowTokens groups tokens.
+type FormRowTokens struct {
+	LabelWidth      float32     // ← size.formLabel
+	LabelGap        float32     // ← space.12
+	RowGap          float32     // ← space.12
+	Label           color.NRGBA // ← color.text.muted
+	LabelSize       float32     // ← font.size.body
+	LabelHeight     float32     // ← size.control
+	Error           color.NRGBA // ← color.danger.text
+	ErrorSize       float32     // ← font.size.footnote
+	ErrorIcon       float32     // ← size.formErrorIcon
+	ErrorGap        float32     // ← space.5
+	Description     color.NRGBA // ← color.text.tertiary
+	DescriptionSize float32     // ← font.size.footnote
+	DescGap         float32     // ← space.4
+}
+
+// TestResultTokens groups tokens.
+type TestResultTokens struct {
+	Gap         float32       // ← space.6
+	FontSize    float32       // ← font.size.small
+	Icon        float32       // ← size.iconSm
+	SpinnerSize float32       // ← size.testSpinner
+	Testing     color.NRGBA   // ← color.text.secondary
+	Success     color.NRGBA   // ← color.success.text
+	SuccessIcon color.NRGBA   // ← color.success.default
+	Fail        color.NRGBA   // ← color.danger.text
+	FailIcon    color.NRGBA   // ← color.danger.default
+	Info        color.NRGBA   // ← color.text.tertiary
+	InfoSize    float32       // ← size.formErrorIcon
+	Crossfade   time.Duration // ← motion.duration.focus
+}
+
+// CollapseTokens groups tokens.
+type CollapseTokens struct {
+	HeaderHeight      float32       // ← size.titlebar
+	Chevron           float32       // ← size.collapseChevron
+	ChevronStroke     float32       // ← size.collapseChevronStroke
+	ChevronColor      color.NRGBA   // ← color.text.secondary
+	Title             color.NRGBA   // ← color.text.primary
+	TitleSize         float32       // ← font.size.bodyLg
+	TitleWeight       int           // ← font.weight.semibold
+	Summary           color.NRGBA   // ← color.text.tertiary
+	SummarySize       float32       // ← font.size.small
+	Duration          time.Duration // ← motion.duration.collapse
+	ChevronRotate     float32       // ← size.collapseChevronRotate
+	ContentFadeFactor float32       // ← opacity.collapseContentFadeFactor
+}
+
+// SwitchTokens groups tokens.
+type SwitchTokens struct {
+	W          float32     // ← size.switchWidth
+	H          float32     // ← size.switchHeight
+	KnobSize   float32     // ← size.switchKnob
+	Inset      float32     // ← space.2
+	Off        color.NRGBA // ← color.border.keycap
+	On         color.NRGBA // ← color.accent.default
+	Knob       color.NRGBA // ← color.text.onAccent
+	KnobShadow Shadow      // ← shadow.switchKnob
+	Animation  Spring      // ← motion.spring.smooth
+}
+
+// SettingsTokens groups tokens.
+type SettingsTokens struct {
+	NavWidth            float32       // ← size.sider
+	NavItemHeight       float32       // ← size.modalIconTile
+	NavItemRadius       float32       // ← radius.control
+	NavItemOn           color.NRGBA   // ← color.accent.subtle
+	NavTextOn           color.NRGBA   // ← color.text.accentStrong
+	NavIconOn           color.NRGBA   // ← color.accent.default
+	NavIconTile         float32       // ← size.controlXs
+	HeaderPaddingTop    float32       // ← space.16
+	HeaderPaddingRight  float32       // ← space.14
+	HeaderPaddingBottom float32       // ← space.14
+	HeaderPaddingLeft   float32       // ← size.settingsHeaderPaddingX
+	TitleSize           float32       // ← font.size.title
+	TitleWeight         int           // ← font.weight.semibold
+	SubtitleSize        float32       // ← font.size.footnote
+	Subtitle            color.NRGBA   // ← color.text.secondary
+	Close               float32       // ← size.control
+	ContentMax          float32       // ← size.settingsContent
+	ContentPaddingY     float32       // ← space.20
+	ContentPaddingX     float32       // ← size.settingsHeaderPaddingX
+	GroupTitleSize      float32       // ← font.size.small
+	GroupTitleWeight    int           // ← font.weight.semibold
+	GroupTitle          color.NRGBA   // ← color.text.muted
+	GroupTitleGap       float32       // ← space.8
+	GroupGap            float32       // ← space.22
+	GroupBg             color.NRGBA   // ← color.surface.zebra
+	GroupRadius         float32       // ← radius.card
+	GroupBorder         color.NRGBA   // ← color.border.raised
+	GroupBorderWidth    float32       // ← size.hairline
+	RowMinHeight        float32       // ← size.settingsRowHeight
+	RowPaddingY         float32       // ← space.9
+	RowPaddingX         float32       // ← space.14
+	RowDivider          color.NRGBA   // ← color.border.subtle
+	RowDividerInset     float32       // ← space.14
+	RowLabelSize        float32       // ← font.size.bodyLg
+	RowLabel            color.NRGBA   // ← color.text.primary
+	RowDescSize         float32       // ← font.size.footnote
+	RowDesc             color.NRGBA   // ← color.text.secondary
+	GroupFootnoteSize   float32       // ← font.size.footnote
+	GroupFootnote       color.NRGBA   // ← color.text.tertiary
+	FadeHeight          float32       // ← size.settingsFadeHeight
+	EnterY              float32       // ← space.8
+	ExitY               float32       // ← space.4
+	Enter               Spring        // ← motion.spring.smooth
+	Fade                time.Duration // ← motion.duration.focus
+	Exit                time.Duration // ← motion.duration.exit
+	SwitchY             float32       // ← space.4
+	SwitchFadeOut       time.Duration // ← motion.duration.settingsSwitchOut
+	SwitchFadeIn        time.Duration // ← motion.duration.exit
+	SelectWidth         float32       // ← size.settingsSelect
+	NumberWidth         float32       // ← size.settingsNumber
+	ScrollbackWidth     float32       // ← size.settingsScrollback
+}
+
+// SchemeCardTokens groups tokens.
+type SchemeCardTokens struct {
+	Radius            float32     // ← radius.lift
+	Padding           float32     // ← space.5
+	Border            color.NRGBA // ← color.surface.controlStrong
+	BorderWidth       float32     // ← size.divider
+	Selected          color.NRGBA // ← color.accent.default
+	SelectedWidth     float32     // ← size.progressThin
+	PreviewHeight     float32     // ← size.schemePreviewHeight
+	PreviewRadius     float32     // ← radius.controlSm
+	PreviewFontSize   float32     // ← size.schemePreviewFont
+	PreviewLineHeight float32     // ← size.schemePreviewLineHeight
+	StripeHeight      float32     // ← size.progress
+	StripeRadius      float32     // ← radius.hair
+	StripeGap         float32     // ← space.2
+	NameSize          float32     // ← font.size.small
+	NameWeight        int         // ← font.weight.medium
+	BadgeSize         float32     // ← font.size.caption2
+	BadgeWeight       int         // ← font.weight.semibold
+	BadgeBg           color.NRGBA // ← color.accent.subtle
+	BadgeText         color.NRGBA // ← color.text.accent
+	BadgeIcon         float32     // ← size.schemeBadgeIcon
+}
+
+// ThemeCardTokens groups tokens.
+type ThemeCardTokens struct {
+	Aspect         float32     // ← size.themeAspect
+	Radius         float32     // ← radius.lift
+	Border         color.NRGBA // ← color.surface.controlStrong
+	BorderWidth    float32     // ← size.divider
+	Selected       color.NRGBA // ← color.accent.default
+	SelectedWidth  float32     // ← size.progressThin
+	SelectedShadow Shadow      // ← shadow.themeSelected
+	Radio          float32     // ← size.themeRadio
+	RadioRing      float32     // ← size.themeRadioRing
+}
+
+// AccentSwatchTokens groups tokens.
+type AccentSwatchTokens struct {
+	Size      float32     // ← size.accentSwatch
+	Gap       float32     // ← space.10
+	RingGap   float32     // ← size.accentRingGap
+	RingWidth float32     // ← size.accentRing
+	RingInset color.NRGBA // ← color.surface.card
 }
 
 // Components 组件层：只由 Semantic 计算得出（见 buildComponents）。
@@ -1978,6 +2273,15 @@ type Components struct {
 	FilePane            FilePaneTokens
 	Input               InputTokens
 	PaneReveal          PaneRevealTokens
+	Modal               ModalTokens
+	FormRow             FormRowTokens
+	TestResult          TestResultTokens
+	Collapse            CollapseTokens
+	Switch              SwitchTokens
+	Settings            SettingsTokens
+	SchemeCard          SchemeCardTokens
+	ThemeCard           ThemeCardTokens
+	AccentSwatch        AccentSwatchTokens
 }
 
 // Palette is the primitive tier.
@@ -2071,6 +2375,7 @@ var Palette = PaletteTokens{
 		A28:  color.NRGBA{R: 0x0a, G: 0x84, B: 0xff, A: 0x47},
 		A35:  color.NRGBA{R: 0x0a, G: 0x84, B: 0xff, A: 0x59},
 		A50:  color.NRGBA{R: 0x0a, G: 0x84, B: 0xff, A: 0x80},
+		A24:  color.NRGBA{R: 0x0a, G: 0x84, B: 0xff, A: 0x3d},
 	},
 	GreenA: PaletteTokensGreenA{
 		A14: color.NRGBA{R: 0x30, G: 0xc4, B: 0x5a, A: 0x24},
@@ -2234,6 +2539,7 @@ var Palette = PaletteTokens{
 		N15: 15,
 		N16: 16,
 		N17: 17,
+		N18: 18,
 	},
 	FontWeight: PaletteTokensFontWeight{
 		N400: 400,
@@ -2318,6 +2624,12 @@ var Palette = PaletteTokens{
 	Shadow: PaletteTokensShadow{
 		Popover:     Shadow{{X: 0, Y: 0, Blur: 0, Spread: 0.5, Color: color.NRGBA{R: 0x00, G: 0x00, B: 0x00, A: 0x1a}}, {X: 0, Y: 10, Blur: 28, Spread: 0, Color: color.NRGBA{R: 0x00, G: 0x00, B: 0x00, A: 0x1f}}, {X: 0, Y: 2, Blur: 6, Spread: 0, Color: color.NRGBA{R: 0x00, G: 0x00, B: 0x00, A: 0x0f}}, {X: 0, Y: 0.5, Blur: 0, Spread: 0, Color: color.NRGBA{R: 0xff, G: 0xff, B: 0xff, A: 0xe6}, Inset: true}},
 		PopoverDark: Shadow{{X: 0, Y: 0, Blur: 0, Spread: 0.5, Color: color.NRGBA{R: 0xff, G: 0xff, B: 0xff, A: 0x24}}, {X: 0, Y: 10, Blur: 28, Spread: 0, Color: color.NRGBA{R: 0x00, G: 0x00, B: 0x00, A: 0x73}}, {X: 0, Y: 2, Blur: 6, Spread: 0, Color: color.NRGBA{R: 0x00, G: 0x00, B: 0x00, A: 0x40}}},
+	},
+	AccentChoice: PaletteTokensAccentChoice{
+		Purple: color.NRGBA{R: 0x8e, G: 0x5c, B: 0xf7, A: 0xff},
+		Pink:   color.NRGBA{R: 0xec, G: 0x48, B: 0x99, A: 0xff},
+		Orange: color.NRGBA{R: 0xff, G: 0x95, B: 0x00, A: 0xff},
+		Yellow: color.NRGBA{R: 0xf5, G: 0xb4, B: 0x00, A: 0xff},
 	},
 }
 
@@ -2452,6 +2764,7 @@ func lightSemantic() Semantic {
 				Default: Palette.Red.N500,
 				Text:    Palette.Red.N700,
 				Subtle:  Palette.Red.N50,
+				Tint14:  color.NRGBA{R: 0xff, G: 0x3b, B: 0x30, A: 0x24},
 			},
 			Protocol: ColorsProtocol{
 				SftpBg:    Palette.Blue.N50,
@@ -2462,6 +2775,17 @@ func lightSemantic() Semantic {
 			Overlay: ColorsOverlay{
 				Backdrop: Palette.BlackA.A40,
 			},
+			AccentChoices: ColorsAccentChoices{
+				Blue:     Palette.Blue.N500,
+				Purple:   Palette.AccentChoice.Purple,
+				Pink:     Palette.AccentChoice.Pink,
+				Red:      Palette.Red.N500,
+				Orange:   Palette.AccentChoice.Orange,
+				Yellow:   Palette.AccentChoice.Yellow,
+				Green:    Palette.Green.N500,
+				Graphite: Palette.Gray.N600,
+			},
+			Scrim: Palette.Black.A18,
 		},
 		Radius: Radii{
 			Window:     Palette.Radius.N12,
@@ -2617,6 +2941,38 @@ func lightSemantic() Semantic {
 			PreviewLineLong:         Palette.Ratio.N0_78,
 			PreviewLineMedium:       Palette.Ratio.N0_6,
 			PreviewLineShort:        Palette.Ratio.N0_45,
+			Modal:                   560,
+			FormLabel:               72,
+			SettingsContent:         720,
+			ModalTopRatio:           0.12,
+			ModalTopMin:             72,
+			ModalIconTile:           32,
+			InputMonoSize:           12,
+			FormErrorIcon:           12,
+			TestSpinner:             13,
+			CollapseChevron:         12,
+			CollapseChevronStroke:   2.25,
+			CollapseChevronRotate:   90,
+			SwitchWidth:             32,
+			SwitchHeight:            19,
+			SwitchKnob:              15,
+			SettingsHeaderPaddingX:  32,
+			SettingsRowHeight:       48,
+			SettingsFadeHeight:      40,
+			SchemePreviewHeight:     66,
+			SchemePreviewFont:       10,
+			SchemePreviewLineHeight: 16,
+			SchemeBadgeIcon:         10,
+			ThemeAspect:             1.6,
+			ThemeRadio:              14,
+			ThemeRadioRing:          4.5,
+			AccentSwatch:            20,
+			AccentRing:              1.5,
+			AccentRingGap:           2,
+			CredentialModal:         Palette.Size.N420,
+			SettingsSelect:          220,
+			SettingsNumber:          64,
+			SettingsScrollback:      96,
 		},
 		Font: Typography{
 			Family: TypographyFamily{
@@ -2644,11 +3000,13 @@ func lightSemantic() Semantic {
 				Body:   Palette.LineHeight.N16,
 				Name:   Palette.LineHeight.N17,
 				Keycap: 12,
+				Input:  Palette.LineHeight.N18,
 			},
 			Tracking: TypographyTracking{
-				Mono:   Palette.LetterSpacing.Neg0_2,
-				Normal: Palette.LetterSpacing.Zero,
-				Caps:   Palette.LetterSpacing.Pos0_3,
+				Mono:      Palette.LetterSpacing.Neg0_2,
+				Normal:    Palette.LetterSpacing.Zero,
+				Caps:      Palette.LetterSpacing.Pos0_3,
+				InputMono: -0.1,
 			},
 		},
 		Shadow: Shadows{
@@ -2674,6 +3032,11 @@ func lightSemantic() Semantic {
 			DotConnecting:     Shadow{{X: 0, Y: 0, Blur: 0, Spread: 3, Color: Palette.AmberA.A18}},
 			Popover:           Palette.Shadow.Popover,
 			Dialog:            Shadow{{X: 0, Y: 10, Blur: 30, Spread: 0, Color: Palette.BlackA.A30}},
+			Modal:             Shadow{{X: 0, Y: 0, Blur: 0, Spread: 0.5, Color: Palette.Black.A12}, {X: 0, Y: 24, Blur: 64, Spread: 0, Color: color.NRGBA{R: 0x00, G: 0x00, B: 0x00, A: 0x38}}, {X: 0, Y: 4, Blur: 16, Spread: 0, Color: Palette.Black.A08}},
+			InputFocus:        Shadow{{X: 0, Y: 0, Blur: 0, Spread: 1.5, Color: Palette.Blue.N500, Inset: true}, {X: 0, Y: 0, Blur: 0, Spread: 3, Color: Palette.BlueA.A16}},
+			InputError:        Shadow{{X: 0, Y: 0, Blur: 0, Spread: 1.5, Color: Palette.Red.N500, Inset: true}, {X: 0, Y: 0, Blur: 0, Spread: 3, Color: color.NRGBA{R: 0xff, G: 0x3b, B: 0x30, A: 0x24}}},
+			SwitchKnob:        Shadow{{X: 0, Y: 1, Blur: 2, Spread: 0, Color: color.NRGBA{R: 0x00, G: 0x00, B: 0x00, A: 0x33}}},
+			ThemeSelected:     Shadow{{X: 0, Y: 0, Blur: 0, Spread: 3, Color: Palette.BlueA.A16}},
 		},
 		Glass: Glass{
 			Fade: GlassFade{
@@ -2703,57 +3066,63 @@ func lightSemantic() Semantic {
 			PaneRevealBlur: Palette.Blur.N8,
 		},
 		Opacity: Opacities{
-			PaneUnfocusedContent:  Palette.Ratio.N0_5,
-			PaneUnfocusedSaturate: Palette.Ratio.N0_35,
-			PaneUnfocusedStatus:   Palette.Ratio.N0_55,
-			PaneHoverContent:      Palette.Ratio.N0_78,
-			PaneHoverSaturate:     Palette.Ratio.N0_7,
-			DragSource:            Palette.Ratio.N0_4,
-			LiftStackBack:         Palette.Ratio.N0_8,
-			Hidden:                Palette.Ratio.N0,
-			OsTint:                Palette.Ratio.N0_09,
-			DragRotation:          -1,
-			DragPreview:           0.9,
-			PreviewHeader:         0.96,
-			PaneCloseScale:        0.97,
-			DropEdgeRatio:         0.3,
-			PaneActionTint:        0.9,
-			RevealFrom:            Palette.Ratio.N0_6,
-			CapsuleEnterScale:     Palette.Ratio.N0_9,
-			PopoverEnterScale:     Palette.Ratio.N0_96,
-			SplitDefaultRatio:     Palette.Ratio.N0_5,
+			PaneUnfocusedContent:      Palette.Ratio.N0_5,
+			PaneUnfocusedSaturate:     Palette.Ratio.N0_35,
+			PaneUnfocusedStatus:       Palette.Ratio.N0_55,
+			PaneHoverContent:          Palette.Ratio.N0_78,
+			PaneHoverSaturate:         Palette.Ratio.N0_7,
+			DragSource:                Palette.Ratio.N0_4,
+			LiftStackBack:             Palette.Ratio.N0_8,
+			Hidden:                    Palette.Ratio.N0,
+			OsTint:                    Palette.Ratio.N0_09,
+			DragRotation:              -1,
+			DragPreview:               0.9,
+			PreviewHeader:             0.96,
+			PaneCloseScale:            0.97,
+			DropEdgeRatio:             0.3,
+			PaneActionTint:            0.9,
+			RevealFrom:                Palette.Ratio.N0_6,
+			CapsuleEnterScale:         Palette.Ratio.N0_9,
+			PopoverEnterScale:         Palette.Ratio.N0_96,
+			SplitDefaultRatio:         Palette.Ratio.N0_5,
+			Disabled:                  0.4,
+			ModalEnterScale:           0.96,
+			ModalExitScale:            0.98,
+			CollapseContentFadeFactor: 1.6,
 		},
 		Motion: Motion{
 			Duration: MotionDuration{
-				Instant:         Palette.Duration.N0,
-				Lift:            Palette.Duration.N120,
-				Hold:            Palette.Duration.N150,
-				Focus:           Palette.Duration.N160,
-				Collapse:        Palette.Duration.N180,
-				Restore:         Palette.Duration.N220,
-				Cancel:          Palette.Duration.N300,
-				Drop:            Palette.Duration.N320,
-				AutoExpand:      Palette.Duration.N500,
-				Flash:           Palette.Duration.N600,
-				FrameInterval:   16 * time.Millisecond,
-				Zoom:            240 * time.Millisecond,
-				PaneEnter:       220 * time.Millisecond,
-				PaneClose:       160 * time.Millisecond,
-				DividerFade:     120 * time.Millisecond,
-				Sidebar:         220 * time.Millisecond,
-				ScrollbarHold:   700 * time.Millisecond,
-				ScrollbarFade:   180 * time.Millisecond,
-				InstantNonzero:  1 * time.Nanosecond,
-				Exit:            Palette.Duration.N120,
-				AutoHide:        Palette.Duration.N3000,
-				Spin:            Palette.Duration.N800,
-				PaneReveal:      Palette.Duration.N220,
-				ConnectionStage: Palette.Duration.N300,
+				Instant:           Palette.Duration.N0,
+				Lift:              Palette.Duration.N120,
+				Hold:              Palette.Duration.N150,
+				Focus:             Palette.Duration.N160,
+				Collapse:          Palette.Duration.N180,
+				Restore:           Palette.Duration.N220,
+				Cancel:            Palette.Duration.N300,
+				Drop:              Palette.Duration.N320,
+				AutoExpand:        Palette.Duration.N500,
+				Flash:             Palette.Duration.N600,
+				FrameInterval:     16 * time.Millisecond,
+				Zoom:              240 * time.Millisecond,
+				PaneEnter:         220 * time.Millisecond,
+				PaneClose:         160 * time.Millisecond,
+				DividerFade:       120 * time.Millisecond,
+				Sidebar:           220 * time.Millisecond,
+				ScrollbarHold:     700 * time.Millisecond,
+				ScrollbarFade:     180 * time.Millisecond,
+				InstantNonzero:    1 * time.Nanosecond,
+				Exit:              Palette.Duration.N120,
+				Spin:              Palette.Duration.N800,
+				PaneReveal:        Palette.Duration.N220,
+				ConnectionStage:   Palette.Duration.N300,
+				Test:              10000 * time.Millisecond,
+				SettingsSwitchOut: 80 * time.Millisecond,
 			},
 			Easing: MotionEasing{
 				Out:    Palette.Easing.EaseOut,
 				Pane:   Bezier{0.2, 0.8, 0.2, 1},
 				Search: Palette.Easing.InOut,
+				In:     Bezier{0.42, 0, 1, 1},
 			},
 			Spring: MotionSpring{
 				Displace: Palette.Spring.Snappy,
@@ -2818,7 +3187,7 @@ func darkOverrides(s *Semantic) {
 	s.Color.Icon.Faint = Palette.Graphite.N400
 	s.Color.Icon.FolderFill = Palette.DarkTint.BlueSubtle
 	s.Color.Accent.Subtle = Palette.DarkTint.BlueSubtle
-	s.Color.Accent.Tint16 = Palette.BlueA.A28
+	s.Color.Accent.Tint16 = Palette.BlueA.A24
 	s.Color.Accent.Tint10 = Palette.BlueA.A18
 	s.Color.Success.Default = Palette.DarkTint.Green400
 	s.Color.Success.Text = Palette.DarkTint.Green300
@@ -2873,6 +3242,12 @@ func darkOverrides(s *Semantic) {
 	s.Color.Border.ControlHover = Palette.Graphite.N550
 	s.Shadow.Dialog = Shadow{{X: 0, Y: 10, Blur: 30, Spread: 0, Color: Palette.BlackA.A50}}
 	s.Color.Fill.Skeleton = Palette.Graphite.N550
+	s.Color.Danger.Tint14 = color.NRGBA{R: 0xff, G: 0x45, B: 0x3a, A: 0x38}
+	s.Color.Scrim = Palette.BlackA.A45
+	s.Shadow.Modal = Shadow{{X: 0, Y: 0, Blur: 0, Spread: 0.5, Color: Palette.WhiteA.A12}, {X: 0, Y: 24, Blur: 64, Spread: 0, Color: color.NRGBA{R: 0x00, G: 0x00, B: 0x00, A: 0x8c}}, {X: 0, Y: 4, Blur: 16, Spread: 0, Color: Palette.BlackA.A30}}
+	s.Shadow.InputFocus = Shadow{{X: 0, Y: 0, Blur: 0, Spread: 1.5, Color: Palette.Blue.N500, Inset: true}, {X: 0, Y: 0, Blur: 0, Spread: 3, Color: Palette.BlueA.A24}}
+	s.Shadow.InputError = Shadow{{X: 0, Y: 0, Blur: 0, Spread: 1.5, Color: Palette.DarkTint.Red400, Inset: true}, {X: 0, Y: 0, Blur: 0, Spread: 3, Color: color.NRGBA{R: 0xff, G: 0x45, B: 0x3a, A: 0x38}}}
+	s.Shadow.ThemeSelected = Shadow{{X: 0, Y: 0, Blur: 0, Spread: 3, Color: Palette.BlueA.A24}}
 }
 
 func buildComponents(s *Semantic) Components {
@@ -3000,6 +3375,7 @@ func buildComponents(s *Semantic) Components {
 			KbdRadius:    s.Radius.Keycap,
 			Transition:   s.Motion.Duration.Focus,
 			Easing:       s.Motion.Easing.Search,
+			LineHeight:   s.Font.LineHeight.Input,
 		},
 		GroupHeader: GroupHeaderTokens{
 			Height:        s.Size.GroupRow,
@@ -3549,7 +3925,6 @@ func buildComponents(s *Semantic) Components {
 			Error:         s.Color.Danger.Text,
 			Enter:         s.Motion.Spring.Smooth,
 			Exit:          s.Motion.Duration.Exit,
-			AutoHide:      s.Motion.Duration.AutoHide,
 			EnterScale:    s.Opacity.CapsuleEnterScale,
 			PaddingLeft:   s.Space.N7,
 			PaddingRight:  s.Space.N9,
@@ -3649,22 +4024,228 @@ func buildComponents(s *Semantic) Components {
 			GridIconSize:     s.Size.FileGridIconSize,
 		},
 		Input: InputTokens{
-			Height:      s.Size.Control,
-			PaddingX:    s.Space.N9,
-			Radius:      s.Radius.Control,
-			Bg:          s.Color.Surface.Control,
-			Text:        s.Color.Text.Primary,
-			FontSize:    s.Font.Size.Body,
-			Border:      s.Color.Border.Control,
-			BorderHover: s.Color.Border.ControlHover,
-			BorderFocus: s.Color.Accent.Default,
-			BorderWidth: s.Size.Divider,
-			Transition:  s.Motion.Duration.Focus,
+			Height:         s.Size.Control,
+			PaddingX:       s.Space.N9,
+			Radius:         s.Radius.Control,
+			Bg:             s.Color.Surface.Card,
+			Text:           s.Color.Text.Primary,
+			FontSize:       s.Font.Size.Body,
+			Border:         s.Color.Border.Control,
+			BorderHover:    s.Color.Border.SeparatorWindow,
+			BorderFocus:    s.Color.Accent.Default,
+			BorderWidth:    s.Size.Divider,
+			Transition:     s.Motion.Duration.Focus,
+			Gap:            s.Space.N7,
+			FocusShadow:    s.Shadow.InputFocus,
+			ErrorShadow:    s.Shadow.InputError,
+			Placeholder:    s.Color.Text.Placeholder,
+			Icon:           s.Color.Text.Tertiary,
+			MonoFont:       s.Font.Family.Mono,
+			MonoSize:       s.Size.InputMonoSize,
+			MonoTracking:   s.Font.Tracking.InputMono,
+			DisabledBg:     s.Color.Surface.Field,
+			DisabledText:   s.Color.Text.Disabled,
+			DisabledBorder: s.Color.Border.Subtle,
+			Caret:          s.Color.Accent.Default,
+			ChipHeight:     s.Size.ControlXs,
+			ChipRadius:     s.Radius.Chip,
+			ChipBg:         s.Color.Surface.Control,
+			ChipFontSize:   s.Font.Size.Footnote,
+			SelectWidth:    s.Size.TransferProgressWidth,
+			PortWidth:      s.Size.FormLabel,
+			NumberWidth:    s.Size.FormLabel,
+			LineHeight:     s.Font.LineHeight.Input,
 		},
 		PaneReveal: PaneRevealTokens{
 			Blur:     s.Glass.PaneRevealBlur,
 			Duration: s.Motion.Duration.PaneReveal,
 			Easing:   s.Motion.Easing.Out,
+		},
+		Modal: ModalTokens{
+			Width:               s.Size.Modal,
+			Radius:              s.Radius.Window,
+			Bg:                  s.Color.Surface.Card,
+			Shadow:              s.Shadow.Modal,
+			Scrim:               s.Color.Scrim,
+			TopRatio:            s.Size.ModalTopRatio,
+			TopMin:              s.Size.ModalTopMin,
+			BottomMargin:        s.Space.N24,
+			HeaderPaddingTop:    s.Space.N18,
+			HeaderPaddingRight:  s.Space.N16,
+			HeaderPaddingBottom: s.Space.N14,
+			HeaderPaddingLeft:   s.Space.N24,
+			HeaderGap:           s.Space.N12,
+			IconTile:            s.Size.ModalIconTile,
+			IconTileRadius:      s.Radius.RailButton,
+			TitleSize:           s.Font.Size.Title,
+			TitleWeight:         s.Font.Weight.Semibold,
+			SubtitleSize:        s.Font.Size.Footnote,
+			Subtitle:            s.Color.Text.Secondary,
+			BodyPaddingX:        s.Space.N24,
+			Divider:             s.Color.Border.Divider,
+			FooterPaddingTop:    s.Space.N14,
+			FooterPaddingRight:  s.Space.N16,
+			FooterPaddingBottom: s.Space.N16,
+			FooterPaddingLeft:   s.Space.N24,
+			FooterGap:           s.Space.N8,
+			ButtonPaddingX:      s.Space.N12,
+			EnterScale:          s.Opacity.ModalEnterScale,
+			ExitScale:           s.Opacity.ModalExitScale,
+			Enter:               s.Motion.Spring.Smooth,
+			Fade:                s.Motion.Duration.Focus,
+			Exit:                s.Motion.Duration.Exit,
+			ReduceFade:          s.Motion.Duration.Focus,
+			GenerateWidth:       s.Size.CredentialModal,
+			ProtocolRadius:      s.Radius.Lift,
+			ProtocolPadding:     s.Space.N3,
+			ProtocolIcon:        s.Size.ControlXs,
+		},
+		FormRow: FormRowTokens{
+			LabelWidth:      s.Size.FormLabel,
+			LabelGap:        s.Space.N12,
+			RowGap:          s.Space.N12,
+			Label:           s.Color.Text.Muted,
+			LabelSize:       s.Font.Size.Body,
+			LabelHeight:     s.Size.Control,
+			Error:           s.Color.Danger.Text,
+			ErrorSize:       s.Font.Size.Footnote,
+			ErrorIcon:       s.Size.FormErrorIcon,
+			ErrorGap:        s.Space.N5,
+			Description:     s.Color.Text.Tertiary,
+			DescriptionSize: s.Font.Size.Footnote,
+			DescGap:         s.Space.N4,
+		},
+		TestResult: TestResultTokens{
+			Gap:         s.Space.N6,
+			FontSize:    s.Font.Size.Small,
+			Icon:        s.Size.IconSm,
+			SpinnerSize: s.Size.TestSpinner,
+			Testing:     s.Color.Text.Secondary,
+			Success:     s.Color.Success.Text,
+			SuccessIcon: s.Color.Success.Default,
+			Fail:        s.Color.Danger.Text,
+			FailIcon:    s.Color.Danger.Default,
+			Info:        s.Color.Text.Tertiary,
+			InfoSize:    s.Size.FormErrorIcon,
+			Crossfade:   s.Motion.Duration.Focus,
+		},
+		Collapse: CollapseTokens{
+			HeaderHeight:      s.Size.Titlebar,
+			Chevron:           s.Size.CollapseChevron,
+			ChevronStroke:     s.Size.CollapseChevronStroke,
+			ChevronColor:      s.Color.Text.Secondary,
+			Title:             s.Color.Text.Primary,
+			TitleSize:         s.Font.Size.BodyLg,
+			TitleWeight:       s.Font.Weight.Semibold,
+			Summary:           s.Color.Text.Tertiary,
+			SummarySize:       s.Font.Size.Small,
+			Duration:          s.Motion.Duration.Collapse,
+			ChevronRotate:     s.Size.CollapseChevronRotate,
+			ContentFadeFactor: s.Opacity.CollapseContentFadeFactor,
+		},
+		Switch: SwitchTokens{
+			W:          s.Size.SwitchWidth,
+			H:          s.Size.SwitchHeight,
+			KnobSize:   s.Size.SwitchKnob,
+			Inset:      s.Space.N2,
+			Off:        s.Color.Border.Keycap,
+			On:         s.Color.Accent.Default,
+			Knob:       s.Color.Text.OnAccent,
+			KnobShadow: s.Shadow.SwitchKnob,
+			Animation:  s.Motion.Spring.Smooth,
+		},
+		Settings: SettingsTokens{
+			NavWidth:            s.Size.Sider,
+			NavItemHeight:       s.Size.ModalIconTile,
+			NavItemRadius:       s.Radius.Control,
+			NavItemOn:           s.Color.Accent.Subtle,
+			NavTextOn:           s.Color.Text.AccentStrong,
+			NavIconOn:           s.Color.Accent.Default,
+			NavIconTile:         s.Size.ControlXs,
+			HeaderPaddingTop:    s.Space.N16,
+			HeaderPaddingRight:  s.Space.N14,
+			HeaderPaddingBottom: s.Space.N14,
+			HeaderPaddingLeft:   s.Size.SettingsHeaderPaddingX,
+			TitleSize:           s.Font.Size.Title,
+			TitleWeight:         s.Font.Weight.Semibold,
+			SubtitleSize:        s.Font.Size.Footnote,
+			Subtitle:            s.Color.Text.Secondary,
+			Close:               s.Size.Control,
+			ContentMax:          s.Size.SettingsContent,
+			ContentPaddingY:     s.Space.N20,
+			ContentPaddingX:     s.Size.SettingsHeaderPaddingX,
+			GroupTitleSize:      s.Font.Size.Small,
+			GroupTitleWeight:    s.Font.Weight.Semibold,
+			GroupTitle:          s.Color.Text.Muted,
+			GroupTitleGap:       s.Space.N8,
+			GroupGap:            s.Space.N22,
+			GroupBg:             s.Color.Surface.Zebra,
+			GroupRadius:         s.Radius.Card,
+			GroupBorder:         s.Color.Border.Raised,
+			GroupBorderWidth:    s.Size.Hairline,
+			RowMinHeight:        s.Size.SettingsRowHeight,
+			RowPaddingY:         s.Space.N9,
+			RowPaddingX:         s.Space.N14,
+			RowDivider:          s.Color.Border.Subtle,
+			RowDividerInset:     s.Space.N14,
+			RowLabelSize:        s.Font.Size.BodyLg,
+			RowLabel:            s.Color.Text.Primary,
+			RowDescSize:         s.Font.Size.Footnote,
+			RowDesc:             s.Color.Text.Secondary,
+			GroupFootnoteSize:   s.Font.Size.Footnote,
+			GroupFootnote:       s.Color.Text.Tertiary,
+			FadeHeight:          s.Size.SettingsFadeHeight,
+			EnterY:              s.Space.N8,
+			ExitY:               s.Space.N4,
+			Enter:               s.Motion.Spring.Smooth,
+			Fade:                s.Motion.Duration.Focus,
+			Exit:                s.Motion.Duration.Exit,
+			SwitchY:             s.Space.N4,
+			SwitchFadeOut:       s.Motion.Duration.SettingsSwitchOut,
+			SwitchFadeIn:        s.Motion.Duration.Exit,
+			SelectWidth:         s.Size.SettingsSelect,
+			NumberWidth:         s.Size.SettingsNumber,
+			ScrollbackWidth:     s.Size.SettingsScrollback,
+		},
+		SchemeCard: SchemeCardTokens{
+			Radius:            s.Radius.Lift,
+			Padding:           s.Space.N5,
+			Border:            s.Color.Surface.ControlStrong,
+			BorderWidth:       s.Size.Divider,
+			Selected:          s.Color.Accent.Default,
+			SelectedWidth:     s.Size.ProgressThin,
+			PreviewHeight:     s.Size.SchemePreviewHeight,
+			PreviewRadius:     s.Radius.ControlSm,
+			PreviewFontSize:   s.Size.SchemePreviewFont,
+			PreviewLineHeight: s.Size.SchemePreviewLineHeight,
+			StripeHeight:      s.Size.Progress,
+			StripeRadius:      s.Radius.Hair,
+			StripeGap:         s.Space.N2,
+			NameSize:          s.Font.Size.Small,
+			NameWeight:        s.Font.Weight.Medium,
+			BadgeSize:         s.Font.Size.Caption2,
+			BadgeWeight:       s.Font.Weight.Semibold,
+			BadgeBg:           s.Color.Accent.Subtle,
+			BadgeText:         s.Color.Text.Accent,
+			BadgeIcon:         s.Size.SchemeBadgeIcon,
+		},
+		ThemeCard: ThemeCardTokens{
+			Aspect:         s.Size.ThemeAspect,
+			Radius:         s.Radius.Lift,
+			Border:         s.Color.Surface.ControlStrong,
+			BorderWidth:    s.Size.Divider,
+			Selected:       s.Color.Accent.Default,
+			SelectedWidth:  s.Size.ProgressThin,
+			SelectedShadow: s.Shadow.ThemeSelected,
+			Radio:          s.Size.ThemeRadio,
+			RadioRing:      s.Size.ThemeRadioRing,
+		},
+		AccentSwatch: AccentSwatchTokens{
+			Size:      s.Size.AccentSwatch,
+			Gap:       s.Space.N10,
+			RingGap:   s.Size.AccentRingGap,
+			RingWidth: s.Size.AccentRing,
+			RingInset: s.Color.Surface.Card,
 		},
 	}
 }

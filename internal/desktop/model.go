@@ -22,6 +22,7 @@ const (
 type hostID int
 
 type host struct {
+	session             sessionConfig
 	name, user, address string
 	protocol            string
 	system, uptime      string
@@ -47,6 +48,7 @@ type workspaceTab struct {
 }
 
 type remoteSession struct {
+	config                      sessionConfig
 	id                          int
 	host                        hostID
 	state                       connectionState
@@ -128,6 +130,7 @@ func (a *app) newSession(id hostID) *remoteSession {
 
 func (a *app) connectSession(session *remoteSession) {
 	h := a.hosts[session.host]
+	session.config = h.session
 	session.state, session.connectionStarted, session.connectionStep = connecting, time.Time{}, 0
 	session.hasNewOutput, session.hasBell = false, false
 	session.scroll.offset.Y = math.MaxFloat32
@@ -197,6 +200,7 @@ func (a *app) focusSession(tab *workspaceTab, session *remoteSession) {
 }
 
 func (a *app) activateTab(index int) {
+	a.closeSettings()
 	a.activeTab = index
 	tab := a.tabs[index]
 	a.focusSession(tab, tab.focused)
@@ -228,6 +232,9 @@ func (a *app) openHost(id hostID) {
 }
 
 func (a *app) closeTab(index int) {
+	if a.tabs[index].root != nil {
+		a.closedTabs = append(a.closedTabs, closedWorkspaceTab{host: a.tabs[index].focused.host, section: sectionSSH})
+	}
 	closedActive := index == a.activeTab
 	a.tabs = append(a.tabs[:index], a.tabs[index+1:]...)
 	switch {
@@ -238,8 +245,8 @@ func (a *app) closeTab(index int) {
 	case a.activeTab >= len(a.tabs):
 		a.activeTab = len(a.tabs) - 1
 	}
-	if closedActive && len(a.tabs) > 0 {
-		a.activateTab(a.activeTab)
+	if closedActive && len(a.tabs) > 0 && a.activeSection() == sectionSSH {
+		a.focusWorkspace()
 	}
 }
 
@@ -287,7 +294,7 @@ func (a *app) closePane(session *remoteSession) {
 func (a *app) removePane(tab *workspaceTab, session *remoteSession) {
 	tab.root = tab.root.remove(session)
 	if tab.focused == session {
-		if tab == a.currentTab() {
+		if tab == a.currentTab() && a.activeSection() == sectionSSH {
 			a.focusSession(tab, tab.root.firstSession())
 		} else {
 			tab.focused = tab.root.firstSession()
