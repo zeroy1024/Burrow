@@ -262,13 +262,14 @@ func Run() error {
 			BackgroundColor:      windowColor(t.C.Window.Bg),
 			Content:              ui.View(a.view),
 		})
+		a.startCatalogMigration()
 		a.window.OnClose(func(e *mygo.CloseEvent) {
 			if a.quitPending {
 				e.PreventDefault()
 				a.window.Hide()
 				return
 			}
-			if a.credentials.busy || a.savingSession() {
+			if a.credentials.busy || a.savingSession() || a.catalogMigrationBusy() {
 				a.resetQuitAttempt()
 				e.PreventDefault()
 				a.files.notice = &uikit.ToastProps{ID: "save-before-close", Tone: uikit.ToneWarning, Title: "正在保存凭据，完成后再关闭窗口。"}
@@ -316,7 +317,7 @@ func Run() error {
 			e.PreventDefault()
 			return
 		}
-		if a.credentials.busy || a.savingSession() || a.files.dialog != nil && a.files.dialog.busy {
+		if a.credentials.busy || a.savingSession() || a.catalogMigrationBusy() || a.files.dialog != nil && a.files.dialog.busy {
 			a.resetQuitAttempt()
 			e.PreventDefault()
 			a.files.notice = &uikit.ToastProps{ID: "work-before-quit", Tone: uikit.ToneWarning, Title: "文件或凭据操作进行中，完成后再退出。"}
@@ -434,10 +435,7 @@ func (a *app) view(c *ui.Context) {
 			a.catalogDragPreview(c)
 		}
 	})
-	if a.catalogError != nil {
-		uikit.Toast(c, uikit.ToastProps{Title: "无法加载主机配置", Detail: a.catalogError.Error(), Tone: uikit.ToneDanger})
-		a.catalogError = nil
-	}
+	a.showCatalogMigrationError(c)
 	if a.terminalError != nil {
 		uikit.Toast(c, uikit.ToastProps{Title: "终端设置", Detail: a.terminalError.Error(), Tone: uikit.ToneDanger})
 		a.terminalError = nil

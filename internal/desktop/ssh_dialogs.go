@@ -14,6 +14,7 @@ import (
 type sshPrompt struct {
 	ctx                  context.Context
 	title, address       string
+	confirmLabel, detail string
 	fingerprint, keyType string
 	secret               string
 	open                 bool
@@ -74,13 +75,20 @@ func (a *app) sshDialogs(c *ui.Context) {
 			ui.Text(c, fmt.Sprintf("%s\n%s", p.keyType, p.fingerprint)).FontSize(t.Font.Size.Small).Selectable()
 		} else {
 			uikit.PasswordInput(c, &p.secret, uikit.InputProps{Label: p.title, Mono: true}).Input.FillWidth().AutoFocus()
-			uikit.Text(c, "仅用于本次连接，不保存到配置。", uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneSecondary})
+			detail := p.detail
+			if detail == "" {
+				detail = "仅用于本次连接，不保存到配置。"
+			}
+			uikit.Text(c, detail, uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneSecondary})
 		}
 		ui.Row(c).Justify(ui.End).Gap(t.Space.N8).Children(func() {
 			uikit.Button(c, "取消", uikit.ButtonProps{}).OnClick(parts.RequestDismiss)
 			label := "连接"
 			if p.fingerprint != "" {
 				label = "信任并连接"
+			}
+			if p.confirmLabel != "" {
+				label = p.confirmLabel
 			}
 			uikit.Button(c, label, uikit.ButtonProps{Variant: uikit.ButtonPrimary}).OnClick(func() { answer(true) })
 		})

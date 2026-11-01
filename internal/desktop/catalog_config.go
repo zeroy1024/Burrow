@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -20,6 +21,7 @@ type catalogConfigState struct {
 	legacyPath string
 	loadErr    error
 	migrated   bool
+	migration  catalogMigrationState
 }
 
 type catalogConfig struct {
@@ -289,9 +291,21 @@ func (a *app) importLegacyCatalog(directory string) (result error) {
 	created := []string{}
 	defer func() {
 		if result != nil {
-			result = errors.Join(result, discardMigrationFiles(created))
+			cleanupErr := discardMigrationFiles(created)
+			if cleanupErr != nil && a.catalogConfig.migration.plan != nil {
+				a.catalogConfig.migration.unpublished = slices.Clone(created)
+			}
+			result = errors.Join(result, cleanupErr)
 		}
 	}()
+	metadata, err := json.Marshal(config)
+	if err != nil {
+		return err
+	}
+	plan := &catalogMigrationPlan{
+		directory: directory, destination: a.catalogConfig.path,
+		metadata: metadata, keySources: maps.Clone(keySources),
+	}
 	imported := map[string]managedKey{}
 	for index := range config.Hosts {
 		path := keySources[hostID(index)]
@@ -301,8 +315,12 @@ func (a *app) importLegacyCatalog(directory string) (result error) {
 		key, exists := imported[path]
 		if !exists {
 			var files []string
-			key, files, err = copyLegacyPrivateKey(path, directory)
+			key, files, err = copyLegacyPrivateKey(path, directory, nil)
 			created = append(created, files...)
+			if errors.Is(err, errLegacyPrivateKeyLocked) {
+				a.catalogConfig.migration.plan = plan
+				return errCatalogMigrationDeferred
+			}
 			if err != nil {
 				return fmt.Errorf("import legacy private key: %w", err)
 			}

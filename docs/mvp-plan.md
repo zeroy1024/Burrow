@@ -83,3 +83,10 @@
 
 
 补充取消语义：原型冲突框取消会终止本次选择的剩余项；现在按批次取消尚未完成任务、清同批冲突，保留Done和其他批次。追加真实hidden `-race` 单分支复验通过，实际Cancel1次、同批part清零、Done内容保留且独立8MiB任务hash一致。证据 `/private/tmp/sshdesk-queue-cancel-b5wbz7br/verification-summary.json`。最终全项目race/vet/build和原生打包已通过；取消分支修改后再做desktop检查及最终打包，不把旧包当当前产物。
+
+
+## 旧加密PEM目录迁移补齐
+
+此前因缺少内嵌公钥而直接失败的路径，已由真实延迟迁移替代。启动读取仅保留不可变候选元数据；窗口就绪后取得用户提供的本次解密口令，真实计算公钥和指纹，复制加密原文件，完整验证后发布目录。错误或取消会清理未发布副本，持续重试沿用同一计划；口令不写入配置或钥匙串。入口和发布前均检查打开的目录草稿及独立密钥任务，不丢弃草稿；成功后清理旧目录临时引用，保留稳定句柄和运行会话。
+
+受控原生hidden `-race`验证4个主场景、7入口guard及发布前draft guard通过，源文件字节/权限/mtime不变；最后transient-reset microcase验证两scope新建组正确且稳定句柄保留。Secrets Get/Set/Delete边界panic trap均未调用。原4case和补充case分别保存源码hash，未篡改先前证据。路径 `/private/tmp/sshdesk-pem-migration-dhiayfcz/runner/result.json`、`supplement-manifest.json`。最终desktop竞态测试、vet与原生签名打包通过，构建时间晚于最后迁移源修改。

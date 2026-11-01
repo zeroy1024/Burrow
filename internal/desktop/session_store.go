@@ -324,7 +324,9 @@ func validateSessionProfile(h host, byID map[string]host, keyIDs map[string]bool
 
 // Legacy catalogs referenced external files. Copy each one into the managed
 // store without changing the original or creating a new credential-store entry.
-func copyLegacyPrivateKey(source, directory string) (managedKey, []string, error) {
+var errLegacyPrivateKeyLocked = errors.New("旧私钥需要口令才能读取公钥")
+
+func copyLegacyPrivateKey(source, directory string, unlock func() ([]byte, error)) (managedKey, []string, error) {
 	info, err := os.Stat(source)
 	if err != nil {
 		return managedKey{}, nil, err
@@ -343,7 +345,24 @@ func copyLegacyPrivateKey(source, directory string) (managedKey, []string, error
 	if errors.As(err, &encrypted) {
 		public = encrypted.PublicKey
 		if public == nil {
-			return managedKey{}, nil, errors.New("cannot migrate this encrypted private key without its passphrase: its format has no embedded public metadata")
+			if unlock == nil {
+				return managedKey{}, nil, errLegacyPrivateKeyLocked
+			}
+			passphrase, unlockErr := unlock()
+			if unlockErr != nil {
+				clear(passphrase)
+				return managedKey{}, nil, unlockErr
+			}
+			raw, err = ssh.ParseRawPrivateKeyWithPassphrase(data, passphrase)
+			clear(passphrase)
+			if err != nil {
+				return managedKey{}, nil, fmt.Errorf("解锁旧私钥失败：%w", err)
+			}
+			signer, err := ssh.NewSignerFromKey(raw)
+			if err != nil {
+				return managedKey{}, nil, err
+			}
+			public = signer.PublicKey()
 		}
 	} else if err != nil {
 		return managedKey{}, nil, fmt.Errorf("parse legacy private key: %w", err)
@@ -398,7 +417,7 @@ func copyLegacyPrivateKey(source, directory string) (managedKey, []string, error
 func discardMigrationFiles(paths []string) error {
 	var result error
 	for _, path := range paths {
-		if err := os.Remove(path); err != nil {
+		if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
 			result = errors.Join(result, fmt.Errorf("remove unpublished migrated key: %w", err))
 		}
 	}
