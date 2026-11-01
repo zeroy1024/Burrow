@@ -8,6 +8,18 @@ import (
 	"sshdesk/internal/theme"
 )
 
+// ShortcutTable keeps the native editing semantics and the caller's stable list
+// handle; its cell content and recording actions remain application-owned.
+func ShortcutTable(c *ui.Context, state *ui.ListState, label, actionTitle, bindingTitle string, count int, cell func(int, int)) ui.Element {
+	p := theme.Current().C.Settings
+	columns := []ui.TableColumn{
+		{ID: "action", Title: actionTitle, Width: p.ContentMax / 2},
+		{ID: "binding", Title: bindingTitle, Width: p.ContentMax / 3},
+		{ID: "controls", Title: actionTitle, Width: p.ContentMax / 6},
+	}
+	return ui.Table(c, state, columns, count, cell).FillWidth().Height(float32(count+1) * p.RowMinHeight).Label(label)
+}
+
 type SettingsGroupProps struct {
 	Key       any
 	Title     string
