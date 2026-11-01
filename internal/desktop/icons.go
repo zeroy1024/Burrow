@@ -110,16 +110,18 @@ var systems = []systemStyle{
 	{name: "Arch", color: color.NRGBA{R: 0x15, G: 0x99, B: 0xd3, A: 0xff}, icon: archIcon},
 }
 
+func init() {
+	for _, system := range systems {
+		uikit.RegisterOS(system.name, uikit.OSAsset{Icon: system.icon, Brand: system.color})
+	}
+}
+
 var (
-	folderIcon = ui.MustParseSVG([]byte(`
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-     stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+	folderIcon = uikit.LineIcon(`
   <path d="M20 20H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h5l2 2h9a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2Z"/>
-</svg>`))
-	folderLockIcon = ui.MustParseSVG([]byte(`
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-     stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+`)
+	folderLockIcon = uikit.LineIcon(`
   <path d="M8 20H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h5l2 2h9a2 2 0 0 1 2 2v2"/>
   <rect x="12" y="15" width="10" height="7" rx="2"/><path d="M15 15v-2a2 2 0 0 1 4 0v2"/>
-</svg>`))
+`)
 )

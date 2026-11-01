@@ -18,6 +18,7 @@ func localizeTag(tag, text string) string {
 }
 
 var settingsEnglish = map[string]string{
+	"拆分会话":   "Ungroup sessions",
 	"搜索当前页面": "Search current page",
 	"设置…":    "Settings…",
 	"设置":     "Settings", "通用": "General", "外观": "Appearance", "终端": "Terminal", "文件传输": "File Transfer", "快捷键": "Keyboard Shortcuts", "密钥与凭据": "Keys & Credentials", "关于": "About",

@@ -42,7 +42,7 @@ func (a *app) importedThemeMenu(c *ui.Context, name string) func(*ui.Menu) {
 		}
 		if menu.Item(label).Disabled(reason != "").Chosen() {
 			if err := a.deleteImportedTheme(name); err != nil {
-				uikit.Notify(c, "删除配色失败："+err.Error())
+				uikit.Toast(c, uikit.ToastProps{Tone: uikit.ToneDanger, Title: "删除配色失败", Detail: err.Error()})
 			}
 		}
 	}
@@ -71,30 +71,15 @@ func (a *app) deleteImportedTheme(name string) error {
 
 func (a *app) settingsSchemeSelect(c *ui.Context, label string, value *string) bool {
 	t := theme.Current()
-	p := t.C.Input
 	previous := *value
-	parts := ui.SelectBase(c.Key(label), value)
-	uikit.StyleSelect(parts.Trigger, localize(c, label)).Width(t.C.Settings.SelectWidth).Gap(p.Gap).Children(func() {
-		if scheme, ok := termtheme.Lookup(*value); ok {
-			ui.Box(c).Size(t.Size.IconSm, t.Size.IconSm).Radius(t.Radius.Chip).Background(uikit.Color(scheme.Background)).Border(t.Size.Hairline, uikit.Color(p.Border)).PassThrough()
-		}
-		ui.Text(c, *value).FontSize(p.FontSize).Grow(1).MinWidth(0).SingleLine().PassThrough()
-		ui.Icon(c, chevronIcon).Size(t.Size.IconSm, t.Size.IconSm).TextColor(uikit.Color(p.Icon)).PassThrough()
-	})
-	uikit.StyleFormControl(parts.Trigger, "")
-	parts.Popup(func(panel ui.Element) {
-		uikit.StyleSelectPopup(panel).Radius(t.Radius.Popover).MaxHeight(t.C.Settings.ContentMax / 2)
-		for _, name := range termtheme.Names() {
-			item := parts.Item(name).Height(p.Height).Padding(0, t.C.Menu.ItemPaddingX).Gap(t.Space.N8).Radius(t.C.Menu.ItemRadius)
-			if item.Highlighted() {
-				item.Background(uikit.Color(t.Color.State.Hover))
-			}
-			item.Children(func() {
-				scheme, _ := termtheme.Lookup(name)
-				ui.Box(c).Size(t.Size.IconSm, t.Size.IconSm).Radius(t.Radius.Chip).Background(uikit.Color(scheme.Background)).PassThrough()
-				ui.Text(c, name).FontSize(p.FontSize).PassThrough()
-			})
-		}
-	})
+	options := make([]uikit.Option[string], 0, len(termtheme.Names()))
+	for _, name := range termtheme.Names() {
+		scheme, _ := termtheme.Lookup(name)
+		options = append(options, uikit.Option[string]{Value: name, Label: name, Leading: func() {
+			ui.Box(c).Size(t.Size.IconSm, t.Size.IconSm).Radius(t.Radius.Chip).
+				Background(uikit.Color(scheme.Background)).Border(t.Size.Hairline, uikit.Color(t.C.Input.Border)).PassThrough()
+		}})
+	}
+	uikit.Select(c.Key(label), value, options, uikit.SelectProps{Label: localize(c, label)}).Width(t.C.Settings.SelectWidth)
 	return *value != previous
 }

@@ -13,46 +13,42 @@ func FilePanels(c *ui.Context) ui.Element {
 	return ui.Box(c).Key("file-panels").Grow(1).FillWidth().MinWidth(0).MinHeight(0).ClipX()
 }
 
-func FilePane(c *ui.Context, key any, label string, focus *ui.Handle) ui.Element {
-	t := theme.Current()
-	card := ui.Box(c).Key(key).Fill().Radius(t.C.Card.Radius).Background(Color(t.C.Card.Bg)).Clip().
-		Focusable().FocusRing(false).Bind(focus).Label(label)
-	card.DrawOver(func(p *ui.Painter, rect ui.Rect) {
-		p.Stroke(rect, Color(t.Color.Border.Card), t.C.Card.Radius, t.Size.Divider)
-	})
-	return card
+func FilePane(c *ui.Context, key any, label string, focus *ui.Handle, focused bool) ui.Element {
+	return Pane(c, PaneProps{Key: key, Kind: PaneFile, Label: label, Focused: focused}).Fill().
+		Focusable().FocusRing(false).Bind(focus)
 }
 
 func FilePaneHeader(c *ui.Context) ui.Element {
 	t := theme.Current()
-	return ui.Row(c).Height(t.C.FilePane.HeaderHeight).Padding(0, t.Space.N8).
+	return PaneHeader(c, HeaderProps{Density: DensityToolbar}).Root.Height(t.C.FilePane.HeaderHeight).Padding(0, t.Space.N8).
 		Gap(t.C.FilePane.ToolGap).FillWidth()
 }
 
 type PaneToggleProps struct {
 	Label        string
+	Shortcut     string
 	Icon, IconOn *ui.SVG
 }
 
 func PaneToggle(c *ui.Context, on *bool, props PaneToggleProps) ui.Element {
 	t := theme.Current()
 	p := t.C.PaneToggle
-	toggle := Tip(c, ui.ToggleBase(c, on).Size(p.Size, p.Size).Radius(p.Radius).Label(props.Label), props.Label)
-	bg, ink, glyph := ui.Transparent, Color(p.Icon), props.Icon
-	if toggle.Hovered() {
-		bg = Color(p.BgHover)
-	}
-	if *on {
-		bg, ink, glyph = Color(p.BgOn), Color(p.IconOn), props.IconOn
-	}
-	animation := Tween(p.Transition)
-	return toggle.Background(toggle.AnimateColor("bg", bg, animation)).TextColor(toggle.AnimateColor("fg", ink, animation)).
-		Children(func() { ui.Icon(c, glyph).Size(t.C.IconButton.IconSize, t.C.IconButton.IconSize) })
+	surface := *t
+	surface.C.IconButton.Size, surface.C.IconButton.Radius = p.Size, p.Radius
+	surface.C.IconButton.Icon, surface.C.IconButton.IconOn = p.Icon, p.IconOn
+	surface.C.IconButton.BgHover, surface.C.IconButton.BgOn = p.BgHover, p.BgOn
+	surface.C.IconButton.Transition = p.Transition
+	return IconButton(c, props.Icon, IconButtonProps{Label: props.Label, Shortcut: props.Shortcut,
+		On: on, IconOn: props.IconOn, Surface: &surface})
 }
 
-func FilePaneFooter(c *ui.Context) ui.Element {
+func FilePaneFooter(c *ui.Context, props ...FooterProps) ui.Element {
 	t := theme.Current()
-	return ui.Row(c).Absolute().Bottom(0).Left(0).Right(0).Height(t.C.FilePane.StatusHeight).
+	footer := FooterProps{}
+	if len(props) != 0 {
+		footer = props[0]
+	}
+	return PaneFooter(c, footer).Absolute().Bottom(0).Left(0).Right(0).Height(t.C.FilePane.StatusHeight).
 		Padding(0, t.C.StatusBar.PaddingX).Gap(t.Space.N8)
 }
 
@@ -98,9 +94,17 @@ type HistoryParts struct {
 	Back, Forward ui.Element
 }
 
-func HistoryButtons(c *ui.Context, canBack, canForward bool, backIcon, forwardIcon *ui.SVG) HistoryParts {
+type HistoryButtonProps struct {
+	BackShortcut, ForwardShortcut string
+}
+
+func HistoryButtons(c *ui.Context, canBack, canForward bool, backIcon, forwardIcon *ui.SVG, options ...HistoryButtonProps) HistoryParts {
+	props := HistoryButtonProps{}
+	if len(options) != 0 {
+		props = options[0]
+	}
 	return HistoryParts{
-		Back:    IconButton(c, backIcon, IconButtonProps{Key: "后退", Label: "后退"}).Disabled(!canBack),
-		Forward: IconButton(c, forwardIcon, IconButtonProps{Key: "前进", Label: "前进"}).Disabled(!canForward),
+		Back:    IconButton(c, backIcon, IconButtonProps{Key: "后退", Label: "后退", Shortcut: props.BackShortcut, Disabled: !canBack}),
+		Forward: IconButton(c, forwardIcon, IconButtonProps{Key: "前进", Label: "前进", Shortcut: props.ForwardShortcut, Disabled: !canForward}),
 	}
 }

@@ -3,6 +3,7 @@ package uikit
 import (
 	"math"
 	"strconv"
+	"strings"
 
 	"sshdesk/internal/theme"
 
@@ -18,6 +19,18 @@ const (
 	ConnError
 )
 
+func (state ConnState) Label() string {
+	switch state {
+	case ConnConnected:
+		return "已连接"
+	case ConnConnecting:
+		return "连接中"
+	case ConnError:
+		return "连接失败"
+	}
+	return "已断开"
+}
+
 type SessionTabVariant uint8
 
 const (
@@ -31,6 +44,8 @@ type SessionTabProps struct {
 	Selected              bool
 	Variant               SessionTabVariant
 	State                 ConnState
+	ReduceMotion          bool
+	PositionAnimation     ui.Animation
 	Handle                *ui.Handle
 	Extra                 int
 	CloseLabel, DragLabel string
@@ -41,26 +56,30 @@ func SessionTab(c *ui.Context, props SessionTabProps) ui.Element {
 	t := theme.Current()
 	p := t.C.Tab
 	button := ui.ButtonBase(c).Key(props.Key).Height(p.Height).
-		Padding(0, p.PaddingRight, 0, p.PaddingLeft).Gap(p.Gap).Radius(p.Radius)
+		Padding(0, p.PaddingRight, 0, p.PaddingLeft).Gap(p.Gap).Radius(p.Radius).FocusRing(false)
 	if props.Handle != nil {
 		button.Bind(props.Handle)
 	}
 	if props.Variant == SessionTabTerminal {
-		button.Transition(ui.ElementTransition{Position: true, Animation: &ui.Animation{Spring: Spring(t.C.ReorderMotion.TabDisplace)}})
+		button.Transition(ui.ElementTransition{Position: true, Animation: &props.PositionAnimation})
 	}
 	button.AlignItems(ui.Center).Role(ui.RoleTab).Label(props.Title).Selected(props.Selected)
-	foreground := Color(p.Text)
-	if props.Selected {
-		foreground = Color(p.TextSelected)
+	selected := ui.Local(button, "uikit.tabs.selected", func() bool { return false })
+	if props.Selected && !*selected {
+		// Reveal once when opened or selected; allow the user to scroll it
+		// away afterwards without the next frame pulling the strip back.
+		button.ScrollIntoView()
 	}
-	if props.State == ConnDisconnected {
-		foreground = Color(p.TextDisconnected)
-	} else if props.Variant == SessionTabFiles && props.State == ConnError && props.Selected {
-		foreground = Color(p.TextErrorSelected)
-	}
+	*selected = props.Selected
+	foreground := sessionTabForeground(props)
 	animation := Tween(p.StateTransition)
+	hint := props.Hint
+	if hint != "" {
+		hint += " · "
+	}
+	hint += props.State.Label()
 	if props.Variant == SessionTabFiles {
-		Tip(c, button, props.Hint)
+		Tip(c, button, hint)
 		button.TextColor(button.AnimateColor("text", foreground, animation))
 	}
 	background := ui.Transparent
@@ -71,9 +90,12 @@ func SessionTab(c *ui.Context, props SessionTabProps) ui.Element {
 		background = Color(p.BgHover)
 	}
 	button.Background(button.AnimateColor("background", background, animation))
+	if button.FocusVisible() {
+		Shadow(button, t.Shadow.ControlFocus)
+	}
 	if props.Variant == SessionTabTerminal {
 		button.TextColor(button.AnimateColor("text", foreground, animation))
-		Tip(c, button, props.Hint)
+		Tip(c, button, hint)
 	}
 	return button
 }
@@ -82,18 +104,87 @@ type SessionTabParts struct {
 	Close, DragHandle ui.Element
 }
 
+// SessionTabWidth measures the same label and close slot used by live tabs.
+func SessionTabWidth(props SessionTabProps) float32 {
+	t := theme.Current()
+	p := t.C.Tab
+	font := ui.Font{Family: strings.Join(t.Font.Family.Ui, ", "), Size: p.FontSize, Weight: p.WeightSelected}
+	titleWidth, _ := ui.ShapeText(props.Title, font, 0).Size()
+	width := p.PaddingLeft + sessionTabLeadingWidth(props) + titleWidth + t.Size.Icon + 2*p.Gap + p.PaddingRight
+	if props.Extra > 0 {
+		font.Size, font.Weight, font.Features = t.Font.Size.Caption, t.Font.Weight.Regular, "tnum"
+		countWidth, _ := ui.ShapeText("+"+strconv.Itoa(props.Extra), font, 0).Size()
+		width += p.Gap + countWidth
+	}
+	return width
+}
+
+// SessionTabPreview draws a selected tab without input, focus, or tooltip ownership.
+func SessionTabPreview(c *ui.Context, props SessionTabProps) ui.Element {
+	t := theme.Current()
+	p := t.C.Tab
+	props.Selected = true
+	preview := ui.Row(c).Key(props.Key).Height(p.Height).Shrink(0).
+		Padding(0, p.PaddingRight, 0, p.PaddingLeft).Gap(p.Gap).Radius(p.Radius).
+		Center().Background(Color(p.BgSelected)).TextColor(sessionTabForeground(props)).Clip().PassThrough()
+	Shadow(preview, p.ShadowSelected)
+	return preview.Children(func() {
+		sessionTabLabel(c, props)
+		ui.Box(c).Key("close-tab").Size(t.Size.Icon, p.ContentHeight).Shrink(0).Center().PassThrough().Children(func() {
+			ui.Icon(c, props.CloseIcon).Size(t.C.IconButton.IconSize, t.C.IconButton.IconSize).
+				TextColor(Color(t.C.IconButton.Icon)).PassThrough()
+		})
+	})
+}
+
+func sessionTabForeground(props SessionTabProps) ui.Color {
+	p := theme.Current().C.Tab
+	foreground := Color(p.Text)
+	if props.Selected {
+		foreground = Color(p.TextSelected)
+	}
+	if props.State == ConnDisconnected {
+		foreground = Color(p.TextDisconnected)
+	} else if props.Variant == SessionTabFiles && props.State == ConnError && props.Selected {
+		foreground = Color(p.TextErrorSelected)
+	}
+	return foreground
+}
+
+func sessionTabLeadingWidth(props SessionTabProps) float32 {
+	t := theme.Current()
+	if props.Variant == SessionTabTerminal && props.Extra > 0 {
+		return t.Size.IconXs
+	}
+	return t.C.Tab.SpinnerSize
+}
+
+func sessionTabLabel(c *ui.Context, props SessionTabProps) {
+	p := theme.Current().C.Tab
+	ui.Box(c).Width(sessionTabLeadingWidth(props)).Height(p.ContentHeight).Shrink(0).Center().PassThrough().Children(func() {
+		if props.Variant == SessionTabTerminal && props.Extra > 0 {
+			Icon(c, IconGrid, IconProps{Size: SizeXs, Tone: ToneSecondary}).PassThrough()
+			return
+		}
+		StatusDot(c.Key("connection-indicator"), props.State, StatusDotProps{
+			Motion: MotionOverride(props.ReduceMotion),
+		}).PassThrough()
+	})
+	ui.Text(c, props.Title).FontSize(p.FontSize).FontWeight(p.WeightSelected).
+		FixedLineHeight(p.ContentHeight).Top(p.TitleOffset).SingleLine().PassThrough()
+	if props.Extra > 0 {
+		Count(c, props.Extra, CountProps{Style: CountInline}).FixedLineHeight(p.ContentHeight).Top(p.CountOffset)
+	}
+}
+
 // SessionTabContents leaves close, activation, menus and drag ownership with the caller.
 func SessionTabContents(c *ui.Context, root ui.Element, props SessionTabProps) SessionTabParts {
 	t := theme.Current()
 	p := t.C.Tab
-	ui.Box(c).Width(p.SpinnerSize).Height(p.ContentHeight).Shrink(0).Center().Children(func() { TabConnectionIndicator(c, props.State) })
-	ui.Text(c, props.Title).FontSize(p.FontSize).FontWeight(p.WeightSelected).FixedLineHeight(p.ContentHeight).Top(p.TitleOffset).SingleLine()
-	if props.Extra > 0 {
-		ui.Text(c, "+"+strconv.Itoa(props.Extra)).FontSize(t.Font.Size.Caption).FixedLineHeight(p.ContentHeight).Top(p.CountOffset).TextColor(Color(p.Text))
-	}
-	parts := SessionTabParts{Close: IconButton(c, props.CloseIcon, IconButtonProps{Label: props.CloseLabel}).Size(t.Size.Icon, p.ContentHeight)}
+	sessionTabLabel(c, props)
+	parts := SessionTabParts{Close: IconButton(c, props.CloseIcon, IconButtonProps{Key: "close-tab", Label: props.CloseLabel}).Size(t.Size.Icon, p.ContentHeight)}
 	visible := float32(0)
-	if props.Selected || root.Hovered() || parts.Close.Focused() {
+	if props.Selected || root.Hovered() || parts.Close.FocusVisible() {
 		visible = 1
 	}
 	parts.Close.Opacity(Visual(parts.Close, "visible", visible, p.StateTransition))
@@ -103,69 +194,230 @@ func SessionTabContents(c *ui.Context, root ui.Element, props SessionTabProps) S
 	return parts
 }
 
-func TabConnectionIndicator(c *ui.Context, state ConnState) {
-	t := theme.Current().C.Tab
-	reduceMotion := c.Preferences().ReduceMotion
-	color := Color(t.DotConnected)
-	switch state {
-	case ConnDisconnected:
-		color = Color(t.RingDisconnected)
-	case ConnError:
-		color = Color(t.DotError)
-	case ConnConnecting:
-		color = Color(t.Spinner)
+type TabInputResult struct {
+	Select int
+	Close  bool
+}
+
+type tabMiddleInput struct {
+	Up      ui.Point
+	Target  uint64
+	Pending bool
+	Hits    []tabHit
+}
+
+type tabHit struct {
+	ID       uint64
+	Rect     ui.Rect
+	Selected bool
+}
+
+// SessionTabInput keeps keyboard and middle-click events independent from
+// the caller's left-button drag source and workspace lifecycle.
+func SessionTabInput(c *ui.Context, list, tab ui.Element, index, count int) TabInputResult {
+	follow := ui.Local(list, "uikit.tabs.follow", func() int { return -1 })
+	if *follow == index {
+		tab.Focus().ScrollIntoView()
+		*follow = -1
 	}
-	indicator := ui.Box(c).Key("connection-indicator").Size(t.SpinnerSize, t.SpinnerSize)
-	color = indicator.AnimateColor("state", color, Tween(t.StateTransition))
-	filledTarget, ringTarget, spinnerTarget := float32(0), float32(0), float32(0)
+	middle := ui.Local(list, "uikit.tabs.middle", func() tabMiddleInput { return tabMiddleInput{} })
+	bounds := tab.Bounds()
+	inside := func(point ui.Point) bool {
+		return point.X >= bounds.X && point.Y >= bounds.Y && point.X < bounds.X+bounds.W && point.Y < bounds.Y+bounds.H
+	}
+	result := TabInputResult{Select: -1, Close: middle.Pending && middle.Target == tab.ID() && inside(middle.Up)}
+	slot := len(middle.Hits)
+	selected := ui.Local(tab, "uikit.tabs.selected", func() bool { return false })
+	middle.Hits = append(middle.Hits, tabHit{ID: tab.ID(), Selected: *selected})
+	// Paint follows commit, so this records the current transformed hit box;
+	// clipped-out tabs keep an empty rectangle and cannot catch a middle press.
+	tab.DrawOver(func(_ *ui.Painter, _ ui.Rect) { middle.Hits[slot].Rect = tab.Bounds() })
+	if result.Close {
+		middle.Pending = false
+	}
+	if count == 0 {
+		return result
+	}
+	// These scoped registrations also cover the close button's focus. The SDK
+	// checks them before its FocusGroup moves focus, so selection follows once.
 	switch {
-	case state == ConnDisconnected:
-		ringTarget = 1
-	case state == ConnConnecting && !reduceMotion:
-		spinnerTarget = 1
-	default:
-		filledTarget = 1
+	case tab.Shortcut(0, ui.KeyLeft):
+		result.Select = (index - 1 + count) % count
+	case tab.Shortcut(0, ui.KeyRight):
+		result.Select = (index + 1) % count
+	case tab.Shortcut(0, ui.KeyHome):
+		result.Select = 0
+	case tab.Shortcut(0, ui.KeyEnd):
+		result.Select = count - 1
 	}
-	filled := Visual(indicator, "filled", filledTarget, t.StateTransition)
-	ring := Visual(indicator, "ring", ringTarget, t.StateTransition)
-	spinner := Visual(indicator, "spinner", spinnerTarget, t.StateTransition)
-	indicator.Draw(func(p *ui.Painter, r ui.Rect) {
-		alpha := func(color ui.Color, opacity float32) ui.Color {
-			color.A = uint8(float32(color.A) * opacity)
-			return color
+	if result.Select >= 0 {
+		*follow = result.Select
+		c.Invalidate()
+	}
+	return result
+}
+
+type TabItem struct {
+	ID          any
+	Title, Hint string
+	State       ConnState
+	Extra       int
+}
+
+type TabsResult struct {
+	Root, Row, Scroller ui.Element
+	Close               int
+	Select              int
+	Add                 bool
+	Moved               [2]int
+}
+
+type tabReorder struct{ ID any }
+
+type SessionTabsProps struct {
+	Scroll     *ui.ScrollState
+	ScrollKey  any
+	Motion     MotionMode
+	StripInput func(ui.InputEvent) bool
+	// BuildTabs preserves the caller's tab sources and returns the trailing
+	// add button, so an appended tab reveals that action as well.
+	BuildTabs  func(list ui.Element) ui.Element
+	AfterBuild func(strip ui.Element)
+}
+
+// SessionTabs owns the shared viewport, scroller and keyboard group. BuildTabs
+// adapts an existing docking controller without changing its source hierarchy.
+func SessionTabs(c *ui.Context, items []TabItem, active *int, options ...SessionTabsProps) TabsResult {
+	t := theme.Current()
+	props := SessionTabsProps{}
+	if len(options) != 0 {
+		props = options[0]
+	}
+	result := TabsResult{Root: SessionTabsViewport(c), Close: -1, Select: -1, Moved: [2]int{-1, -1}}
+	scroll := props.Scroll
+	if scroll == nil {
+		scroll = ui.Local(result.Root, "uikit.tabs.scroll", func() ui.ScrollState { return ui.ScrollState{} })
+	}
+	result.Root.Children(func() {
+		if props.ScrollKey != nil {
+			c = c.Key(props.ScrollKey)
 		}
-		small := ui.Rect{
-			X: r.X + (r.W-t.DotSize)/2, Y: r.Y + (r.H-t.DotSize)/2,
-			W: t.DotSize, H: t.DotSize,
-		}
-		if filled > 0 {
-			p.Fill(small, alpha(color, filled), t.DotSize/2)
-		}
-		if ring > 0 {
-			p.Stroke(small, alpha(Color(t.RingDisconnected), ring), t.DotSize/2, t.RingWidth)
-		}
-		if spinner == 0 {
-			return
-		}
-		var track ui.Path
-		track.Circle(r.X+r.W/2, r.Y+r.H/2, (r.W-t.SpinnerStroke)/2)
-		p.StrokePath(&track, t.SpinnerStroke, alpha(Color(t.SpinnerTrack), spinner))
-		phase := float32(p.Now().UnixNano()%int64(t.SpinnerPeriod)) / float32(t.SpinnerPeriod)
-		var arc ui.Path
-		cx, cy, radius := r.X+r.W/2, r.Y+r.H/2, (r.W-t.SpinnerStroke)/2
-		steps := 16
-		for i := range steps + 1 {
-			angle := float64((phase + float32(i)/float32(steps)/4) * 2 * math.Pi)
-			x, y := cx+radius*float32(math.Cos(angle)), cy+radius*float32(math.Sin(angle))
-			if i == 0 {
-				arc.MoveTo(x, y)
-			} else {
-				arc.LineTo(x, y)
+		result.Scroller = SessionTabsScroll(c, scroll)
+		result.Scroller.Children(func() {
+			result.Row = SessionTabsRow(c)
+			middle := ui.Local(result.Row, "uikit.tabs.middle", func() tabMiddleInput { return tabMiddleInput{} })
+			middle.Hits = middle.Hits[:0]
+			previousCount := ui.Local(result.Row, "uikit.tabs.count", func() int { return -1 })
+			revealTail := func(add ui.Element) {
+				count := len(middle.Hits)
+				if *previousCount >= 0 && count > *previousCount && middle.Hits[count-1].Selected {
+					// This follows the selected tab's reveal. Layout resolves the
+					// new content range, including the gap and the whole add button.
+					add.ScrollIntoView()
+				}
+				// A restored strip keeps the selected tab's initial reveal.
+				*previousCount = count
+			}
+			result.Row.Children(func() {
+				if props.BuildTabs != nil {
+					revealTail(props.BuildTabs(result.Row))
+					return
+				}
+
+				for index, item := range items {
+					props := SessionTabProps{Key: item.ID, Title: item.Title, Hint: item.Hint, State: item.State, Extra: item.Extra,
+						Selected: index == *active, CloseLabel: "关闭标签 " + item.Title, CloseIcon: IconSVG(IconClose),
+						ReduceMotion: MotionReduced(c, props.Motion), PositionAnimation: Anim(c, t.C.Tab.StateTransition, props.Motion)}
+					tab := SessionTab(c, props)
+					input := SessionTabInput(c, result.Row, tab, index, len(items))
+					if tab.Clicked() {
+						*active = index
+					}
+					if input.Select >= 0 {
+						*active = input.Select
+					}
+					if input.Close {
+						result.Close = index
+					}
+					tab.Drag(tabReorder{item.ID}).Cursor(ui.CursorDefault)
+					if tab.Dragging() {
+						tab.Cursor(ui.CursorGrabbing)
+					}
+					if source, dropped := ui.Drop[tabReorder](tab); dropped && source.ID != item.ID {
+						for from, candidate := range items {
+							if candidate.ID == source.ID {
+								result.Moved = [2]int{from, index}
+								break
+							}
+						}
+					}
+					tab.Children(func() {
+						parts := SessionTabContents(c, tab, props)
+						if parts.Close.Clicked() {
+							result.Close = index
+						}
+						parts.DragHandle.PassThrough()
+					})
+				}
+				add := IconButton(c, IconPlus, IconButtonProps{Key: "add-tab", Label: "新建选项卡"})
+				result.Add = add.Clicked()
+				revealTail(add)
+			})
+		})
+		middle := ui.Local(result.Row, "uikit.tabs.middle", func() tabMiddleInput { return tabMiddleInput{} })
+		if count := len(middle.Hits); count != 0 {
+			switch {
+			case result.Row.Shortcut(0, ui.KeyLeft), result.Row.Shortcut(0, ui.KeyEnd):
+				result.Select = count - 1
+			case result.Row.Shortcut(0, ui.KeyRight), result.Row.Shortcut(0, ui.KeyHome):
+				result.Select = 0
+			}
+			if result.Select >= 0 {
+				follow := ui.Local(result.Row, "uikit.tabs.follow", func() int { return -1 })
+				*follow = result.Select
+				if props.BuildTabs == nil {
+					*active = result.Select
+				}
+				c.Invalidate()
 			}
 		}
-		p.StrokePath(&arc, t.SpinnerStroke, alpha(Color(t.Spinner), spinner))
-		if state == ConnConnecting && !reduceMotion {
-			p.AnimationFrame()
+		middle.Pending = false
+		// MyGo delivers to the nearest handler without bubbling false results.
+		// Keep middle presses and the existing strip controller in this one handler.
+		stripInput := func(event ui.InputEvent) bool {
+			if event.Button == 2 && (event.Kind == ui.InputPointerDown || event.Kind == ui.InputPointerUp) {
+				bounds := result.Scroller.Bounds()
+				point := ui.Point{X: bounds.X + event.X, Y: bounds.Y + event.Y}
+				if event.Kind == ui.InputPointerDown {
+					middle.Target = 0
+					for index := len(middle.Hits) - 1; index >= 0; index-- {
+						hit := middle.Hits[index]
+						if point.X >= hit.Rect.X && point.Y >= hit.Rect.Y && point.X < hit.Rect.X+hit.Rect.W && point.Y < hit.Rect.Y+hit.Rect.H {
+							middle.Target = hit.ID
+							break
+						}
+					}
+				} else {
+					middle.Up = point
+					middle.Pending = event.X >= 0 && event.Y >= 0 && event.X < bounds.W && event.Y < bounds.H
+					c.Invalidate()
+				}
+				return true
+			}
+			if props.StripInput != nil && props.StripInput(event) {
+				return true
+			}
+			if event.Kind == ui.InputScroll && math.Abs(float64(event.DY)) > math.Abs(float64(event.DX)) {
+				scroll.X = min(max(scroll.X+event.DY, 0), scroll.MaxX)
+				c.Invalidate()
+				return true
+			}
+			return false
 		}
+		if props.AfterBuild != nil {
+			props.AfterBuild(result.Scroller)
+		}
+		result.Scroller.HandleInput(stripInput)
 	})
+	return result
 }

@@ -8,44 +8,66 @@ import (
 
 type ScrollFadeProps struct {
 	Height               float32
-	Bottom, Translucent  bool
+	Translucent          bool
+	Gradient             bool
 	Background, MaskTint ui.Color
 }
 
-func ScrollFade(c *ui.Context, props ScrollFadeProps) {
-	fade := theme.Current().C.FadeBar
+func ScrollFade(c *ui.Context, edge Edge, options ...ScrollFadeProps) ui.Element {
+	t := theme.Current()
+	fade := t.C.FadeBar
+	props := ScrollFadeProps{Gradient: true}
+	if len(options) != 0 {
+		props = options[0]
+	}
+	if props.Height == 0 {
+		props.Height = t.Size.FadeExtent
+	}
+	if props.Background.A == 0 {
+		props.Background = Color(t.Color.Surface.Card)
+	}
+	if props.MaskTint.A == 0 {
+		props.MaskTint = Color(t.Color.Text.Primary)
+	}
 	angle := float32(180)
-	if props.Bottom {
+	if edge == EdgeBottom {
 		angle = 0
 	}
-	band := func() ui.Element {
-		element := ui.Box(c).Absolute().Left(0).Right(0).Height(props.Height).PassThrough()
-		if props.Bottom {
-			return element.Bottom(0)
+	root := ui.Box(c).Absolute().Left(0).Right(0).Height(props.Height).PassThrough()
+	if edge == EdgeBottom {
+		root.Bottom(0)
+	} else {
+		root.Top(0)
+	}
+	root.Children(func() {
+		band := func() ui.Element { return ui.Box(c).Absolute().Fill().PassThrough() }
+		if props.Gradient {
+			band().LinearGradient(ui.LinearGradient{From: props.Background, To: ui.Transparent, Angle: angle})
+			return
 		}
-		return element.Top(0)
-	}
-	if !props.Translucent {
-		band().Background(props.Background)
-		return
-	}
-	// Mask progressively stronger blur layers before adding the surface tint.
-	layers := [...]struct{ radius, solid, end float32 }{
-		{radius: fade.Blur1, solid: fade.Mask1Solid, end: fade.Mask1End},
-		{radius: fade.Blur2, solid: fade.Mask2Solid, end: fade.Mask2End},
-		{radius: fade.Blur3, solid: fade.Mask3Solid, end: fade.Mask3End},
-	}
-	for _, layer := range layers {
-		band().Material(glass.Blur{
-			Radius: layer.radius,
-			Mask: &ui.LinearGradient{
-				From: props.MaskTint, To: ui.Transparent, Angle: angle, Start: layer.solid, End: layer.end,
-			},
-		})
-	}
-	band().LinearGradient(ui.LinearGradient{Angle: angle, Stops: []ui.GradientStop{
-		{Color: props.Background.Alpha(fade.TintStart), At: 0},
-		{Color: props.Background.Alpha(fade.TintMid), At: fade.TintMidStop},
-		{Color: props.Background.Alpha(fade.TintEnd), At: 1},
-	}})
+		if !props.Translucent {
+			band().Background(props.Background)
+			return
+		}
+		// Mask progressively stronger blur layers before adding the surface tint.
+		layers := [...]struct{ radius, solid, end float32 }{
+			{radius: fade.Blur1, solid: fade.Mask1Solid, end: fade.Mask1End},
+			{radius: fade.Blur2, solid: fade.Mask2Solid, end: fade.Mask2End},
+			{radius: fade.Blur3, solid: fade.Mask3Solid, end: fade.Mask3End},
+		}
+		for _, layer := range layers {
+			band().Material(glass.Blur{
+				Radius: layer.radius,
+				Mask: &ui.LinearGradient{
+					From: props.MaskTint, To: ui.Transparent, Angle: angle, Start: layer.solid, End: layer.end,
+				},
+			})
+		}
+		band().LinearGradient(ui.LinearGradient{Angle: angle, Stops: []ui.GradientStop{
+			{Color: props.Background.Alpha(fade.TintStart), At: 0},
+			{Color: props.Background.Alpha(fade.TintMid), At: fade.TintMidStop},
+			{Color: props.Background.Alpha(fade.TintEnd), At: 1},
+		}})
+	})
+	return root
 }

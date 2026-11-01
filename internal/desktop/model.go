@@ -3,6 +3,7 @@ package desktop
 import (
 	"fmt"
 	"math"
+	"slices"
 	"time"
 
 	"sshdesk/internal/theme"
@@ -45,6 +46,19 @@ type workspaceTab struct {
 	layoutUntil        time.Time
 	workspaceSize      ui.Point
 	workspaceResizedAt time.Time
+}
+
+func (tab *workspaceTab) canSeparateSessions() bool {
+	sessions := tab.root.sessions()
+	if len(sessions) < 2 {
+		return false
+	}
+	for _, session := range sessions {
+		if session.closing {
+			return false
+		}
+	}
+	return true
 }
 
 type remoteSession struct {
@@ -195,15 +209,24 @@ func appendSessionLines(session *remoteSession, lines ...terminalLine) {
 func (a *app) focusSession(tab *workspaceTab, session *remoteSession) {
 	tab.focused = session
 	session.focus.Focus()
+	session.markViewed()
+}
+
+func (session *remoteSession) markViewed() {
 	session.hasNewOutput, session.hasBell = false, false
 	session.cursorStarted = time.Time{}
 }
 
 func (a *app) activateTab(index int) {
+	a.selectTab(index)
+	a.tabs[index].focused.focus.Focus()
+}
+
+func (a *app) selectTab(index int) {
+	a.settingsUI.previousFocus = ui.Handle{}
 	a.closeSettings()
 	a.activeTab = index
-	tab := a.tabs[index]
-	a.focusSession(tab, tab.focused)
+	a.tabs[index].focused.markViewed()
 }
 
 // The prototype receives complete output lines; BEL is an activity event, not printable text.
@@ -229,6 +252,65 @@ func (a *app) openHost(id hostID) {
 		id: a.nextTab, root: &terminalLayout{session: session}, focused: session,
 	})
 	a.activateTab(len(a.tabs) - 1)
+}
+
+func (a *app) ungroupTab(tab *workspaceTab) {
+	index := slices.Index(a.tabs, tab)
+	if index < 0 || !tab.canSeparateSessions() {
+		return
+	}
+	active, focused := a.currentTab(), tab.focused
+	sessions := tab.root.sessions()
+	separated := make([]*workspaceTab, 0, len(sessions))
+	*tab = workspaceTab{
+		id: tab.id, frame: tab.frame,
+		root: &terminalLayout{session: sessions[0]}, focused: sessions[0],
+	}
+	separated = append(separated, tab)
+	for _, session := range sessions[1:] {
+		a.nextTab++
+		separated = append(separated, &workspaceTab{
+			id: a.nextTab, root: &terminalLayout{session: session}, focused: session,
+		})
+	}
+	a.tabs = slices.Replace(a.tabs, index, index+1, separated...)
+	if active != tab {
+		a.activeTab = slices.Index(a.tabs, active)
+		return
+	}
+	a.resizing = nil
+	a.activateTab(index + slices.Index(sessions, focused))
+}
+
+func (a *app) detachPaneToTab(source *workspaceTab, session *remoteSession, index int, area ui.Rect) *workspaceTab {
+	if !source.canSeparateSessions() || slices.Index(a.tabs, source) < 0 {
+		return nil
+	}
+	if source.root.find(session) == nil {
+		return nil
+	}
+	if index < 0 || index > len(a.tabs) {
+		return nil
+	}
+	minimum := source.root.minimum()
+	canvas := ui.Rect{W: max(area.W, minimum.X), H: max(area.H, minimum.Y)}
+	remaining := source.root.copyAt(canvas).remove(session)
+	focused := source.focused
+	if focused == session {
+		focused = remaining.firstSession()
+	}
+	*source = workspaceTab{
+		id: source.id, frame: source.frame, root: remaining, focused: focused,
+	}
+	a.markPaneLayout(source, theme.Current().C.ReorderMotion.PaneDrop.Duration)
+	a.nextTab++
+	tab := &workspaceTab{
+		id: a.nextTab, root: &terminalLayout{session: session}, focused: session,
+	}
+	a.tabs = slices.Insert(a.tabs, index, tab)
+	a.resizing = nil
+	a.activateTab(index)
+	return tab
 }
 
 func (a *app) closeTab(index int) {

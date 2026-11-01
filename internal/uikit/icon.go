@@ -7,21 +7,93 @@ import (
 )
 
 type IconButtonProps struct {
-	Label string
-	Key   any
+	Label    string
+	Key      any
+	Size     Size
+	Variant  IconVariant
+	On       *bool
+	IconOn   *ui.SVG
+	Shortcut string
+	Disabled bool
+	Surface  *theme.Theme
 }
 
-// Icon leaves layout and inherited color to the caller, as the native primitive does.
-func Icon(c *ui.Context, icon *ui.SVG) ui.Element { return ui.Icon(c, icon) }
+type IconVariant uint8
 
-func IconButton(c *ui.Context, icon *ui.SVG, props IconButtonProps) ui.Element {
-	t := theme.Current()
-	key := props.Key
-	if key == nil {
-		key = props.Label
+const (
+	IconPlain IconVariant = iota
+	IconFilled
+	IconOnWindow
+)
+
+type IconProps struct {
+	Size Size
+	Tone Tone
+}
+
+type IconSource interface {
+	IconName | *ui.SVG
+}
+
+func resolveIcon[T IconSource](source T) *ui.SVG {
+	switch icon := any(source).(type) {
+	case IconName:
+		return IconSVG(icon)
+	case *ui.SVG:
+		return icon
 	}
-	button := StyleIconButton(ui.ButtonBase(c).Key(key).Label(props.Label), t)
-	Tip(c, button, props.Label)
-	button.Children(func() { ui.Icon(c, icon).Size(t.C.IconButton.IconSize, t.C.IconButton.IconSize) })
-	return button
+	panic("uikit: unsupported icon source")
+}
+
+func Icon[T IconSource](c *ui.Context, source T, props IconProps) ui.Element {
+	t := theme.Current()
+	size := t.C.IconButton.IconSize
+	switch props.Size {
+	case SizeXs:
+		size = t.C.IconButton.IconSizeXs
+	case SizeSm:
+		size = t.C.IconButton.IconSizeSm
+	}
+	ink := Color(t.C.IconButton.Icon)
+	if props.Tone != ToneNeutral {
+		ink = ToneColor(props.Tone)
+	}
+	return ui.Icon(c, resolveIcon(source)).Size(size, size).TextColor(ink)
+}
+
+func IconButton[T IconSource](c *ui.Context, icon T, props IconButtonProps) ui.Element {
+	t := theme.Current()
+	if props.Surface != nil {
+		t = props.Surface
+	}
+	if props.Key != nil {
+		c = c.Key(props.Key)
+	}
+	var button ui.Element
+	if props.On == nil {
+		button = ui.ButtonBase(c)
+	} else {
+		button = ui.ToggleBase(c, props.On)
+	}
+	button.Label(props.Label).Disabled(props.Disabled)
+	on := props.On != nil && *props.On
+	styleIconButton(button, t, props.Variant, on)
+	size, glyph := t.C.IconButton.Size, t.C.IconButton.IconSize
+	switch props.Size {
+	case SizeSm:
+		size, glyph = t.C.IconButton.SizeSm, t.C.IconButton.IconSizeSm
+	case SizeXs:
+		size, glyph = t.C.IconButton.SizeXs, t.C.IconButton.IconSizeXs
+	}
+	button.Size(size, size)
+	Tip(c, button, props.Label, props.Shortcut)
+	button.Children(func() {
+		// ToggleBase has processed this frame's value input before resolving the on glyph.
+		image := resolveIcon(icon)
+		if props.On != nil && *props.On && props.IconOn != nil {
+			image = props.IconOn
+		}
+		ui.Icon(c, image).Size(glyph, glyph).PassThrough()
+	})
+	return StyleDisabled(button, props.Disabled)
 }

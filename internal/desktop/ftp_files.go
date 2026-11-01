@@ -21,23 +21,20 @@ type fileEntry struct {
 }
 
 type filePaneState struct {
-	path           string
-	remote         bool
-	directories    map[string][]fileEntry
-	selected       map[string]bool
-	scroll         ui.ScrollState
-	focus          ui.Handle
-	history        []string
-	historyIndex   int
-	query          string
-	searchOpen     bool
-	search         ui.Handle
-	sortColumn     int
-	sortDescending bool
-	anchor         string
-	reveal         string
-	hoverFolder    string
-	hoverStarted   time.Time
+	path         string
+	remote       bool
+	directories  map[string][]fileEntry
+	table        uikit.TableState
+	scroll       ui.ScrollState
+	focus        ui.Handle
+	history      []string
+	historyIndex int
+	query        string
+	searchOpen   bool
+	search       ui.Handle
+	reveal       string
+	hoverFolder  string
+	hoverStarted time.Time
 }
 
 type fileWorkspaceState struct {
@@ -45,7 +42,7 @@ type fileWorkspaceState struct {
 	ratio                   float32
 	localPaths              map[string]string
 	resizing                bool
-	notice                  string
+	notice                  *uikit.ToastProps
 	dialog                  *fileActionDialog
 	conflict                *fileConflict
 	drag                    *fileDrag
@@ -55,6 +52,7 @@ type fileWorkspaceState struct {
 type fileActionDialog struct {
 	session   *fileSession
 	pane      *filePaneState
+	preview   fileEntry
 	kind      string
 	name      string
 	original  string
@@ -81,7 +79,8 @@ type fileConflict struct {
 // no operation on this page writes, deletes or uploads the user's actual files.
 func newFilePane(remote bool) *filePaneState {
 	p := &filePaneState{
-		remote: remote, selected: map[string]bool{}, directories: map[string][]fileEntry{},
+		remote: remote, directories: map[string][]fileEntry{},
+		table:   uikit.TableState{Cursor: -1, Sort: ui.SortOrder{Column: "name"}},
 		history: []string{},
 	}
 	p.path = "~"
@@ -153,17 +152,26 @@ func (p *filePaneState) entries() []fileEntry {
 			}
 			return 1
 		}
-		comparison := strings.Compare(strings.ToLower(a.name), strings.ToLower(b.name))
-		switch p.sortColumn {
-		case 1:
-			comparison = cmp.Compare(a.size, b.size)
-		case 2:
-			comparison = a.modified.Compare(b.modified)
+		orders := p.table.SortBy
+		if len(orders) == 0 && p.table.Sort.Column != "" {
+			orders = []ui.SortOrder{p.table.Sort}
 		}
-		if p.sortDescending {
-			return -comparison
+		for _, order := range orders {
+			comparison := strings.Compare(strings.ToLower(a.name), strings.ToLower(b.name))
+			switch order.Column {
+			case "size":
+				comparison = cmp.Compare(a.size, b.size)
+			case "modified":
+				comparison = a.modified.Compare(b.modified)
+			}
+			if order.Descending {
+				comparison = -comparison
+			}
+			if comparison != 0 {
+				return comparison
+			}
 		}
-		return comparison
+		return 0
 	})
 	return entries
 }
@@ -171,7 +179,7 @@ func (p *filePaneState) entries() []fileEntry {
 func (p *filePaneState) selection() []fileEntry {
 	entries := []fileEntry{}
 	for _, entry := range p.entries() {
-		if p.selected[entry.name] {
+		if p.table.Selection.Has(entry.path) {
 			entries = append(entries, entry)
 		}
 	}
@@ -183,8 +191,10 @@ func (a *app) navigateFiles(c *ui.Context, session *fileSession, pane *filePaneS
 	if pane.path == target {
 		return
 	}
-	pane.path, pane.query, pane.anchor = target, "", ""
-	pane.selected, pane.scroll.Y = map[string]bool{}, 0
+	pane.path, pane.query = target, ""
+	pane.table.Clear()
+	pane.table.List.ScrollTo(0, ui.Start)
+	pane.scroll.Y = 0
 	pane.history = append(pane.history[:pane.historyIndex+1], target)
 	pane.historyIndex = len(pane.history) - 1
 	if !pane.remote {
@@ -199,47 +209,13 @@ func (a *app) fileHistory(c *ui.Context, session *fileSession, pane *filePaneSta
 		return
 	}
 	pane.path, pane.historyIndex = pane.history[index], index
-	pane.selected, pane.scroll.Y, pane.query = map[string]bool{}, 0, ""
+	pane.table.Clear()
+	pane.table.List.ScrollTo(0, ui.Start)
+	pane.scroll.Y, pane.query = 0, ""
 	if !pane.remote {
 		a.files.localPaths[a.fileSiteKey(session)] = pane.path
 		a.saveFilePreferences(c)
 	}
-}
-
-func (a *app) selectFile(pane *filePaneState, entry fileEntry, modifiers ui.Modifiers) {
-	a.files.activeRemote = pane.remote
-	pane.focus.Focus()
-	if modifiers&ui.Shift != 0 && pane.anchor != "" {
-		entries := pane.entries()
-		start, end := -1, -1
-		for i, item := range entries {
-			if item.name == pane.anchor {
-				start = i
-			}
-			if item.name == entry.name {
-				end = i
-			}
-		}
-		if start >= 0 && end >= 0 {
-			if modifiers&ui.Super == 0 {
-				pane.selected = map[string]bool{}
-			}
-			for _, item := range entries[min(start, end) : max(start, end)+1] {
-				pane.selected[item.name] = true
-			}
-			return
-		}
-	}
-	if modifiers&ui.Super != 0 {
-		if pane.selected[entry.name] {
-			delete(pane.selected, entry.name)
-		} else {
-			pane.selected[entry.name] = true
-		}
-	} else {
-		pane.selected = map[string]bool{entry.name: true}
-	}
-	pane.anchor = entry.name
 }
 
 func fileWritable(pane *filePaneState, target string) bool {
@@ -251,7 +227,7 @@ func (a *app) requestFileTransfer(c *ui.Context, drag fileDrag, target *filePane
 		return
 	}
 	if !fileWritable(target, directory) {
-		uikit.Notify(c, "此目录不可写")
+		uikit.Toast(c, uikit.ToastProps{ID: "此目录不可写", Tone: uikit.ToneWarning, Title: "此目录不可写"})
 		return
 	}
 	a.files.conflict = &fileConflict{
@@ -367,7 +343,8 @@ func (a *app) revealTransferredFile(c *ui.Context, task *transferTask) {
 		pane.history = append(pane.history[:pane.historyIndex+1], task.targetPath)
 		pane.historyIndex = len(pane.history) - 1
 	}
-	pane.selected, pane.reveal = map[string]bool{task.entry.name: true}, task.entry.name
+	pane.table.Select(path.Join(pane.path, task.entry.name))
+	pane.reveal = path.Join(pane.path, task.entry.name)
 	pane.query, pane.scroll.Y = "", 0
 	a.files.activeRemote = pane.remote
 	if !pane.remote {

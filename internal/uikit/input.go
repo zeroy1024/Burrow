@@ -2,6 +2,7 @@ package uikit
 
 import (
 	"slices"
+	"strconv"
 	"strings"
 
 	"sshdesk/internal/theme"
@@ -13,40 +14,85 @@ type InputProps struct {
 	Label, Placeholder string
 	Handle             *ui.Handle
 	Mono               bool
+	Leading            IconName
+	LeadingSVG         *ui.SVG
+	Trailing           func()
+	Error              string
+	ReadOnly, Disabled bool
+	Width              float32
 	DeferStyle         bool
+	Motion             MotionMode
 }
 
-// Input returns the text control itself so callers can handle edits before
-// applying form validation with StyleFormControl.
+// Input returns the actual text control so Changed, Submitted and Bind retain
+// their native meanings, including when decorations surround the field.
 func Input(c *ui.Context, value *string, p InputProps) ui.Element {
-	t := theme.Current().C.Input
-	e := ui.TextInputBase(c, value).Height(t.Height).
-		Padding(0, t.PaddingX).Radius(t.Radius).FontSize(t.FontSize).FixedLineHeight(t.LineHeight).
-		TextColor(Color(t.Text)).Background(Color(t.Bg)).Label(p.Label)
-	if p.Handle != nil {
-		e.Bind(p.Handle)
+	t := theme.Current()
+	field := t.C.Input
+	var input ui.Element
+	build := func() {
+		input = ui.TextInputBase(c, value).Height(field.Height).FillWidth().MinWidth(0).
+			Padding(0, field.PaddingX).Radius(field.Radius).FontSize(field.FontSize).FixedLineHeight(field.LineHeight).
+			TextColor(Color(field.Text)).Background(Color(field.Bg)).Label(p.Label).
+			ReadOnly(p.ReadOnly).Disabled(p.Disabled).FocusRing(false)
+		if p.Handle != nil {
+			input.Bind(p.Handle)
+		}
+		input.Placeholder(p.Placeholder)
+		if p.Mono {
+			input.Font(strings.Join(field.MonoFont, ", ")).FontSize(field.MonoSize).LetterSpacing(field.MonoTracking)
+		}
+		if p.Width > 0 && p.Leading == "" && p.LeadingSVG == nil && p.Trailing == nil {
+			input.Width(p.Width)
+		}
+		if p.Disabled {
+			input.Background(Color(field.DisabledBg)).TextColor(Color(field.DisabledText))
+		}
 	}
-	if p.Placeholder != "" {
-		e.Placeholder(p.Placeholder)
+	if p.Leading != "" || p.LeadingSVG != nil || p.Trailing != nil {
+		root := ui.Row(c).Height(field.Height).MinWidth(0)
+		if p.Width > 0 {
+			root.Width(p.Width)
+		} else {
+			root.FillWidth()
+		}
+		root.Children(func() {
+			build()
+			if p.Leading != "" || p.LeadingSVG != nil {
+				input.PaddingStart(field.PaddingX + t.Size.IconSm + field.Gap)
+				leading := ui.Row(c).Absolute().Top(0).Bottom(0).Left(field.PaddingX).Center().PassThrough()
+				if p.Disabled {
+					leading.Opacity(t.Opacity.Disabled)
+				}
+				leading.Children(func() {
+					if p.LeadingSVG != nil {
+						ui.Icon(c, p.LeadingSVG).Size(t.Size.IconSm, t.Size.IconSm).TextColor(Color(field.Icon)).PassThrough()
+					} else {
+						Icon(c, p.Leading, IconProps{Size: SizeSm}).TextColor(Color(field.Icon)).PassThrough()
+					}
+				})
+			}
+			if p.Trailing != nil {
+				input.PaddingEnd(field.Height)
+				StyleDisabled(ui.Row(c).Absolute().Top(0).Bottom(0).Right(0).Center(), p.Disabled).Children(p.Trailing)
+			}
+		})
+	} else {
+		build()
 	}
-	if p.Mono {
-		e.Font(strings.Join(t.MonoFont, ", ")).FontSize(t.MonoSize).LetterSpacing(t.MonoTracking)
+	StyleDisabled(input, p.Disabled)
+	if !p.DeferStyle {
+		StyleFormControl(input, p.Error)
 	}
-	if p.DeferStyle {
-		return e
-	}
-	border := t.Border
-	switch {
-	case e.Focused():
-		border = t.BorderFocus
-	case e.Hovered():
-		border = t.BorderHover
-	}
-	return e.Border(t.BorderWidth, e.AnimateColor("border", Color(border), Tween(t.Transition)))
+	return input
 }
 
 // StyleFormControl is applied once, after this frame's edit and blur validation.
 func StyleFormControl(e ui.Element, message string) ui.Element {
+	return styleFormControl(e, message, e.FocusVisible())
+}
+
+func styleFormControl(e ui.Element, message string, focused bool) ui.Element {
 	p := theme.Current().C.Input
 	border := p.Border
 	if e.Hovered() {
@@ -56,43 +102,59 @@ func StyleFormControl(e ui.Element, message string) ui.Element {
 	for index := range shadow {
 		shadow[index].Color.A = 0
 	}
-	if e.Focused() {
+	if focused {
 		shadow = p.FocusShadow
 	}
 	if message != "" {
 		shadow = p.ErrorShadow
 		e.Error(message)
 	}
+	if e.IsDisabled() {
+		border = p.DisabledBorder
+	}
 	e.Border(p.BorderWidth, e.AnimateColor("border", Color(border), Tween(p.Transition)))
 	return AnimatedShadow(e, "input-ring", shadow, Tween(p.Transition))
 }
 
-type PasswordProps struct {
-	Label, Placeholder string
-	Handle             *ui.Handle
-	Shown              bool
-	EyeIcon            *ui.SVG
-	ToggleKey          any
-	InputKey           any
-}
-
 type PasswordParts struct {
-	Input, Toggle ui.Element
+	Root, Input, Toggle ui.Element
 }
 
-// PasswordInput keeps reveal state and validation with its caller.
-func PasswordInput(c *ui.Context, value *string, p PasswordProps) PasswordParts {
+func PasswordInput(c *ui.Context, value *string, p InputProps) PasswordParts {
 	t := theme.Current()
-	var parts PasswordParts
-	ui.Row(c).FillWidth().Children(func() {
-		parts.Input = Input(c.Key(p.InputKey), value, InputProps{
-			Label: p.Label, Placeholder: p.Placeholder, Handle: p.Handle, Mono: true, DeferStyle: true,
-		}).FillWidth().MinWidth(0).Grow(1).PaddingEnd(t.C.Input.Height)
-		if !p.Shown {
+	parts := PasswordParts{Root: ui.Row(c).FillWidth().MinWidth(0)}
+	shown := ui.Local(parts.Root, "uikit.password.reveal", func() bool { return false })
+	parts.Root.Children(func() {
+		parts.Input = Input(c.Key("input"), value, p).Grow(1).PaddingEnd(t.C.Input.Height)
+		label := "显示密码"
+		if *shown {
+			label = "隐藏密码"
+		}
+		icon := IconEye
+		if *shown {
+			icon = IconEyeOff
+		}
+		parts.Toggle = IconButton(c, icon, IconButtonProps{Label: label, Key: "reveal", Size: SizeXs, Disabled: p.Disabled}).
+			Absolute().Right(t.C.Input.PaddingX / 2).Top((t.C.Input.Height - t.C.IconButton.SizeXs) / 2)
+		if parts.Toggle.Clicked() {
+			*shown = !*shown
+		}
+		if !*shown {
 			parts.Input.Password()
 		}
-		parts.Toggle = IconButton(c, p.EyeIcon, IconButtonProps{Label: "显示或隐藏" + p.Label, Key: p.ToggleKey}).
-			Absolute().Right(0).Top(0).Size(t.C.Input.Height, t.C.Input.Height).TextColor(Color(t.C.Input.Icon))
 	})
 	return parts
+}
+
+// PortInput deliberately retains the raw text, including an empty in-progress
+// edit; protocol defaults and persistence belong to the session draft.
+func PortInput(c *ui.Context, value *string, p InputProps) ui.Element {
+	p.Mono = true
+	if *value != "" {
+		port, err := strconv.Atoi(*value)
+		if err != nil || port < 1 || port > 65535 {
+			p.Error = "端口需在 1–65535 之间"
+		}
+	}
+	return Input(c, value, p)
 }

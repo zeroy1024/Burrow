@@ -2,7 +2,6 @@ package desktop
 
 import (
 	"fmt"
-	"math"
 	"slices"
 
 	"sshdesk/internal/theme"
@@ -19,64 +18,61 @@ func (a *app) titleBar(c *ui.Context, shown float32) {
 			if a.page().sidebarCollapsed {
 				label = "展开会话栏"
 			}
-			uikit.IconButton(c, sidebarIcon, uikit.IconButtonProps{Key: "sidebar-toggle", Label: label}).
-				Disabled(a.activeSection() == sectionSettings).
+			uikit.IconButton(c, sidebarIcon, uikit.IconButtonProps{Key: "sidebar-toggle", Label: label, Variant: uikit.IconOnWindow,
+				Disabled: a.activeSection() == sectionSettings}).
 				OnClick(func() { a.page().sidebarCollapsed = !a.page().sidebarCollapsed })
 		})
-		uikit.SessionTabsViewport(c).Children(func() {
-			// Clip the native indicator outside the viewport while retaining native scrolling.
-			strip := uikit.SessionTabsScroll(c.Key("session-tabs"), &a.tabScroll).HandleInput(func(ev ui.InputEvent) bool {
+		var add ui.Element
+		tabs := uikit.SessionTabs(c, nil, nil, uikit.SessionTabsProps{
+			Scroll: &a.tabScroll, ScrollKey: "session-tabs", Motion: uikit.MotionOverride(a.reduceMotion(c)),
+			StripInput: func(ev ui.InputEvent) bool {
 				if ev.Kind == ui.InputPointerDown && ev.Button == 0 {
 					a.tabPress = ui.Point{X: ev.X, Y: ev.Y}
 				}
-				if ev.Kind != ui.InputScroll || math.Abs(float64(ev.DY)) <= math.Abs(float64(ev.DX)) {
-					return false
+				return false
+			},
+			BuildTabs: func(list ui.Element) ui.Element {
+				var pendingAction func()
+				for i, tab := range a.tabs {
+					if action := a.tabButton(c, list, i, tab); action != nil {
+						pendingAction = action
+					}
 				}
-				a.tabScroll.X = min(max(a.tabScroll.X+ev.DY, 0), a.tabScroll.MaxX)
-				return true
-			})
-			strip.Children(func() {
-				uikit.SessionTabsRow(c).Children(func() {
-					var pendingClose func()
-					for i, tab := range a.tabs {
-						if close := a.tabButton(c, i, tab); close != nil {
-							pendingClose = close
+				var menu []uikit.MenuEntry
+				for _, group := range a.catalogGroups() {
+					entry := uikit.MenuEntry{ID: fmt.Sprintf("group-%d", group.id), Label: group.name}
+					for _, id := range group.hosts {
+						if a.hosts[id].protocol != "" {
+							continue
 						}
+						entry.Children = append(entry.Children, uikit.MenuEntry{ID: fmt.Sprintf("host-%d", id), Label: a.hosts[id].name,
+							OnChoose: func() { a.openHost(id) }})
 					}
-					uikit.IconButton(c, plusIcon, uikit.IconButtonProps{Label: "新建会话"}).Menu(func(m *ui.Menu) {
-						for _, group := range a.catalogGroups() {
-							m.Submenu(group.name, func(sub *ui.Menu) {
-								for _, id := range group.hosts {
-									if a.hosts[id].protocol != "" {
-										continue
-									}
-									if sub.Item(a.hosts[id].name).Chosen() {
-										a.openHost(id)
-									}
-								}
-							})
-						}
-					})
-					if pendingClose != nil {
-						pendingClose()
-					}
-				})
-			})
-			a.tabStripTarget(c, strip)
+					entry.Disabled = len(entry.Children) == 0
+					menu = append(menu, entry)
+				}
+				add = uikit.IconButton(c, plusIcon, uikit.IconButtonProps{Key: "新建会话", Label: "新建会话", Variant: uikit.IconOnWindow})
+				uikit.MenuOn(c, add, menu)
+				if pendingAction != nil {
+					pendingAction()
+				}
+				return add
+			},
 		})
+		a.tabStripTarget(c, tabs, add)
+		if tabs.Select >= 0 {
+			a.selectTab(tabs.Select)
+		}
 		uikit.TitleBarActions(c).Children(func() {
-			status := uikit.IconButton(c, activityIcon, uikit.IconButtonProps{Label: "服务器监控"}).Expanded(a.statusVisible).
-				Disabled(a.activeSection() == sectionSettings)
-			if a.statusVisible {
-				status.Background(uikit.Color(t.C.TitleAction.BgOn))
-			}
-			status.OnClick(func() { a.statusVisible = !a.statusVisible })
+			uikit.IconButton(c, activityIcon, uikit.IconButtonProps{Key: "服务器监控", Label: "服务器监控", Variant: uikit.IconOnWindow,
+				On: &a.statusVisible, Disabled: a.activeSection() == sectionSettings}).Expanded(a.statusVisible)
 		})
 	})
 }
 
-func (a *app) tabButton(c *ui.Context, index int, tab *workspaceTab) func() {
-	var pendingClose func()
+func (a *app) tabButton(c *ui.Context, list ui.Element, index int, tab *workspaceTab) func() {
+	t := theme.Current()
+	var pendingAction func()
 	session := tab.focused
 	h := a.hosts[session.host]
 	hint := fmt.Sprintf("%s@%s:%d", h.user, h.address, h.port)
@@ -89,13 +85,25 @@ func (a *app) tabButton(c *ui.Context, index int, tab *workspaceTab) func() {
 	props := uikit.SessionTabProps{
 		Key: tab.id, Title: h.name, Hint: hint, Selected: a.activeTab == index,
 		State: connectionIndicatorState(session.state), Handle: &tab.frame,
+		ReduceMotion: a.reduceMotion(c), PositionAnimation: a.positionAnimation(ui.Animation{Spring: uikit.Spring(t.C.ReorderMotion.TabDisplace)}),
 		Extra: tab.root.count() - 1, CloseLabel: "关闭标签 " + h.name, DragLabel: "拖动标签 " + h.name, CloseIcon: closeIcon,
 	}
 	button := uikit.SessionTab(c, props)
+	input := uikit.SessionTabInput(c, list, button, index, len(a.tabs))
+	if input.Select >= 0 {
+		a.selectTab(input.Select)
+	}
+	if input.Close {
+		pendingAction = func() { a.requestCloseTab(slices.Index(a.tabs, tab)) }
+	}
 	button.OnClick(func() { a.activateTab(slices.Index(a.tabs, tab)) })
 	button.ContextMenu(func(m *ui.Menu) {
 		current := tab.focused
-		if m.Item("编辑会话…").Chosen() {
+		if tab.root.count() > 1 {
+			if m.Item(localize(c, "拆分会话")).Disabled(a.drag != nil || !tab.canSeparateSessions()).Chosen() {
+				pendingAction = func() { a.ungroupTab(tab) }
+			}
+		} else if m.Item("编辑会话…").Chosen() {
 			a.startEditHostDraft(current.host)
 		}
 		m.Separator()
@@ -112,7 +120,7 @@ func (a *app) tabButton(c *ui.Context, index int, tab *workspaceTab) func() {
 		}
 		m.Separator()
 		if m.Item("关闭选项卡").Chosen() {
-			pendingClose = func() { a.requestCloseTab(slices.Index(a.tabs, tab)) }
+			pendingAction = func() { a.requestCloseTab(slices.Index(a.tabs, tab)) }
 		}
 	})
 	button.Children(func() {
@@ -125,5 +133,8 @@ func (a *app) tabButton(c *ui.Context, index int, tab *workspaceTab) func() {
 	if d := a.drag; d != nil && d.kind == dragTab && d.originTab == tab && d.phase != dragLanded {
 		button.Opacity(0)
 	}
-	return pendingClose
+	if d := a.drag; d != nil && d.phase == dragTabLanding && d.landingTab == tab {
+		button.Opacity(0)
+	}
+	return pendingAction
 }

@@ -8,7 +8,8 @@ import (
 type EmptyKind uint8
 
 const (
-	EmptyTerminal EmptyKind = iota
+	EmptyGeneric EmptyKind = iota
+	EmptyTerminal
 	EmptyFiles
 	EmptyConnection
 )
@@ -16,6 +17,7 @@ const (
 type EmptyProps struct {
 	Kind                 EmptyKind
 	Icon                 *ui.SVG
+	IconName             IconName
 	Title, Detail, Error string
 	Action               string
 }
@@ -29,53 +31,58 @@ type EmptyMessageKind uint8
 const (
 	EmptyFolder EmptyMessageKind = iota
 	EmptySettingsSearch
+	EmptyCatalogSearch
 )
 
 func EmptyMessage(c *ui.Context, text string, kind EmptyMessageKind) ui.Element {
 	t := theme.Current()
 	e := ui.Text(c, text)
-	if kind == EmptyFolder {
-		e.FillWidth().Padding(t.Space.N24)
-	} else {
-		e.FontSize(t.Font.Size.Body)
+	switch kind {
+	case EmptyFolder:
+		return e.FillWidth().Padding(t.Space.N24).TextColor(Color(t.Color.Text.Secondary))
+	case EmptyCatalogSearch:
+		return e.FontSize(t.Font.Size.Small).TextColor(Color(t.Color.Text.Secondary)).Padding(t.Space.N12)
 	}
-	return e.TextColor(Color(t.Color.Text.Tertiary))
+	return e.FontSize(t.Font.Size.Body).TextColor(Color(t.Color.Text.Tertiary))
 }
 
 func EmptyState(c *ui.Context, props EmptyProps) EmptyParts {
 	t := theme.Current()
-	root := Card(c)
+	p := t.C.EmptyState
+	var root ui.Element
+	if props.Kind != EmptyGeneric {
+		root = Card(c)
+	} else {
+		root = ui.Column(c)
+	}
+	root.Role(ui.RoleStatus).Label(props.Title)
 	if props.Kind == EmptyTerminal {
 		root.Fill().MinWidth(0)
 	} else if props.Kind == EmptyFiles {
 		root.Grow(1).FillWidth()
-	} else {
+	} else if props.Kind == EmptyConnection {
 		root.FillWidth().Grow(1)
+	} else {
+		root.FillWidth()
 	}
 	parts := EmptyParts{Root: root.Center().Gap(t.Space.N12)}
 	parts.Root.Children(func() {
-		ui.Icon(c, props.Icon).Size(t.C.Pane.EmptyIconSize, t.C.Pane.EmptyIconSize).TextColor(Color(t.Color.Text.Secondary))
-		title := ui.Text(c, props.Title).FontSize(t.C.Pane.EmptyTitleSize)
-		if props.Kind == EmptyTerminal {
-			title.FontWeight(t.C.Pane.EmptyTitleWeight)
-		} else if props.Kind == EmptyConnection {
-			title.FontWeight(t.Font.Weight.Semibold)
+		icon := props.Icon
+		if props.IconName != "" {
+			icon = IconSVG(props.IconName)
 		}
-		if props.Kind == EmptyConnection {
-			if props.Error != "" {
-				ui.Text(c, props.Error).TextColor(Color(t.Color.Danger.Text))
-			}
-			if props.Action != "" {
-				parts.Action = Button(c, props.Action, ButtonProps{})
-			}
-			ui.Text(c, props.Detail).FontSize(t.Font.Size.Caption).TextColor(Color(t.Color.Text.Secondary))
-			return
+		if icon != nil {
+			ui.Box(c).Size(p.IconTile, p.IconTile).Radius(p.IconRadius).Background(Color(p.IconBg)).Center().Children(func() {
+				ui.Icon(c, icon).Size(t.Size.Icon, t.Size.Icon).TextColor(Color(p.Icon)).PassThrough()
+			})
 		}
-		detail := ui.Text(c, props.Detail)
-		if props.Kind == EmptyTerminal {
-			detail.FontSize(t.Font.Size.Body)
+		ui.Text(c, props.Title).FontSize(p.Title).FontWeight(t.Font.Weight.Semibold).MaxWidth(p.MaxWidth).TextAlign(ui.Center)
+		if props.Error != "" {
+			FieldMessage(c, props.Error, FieldMessageProps{Tone: ToneDanger}).MaxWidth(p.MaxWidth)
 		}
-		detail.TextColor(Color(t.Color.Text.Secondary))
+		if props.Detail != "" {
+			ui.Text(c, props.Detail).FontSize(t.Font.Size.Small).TextColor(Color(p.Detail)).MaxWidth(p.MaxWidth).TextAlign(ui.Center)
+		}
 		if props.Action != "" {
 			parts.Action = Button(c, props.Action, ButtonProps{})
 		}

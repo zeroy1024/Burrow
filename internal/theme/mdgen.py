@@ -72,8 +72,8 @@ siderItem.nameColor             ← component，只能引用 semantic
 - 设计稿没画：`color.state.pressed`（按下）、`size.dropLine`（MyGo `ListState.Reorder` 插入线 2px）、组件 `menu.*`（按浮起层/拖动卡片推导）、`button.bgHover/bgPressed`、`iconButton.bgHover`。
 - tab 拖动、窗格拖动没有单独设计：`reorderMotion.tabDisplace / paneDisplace / paneDrop` 沿用 sider 拖动的弹簧参数。
 - 整个 Dark 主题（{COUNTS["darkOverrides"]} 项覆盖 + `palette.graphite / darkTint / whiteA / blackA / inkDark`）。
-- FTP v3 danger 红色、原生文件面板补充尺寸与演示传输吞吐标记为 **derived**。侧栏状态与选中 token 已标 `deprecated`，保留生成供已有主题兼容，新组件不得引用。
-- 同一含义在稿子里出现过两个值时，取主稿：sider 选中行用 `common.css` 的 `#efeff1`（`sider-drag.html` 里是 `#f2f2f4`）；图标线宽用 `icons.js` 默认 1.75（拖动稿用 1.7）。
+- FTP v3 danger 红色、原生文件面板补充尺寸与演示传输吞吐标记为 **derived**。侧栏旧连接状态与会话选中 token 已标 `deprecated`，保留生成供已有主题兼容，新组件不得引用；独立的 `siderItem.bgActive` 只表示目录条目的原生焦点反馈。
+- 同一含义在稿子里出现过两个值时，取主稿：旧 sider 会话选中兼容 token 保留 `common.css` 的 `#efeff1`（`sider-drag.html` 里是 `#f2f2f4`）；新目录焦点反馈 `bgActive` 跟随 `color.state.selectedAccent`。图标线宽用 `icons.js` 默认 1.75（拖动稿用 1.7）。
 - 已知限制：深色下部分深色品牌 logo（CentOS、Debian 的深色字形）对比度偏低，实现时可以给 OS glyph 加一个 `Mix(brand, white, .35)` 提亮。
 
 ## 6. Palette

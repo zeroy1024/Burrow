@@ -29,7 +29,7 @@ func terminalSurface(background color.NRGBA) *theme.Theme {
 	if terminalSurfaceCache.theme != nil && terminalSurfaceCache.background == background {
 		return terminalSurfaceCache.theme
 	}
-	surface := uikit.TerminalSurface(background, terminalLightSurface, terminalDarkSurface)
+	surface := uikit.TerminalChrome(background, terminalLightSurface, terminalDarkSurface)
 	terminalSurfaceCache.background, terminalSurfaceCache.theme = background, surface
 	return surface
 }

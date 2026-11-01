@@ -23,6 +23,8 @@ func WithAccent(t *Theme, c color.NRGBA) *Theme {
 		mix, textBase = .18, color.NRGBAModel.Convert(color.White).(color.NRGBA)
 		s.Color.Accent.Tint16 = WithAlpha(c, .24)
 	}
+	s.Color.Accent.Hover = Mix(c, textBase, .15)
+	s.Color.Accent.Pressed = Mix(c, textBase, .25)
 	s.Color.Accent.Subtle = Mix(s.Color.Surface.Card, c, mix)
 	s.Color.Text.Accent = Mix(c, textBase, .15)
 	s.Color.Text.AccentStrong = Mix(c, textBase, .25)
@@ -32,6 +34,8 @@ func WithAccent(t *Theme, c color.NRGBA) *Theme {
 	s.Shadow.FocusRing = recolorShadow(s.Shadow.FocusRing, c)
 	s.Shadow.InputFocus = recolorShadow(s.Shadow.InputFocus, c)
 	s.Shadow.InputFocus[1].Color = s.Color.Accent.Tint16
+	s.Shadow.ControlFocus = recolorShadow(s.Shadow.ControlFocus, c)
+	s.Shadow.ControlFocus[1].Color = s.Color.Accent.Tint16
 	s.Shadow.Flash = recolorShadow(s.Shadow.Flash, c)
 	s.Shadow.PlaceholderAccent = recolorShadow(s.Shadow.PlaceholderAccent, c)
 	s.Shadow.ThemeSelected = recolorShadow(s.Shadow.ThemeSelected, c)

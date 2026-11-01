@@ -1,4 +1,43 @@
-# 公共 UI 组件迁移
+# UIKit 原始规格实现
+
+本轮在`c829ecd`及其后尚未提交的12项修复之上继续实施，没有回退或覆盖这些修复。重新读取原zip的prompt及三张设计图，目标从“抽取原页面外观”改为完整公共规格和适用接入。逐项子能力、API、消费者、用户决定与限制以[覆盖清单](uikit-coverage.md)为准。
+
+## 本轮分阶段交付
+
+1. 收尾当前修复并保存本地差异/源码manifest，原有搜索命中、输入居中、设置清理、菜单四动作、平级切页及拖动契约继续作为基线。
+2. 实现L1完整变体/语义类型/令牌；Icon名称与SVG入口、五类Button、IconButton Toggle/Surface、四Tone Kbd、Badge/Count/StatusPill、Spinner/Divider均有真实渲染及输入逻辑。
+3. 实现完整泛型/复合表单，迁移会话和设置；Modal新增丢弃确认及公共slots，保留应用原退出/保存计时所有者。Port字符串、ENV逗号、独立密钥任务不改。
+4. 按最新用户约定，SSH/文件目录的右键与更多共用RowMenuOn及同一Popover；原生Menu适配仍用于其他既有系统菜单。Toast复用SDK队列/暂停/动作。Sider、SessionTabs和SidePanel等由公共容器实际构建，原拖动/滚动/页面控制器通过纯UI slots适配。
+5. 文件列表实际虚拟化，选择/排序/列宽/键盘/屏外定位/拖动源保活由共享UI适配承担；传输行只接收display snapshot并返回操作。Meter/Latency阈值、Progress不定进度、FileIcon扩展名和TerminalSurface均接适用页面。
+6. 按源码合同复核各变体和消费者，重写覆盖表，并运行已有测试、构建及静态检查。没有把旧隔离对照或函数数量当作本轮完成证据。
+
+## 接入复核整改
+
+复核发现旧小弹窗壳、后置禁用/选中覆盖、错误反馈和若干预设消费者仍不完整，已按[逐项整改记录](uikit-coverage.md#复核后的接入整改)修正。紧凑Modal保留居中、原内容宽与间距；SSH/文件关闭确认共用入口，原确认条件、关闭记录及动作保留。新增的ActivityBadge、目录空态、IconOn和局部Surface适配保留原几何，不重建或取消业务资源。
+
+本次进一步完成[九项问题与两项收口](uikit-coverage.md#第二次全面复核九项问题与两项收口)：分段构造前Key及标签焦点转发、标签键盘select/鼠标activate焦点分工、文件卡片底色、搜索/导航/卡片/标签焦点规范、PathBar统一事件、圆形色样裁剪、下拉勾选前景，以及TextFont/实测MiddleLabel的页面接入。保持原尺寸、字体、业务值及会话/任务所有者；验证边界仍以覆盖清单为准。
+
+## 滚动条显隐同步
+
+`ScrollbarState/ScrollbarProps/Scrollbars`复用原终端/目录/状态卡的700ms保持、180ms过渡及边缘显示规则，接入需要显示滚动条的Scroll/List区域，两轴分别处理。顶部SSH/文件会话选项卡按最新要求始终隐藏滚动条，共用滚轮横移；新建时连同末尾加号滚入视野，选择时定位目标标签，后续允许自由滚动。改动按[页面与卡片清单](scrollbars.md)记录。快捷键表按用户最新要求使用固定列比例和顺序，取消双击适宽、拖动调宽、列重排及内层滚动；内容自然撑高，只随设置页外层滚动，保留录制、恢复默认和稳定动作身份。
+
+## 关键所有权与适配
+
+- 组合SSH标签用原四宫格替代状态点；单会话/文件标签状态保留。公共SessionTabWidth/SessionTabPreview复用真实标签内容，DragMorphGhost/DragMorphSettled提供面板与标签的形态、位置和透明度交接。Shell浮卡使用真实输出及拖动起点的视口快照，悬停时在手里，邻居只做视觉让位；松开后由原pendingDock提交同一session的移动。组合菜单拆分同样只改变标签和布局容器，不创建连接。
+- 基础依赖为`desktop → uikit → theme / termtheme / MyGo`。UIKit没有配置/网络/文件/钥匙串操作或业务资源订阅。
+- Settings关闭清理临时状态、原稳定Handle、SSH输出/滚动、文件历史及后台传输由应用继续持有。UI组件不在挂载/卸载时创建、取消或重连业务会话。
+- `TableState`持有唯一path选择/cursor/anchor及公开ListState。因为内层Drag先接鼠标，不能把选择宣称为SDK native selector；由共享适配实现同样的多选与键盘。源行焦点触发SDK屏外保活，Reveal先按路径定位，不依赖屏外行已构建。
+- 原始设计的Grid原生关联在固定SDK无公开接口，用户接受公开Table/Row/Cell/ColumnHeader语义适配；保留可读列名/值/排序/选择，未宣称平台Grid关联已实现。
+- 用户确认会话Dirty退出也提示、Tab减少动态静态、目录1.03且无旋转、窗格只保留页脚连接胶囊。公共旋转能力仍提供。原稿内部矛盾及SDK签名差异见覆盖表。
+- `tokens_src.py`生成全部产物；新组件字段引用语义层。补齐了原设计要求的白色75%透明度、没有新增色相或无关依赖。
+
+## 本轮验证边界
+
+最终代码的已有测试、构建、go vet、格式/差异检查，以及MyGo应用编译与本地签名均通过，具体结果见覆盖清单。未新增永久测试、组件画廊、截图基线或CI；未运行设备UI/像素/VoiceOver验收，也未触发真实SSH/FTP或密钥操作。编译与源码核对不能代替这些运行时验证。
+
+## 前三批迁移与12项修复的历史记录
+
+以下保留当时的范围及证据，仅描述当时版本。“组合覆盖”“无消费者”“未虚拟化”等历史分类已被本轮实现和新覆盖表取代，不能作为当前API使用说明。
 
 本批以 `d534c5c` 为基线，完成基础适配、会话弹窗和设置页的组件抽取。沿用 Go 1.27.3、MyGo v0.7.3；组件每次构建读取当前主题。
 
@@ -12,7 +51,7 @@
 | 会话弹窗 | Input、PasswordInput、Select、Segmented、FormRow/FieldMessage、Modal、Section、Chip 外观 | 草稿、认证、端口规则、环境变量提交、校验、测试连接、保存和退出计时 |
 | 设置页 | SettingsGroup/Row/NavItem、ThemeCard/SchemeCard、数字输入、Switch、Popover、密钥表单外观 | 搜索/高亮、本地化、偏好写入、字体/配色数据、密钥操作与生命周期 |
 
-第一批完成时，SSH/文件工作区的导航与容器仍留在原处；第二批的接入范围见下文。第一批暂留的私有纯转发已经在第三批清理，`uiadapt.go` 现仅保留应用策略和原生窗口格式适配。
+第一批完成时，SSH/文件工作区的导航与容器仍留在原处；第二批的接入范围见下文。第三批移除了大部分私有纯转发，审查修复继续移除遗漏的 `paneFocusShadows/dragPlaceholder`；`uiadapt.go` 现仅保留应用策略和原生窗口格式适配。
 
 ## 控件与状态契约
 
@@ -29,6 +68,8 @@
 `tokens_src.py` 是唯一令牌源；`gen.py` 和 `mdgen.py` 生成 Go、JSON 与 Markdown。此次仅为 Kbd 补充实际使用的组件映射及语义角色，沿用已有 palette 值；Flat 提示保持原搜索框文字几何。
 
 根视图每次构建设置 `uikit.UITheme`；`theme.OnChange` 的订阅仍只在应用生命周期注册。`Reduced` 接收现有 `system/on/off` 偏好，`Position` 保留非零瞬时时长；`Visual` 保留颜色与透明度过渡。没有新增页面切换动画。
+
+SSH与文件Tab由调用方传入已解析的减少动态效果值，SSH Tab的位移动画也经应用的`Position`策略传入；组件不再只读取系统值而遗漏应用“始终开启”设置。
 
 ## 全部已批准范围
 
@@ -62,7 +103,7 @@
 ### 第二批保留的契约
 
 - UIKit 返回原节点或 Parts，`Bind`、菜单、点击、Drag/Drop 仍挂在同一个交互节点。目录先执行 `trackCatalogDrag`，再根据当前状态构建样式与事件；没有改用 `TabsBase/ListState.Reorder` 接管拖拽。
-- SiderRow 不接受连接状态或选中状态。普通单击只聚焦，双击/Enter打开；更多按钮继续使用 `FocusVisible`，默认背景透明。
+- SiderRow 不接受会话连接或选中状态。普通单击只聚焦，并以原生 `Focused()` 驱动独立的 active 底色；失焦即退回普通/hover外观，双击/Enter打开后由原工作区焦点流程清除。两页共用 `SiderItem.BgActive`，不读活动标签、不新增主机选择字段、不改变Logo/文字状态。更多按钮继续使用 `FocusVisible`，默认背景透明。
 - UI 连接枚举与应用枚举显式映射；标签内容在原构建时点读取最新连接状态。减少动态效果下仍显示静态指示。
 - 标签与窗格拖动目标仍由 `paneDragHandle` 管理，默认箭头、实际起拖后闭合抓手。拖拽落点、取消、回位、停靠、重排与自动滚动控制器不变。
 - 终端继续从各会话的配色和实际背景解析 surface，UIKit 不用全局 App 背景覆盖终端；滚动渐隐保留终端与文件面板不同的遮罩着色来源。
@@ -99,7 +140,7 @@
 - `uiadapt.go` 仅保留原生窗口要求的颜色字符串转换和携带应用快捷键策略/稳定句柄的搜索适配；原颜色、阴影、动效、按钮、输入、图标、Tooltip 等私有纯转发声明和调用均已移除。
 - 终端缓存、强调色 surface 更新及滚动条从应用 surface 选择颜色继续由应用管理；纯对比度与 chrome 适配算法已经移入 UIKit。
 - 原生菜单由系统绘制，通过 UIKit 返回的 Element 绑定 `Menu/ContextMenu`；业务菜单构造器继续在应用层。Toast 复用 SDK 原生窗口队列，经 `Notify` 发出，不新增 viewport 或回调生命周期。
-- 自定义选项内容/录制/本地化绑定需要的少量 `SelectBase/SegmentedBase/PopoverBase/ButtonBase` 仍由应用组合，公共控件样式已共享。快捷键表通过 `ShortcutTable` 保留原 SDK Table 和同一稳定 ListState，不强换文件列表内核。
+- 自定义选项内容/录制/本地化绑定需要的少量 `SelectBase/SegmentedBase/PopoverBase/ButtonBase` 仍由应用组合，公共控件样式已共享。快捷键表通过 `ShortcutTable` 使用固定列、自然高度和稳定动作Key；只保留设置外层滚动，文件列表内核不变。
 - 普通 SVG 描边解析已统一至 UIKit；品牌图案和 OS 选项索引/品牌色属于既有资源及模型到 UI 的映射，保留原值。数学比例、ANSI 解析、真实 I/O 超时及演示时钟不当作样式字面量搬入 UI 令牌。
 - 仅将既有终端文字测试中的颜色适配符号改为公共 API，原输入、预期值和断言保持不变；没有新增永久测试或削弱检查。
 
@@ -114,6 +155,29 @@
 | 文件列表公共呈现 | DataTable/Column/SortHeader/ListRow 实际接入；原全量行、稳定路径身份和业务事件保留；Files 对照及拖拽检查通过 |
 | 数据/监控/传输 | Meter/Progress/Stat/KeyValue/Sparkline 与完整 Transfer* 组合接入；队列、暂停/重试、计时、并发、折叠和调整尺寸仍在应用；对照通过 |
 | 领域/反馈/拖拽呈现 | 当前实际使用的图标、状态、延迟、测试反馈、空态、编辑提示、终端纯对比度与预览显示已接入；不同会话配色及原状态机验证通过 |
-| 覆盖与旧实现清理 | [69 项清单](uikit-coverage.md) 全部分类：48 项 API、19 项组合覆盖、2 项无当前调用不纳入；保留的原生宿主/策略和未采纳能力明确说明，旧私有纯样式转发声明和调用为 0 |
+| 覆盖与旧实现清理 | [69 项清单](uikit-coverage.md) 已在后续审查中纠正 Checkbox 漏记、空目录未接入及两处纯转发遗漏；当前分类为49项API、19项组合覆盖、1项无当前调用不纳入，不能将原分类当作全部调用均已核查的证据 |
 | 布局、交互与后台约束 | 多尺寸、主题/配色、减少动态、焦点、切页、稳定句柄、保存、身份、拖放、后台推进/暂停检查及源码对照通过；没有新增路由/选择状态副本或后台生命周期所有者 |
 | 资源与验证边界 | UIKit 无应用包依赖或配置/网络/Secrets I/O；依赖版本不变，没有新增永久测试/画廊/截图/CI规则；隔离数据不读真实运行时配置；不将演示检查视为真实服务器端到端验证 |
+
+## 共享组件审查修复
+
+本次修复以`c829ecd`为基线，处理源码审查确认的12项问题。前述三批布局对照属于历史记录，不代替本次交互验证。
+
+| 问题 | 修复结果 |
+| --- | --- |
+| 定制Select弹层不能滚动 | 三处配色/私钥菜单加入`SelectPopupViewport`，保留原上限、选项和SDK定位；触发器布局变化后请求下一帧重新计算可用高度 |
+| 文件投放提示遮挡目标 | `DropHint`文字与容器均穿透，目录行继续接收原DragOver/Drop事件 |
+| 密钥操作忙碌时仍可编辑 | Modal禁用整表；类型Select随busy切换重建临时状态，关闭已在独立overlay打开的菜单，草稿值及任务快照逻辑保留 |
+| Tab减少动态效果遗漏应用设置 | 连接指示与SSH标签位移使用调用方解析后的偏好/动画，阶段推进和颜色透明度过渡保留 |
+| 终端标题/响铃Tooltip被覆盖 | Header自身承接点击和拖动，移除覆盖内容的独立handle；标题、整枚响铃徽标使用各自正常Tooltip锚点，不再依赖条件注册或额外刷新状态 |
+| 目录预览子孙截获命中 | SiderRowLabel、OsLogo、ProtocolIcon和DragGroupLabel装饰子树逐层穿透，原目录行继续接收单击、双击和拖动 |
+| 会话配色下拉状态样式分叉 | 触发器复用`StyleSelect/StyleFormControl`，保留定制选项内容 |
+| Checkbox漏接入 | 密钥与传输冲突两处接入`uikit.Checkbox`，保持原生外观；纠正前版无消费者结论 |
+| 空目录没有消费共享空态 | 使用`EmptyMessage(EmptyFolder)`，明确保留原Secondary颜色和padding；设置搜索无结果继续使用Tertiary |
+| 设置进度预览手写 | 使用实际`Progress`，保持48px宽、静态50%值 |
+| 目录图标线宽硬编码 | 两枚FTP/SFTP目录图标使用`LineIcon`，path和当前描边数值不变 |
+| 重复呈现与纯转发 | TransferFilters/TransferAction复用基础组件；侧栏与横竖终端手柄共用SplitterHandle；移除paneFocusShadows/dragPlaceholder转发 |
+
+本次只复用已有测试、构建和静态检查；未新增测试、进行视觉验收或触发真实配置、钥匙串、密钥生成、网络及系统弹窗。页面切换、SSH会话和后台传输控制器没有修改，不能将编译和源码核对表述为这些交互已完成设备实测。
+
+修复后的`go test ./...`、`go build ./...`、`go vet ./...`、修改文件的`gofmt`及`git diff --check`均通过。69项分类核对为49项API、19项组合、1项无消费者，覆盖表105处共享函数位置引用与当前源码匹配；依赖、token及已有测试未改。

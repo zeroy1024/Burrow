@@ -24,8 +24,11 @@ type PathItem struct {
 }
 
 type PathBarParts struct {
-	Root  ui.Element
-	Items []PathItem
+	Root   ui.Element
+	Items  []PathItem
+	Chosen bool
+	Target string
+	Index  int
 }
 
 // PathBar folds by measured width. Navigation and path ownership stay with the caller.
@@ -41,16 +44,21 @@ func PathBar(c *ui.Context, props PathBarProps) PathBarParts {
 	visible := make([]int, len(props.Segments))
 	for i, segment := range props.Segments {
 		widths[i], visible[i] = measure(segment.Label), i
+		if i == len(props.Segments)-1 {
+			current := font
+			current.Weight = t.Font.Weight.Semibold
+			widths[i], _ = ui.ShapeText(segment.Label, current, 0).Size()
+		}
 	}
 	ellipsisWidth := measure("…")
 	bar := Tip(c, ui.Box(c).Key("file-breadcrumbs").Grow(1).MinWidth(0).Clip().Height(t.C.Breadcrumb.Height).
 		Radius(t.C.Breadcrumb.Radius).Background(Color(t.C.Breadcrumb.BgOnGlass)).
 		Font(family).FontSize(font.Size).FontWeight(font.Weight).Label("当前目录 "+props.Path), props.Path)
-	parts := PathBarParts{Root: bar}
+	parts := PathBarParts{Root: bar, Index: -1}
 	width := bar.LayoutBounds().W
 	available := max(0, width-2*t.C.Breadcrumb.PaddingX)
 	required := func(indices []int) float32 {
-		result := t.Size.Icon + float32(len(indices)-1)*t.Font.Size.Caption +
+		result := t.C.Breadcrumb.IconSize + float32(len(indices)-1)*t.Font.Size.Caption +
 			float32(2*len(indices)-1)*t.C.Breadcrumb.Gap
 		for _, index := range indices {
 			if index < 0 {
@@ -84,7 +92,7 @@ func PathBar(c *ui.Context, props PathBarProps) PathBarParts {
 	bar.Children(func() {
 		ui.Row(c).Absolute().Top(0).Bottom(0).Left(t.C.Breadcrumb.PaddingX).Right(t.C.Breadcrumb.PaddingX).
 			Gap(t.C.Breadcrumb.Gap).AlignItems(ui.Center).Children(func() {
-			ui.Icon(c, props.Icon).Size(t.Size.Icon, t.Size.Icon).TextColor(Color(t.C.Breadcrumb.Text)).Shrink(0)
+			ui.Icon(c, props.Icon).Size(t.C.Breadcrumb.IconSize, t.C.Breadcrumb.IconSize).TextColor(Color(t.C.Breadcrumb.Text)).Shrink(0).PassThrough()
 			for position, index := range visible {
 				if position > 0 {
 					ui.Icon(c, props.Separator).Size(t.Font.Size.Caption, t.Font.Size.Caption).
@@ -103,10 +111,23 @@ func PathBar(c *ui.Context, props PathBarProps) PathBarParts {
 				item := Tip(c, ui.ButtonBase(c).Key(key).Label(label), target).Shrink(1).MinWidth(0).
 					TextColor(Color(t.C.Breadcrumb.Text))
 				if index == len(props.Segments)-1 {
-					item.TextColor(Color(t.C.Breadcrumb.Current))
+					item.TextColor(Color(t.C.Breadcrumb.Current)).FontWeight(t.Font.Weight.Semibold)
 				}
-				item.Children(func() { ui.Text(c, label).SingleLine().MinWidth(0).FontSize(font.Size) })
-				parts.Items = append(parts.Items, PathItem{Element: item, Target: target})
+				item.Children(func() { ui.Text(c, label).SingleLine().MinWidth(0).FontSize(font.Size).PassThrough() })
+				if index < 0 {
+					var entries []MenuEntry
+					for hidden := visible[position-1] + 1; hidden < visible[position+1]; hidden++ {
+						segment := props.Segments[hidden]
+						entries = append(entries, MenuEntry{ID: segment.Target, Label: segment.Label, Icon: IconFolder,
+							OnChoose: func() { parts.Chosen, parts.Target, parts.Index = true, segment.Target, hidden }})
+					}
+					MenuOn(c, item, entries)
+				} else {
+					parts.Items = append(parts.Items, PathItem{Element: item, Target: target})
+					if item.Clicked() {
+						parts.Chosen, parts.Target, parts.Index = true, target, index
+					}
+				}
 			}
 		})
 	})

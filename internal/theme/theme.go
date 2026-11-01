@@ -130,6 +130,7 @@ type PaletteTokensWhite struct {
 	A70 color.NRGBA
 	A85 color.NRGBA
 	A90 color.NRGBA
+	A75 color.NRGBA // 设计指定的既有白色透明度 [derived]
 }
 
 // PaletteTokensBlueA groups tokens.
@@ -577,6 +578,8 @@ type ColorsAccent struct {
 	Tint28  color.NRGBA // 占位内描边
 	Tint35  color.NRGBA // 标注描边
 	Tint50  color.NRGBA // 自动滚动区边线
+	Hover   color.NRGBA
+	Pressed color.NRGBA
 }
 
 // ColorsSuccess groups tokens.
@@ -647,6 +650,8 @@ type ColorsDanger struct {
 	Text    color.NRGBA // 失败文字
 	Subtle  color.NRGBA // 失败图标底、失败徽章底
 	Tint14  color.NRGBA // 错误输入框外光晕
+	Hover   color.NRGBA
+	Pressed color.NRGBA
 }
 
 // ColorsProtocol groups tokens.
@@ -681,6 +686,14 @@ type ColorsKeycap struct {
 	AccentBg color.NRGBA
 }
 
+// ColorsToast groups tokens.
+type ColorsToast struct {
+	Action  color.NRGBA
+	Ok      color.NRGBA
+	Error   color.NRGBA
+	Warning color.NRGBA
+}
+
 // Colors groups tokens.
 type Colors struct {
 	Bg            ColorsBg
@@ -703,6 +716,7 @@ type Colors struct {
 	AccentChoices ColorsAccentChoices
 	Scrim         color.NRGBA // 会话弹窗遮罩，覆盖标题栏
 	Keycap        ColorsKeycap
+	Toast         ColorsToast
 }
 
 // Radii groups tokens.
@@ -897,6 +911,25 @@ type Sizes struct {
 	SettingsNumber          float32
 	SettingsScrollback      float32
 	Keycap                  float32
+	ButtonLarge             float32
+	BadgeSmall              float32
+	BadgeMedium             float32
+	Check                   float32
+	RadioDot                float32
+	PanelHeader             float32
+	Toast                   float32
+	EmptyMaxWidth           float32
+	KeyValueRow             float32
+	SparklineHeight         float32
+	SparklineStroke         float32
+	MeterHeight             float32
+	IconXs                  float32
+	SegmentedItem           float32
+	LatencyWarn             float32
+	LatencyBad              float32
+	TableNameMinWidth       float32
+	MeterWarnRatio          float32
+	MeterCriticalRatio      float32
 }
 
 // TypographyFamily groups tokens.
@@ -980,6 +1013,8 @@ type Shadows struct {
 	InputError        Shadow // 输入框错误：优先于焦点
 	SwitchKnob        Shadow // 开关滑块
 	ThemeSelected     Shadow // 外观主题卡片选中光晕
+	ControlFocus      Shadow
+	CardInset         Shadow // UIKit 卡片内描边，外框几何不变
 }
 
 // GlassFade groups tokens.
@@ -1045,6 +1080,7 @@ type Opacities struct {
 	ModalEnterScale           float32
 	ModalExitScale            float32
 	CollapseContentFadeFactor float32
+	SparklineFill             float32
 }
 
 // MotionDuration groups tokens.
@@ -1074,6 +1110,9 @@ type MotionDuration struct {
 	ConnectionStage   time.Duration // SSH 演示连接每个阶段的停留时间
 	Test              time.Duration
 	SettingsSwitchOut time.Duration
+	Fast              time.Duration
+	Base              time.Duration
+	AutoHide          time.Duration
 }
 
 // MotionEasing groups tokens.
@@ -1095,10 +1134,12 @@ type MotionSpring struct {
 
 // MotionDrag groups tokens.
 type MotionDrag struct {
-	Threshold      float32 // 移动阈值 px
-	LiftScale      float32
-	AutoScrollMax  float32 // px/s，t² 曲线
-	AutoScrollZone float32
+	Threshold        float32 // 移动阈值 px
+	LiftScale        float32
+	AutoScrollMax    float32 // px/s，t² 曲线
+	AutoScrollZone   float32
+	StandardScale    float32
+	StandardRotation float32
 }
 
 // Motion groups tokens.
@@ -1296,6 +1337,7 @@ type SiderItemTokens struct {
 	Radius            float32       // ← radius.control
 	Spacing           float32       // ← space.1
 	BgHover           color.NRGBA   // ← color.state.hover
+	BgActive          color.NRGBA   // ← color.state.selectedAccent
 	BgSelected        color.NRGBA   // ← color.state.selected; Deprecated: 侧栏不再显示状态/选中
 	NameSize          float32       // ← font.size.bodyLg
 	NameWeight        int           // ← font.weight.medium
@@ -1336,7 +1378,7 @@ type OsLogoTokens struct {
 type CardTokens struct {
 	Bg     color.NRGBA // ← color.surface.card
 	Radius float32     // ← radius.card
-	Shadow Shadow      // ← shadow.card
+	Shadow Shadow      // ← shadow.cardInset
 }
 
 // PaneTokens groups tokens.
@@ -1478,41 +1520,77 @@ type BadgeTokens struct {
 	OkBgOnGlass      color.NRGBA // ← color.success.onGlass
 	RunBg            color.NRGBA // ← color.accent.subtle
 	RunText          color.NRGBA // ← color.text.accent
+	HeightSm         float32     // ← size.badgeSmall
+	HeightMd         float32     // ← size.badgeMedium
+	WarnBg           color.NRGBA // ← color.warning.subtle
+	WarnText         color.NRGBA // ← color.warning.textStrong
+	WarnDot          color.NRGBA // ← color.warning.default
+	ErrBg            color.NRGBA // ← color.danger.subtle
+	ErrText          color.NRGBA // ← color.danger.text
+	ErrDot           color.NRGBA // ← color.danger.default
+	RunDot           color.NRGBA // ← color.accent.default
+	NeutralDot       color.NRGBA // ← color.status.offline
+	MutedBg          color.NRGBA // ← color.surface.field
+	MutedText        color.NRGBA // ← color.text.tertiary
 }
 
 // ButtonTokens groups tokens.
 type ButtonTokens struct {
-	Height      float32       // ← size.control
-	Radius      float32       // ← radius.control
-	PaddingX    float32       // ← space.9
-	Gap         float32       // ← space.6
-	FontSize    float32       // ← font.size.body
-	Text        color.NRGBA   // ← color.text.strong
-	Border      color.NRGBA   // ← color.border.control
-	BorderWidth float32       // ← size.divider
-	PrimaryBg   color.NRGBA   // ← color.accent.default
-	PrimaryText color.NRGBA   // ← color.text.onAccent
-	BgHover     color.NRGBA   // ← color.state.hover
-	BgPressed   color.NRGBA   // ← color.state.pressed
-	Bg          color.NRGBA   // ← color.surface.control
-	Transition  time.Duration // ← motion.duration.focus
+	Height             float32       // ← size.control
+	Radius             float32       // ← radius.control
+	PaddingX           float32       // ← space.9
+	Gap                float32       // ← space.6
+	FontSize           float32       // ← font.size.body
+	Text               color.NRGBA   // ← color.text.strong
+	Border             color.NRGBA   // ← color.border.control
+	BorderWidth        float32       // ← size.divider
+	PrimaryBg          color.NRGBA   // ← color.accent.default
+	PrimaryText        color.NRGBA   // ← color.text.onAccent
+	BgHover            color.NRGBA   // ← color.state.hover
+	BgPressed          color.NRGBA   // ← color.state.pressed
+	Bg                 color.NRGBA   // ← color.surface.control
+	Transition         time.Duration // ← motion.duration.focus
+	HeightSm           float32       // ← size.controlSm
+	HeightLg           float32       // ← size.buttonLarge
+	PaddingXSm         float32       // ← space.9
+	PaddingXLg         float32       // ← space.14
+	SecondaryBg        color.NRGBA   // ← color.surface.control
+	SecondaryBgHover   color.NRGBA   // ← color.surface.controlStrong
+	PlainBgHover       color.NRGBA   // ← color.state.hover
+	PrimaryBgHover     color.NRGBA   // ← color.accent.hover
+	PrimaryBgPressed   color.NRGBA   // ← color.accent.pressed
+	DangerBg           color.NRGBA   // ← color.danger.default
+	DangerBgHover      color.NRGBA   // ← color.danger.hover
+	DangerBgPressed    color.NRGBA   // ← color.danger.pressed
+	DangerText         color.NRGBA   // ← color.text.onAccent
+	DangerPlainText    color.NRGBA   // ← color.danger.text
+	DangerPlainBgHover color.NRGBA   // ← color.danger.subtle
+	KbdGap             float32       // ← space.6
+	FocusShadow        Shadow        // ← shadow.controlFocus
 }
 
 // IconButtonTokens groups tokens.
 type IconButtonTokens struct {
-	Size       float32       // ← size.controlMd
-	SizeSm     float32       // ← size.controlSm
-	SizeXs     float32       // ← size.controlXs
-	Radius     float32       // ← radius.controlSm
-	Icon       color.NRGBA   // ← color.icon.default
-	IconSubtle color.NRGBA   // ← color.icon.subtle
-	IconFaint  color.NRGBA   // ← color.icon.faint
-	Bg         color.NRGBA   // ← color.surface.control
-	BgHover    color.NRGBA   // ← color.state.hover
-	IconSize   float32       // ← size.icon
-	Stroke     float32       // ← size.iconStroke
-	BgPressed  color.NRGBA   // ← color.state.pressed
-	Transition time.Duration // ← motion.duration.focus
+	Size        float32       // ← size.controlMd
+	SizeSm      float32       // ← size.controlSm
+	SizeXs      float32       // ← size.controlXs
+	Radius      float32       // ← radius.controlSm
+	Icon        color.NRGBA   // ← color.icon.default
+	IconSubtle  color.NRGBA   // ← color.icon.subtle
+	IconFaint   color.NRGBA   // ← color.icon.faint
+	Bg          color.NRGBA   // ← color.surface.control
+	BgHover     color.NRGBA   // ← color.state.hover
+	IconSize    float32       // ← size.icon
+	Stroke      float32       // ← size.iconStroke
+	BgPressed   color.NRGBA   // ← color.state.pressed
+	Transition  time.Duration // ← motion.duration.focus
+	BgOn        color.NRGBA   // ← color.state.pressed
+	IconOn      color.NRGBA   // ← color.text.primary
+	BgFilled    color.NRGBA   // ← color.surface.control
+	IconHover   color.NRGBA   // ← color.text.primary
+	IconSizeSm  float32       // ← size.iconSm
+	IconSizeXs  float32       // ← size.iconXs
+	FocusShadow Shadow        // ← shadow.controlFocus
 }
 
 // FloatButtonTokens groups tokens.
@@ -1540,6 +1618,10 @@ type SegmentedTokens struct {
 	ShadowOn     Shadow        // ← shadow.segment
 	Transition   time.Duration // ← motion.duration.focus
 	BgHover      color.NRGBA   // ← color.state.hover
+	CountText    color.NRGBA   // ← color.text.tertiary
+	CountTextOn  color.NRGBA   // ← color.text.muted
+	ItemHeightMd float32       // ← size.segmentedItem
+	HeightSm     float32       // ← size.controlSm
 }
 
 // BreadcrumbTokens groups tokens.
@@ -1553,6 +1635,7 @@ type BreadcrumbTokens struct {
 	Text      color.NRGBA // ← color.text.muted
 	Current   color.NRGBA // ← color.text.primary
 	Separator color.NRGBA // ← color.text.placeholder
+	IconSize  float32     // ← size.iconXs
 }
 
 // FileListTokens groups tokens.
@@ -1574,6 +1657,9 @@ type FileListTokens struct {
 	FolderIcon       color.NRGBA // ← color.icon.folder
 	FolderFill       color.NRGBA // ← color.icon.folderFill
 	PaneHeaderHeight float32     // ← size.fileHeader
+	HeaderBg         color.NRGBA // ← color.surface.card
+	ColumnGap        float32     // ← space.16
+	NameMinWidth     float32     // ← size.tableNameMinWidth
 }
 
 // ProgressTokens groups tokens.
@@ -1585,6 +1671,11 @@ type ProgressTokens struct {
 	FillNeutral color.NRGBA // ← color.fill.strong
 	FillPaused  color.NRGBA // ← color.status.paused
 	FillDone    color.NRGBA // ← color.success.default
+	HeightMeter float32     // ← size.meterHeight
+	MeterFill   color.NRGBA // ← color.fill.strong
+	MeterWarnAt float32     // ← size.meterWarnRatio
+	MeterCritAt float32     // ← size.meterCriticalRatio
+	FillError   color.NRGBA // ← color.danger.default
 }
 
 // TooltipTokens groups tokens.
@@ -1646,6 +1737,8 @@ type DragLiftTokens struct {
 	LiftDuration     time.Duration // ← motion.duration.lift
 	SourceOpacity    float32       // ← opacity.dragSource
 	StackBg          color.NRGBA   // ← color.surface.liftStack
+	StandardScale    float32       // ← motion.drag.standardScale
+	StandardRotation float32       // ← motion.drag.standardRotation
 }
 
 // DropIndicatorTokens groups tokens.
@@ -1843,6 +1936,8 @@ type FilePaneFocusTokens struct {
 	SelBgInactive       color.NRGBA   // ← color.state.selected
 	SelTextInactive     color.NRGBA   // ← color.text.primary
 	Transition          time.Duration // ← motion.duration.focus
+	BorderFocused       color.NRGBA   // ← color.accent.default
+	BorderWidthFocused  float32       // ← size.focusRing
 }
 
 // FTPSplitTokens groups tokens.
@@ -2248,6 +2343,159 @@ type KbdTokens struct {
 	AccentText color.NRGBA // ← color.text.onAccent
 }
 
+// DividerTokens groups tokens.
+type DividerTokens struct {
+	Color          color.NRGBA // ← color.border.divider
+	Width          float32     // ← size.divider
+	VerticalHeight float32     // ← size.separatorShort
+}
+
+// SpinnerTokens groups tokens.
+type SpinnerTokens struct {
+	SizeXs float32       // ← size.iconXs
+	SizeSm float32       // ← size.iconSm
+	SizeMd float32       // ← size.icon
+	Color  color.NRGBA   // ← color.icon.default
+	Period time.Duration // ← motion.duration.spin
+}
+
+// CheckTokens groups tokens.
+type CheckTokens struct {
+	Size     float32     // ← size.check
+	Radius   float32     // ← radius.keycap
+	Border   color.NRGBA // ← color.border.keycap
+	On       color.NRGBA // ← color.accent.default
+	Mark     color.NRGBA // ← color.text.onAccent
+	RadioDot float32     // ← size.radioDot
+}
+
+// BannerTokens groups tokens.
+type BannerTokens struct {
+	PaddingX    float32     // ← space.12
+	PaddingY    float32     // ← space.9
+	Radius      float32     // ← radius.railButton
+	Gap         float32     // ← space.8
+	Icon        float32     // ← size.iconSm
+	NeutralBg   color.NRGBA // ← color.surface.control
+	NeutralText color.NRGBA // ← color.text.strong
+	NeutralIcon color.NRGBA // ← color.text.secondary
+	InfoBg      color.NRGBA // ← color.accent.subtle
+	InfoText    color.NRGBA // ← color.text.accentStrong
+	InfoIcon    color.NRGBA // ← color.accent.default
+	WarnBg      color.NRGBA // ← color.warning.subtle
+	WarnText    color.NRGBA // ← color.warning.textStrong
+	WarnIcon    color.NRGBA // ← color.warning.default
+	DangerBg    color.NRGBA // ← color.danger.subtle
+	DangerText  color.NRGBA // ← color.danger.text
+	DangerIcon  color.NRGBA // ← color.danger.default
+}
+
+// PanelTokens groups tokens.
+type PanelTokens struct {
+	Width        float32     // ← size.statsPanel
+	HeaderHeight float32     // ← size.panelHeader
+	PaddingX     float32     // ← space.14
+	SectionGap   float32     // ← space.8
+	Divider      color.NRGBA // ← color.border.divider
+	StatLabel    color.NRGBA // ← color.text.primary
+	StatValue    color.NRGBA // ← color.text.secondary
+	Caption      color.NRGBA // ← color.text.tertiary
+}
+
+// SparklineTokens groups tokens.
+type SparklineTokens struct {
+	Height    float32     // ← size.sparklineHeight
+	Stroke    float32     // ← size.sparklineStroke
+	Line      color.NRGBA // ← color.accent.default
+	FillAlpha float32     // ← opacity.sparklineFill
+}
+
+// KeyValueTokens groups tokens.
+type KeyValueTokens struct {
+	RowHeight float32     // ← size.keyValueRow
+	Key       color.NRGBA // ← color.text.secondary
+	Value     color.NRGBA // ← color.text.primary
+	ValueDim  color.NRGBA // ← color.text.tertiary
+	Font      float32     // ← font.size.footnote
+}
+
+// EmptyStateTokens groups tokens.
+type EmptyStateTokens struct {
+	IconTile   float32     // ← size.titlebar
+	IconRadius float32     // ← radius.window
+	IconBg     color.NRGBA // ← color.surface.control
+	Icon       color.NRGBA // ← color.text.secondary
+	Title      float32     // ← font.size.bodyLg
+	Detail     color.NRGBA // ← color.text.secondary
+	MaxWidth   float32     // ← size.emptyMaxWidth
+}
+
+// ToastTokens groups tokens.
+type ToastTokens struct {
+	Width    float32       // ← size.toast
+	Radius   float32       // ← radius.card
+	Bg       color.NRGBA   // ← color.tooltip.bg
+	Text     color.NRGBA   // ← color.tooltip.text
+	Detail   color.NRGBA   // ← color.tooltip.kbd
+	Action   color.NRGBA   // ← color.toast.action
+	OkIcon   color.NRGBA   // ← color.toast.ok
+	ErrIcon  color.NRGBA   // ← color.toast.error
+	WarnIcon color.NRGBA   // ← color.toast.warning
+	Shadow   Shadow        // ← shadow.lift
+	PaddingX float32       // ← space.14
+	PaddingY float32       // ← space.10
+	Gap      float32       // ← space.8
+	Timeout  time.Duration // ← motion.duration.autoHide
+}
+
+// PopoverTokens groups tokens.
+type PopoverTokens struct {
+	Radius  float32     // ← radius.window
+	Padding float32     // ← space.12
+	Bg      color.NRGBA // ← color.surface.raised
+	Shadow  Shadow      // ← shadow.lift
+}
+
+// LatencyTokens groups tokens.
+type LatencyTokens struct {
+	WarnMs float32     // ← size.latencyWarn
+	BadMs  float32     // ← size.latencyBad
+	Normal color.NRGBA // ← color.text.secondary
+	Warn   color.NRGBA // ← color.warning.text
+	Bad    color.NRGBA // ← color.danger.text
+}
+
+// ListRowTokens groups tokens.
+type ListRowTokens struct {
+	Height   float32     // ← size.listRow
+	Radius   float32     // ← radius.controlSm
+	PaddingX float32     // ← space.8
+	Gap      float32     // ← space.9
+	Meta     color.NRGBA // ← color.text.secondary
+}
+
+// PaneHeaderTokens groups tokens.
+type PaneHeaderTokens struct {
+	HeightCompact float32 // ← size.paneHeader
+	HeightToolbar float32 // ← size.fileHeader
+	HeightTitle   float32 // ← size.panelHeader
+	TitleFont     float32 // ← font.size.bodyLg
+	TitleWeight   int     // ← font.weight.semibold
+	PaddingLeft   float32 // ← space.14
+	PaddingRight  float32 // ← space.8
+	Gap           float32 // ← space.7
+}
+
+// PaneFooterTokens groups tokens.
+type PaneFooterTokens struct {
+	Height   float32     // ← size.paneStatusBar
+	PaddingX float32     // ← space.14
+	Gap      float32     // ← space.10
+	Text     color.NRGBA // ← color.text.secondary
+	Font     float32     // ← font.size.footnote
+	Divider  color.NRGBA // ← color.border.divider
+}
+
 // Components 组件层：只由 Semantic 计算得出（见 buildComponents）。
 type Components struct {
 	Window              WindowTokens
@@ -2308,6 +2556,20 @@ type Components struct {
 	ThemeCard           ThemeCardTokens
 	AccentSwatch        AccentSwatchTokens
 	Kbd                 KbdTokens
+	Divider             DividerTokens
+	Spinner             SpinnerTokens
+	Check               CheckTokens
+	Banner              BannerTokens
+	Panel               PanelTokens
+	Sparkline           SparklineTokens
+	KeyValue            KeyValueTokens
+	EmptyState          EmptyStateTokens
+	Toast               ToastTokens
+	Popover             PopoverTokens
+	Latency             LatencyTokens
+	ListRow             ListRowTokens
+	PaneHeader          PaneHeaderTokens
+	PaneFooter          PaneFooterTokens
 }
 
 // Palette is the primitive tier.
@@ -2388,6 +2650,7 @@ var Palette = PaletteTokens{
 		A70: color.NRGBA{R: 0xff, G: 0xff, B: 0xff, A: 0xb2},
 		A85: color.NRGBA{R: 0xff, G: 0xff, B: 0xff, A: 0xd9},
 		A90: color.NRGBA{R: 0xff, G: 0xff, B: 0xff, A: 0xe6},
+		A75: color.NRGBA{R: 0xff, G: 0xff, B: 0xff, A: 0xbf},
 	},
 	BlueA: PaletteTokensBlueA{
 		A035: color.NRGBA{R: 0x0a, G: 0x84, B: 0xff, A: 0x09},
@@ -2737,6 +3000,8 @@ func lightSemantic() Semantic {
 				Tint28:  Palette.BlueA.A28,
 				Tint35:  Palette.BlueA.A35,
 				Tint50:  Palette.BlueA.A50,
+				Hover:   Palette.Blue.N600,
+				Pressed: Palette.Blue.N700,
 			},
 			Success: ColorsSuccess{
 				Default: Palette.Green.N500,
@@ -2791,6 +3056,8 @@ func lightSemantic() Semantic {
 				Text:    Palette.Red.N700,
 				Subtle:  Palette.Red.N50,
 				Tint14:  color.NRGBA{R: 0xff, G: 0x3b, B: 0x30, A: 0x24},
+				Hover:   Palette.Red.N500,
+				Pressed: Palette.Red.N500,
 			},
 			Protocol: ColorsProtocol{
 				SftpBg:    Palette.Blue.N50,
@@ -2814,8 +3081,14 @@ func lightSemantic() Semantic {
 			Scrim: Palette.Black.A18,
 			Keycap: ColorsKeycap{
 				InkBg:    Palette.WhiteA.A16,
-				InkText:  Palette.White.A60,
+				InkText:  Palette.White.A75,
 				AccentBg: Palette.WhiteA.A20,
+			},
+			Toast: ColorsToast{
+				Action:  Palette.DarkTint.Blue300,
+				Ok:      Palette.DarkTint.Green400,
+				Error:   Palette.DarkTint.Red400,
+				Warning: Palette.DarkTint.Amber400,
 			},
 		},
 		Radius: Radii{
@@ -3005,6 +3278,25 @@ func lightSemantic() Semantic {
 			SettingsNumber:          64,
 			SettingsScrollback:      96,
 			Keycap:                  Palette.Size.N18,
+			ButtonLarge:             Palette.Size.N32,
+			BadgeSmall:              Palette.Size.N18,
+			BadgeMedium:             20,
+			Check:                   Palette.Size.N14,
+			RadioDot:                4.5,
+			PanelHeader:             46,
+			Toast:                   340,
+			EmptyMaxWidth:           220,
+			KeyValueRow:             Palette.Size.N22,
+			SparklineHeight:         Palette.Size.N34,
+			SparklineStroke:         Palette.Size.N1_5,
+			MeterHeight:             Palette.Size.N4,
+			IconXs:                  Palette.Size.N12,
+			SegmentedItem:           Palette.Size.N24,
+			LatencyWarn:             150,
+			LatencyBad:              400,
+			TableNameMinWidth:       160,
+			MeterWarnRatio:          0.7,
+			MeterCriticalRatio:      0.9,
 		},
 		Font: Typography{
 			Family: TypographyFamily{
@@ -3069,6 +3361,8 @@ func lightSemantic() Semantic {
 			InputError:        Shadow{{X: 0, Y: 0, Blur: 0, Spread: 1.5, Color: Palette.Red.N500, Inset: true}, {X: 0, Y: 0, Blur: 0, Spread: 3, Color: color.NRGBA{R: 0xff, G: 0x3b, B: 0x30, A: 0x24}}},
 			SwitchKnob:        Shadow{{X: 0, Y: 1, Blur: 2, Spread: 0, Color: color.NRGBA{R: 0x00, G: 0x00, B: 0x00, A: 0x33}}},
 			ThemeSelected:     Shadow{{X: 0, Y: 0, Blur: 0, Spread: 3, Color: Palette.BlueA.A16}},
+			ControlFocus:      Shadow{{X: 0, Y: 0, Blur: 0, Spread: 1.5, Color: Palette.Blue.N500}, {X: 0, Y: 0, Blur: 0, Spread: 5.5, Color: Palette.BlueA.A16}},
+			CardInset:         Shadow{{X: 0, Y: 0, Blur: 0, Spread: 0.5, Color: Palette.Black.A06, Inset: true}},
 		},
 		Glass: Glass{
 			Fade: GlassFade{
@@ -3121,6 +3415,7 @@ func lightSemantic() Semantic {
 			ModalEnterScale:           0.96,
 			ModalExitScale:            0.98,
 			CollapseContentFadeFactor: 1.6,
+			SparklineFill:             0.1,
 		},
 		Motion: Motion{
 			Duration: MotionDuration{
@@ -3149,6 +3444,9 @@ func lightSemantic() Semantic {
 				ConnectionStage:   Palette.Duration.N300,
 				Test:              10000 * time.Millisecond,
 				SettingsSwitchOut: 80 * time.Millisecond,
+				Fast:              Palette.Duration.N120,
+				Base:              Palette.Duration.N160,
+				AutoHide:          3000 * time.Millisecond,
 			},
 			Easing: MotionEasing{
 				Out:    Palette.Easing.EaseOut,
@@ -3164,10 +3462,12 @@ func lightSemantic() Semantic {
 				Content:  Palette.Spring.Content,
 			},
 			Drag: MotionDrag{
-				Threshold:      Palette.Size.N4,
-				LiftScale:      Palette.Ratio.N1_03,
-				AutoScrollMax:  Palette.Speed.AutoScroll,
-				AutoScrollZone: Palette.Size.N48,
+				Threshold:        Palette.Size.N4,
+				LiftScale:        Palette.Ratio.N1_03,
+				AutoScrollMax:    Palette.Speed.AutoScroll,
+				AutoScrollZone:   Palette.Size.N48,
+				StandardScale:    1.02,
+				StandardRotation: -0.6,
 			},
 			DemoTransferSpeed: Palette.Speed.DemoTransfer,
 		},
@@ -3280,6 +3580,12 @@ func darkOverrides(s *Semantic) {
 	s.Shadow.InputFocus = Shadow{{X: 0, Y: 0, Blur: 0, Spread: 1.5, Color: Palette.Blue.N500, Inset: true}, {X: 0, Y: 0, Blur: 0, Spread: 3, Color: Palette.BlueA.A24}}
 	s.Shadow.InputError = Shadow{{X: 0, Y: 0, Blur: 0, Spread: 1.5, Color: Palette.DarkTint.Red400, Inset: true}, {X: 0, Y: 0, Blur: 0, Spread: 3, Color: color.NRGBA{R: 0xff, G: 0x45, B: 0x3a, A: 0x38}}}
 	s.Shadow.ThemeSelected = Shadow{{X: 0, Y: 0, Blur: 0, Spread: 3, Color: Palette.BlueA.A24}}
+	s.Color.Accent.Hover = Palette.DarkTint.Blue300
+	s.Color.Accent.Pressed = Palette.DarkTint.Blue200
+	s.Color.Danger.Hover = Palette.DarkTint.Red400
+	s.Color.Danger.Pressed = Palette.DarkTint.Red300
+	s.Shadow.ControlFocus = Shadow{{X: 0, Y: 0, Blur: 0, Spread: 1.5, Color: Palette.Blue.N500}, {X: 0, Y: 0, Blur: 0, Spread: 5.5, Color: Palette.BlueA.A24}}
+	s.Shadow.CardInset = Shadow{{X: 0, Y: 0, Blur: 0, Spread: 0.5, Color: Palette.WhiteA.A08, Inset: true}}
 }
 
 func buildComponents(s *Semantic) Components {
@@ -3440,6 +3746,7 @@ func buildComponents(s *Semantic) Components {
 			Radius:            s.Radius.Control,
 			Spacing:           s.Space.N1,
 			BgHover:           s.Color.State.Hover,
+			BgActive:          s.Color.State.SelectedAccent,
 			BgSelected:        s.Color.State.Selected,
 			NameSize:          s.Font.Size.BodyLg,
 			NameWeight:        s.Font.Weight.Medium,
@@ -3476,7 +3783,7 @@ func buildComponents(s *Semantic) Components {
 		Card: CardTokens{
 			Bg:     s.Color.Surface.Card,
 			Radius: s.Radius.Card,
-			Shadow: s.Shadow.Card,
+			Shadow: s.Shadow.CardInset,
 		},
 		Pane: PaneTokens{
 			Bg:                  s.Color.Surface.Terminal,
@@ -3606,37 +3913,73 @@ func buildComponents(s *Semantic) Components {
 			OkBgOnGlass:      s.Color.Success.OnGlass,
 			RunBg:            s.Color.Accent.Subtle,
 			RunText:          s.Color.Text.Accent,
+			HeightSm:         s.Size.BadgeSmall,
+			HeightMd:         s.Size.BadgeMedium,
+			WarnBg:           s.Color.Warning.Subtle,
+			WarnText:         s.Color.Warning.TextStrong,
+			WarnDot:          s.Color.Warning.Default,
+			ErrBg:            s.Color.Danger.Subtle,
+			ErrText:          s.Color.Danger.Text,
+			ErrDot:           s.Color.Danger.Default,
+			RunDot:           s.Color.Accent.Default,
+			NeutralDot:       s.Color.Status.Offline,
+			MutedBg:          s.Color.Surface.Field,
+			MutedText:        s.Color.Text.Tertiary,
 		},
 		Button: ButtonTokens{
-			Height:      s.Size.Control,
-			Radius:      s.Radius.Control,
-			PaddingX:    s.Space.N9,
-			Gap:         s.Space.N6,
-			FontSize:    s.Font.Size.Body,
-			Text:        s.Color.Text.Strong,
-			Border:      s.Color.Border.Control,
-			BorderWidth: s.Size.Divider,
-			PrimaryBg:   s.Color.Accent.Default,
-			PrimaryText: s.Color.Text.OnAccent,
-			BgHover:     s.Color.State.Hover,
-			BgPressed:   s.Color.State.Pressed,
-			Bg:          s.Color.Surface.Control,
-			Transition:  s.Motion.Duration.Focus,
+			Height:             s.Size.Control,
+			Radius:             s.Radius.Control,
+			PaddingX:           s.Space.N9,
+			Gap:                s.Space.N6,
+			FontSize:           s.Font.Size.Body,
+			Text:               s.Color.Text.Strong,
+			Border:             s.Color.Border.Control,
+			BorderWidth:        s.Size.Divider,
+			PrimaryBg:          s.Color.Accent.Default,
+			PrimaryText:        s.Color.Text.OnAccent,
+			BgHover:            s.Color.State.Hover,
+			BgPressed:          s.Color.State.Pressed,
+			Bg:                 s.Color.Surface.Control,
+			Transition:         s.Motion.Duration.Focus,
+			HeightSm:           s.Size.ControlSm,
+			HeightLg:           s.Size.ButtonLarge,
+			PaddingXSm:         s.Space.N9,
+			PaddingXLg:         s.Space.N14,
+			SecondaryBg:        s.Color.Surface.Control,
+			SecondaryBgHover:   s.Color.Surface.ControlStrong,
+			PlainBgHover:       s.Color.State.Hover,
+			PrimaryBgHover:     s.Color.Accent.Hover,
+			PrimaryBgPressed:   s.Color.Accent.Pressed,
+			DangerBg:           s.Color.Danger.Default,
+			DangerBgHover:      s.Color.Danger.Hover,
+			DangerBgPressed:    s.Color.Danger.Pressed,
+			DangerText:         s.Color.Text.OnAccent,
+			DangerPlainText:    s.Color.Danger.Text,
+			DangerPlainBgHover: s.Color.Danger.Subtle,
+			KbdGap:             s.Space.N6,
+			FocusShadow:        s.Shadow.ControlFocus,
 		},
 		IconButton: IconButtonTokens{
-			Size:       s.Size.ControlMd,
-			SizeSm:     s.Size.ControlSm,
-			SizeXs:     s.Size.ControlXs,
-			Radius:     s.Radius.ControlSm,
-			Icon:       s.Color.Icon.Default,
-			IconSubtle: s.Color.Icon.Subtle,
-			IconFaint:  s.Color.Icon.Faint,
-			Bg:         s.Color.Surface.Control,
-			BgHover:    s.Color.State.Hover,
-			IconSize:   s.Size.Icon,
-			Stroke:     s.Size.IconStroke,
-			BgPressed:  s.Color.State.Pressed,
-			Transition: s.Motion.Duration.Focus,
+			Size:        s.Size.ControlMd,
+			SizeSm:      s.Size.ControlSm,
+			SizeXs:      s.Size.ControlXs,
+			Radius:      s.Radius.ControlSm,
+			Icon:        s.Color.Icon.Default,
+			IconSubtle:  s.Color.Icon.Subtle,
+			IconFaint:   s.Color.Icon.Faint,
+			Bg:          s.Color.Surface.Control,
+			BgHover:     s.Color.State.Hover,
+			IconSize:    s.Size.Icon,
+			Stroke:      s.Size.IconStroke,
+			BgPressed:   s.Color.State.Pressed,
+			Transition:  s.Motion.Duration.Focus,
+			BgOn:        s.Color.State.Pressed,
+			IconOn:      s.Color.Text.Primary,
+			BgFilled:    s.Color.Surface.Control,
+			IconHover:   s.Color.Text.Primary,
+			IconSizeSm:  s.Size.IconSm,
+			IconSizeXs:  s.Size.IconXs,
+			FocusShadow: s.Shadow.ControlFocus,
 		},
 		FloatButton: FloatButtonTokens{
 			Size:        s.Size.ControlLg,
@@ -3660,6 +4003,10 @@ func buildComponents(s *Semantic) Components {
 			ShadowOn:     s.Shadow.Segment,
 			Transition:   s.Motion.Duration.Focus,
 			BgHover:      s.Color.State.Hover,
+			CountText:    s.Color.Text.Tertiary,
+			CountTextOn:  s.Color.Text.Muted,
+			ItemHeightMd: s.Size.SegmentedItem,
+			HeightSm:     s.Size.ControlSm,
 		},
 		Breadcrumb: BreadcrumbTokens{
 			Height:    s.Size.ControlMd,
@@ -3671,6 +4018,7 @@ func buildComponents(s *Semantic) Components {
 			Text:      s.Color.Text.Muted,
 			Current:   s.Color.Text.Primary,
 			Separator: s.Color.Text.Placeholder,
+			IconSize:  s.Size.IconXs,
 		},
 		FileList: FileListTokens{
 			HeaderHeight:     s.Size.ListRow,
@@ -3690,6 +4038,9 @@ func buildComponents(s *Semantic) Components {
 			FolderIcon:       s.Color.Icon.Folder,
 			FolderFill:       s.Color.Icon.FolderFill,
 			PaneHeaderHeight: s.Size.FileHeader,
+			HeaderBg:         s.Color.Surface.Card,
+			ColumnGap:        s.Space.N16,
+			NameMinWidth:     s.Size.TableNameMinWidth,
 		},
 		Progress: ProgressTokens{
 			Height:      s.Size.Progress,
@@ -3699,6 +4050,11 @@ func buildComponents(s *Semantic) Components {
 			FillNeutral: s.Color.Fill.Strong,
 			FillPaused:  s.Color.Status.Paused,
 			FillDone:    s.Color.Success.Default,
+			HeightMeter: s.Size.MeterHeight,
+			MeterFill:   s.Color.Fill.Strong,
+			MeterWarnAt: s.Size.MeterWarnRatio,
+			MeterCritAt: s.Size.MeterCriticalRatio,
+			FillError:   s.Color.Danger.Default,
 		},
 		Tooltip: TooltipTokens{
 			Bg:         s.Color.Tooltip.Bg,
@@ -3752,6 +4108,8 @@ func buildComponents(s *Semantic) Components {
 			LiftDuration:     s.Motion.Duration.Lift,
 			SourceOpacity:    s.Opacity.DragSource,
 			StackBg:          s.Color.Surface.LiftStack,
+			StandardScale:    s.Motion.Drag.StandardScale,
+			StandardRotation: s.Motion.Drag.StandardRotation,
 		},
 		DropIndicator: DropIndicatorTokens{
 			PlaceholderBg:           s.Color.Fill.Placeholder,
@@ -3925,6 +4283,8 @@ func buildComponents(s *Semantic) Components {
 			SelBgInactive:       s.Color.State.Selected,
 			SelTextInactive:     s.Color.Text.Primary,
 			Transition:          s.Motion.Duration.Focus,
+			BorderFocused:       s.Color.Accent.Default,
+			BorderWidthFocused:  s.Size.FocusRing,
 		},
 		FTPSplit: FTPSplitTokens{
 			Gutter:            s.Space.N8,
@@ -4292,6 +4652,131 @@ func buildComponents(s *Semantic) Components {
 			InkText:    s.Color.Keycap.InkText,
 			AccentBg:   s.Color.Keycap.AccentBg,
 			AccentText: s.Color.Text.OnAccent,
+		},
+		Divider: DividerTokens{
+			Color:          s.Color.Border.Divider,
+			Width:          s.Size.Divider,
+			VerticalHeight: s.Size.SeparatorShort,
+		},
+		Spinner: SpinnerTokens{
+			SizeXs: s.Size.IconXs,
+			SizeSm: s.Size.IconSm,
+			SizeMd: s.Size.Icon,
+			Color:  s.Color.Icon.Default,
+			Period: s.Motion.Duration.Spin,
+		},
+		Check: CheckTokens{
+			Size:     s.Size.Check,
+			Radius:   s.Radius.Keycap,
+			Border:   s.Color.Border.Keycap,
+			On:       s.Color.Accent.Default,
+			Mark:     s.Color.Text.OnAccent,
+			RadioDot: s.Size.RadioDot,
+		},
+		Banner: BannerTokens{
+			PaddingX:    s.Space.N12,
+			PaddingY:    s.Space.N9,
+			Radius:      s.Radius.RailButton,
+			Gap:         s.Space.N8,
+			Icon:        s.Size.IconSm,
+			NeutralBg:   s.Color.Surface.Control,
+			NeutralText: s.Color.Text.Strong,
+			NeutralIcon: s.Color.Text.Secondary,
+			InfoBg:      s.Color.Accent.Subtle,
+			InfoText:    s.Color.Text.AccentStrong,
+			InfoIcon:    s.Color.Accent.Default,
+			WarnBg:      s.Color.Warning.Subtle,
+			WarnText:    s.Color.Warning.TextStrong,
+			WarnIcon:    s.Color.Warning.Default,
+			DangerBg:    s.Color.Danger.Subtle,
+			DangerText:  s.Color.Danger.Text,
+			DangerIcon:  s.Color.Danger.Default,
+		},
+		Panel: PanelTokens{
+			Width:        s.Size.StatsPanel,
+			HeaderHeight: s.Size.PanelHeader,
+			PaddingX:     s.Space.N14,
+			SectionGap:   s.Space.N8,
+			Divider:      s.Color.Border.Divider,
+			StatLabel:    s.Color.Text.Primary,
+			StatValue:    s.Color.Text.Secondary,
+			Caption:      s.Color.Text.Tertiary,
+		},
+		Sparkline: SparklineTokens{
+			Height:    s.Size.SparklineHeight,
+			Stroke:    s.Size.SparklineStroke,
+			Line:      s.Color.Accent.Default,
+			FillAlpha: s.Opacity.SparklineFill,
+		},
+		KeyValue: KeyValueTokens{
+			RowHeight: s.Size.KeyValueRow,
+			Key:       s.Color.Text.Secondary,
+			Value:     s.Color.Text.Primary,
+			ValueDim:  s.Color.Text.Tertiary,
+			Font:      s.Font.Size.Footnote,
+		},
+		EmptyState: EmptyStateTokens{
+			IconTile:   s.Size.Titlebar,
+			IconRadius: s.Radius.Window,
+			IconBg:     s.Color.Surface.Control,
+			Icon:       s.Color.Text.Secondary,
+			Title:      s.Font.Size.BodyLg,
+			Detail:     s.Color.Text.Secondary,
+			MaxWidth:   s.Size.EmptyMaxWidth,
+		},
+		Toast: ToastTokens{
+			Width:    s.Size.Toast,
+			Radius:   s.Radius.Card,
+			Bg:       s.Color.Tooltip.Bg,
+			Text:     s.Color.Tooltip.Text,
+			Detail:   s.Color.Tooltip.Kbd,
+			Action:   s.Color.Toast.Action,
+			OkIcon:   s.Color.Toast.Ok,
+			ErrIcon:  s.Color.Toast.Error,
+			WarnIcon: s.Color.Toast.Warning,
+			Shadow:   s.Shadow.Lift,
+			PaddingX: s.Space.N14,
+			PaddingY: s.Space.N10,
+			Gap:      s.Space.N8,
+			Timeout:  s.Motion.Duration.AutoHide,
+		},
+		Popover: PopoverTokens{
+			Radius:  s.Radius.Window,
+			Padding: s.Space.N12,
+			Bg:      s.Color.Surface.Raised,
+			Shadow:  s.Shadow.Lift,
+		},
+		Latency: LatencyTokens{
+			WarnMs: s.Size.LatencyWarn,
+			BadMs:  s.Size.LatencyBad,
+			Normal: s.Color.Text.Secondary,
+			Warn:   s.Color.Warning.Text,
+			Bad:    s.Color.Danger.Text,
+		},
+		ListRow: ListRowTokens{
+			Height:   s.Size.ListRow,
+			Radius:   s.Radius.ControlSm,
+			PaddingX: s.Space.N8,
+			Gap:      s.Space.N9,
+			Meta:     s.Color.Text.Secondary,
+		},
+		PaneHeader: PaneHeaderTokens{
+			HeightCompact: s.Size.PaneHeader,
+			HeightToolbar: s.Size.FileHeader,
+			HeightTitle:   s.Size.PanelHeader,
+			TitleFont:     s.Font.Size.BodyLg,
+			TitleWeight:   s.Font.Weight.Semibold,
+			PaddingLeft:   s.Space.N14,
+			PaddingRight:  s.Space.N8,
+			Gap:           s.Space.N7,
+		},
+		PaneFooter: PaneFooterTokens{
+			Height:   s.Size.PaneStatusBar,
+			PaddingX: s.Space.N14,
+			Gap:      s.Space.N10,
+			Text:     s.Color.Text.Secondary,
+			Font:     s.Font.Size.Footnote,
+			Divider:  s.Color.Border.Divider,
 		},
 	}
 }

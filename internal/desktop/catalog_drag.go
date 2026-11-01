@@ -505,7 +505,10 @@ func (a *app) settleCatalogDrag(c *ui.Context, commit bool) {
 			}
 		})
 		if err != nil {
-			uikit.Notify(c, "保存排序失败，已恢复原位置："+err.Error())
+			uikit.Toast(c, uikit.ToastProps{
+				ID: "保存排序失败，已恢复原位置：" + err.Error(), Tone: uikit.ToneDanger,
+				Title: "保存排序失败", Detail: "已恢复原位置：" + err.Error(),
+			})
 		} else {
 			d.phase = catalogSettling
 		}

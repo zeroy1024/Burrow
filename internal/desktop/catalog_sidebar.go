@@ -3,7 +3,6 @@ package desktop
 import (
 	"fmt"
 	"slices"
-	"strconv"
 	"strings"
 
 	"sshdesk/internal/theme"
@@ -33,11 +32,7 @@ func (a *app) catalogList(c *ui.Context) {
 	t := theme.Current()
 	viewport := ui.Box(c).Key("catalog-viewport").Grow(1).MinHeight(0).Clip()
 	viewport.Children(func() {
-		ui.Scroll(c.Key("session-list")).TrackScroll(&a.page().catalogScroll).Fill().MinHeight(0).
-			ScrollbarInsets(0, -t.C.Scrollbar.TrackWidth, 0, 0).
-			HandleInput(func(ev ui.InputEvent) bool {
-				return a.page().catalogScrollbar.input(ev, &a.page().catalogScroll)
-			}).Padding(t.C.Catalog.ListPaddingY, t.C.Catalog.ListPaddingX).Children(func() {
+		content := ui.Scroll(c.Key("session-list")).TrackScroll(&a.page().catalogScroll).Fill().MinHeight(0).Padding(t.C.Catalog.ListPaddingY, t.C.Catalog.ListPaddingX).Children(func() {
 			ui.Column(c).Key("catalog-items").FillWidth().Children(func() {
 				a.page().catalogSlots = a.catalogPlan(c)
 				for i, slot := range a.page().catalogSlots {
@@ -81,13 +76,13 @@ func (a *app) catalogList(c *ui.Context) {
 					}
 				}
 				if len(a.page().catalogSlots) == 0 && strings.TrimSpace(a.page().query) != "" {
-					ui.Text(c, "没有匹配的主机").FontSize(t.Font.Size.Small).TextColor(uikit.Color(t.Color.Text.Secondary)).Padding(t.Space.N12)
+					uikit.EmptyMessage(c, "没有匹配的主机", uikit.EmptyCatalogSearch)
 				}
 			})
 		})
-		fadingScrollbar(c, scrollbarView{
-			element: viewport, offset: &a.page().catalogScroll, label: "会话栏滚动条", color: uikit.Color(t.C.Scrollbar.Color),
-		}, &a.page().catalogScrollbar)
+		uikit.Scrollbars(c, viewport, content, &a.page().catalogScroll, uikit.ScrollbarProps{
+			Label: "会话栏滚动条", State: &a.page().catalogScrollbar,
+		})
 	})
 	if a.section == sectionSSH {
 		a.syncCatalogWorkspacePreview(c)
@@ -134,18 +129,32 @@ func (a *app) catalogHeader(c *ui.Context, slot catalogSlot) ui.Element {
 	t := theme.Current()
 	group := slot.group
 	expanded := a.catalogExpanded(group)
-	header := uikit.SiderGroup(c, uikit.SiderGroupProps{Key: slot.key, Title: group.name, Expanded: expanded})
+	count := a.catalogModeCount(group.hosts)
+	arrowAnimation := a.catalogDisplaceAnimation()
+	result := uikit.SiderGroup(c, uikit.SiderGroupProps{
+		Key: slot.key, Title: group.name, Open: &expanded, Count: count,
+		Chevron: chevronIcon, Motion: uikit.MotionOverride(a.reduceMotion(c)),
+		ArrowAnimation: &arrowAnimation, DeferPresentation: true,
+	})
+	header := result.Root
+	// The existing source is tracked before any hover, count, or landing styling.
 	a.trackCatalogDrag(c, header, slot)
 	highlight := a.page().catalogDrag != nil && a.page().catalogDrag.phase == catalogDragging &&
 		a.page().catalogDrag.kind == catalogHostDrag && a.page().catalogDrag.hoverGroup == group
-	uikit.StyleSiderGroup(header, highlight)
+	motion := a.catalogMotion(slot.key)
+	if count != motion.count {
+		motion.down, motion.count = count < motion.count, count
+	}
+	result.Present(c, uikit.SiderGroupPresentation{
+		Highlighted: highlight, DisableToggle: a.page().catalogDrag != nil, CountDown: motion.down,
+	})
+	if result.Toggled {
+		a.page().lastGroup = group
+		if err := a.commitCatalogMove(func() { a.setGroupCollapsed(group, !a.groupCollapsed(group)) }); err != nil {
+			uikit.Toast(c, uikit.ToastProps{Tone: uikit.ToneDanger, Title: "保存分组状态失败", Detail: err.Error()})
+		}
+	}
 	if a.page().catalogDrag == nil {
-		header.OnClick(func() {
-			a.page().lastGroup = group
-			if err := a.commitCatalogMove(func() { a.setGroupCollapsed(group, !a.groupCollapsed(group)) }); err != nil {
-				uikit.Notify(c, "保存分组状态失败："+err.Error())
-			}
-		})
 		header.ContextMenu(func(m *ui.Menu) {
 			if m.Item("添加主机").Chosen() {
 				a.startHostDraft()
@@ -156,28 +165,19 @@ func (a *app) catalogHeader(c *ui.Context, slot catalogSlot) ui.Element {
 			}
 		})
 	}
-	header.Children(func() {
-		motion := a.catalogMotion(slot.key)
-		count := a.catalogModeCount(group.hosts)
-		if count != motion.count {
-			motion.down, motion.count = count < motion.count, count
-		}
-		uikit.SiderGroupContents(c, uikit.SiderGroupContentProps{
-			Title: group.name, Expanded: expanded, Highlighted: highlight, Count: count, CountDown: motion.down,
-			Chevron: chevronIcon, ArrowAnimation: a.catalogDisplaceAnimation(),
-		})
-		if highlight && a.groupCollapsed(group) && !a.page().catalogDrag.autoExpanded[group] {
+	if highlight && a.groupCollapsed(group) && !a.page().catalogDrag.autoExpanded[group] {
+		header.Children(func() {
 			progress := min(1, float32(c.Now().Sub(a.page().catalogDrag.hoverStarted))/float32(t.C.GroupHeader.ExpandDelay))
 			uikit.SiderGroupExpand(c, progress)
-		}
-	})
+		})
+	}
 	return header
 }
 
-func (a *app) catalogHostMenu(c *ui.Context, id hostID) func(*ui.Menu) {
+func (a *app) catalogHostMenu(c *ui.Context, id hostID) []uikit.MenuEntry {
 	h := a.hosts[id]
-	return func(m *ui.Menu) {
-		if m.Item("连接").Chosen() {
+	return []uikit.MenuEntry{
+		{ID: "connect", Label: localize(c, "连接"), Icon: uikit.IconTerminal, OnChoose: func() {
 			a.openCatalogHost(id)
 			if a.section == sectionFiles {
 				session := a.currentFileSession()
@@ -185,9 +185,9 @@ func (a *app) catalogHostMenu(c *ui.Context, id hostID) func(*ui.Menu) {
 					a.reconnectFileSession(session)
 				}
 			}
-		}
-		m.Separator()
-		if m.Item("编辑").Chosen() {
+		}},
+		{ID: "after-connect", Separator: true},
+		{ID: "edit", Label: localize(c, "编辑"), Icon: uikit.IconEdit, OnChoose: func() {
 			for _, group := range a.catalogGroups() {
 				if slices.Contains(group.hosts, id) {
 					a.page().lastGroup = group
@@ -195,8 +195,8 @@ func (a *app) catalogHostMenu(c *ui.Context, id hostID) func(*ui.Menu) {
 				}
 			}
 			a.startEditHostDraft(id)
-		}
-		if m.Item("复制").Chosen() {
+		}},
+		{ID: "copy", Label: localize(c, "复制"), Icon: uikit.IconCopy, OnChoose: func() {
 			address := fmt.Sprintf("%s@%s:%d", h.user, h.address, h.port)
 			if a.section == sectionFiles {
 				protocol := "sftp"
@@ -206,72 +206,58 @@ func (a *app) catalogHostMenu(c *ui.Context, id hostID) func(*ui.Menu) {
 				address = protocol + "://" + address
 			}
 			mygo.Clipboard.WriteText(address)
-		}
-		m.Separator()
-		if m.Item("删除").Chosen() {
+		}},
+		{ID: "before-delete", Separator: true},
+		{ID: "delete", Label: localize(c, "删除"), Icon: uikit.IconTrash, Danger: true, OnChoose: func() {
 			if a.fileSiteBusy(id) {
 				uikit.Notify(c, "请先取消或清除该会话的传输任务")
 				return
 			}
 			a.page().draft = hostDraft{id: id, deleting: true}
 			a.page().addHostOpen = true
-		}
+		}},
 	}
 }
 
 func (a *app) catalogHostRow(c *ui.Context, slot catalogSlot) ui.Element {
 	t := theme.Current()
 	id, h := hostID(slot.key.id), a.hosts[slot.key.id]
-	row := uikit.SiderRow(c, uikit.SiderRowProps{Key: slot.key, Title: h.name, Subtitle: h.user + "@" + h.address})
+	result := uikit.SiderRow(c, uikit.SiderRowProps{
+		Key: slot.key, Title: h.name, Subtitle: h.user + "@" + h.address, Description: h.system,
+		Logo: func() { a.catalogHostIcon(c, id) }, DragValue: hostDrag{id: id, group: slot.group},
+		DeferPresentation: true, Motion: uikit.MotionOverride(a.reduceMotion(c)),
+	})
+	row := result.Root
 	if row.Clicked() {
 		a.page().lastGroup = slot.group
 	}
+	// Presentation reuses this same source after the custom drag controller runs.
 	a.trackCatalogDrag(c, row, slot)
-	background := ui.Transparent
-	if a.page().catalogDrag == nil && row.Hovered() {
-		background = uikit.Color(t.C.SiderItem.BgHover)
-	}
 	animation := catalogColorAnimation()
-	colorKey := "row-bg"
 	flashing := a.page().catalogFlash != nil && *a.page().catalogFlash == slot.key
 	seeding := flashing && a.page().catalogFlashSeed > 0
 	if flashing {
-		colorKey = "landing-bg"
-		background = ui.Transparent
 		animation = ui.Animation{Duration: t.C.DropIndicator.FlashDuration, Ease: uikit.Easing(t.C.DropIndicator.FlashEasing)}
 		if seeding {
-			background = uikit.Color(t.C.DropIndicator.FlashBg)
 			animation = ui.Animation{Duration: t.C.Desktop.InstantDuration}
 		}
 	}
-	shownBackground := row.AnimateColor(colorKey, background, animation)
-	row.Background(shownBackground)
-	if flashing {
-		opacity := float32(shownBackground.A) / float32(t.C.DropIndicator.FlashBg.A)
-		uikit.ShadowOpacity(row, t.C.DropIndicator.FlashShadow, opacity)
+	if a.page().catalogDrag == nil {
+		result.SetMenu(a.catalogHostMenu(c, id))
 	}
+	result.Present(c, uikit.SiderRowPresentation{
+		InteractionDisabled: a.page().catalogDrag != nil, Flashing: flashing, Seeding: seeding, Animation: &animation,
+	})
 	if seeding {
-		if shownBackground == background {
+		if result.Seeded {
 			a.page().catalogFlashSeed = 0
 			a.page().catalogFlashUntil = c.Now().Add(t.C.DropIndicator.FlashDuration)
 		}
 		c.AnimationFrame()
 	}
-	if a.page().catalogDrag == nil {
-		row.ContextMenu(a.catalogHostMenu(c, id))
-		if row.DoubleClicked() || row.Focused() && row.Shortcut(0, ui.KeyEnter) {
-			a.openCatalogHost(id)
-		}
+	if result.Open {
+		a.openCatalogHost(id)
 	}
-	row.Children(func() {
-		a.catalogHostContents(c, id)
-		action := uikit.SiderMore(c, row, uikit.SiderMoreProps{
-			Label: "更多操作 " + h.name, Description: h.system, Icon: moreIcon, Disabled: a.page().catalogDrag != nil,
-		})
-		if a.page().catalogDrag == nil {
-			action.Menu(a.catalogHostMenu(c, id))
-		}
-	})
 	return row
 }
 
@@ -328,21 +314,35 @@ func (a *app) catalogDragPreview(c *ui.Context) {
 	if a.reduceMotion(c) {
 		scale = 1
 	}
-	lift := a.positionAnimation(uikit.Tween(t.C.DragLift.LiftDuration))
-	uikit.StyleDragLift(ghost, scale, shadow, lift)
+	returningGroup := d.kind == catalogGroupDrag && d.phase != catalogDragging
+	if returningGroup {
+		// Keep the return spring's position, but stop presenting a lifted stack
+		// once the real list has restored this group's expanded state.
+		ghost.AnimatePose(ui.Pose{Scale: 1}, ui.Animation{Duration: t.C.Desktop.InstantDuration})
+	} else {
+		lift := a.positionAnimation(uikit.Tween(t.C.DragLift.LiftDuration))
+		uikit.StyleDragLift(c, ghost, uikit.DragLiftProps{Scale: scale, Shadow: shadow,
+			Animation: lift, Motion: uikit.MotionOverride(a.reduceMotion(c))})
+	}
 	ghost.Children(func() {
-		if d.kind == catalogGroupDrag {
+		if d.kind == catalogGroupDrag && !returningGroup {
 			// Paint the sheets before the front card so their shadows remain behind it.
 			for _, offset := range []float32{t.C.DragLift.StackInset, t.C.DragLift.StackInset / 2} {
 				uikit.DragLiftSheet(c, offset, d.origin.H)
 			}
 		}
-		uikit.DragLiftCard(c).Children(func() {
+		card := uikit.DragLiftCard(c)
+		if returningGroup {
+			p := t.C.GroupHeader
+			card.Background(ui.Transparent).Padding(0, p.PaddingX).Gap(p.Gap)
+		}
+		card.Children(func() {
 			if d.kind == catalogHostDrag {
 				a.catalogHostContents(c, d.host.id)
 				return
 			}
-			uikit.DragGroupLabel(c, d.group.name, strconv.Itoa(len(d.group.hosts))+" 台", chevronIcon)
+			uikit.DragGroupLabel(c, d.group.name, a.catalogModeCount(d.group.hosts), chevronIcon,
+				uikit.DragGroupLabelProps{Dragging: !returningGroup, Expanded: a.catalogExpanded(d.group)})
 		})
 	})
 }

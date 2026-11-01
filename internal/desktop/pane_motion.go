@@ -33,6 +33,9 @@ func (a *app) beginWorkspaceFrame(c *ui.Context) {
 			bar := a.tabScroll.Bounds(c)
 			d.detached = a.pointer.Y > bar.Y+bar.H+t.C.Desktop.TabDetachDistance
 		}
+		if d.kind == dragPane && d.phase == dragActive {
+			d.overTabs = false
+		}
 	}
 	for _, tab := range a.tabs {
 		if tab.layoutPending {
@@ -292,16 +295,5 @@ func (a *app) terminalDivider(c *ui.Context, split splitPlacement) {
 	if edge.Hovered() || held || edge.FocusVisible() {
 		target = 1
 	}
-	color := uikit.Color(t.C.Desktop.DividerHandleColor)
-	if held {
-		color = uikit.Color(t.C.DropIndicator.LineColor)
-	}
-	edge.Children(func() {
-		handle := ui.Box(c).Size(t.C.Desktop.DividerHandleWidth, t.C.Desktop.DividerHandleHeight).
-			Radius(t.C.Desktop.DividerHandleRadius).Background(color).
-			Opacity(uikit.Visual(edge, "handle", target, t.C.Desktop.DividerFadeDuration)).PassThrough()
-		if node.stacked {
-			handle.Size(t.C.Desktop.DividerHandleHeight, t.C.Desktop.DividerHandleWidth)
-		}
-	})
+	edge.Children(func() { uikit.SplitterHandle(c, edge, target, held, node.stacked) })
 }

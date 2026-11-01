@@ -59,7 +59,7 @@ type settingsState struct {
 	scroll                         [7]ui.ScrollState
 	notice                         string
 	allSchemes                     bool
-	shortcutList                   ui.ListState
+	shortcutTable                  ui.Handle
 	recording                      string
 	pendingBinding, conflictAction string
 	fonts                          []string
@@ -68,14 +68,14 @@ type settingsState struct {
 
 func (s *settingsState) reset() {
 	clean := settingsState{
-		search:       s.search,
-		shortcutList: ui.ListState{Handle: s.shortcutList.Handle},
+		search:        s.search,
+		shortcutTable: s.shortcutTable,
 	}
 	for index := range s.scroll {
 		clean.scroll[index].Handle = s.scroll[index].Handle
 	}
 	// MyGo keeps handle bindings for the window's lifetime. Reuse those bindings
-	// while releasing page data, callbacks and the list's private layout caches.
+	// while releasing page data and callbacks.
 	*s = clean
 }
 
@@ -221,7 +221,7 @@ func (a *app) tickPreferences(c *ui.Context) {
 		if a.settingsUI.open {
 			a.settingsUI.notice = err.Error()
 		}
-		uikit.Notify(c, "保存设置失败："+err.Error())
+		uikit.Toast(c, uikit.ToastProps{Tone: uikit.ToneDanger, Title: "保存设置失败", Detail: err.Error()})
 	}
 }
 

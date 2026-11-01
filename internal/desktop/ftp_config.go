@@ -118,7 +118,7 @@ func (a *app) readFilePreferences() error {
 
 func (a *app) saveFilePreferences(c *ui.Context) {
 	if err := a.writeFilePreferences(); err != nil {
-		uikit.Notify(c, "保存文件传输偏好失败："+err.Error())
+		uikit.Toast(c, uikit.ToastProps{ID: "保存文件传输偏好失败：" + err.Error(), Tone: uikit.ToneDanger, Title: "保存文件传输偏好失败", Detail: err.Error()})
 	}
 }
 

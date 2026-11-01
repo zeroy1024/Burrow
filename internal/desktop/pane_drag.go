@@ -37,6 +37,7 @@ const (
 	dragActive paneDragPhase = iota
 	dragReturning
 	dragLanded
+	dragTabLanding
 )
 
 type paneDragState struct {
@@ -49,7 +50,14 @@ type paneDragState struct {
 	detached           bool
 	order              []*workspaceTab
 	returnStarted      time.Time
+	overTabs           bool
+	tabRect, paneRect  ui.Rect
+	landingTab         *workspaceTab
+	morphSeed          bool
+	viewport           terminalDragViewport
 }
+
+const paneTabSlotMotion = "pane-tab-slot"
 
 func (a *app) paneDragHandle(c *ui.Context, source ui.Element, transfer paneTransfer) {
 	if a.activeSection() != sectionSSH {
@@ -83,7 +91,10 @@ func (a *app) paneDragHandle(c *ui.Context, source ui.Element, transfer paneTran
 	}
 	d := &paneDragState{
 		kind: kind, session: transfer.session, originTab: transfer.tab, origin: r,
-		grab: ui.Point{X: a.pointer.X - r.X, Y: a.pointer.Y - r.Y}, order: []*workspaceTab{},
+		grab: ui.Point{X: a.pointer.X - r.X, Y: a.pointer.Y - r.Y}, order: []*workspaceTab{}, morphSeed: kind == dragPane,
+	}
+	if kind == dragPane {
+		d.viewport = terminalDragViewportFor(transfer.session)
 	}
 	if transfer.fromTab {
 		d.order = slices.Clone(a.tabs)
@@ -94,22 +105,40 @@ func (a *app) paneDragHandle(c *ui.Context, source ui.Element, transfer paneTran
 	a.drag = d
 }
 
-func (a *app) tabStripTarget(c *ui.Context, strip ui.Element) {
+func (a *app) tabStripTarget(c *ui.Context, parts uikit.TabsResult, add ui.Element) {
 	if a.activeSection() != sectionSSH {
 		return
 	}
-	_, over := ui.DragOver[paneTransfer](strip)
-	_, released := ui.Drop[paneTransfer](strip)
-	d := a.drag
-	if d == nil || d.kind != dragTab || d.detached || d.phase != dragActive {
+	strip := parts.Scroller
+	t := theme.Current()
+	animation := a.positionAnimation(ui.Animation{Spring: uikit.Spring(t.C.ReorderMotion.TabDisplace)})
+	// Keep the transition registered outside a drag as well, so yielding and
+	// returning to the original position use the same continuous spring.
+	add.Transition(ui.ElementTransition{Position: true, Animation: &animation})
+	source, over := ui.DragOver[paneTransfer](strip)
+	dropped, released := ui.Drop[paneTransfer](strip)
+	if released {
+		source = dropped
+	}
+	canExtract := (over || released) && !source.fromTab && source.tab.canSeparateSessions()
+	paneWidth := float32(0)
+	if canExtract {
+		paneWidth = uikit.SessionTabWidth(a.paneTabProps(c, source.session))
+	}
+	index, slotX := a.paneTabInsertion(c, parts, add, paneWidth)
+	if !over && !released {
 		return
 	}
-	if !over && !released {
+	d := a.drag
+	if source.fromTab && (d == nil || d.kind != dragTab || d.detached || d.phase != dragActive) {
+		return
+	}
+	if !source.fromTab && !canExtract {
+		strip.Cursor(ui.CursorNotAllowed)
 		return
 	}
 	r := strip.Bounds()
 	var delta float32
-	t := theme.Current()
 	zone := t.C.DropIndicator.AutoScrollZone
 	step := t.C.DropIndicator.AutoScrollMax * float32(t.C.Desktop.FrameInterval.Seconds())
 	if over && a.pointer.X < r.X+zone {
@@ -126,6 +155,34 @@ func (a *app) tabStripTarget(c *ui.Context, strip ui.Element) {
 			a.tabScroll.X = next
 			c.After(t.C.Desktop.FrameInterval)
 		}
+	}
+	if !source.fromTab {
+		if d == nil || d.phase != dragActive {
+			origin := source.session.frame.Bounds(c)
+			d = &paneDragState{kind: dragPane, session: source.session, originTab: source.tab, origin: origin,
+				grab: ui.Point{X: t.C.DragGhost.Width / 2, Y: t.C.Desktop.DragGrabY}, morphSeed: true,
+				paneRect: ui.Rect{X: origin.X, Y: origin.Y, W: t.C.DragGhost.Width, H: t.C.DragGhost.Height},
+				viewport: terminalDragViewportFor(source.session)}
+			a.drag = d
+		}
+		d.overTabs = true
+		d.tabRect = ui.Rect{X: slotX,
+			Y: r.Y + (r.H-t.C.Tab.Height)/2, W: paneWidth, H: t.C.Tab.Height}
+		strip.Cursor(ui.CursorGrabbing)
+		if released {
+			a.pendingDock = func() {
+				tab := a.detachPaneToTab(source.tab, source.session, index, a.workArea.Bounds(c))
+				if tab == nil {
+					return
+				}
+				// The inserted real tab now owns the space; do not retain a
+				// second animated tail after the model has been committed.
+				parts.Row.Jump(paneTabSlotMotion, 0)
+				startPaneReveal(source.session)
+				d.phase, d.landingTab = dragTabLanding, tab
+			}
+		}
+		return
 	}
 
 	// Reconstruct the slots from their widths, independent of position animations.
@@ -154,6 +211,41 @@ func (a *app) tabStripTarget(c *ui.Context, strip ui.Element) {
 		d.phase, d.returnStarted = dragReturning, c.Now()
 		d.returnRect = a.tabSlot(c, d.originTab)
 	}
+}
+
+func (a *app) paneTabInsertion(c *ui.Context, parts uikit.TabsResult, add ui.Element, width float32) (int, float32) {
+	t := theme.Current()
+	index, x := len(a.tabs), parts.Scroller.Bounds().X-a.tabScroll.X
+	slotX, total := x, add.Bounds().W
+	for i, tab := range a.tabs {
+		w := tab.frame.Bounds(c).W
+		if index == len(a.tabs) && a.pointer.X < x+w/2 {
+			index, slotX = i, x
+		}
+		x += w + t.C.Titlebar.TabsGap
+		total += w + t.C.Titlebar.TabsGap
+	}
+	if index == len(a.tabs) {
+		slotX = x
+	}
+	space := float32(0)
+	if width > 0 {
+		space = width + t.C.Titlebar.TabsGap
+		for i, tab := range a.tabs {
+			if i >= index {
+				c.Resolve(tab.frame).Left(space)
+			}
+		}
+		add.Left(space)
+	}
+	// Keep the scroll range while the same spring restores the neighbours.
+	// Removing it immediately would clamp scrollX and visibly jump the strip.
+	animation := a.positionAnimation(ui.Animation{Spring: uikit.Spring(t.C.ReorderMotion.TabDisplace)})
+	gap := parts.Row.AnimateTo(paneTabSlotMotion, space, animation)
+	if space > 0 || !parts.Row.Settled(paneTabSlotMotion) {
+		parts.Row.Width(total + max(0, gap)).Shrink(0)
+	}
+	return index, slotX
 }
 
 func (a *app) tabSlot(c *ui.Context, tab *workspaceTab) ui.Rect {
@@ -197,6 +289,10 @@ func (a *app) dragPreview(c *ui.Context) {
 	if d == nil || d.phase == dragLanded {
 		return
 	}
+	if d.kind == dragPane {
+		a.paneTabDragPreview(c, d)
+		return
+	}
 	t := theme.Current()
 	p := t.C.DragGhost
 	tabPreview := d.kind == dragTab && !d.detached
@@ -220,13 +316,97 @@ func (a *app) dragPreview(c *ui.Context) {
 	ghost.Children(func() {
 		if tabPreview {
 			uikit.DragTabGhost(c, radius).Children(func() {
-				uikit.ConnectionDot(c, connectionIndicatorState(d.session.state), t.C.Tab.DotSize)
+				if d.originTab.root.count() > 1 {
+					uikit.Icon(c, uikit.IconGrid, uikit.IconProps{Size: uikit.SizeXs, Tone: uikit.ToneSecondary}).PassThrough()
+				} else {
+					uikit.ConnectionDot(c, connectionIndicatorState(d.session.state), t.C.Tab.DotSize)
+				}
 				uikit.DragTabTitle(c, a.hosts[d.session.host].name)
 			})
 			return
 		}
 		a.paneDragPreview(c, d.session)
 	})
+}
+
+func (a *app) paneTabProps(c *ui.Context, session *remoteSession) uikit.SessionTabProps {
+	return uikit.SessionTabProps{
+		Key: session.id, Title: a.hosts[session.host].name, Selected: true,
+		State: connectionIndicatorState(session.state), CloseIcon: closeIcon,
+		ReduceMotion: a.reduceMotion(c),
+	}
+}
+
+func (a *app) paneTabDragPreview(c *ui.Context, d *paneDragState) {
+	t := theme.Current()
+	p := t.C.DragGhost
+	targetKnown := false
+	if d.phase == dragTabLanding {
+		if slices.Index(a.tabs, d.landingTab) < 0 {
+			a.drag = nil
+			return
+		}
+		// The newly inserted tab gets its first committed bounds after layout.
+		// Until then retain the real insertion slot shown during the drag.
+		if rect := d.landingTab.frame.Bounds(c); rect.W > 0 && rect.H > 0 {
+			d.tabRect, targetKnown = rect, true
+		}
+	}
+	pane := ui.Rect{W: p.Width, H: p.Height}
+	switch d.phase {
+	case dragActive:
+		pane.X, pane.Y = a.pointer.X-min(d.grab.X, p.Width/2), a.pointer.Y-t.C.Desktop.DragGrabY
+		d.paneRect = pane
+	case dragReturning:
+		pane.X, pane.Y = d.returnRect.X, d.returnRect.Y
+	case dragTabLanding:
+		pane = d.paneRect
+	}
+	tabTarget := d.overTabs || d.phase == dragTabLanding
+	tab := d.tabRect
+	if d.phase == dragActive {
+		width := uikit.SessionTabWidth(a.paneTabProps(c, d.session))
+		// Hovering changes only the shape held at the pointer. Insertion and
+		// neighbour movement begin on release, as for a tab dragged into Shell.
+		tab = ui.Rect{X: a.pointer.X - min(d.grab.X, width/2),
+			Y: a.pointer.Y - min(d.grab.Y, t.C.Tab.Height/2), W: width, H: t.C.Tab.Height}
+	}
+	seed := d.morphSeed
+	if seed {
+		// A fast native drop can arrive before the first drag preview frame.
+		// Seed its real pane view once so it still morphs instead of popping in.
+		tabTarget, d.morphSeed = false, false
+		c.AnimationFrame()
+	}
+	ghost := uikit.DragMorphGhost(c, uikit.DragMorphGhostProps{
+		Key: d, PaneRect: pane, TabRect: tab, Tab: tabTarget,
+		Settling: d.phase != dragActive, Motion: uikit.MotionOverride(a.reduceMotion(c)),
+	}, func() {
+		background := termtheme.TerminalBackground(a.sessionScheme(d.session), t.C.Pane.Bg, a.terminal.prefs.Background)
+		surface := terminalSurface(background)
+		uikit.DragPaneGhost(c, background, surface).Children(func() {
+			uikit.DragPaneHeader(c, surface).Children(func() {
+				uikit.StatusDot(c, connectionIndicatorState(d.session.state), uikit.StatusDotProps{
+					Motion: uikit.MotionOverride(a.reduceMotion(c)),
+				}).PassThrough()
+				uikit.DragPaneTitle(c, a.hosts[d.session.host].name, surface)
+			})
+			width := p.Width - p.PaddingLeft - p.PaddingRight
+			height := p.Height - 2*p.PaddingY - p.HeaderHeight - t.Space.N8
+			a.terminalDragContents(c, d.session, d.viewport, width, height)
+		})
+	}, func() {
+		uikit.SessionTabPreview(c, a.paneTabProps(c, d.session)).FillWidth()
+	})
+	visible := float32(1)
+	if d.phase == dragReturning {
+		visible = 0
+	}
+	uikit.StyleDragGhost(ghost, visible, t.C.ReorderMotion.Cancel.Duration)
+	if d.phase == dragTabLanding && !seed && targetKnown && uikit.DragMorphSettled(ghost) {
+		d.phase = dragLanded
+		c.AnimationFrame()
+	}
 }
 
 func (a *app) paneDragPreview(c *ui.Context, session *remoteSession) {
@@ -436,8 +616,6 @@ func (a *app) dockSession(tab *workspaceTab, target *remoteSession, value any, p
 		a.drag.session, a.drag.phase = session, dragLanded
 	}
 }
-
-func (a *app) dragPlaceholder(pane ui.Element) { uikit.StylePanePlaceholder(pane) }
 
 func (a *app) paneSizeLabel(session *remoteSession) string {
 	return fmt.Sprintf("%d × %d · 演示", session.columns, session.rows)

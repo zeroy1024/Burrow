@@ -14,6 +14,13 @@ func Color(c color.NRGBA) ui.Color {
 	return ui.Color{R: c.R, G: c.G, B: c.B, A: c.A}
 }
 
+// Install refreshes the native theme from the current tokens on each root build.
+func Install(c *ui.Context) *ui.Theme {
+	t := UITheme(theme.Current())
+	c.SetTheme(t)
+	return t
+}
+
 func Shadow(e ui.Element, layers theme.Shadow) ui.Element {
 	return ShadowOpacity(e, layers, 1)
 }
@@ -52,18 +59,18 @@ func UITheme(t *theme.Theme) *ui.Theme {
 		Dark:           t.IsDark,
 		Background:     Color(t.C.Window.Bg),
 		Surface:        Color(t.C.Button.Bg),
-		SurfaceHover:   Color(t.C.Button.BgHover),
+		SurfaceHover:   Color(t.C.Button.SecondaryBgHover),
 		SurfacePressed: Color(t.C.Button.BgPressed),
 		Border:         Color(t.C.Button.Border),
 		Text:           Color(t.Color.Text.Primary),
 		TextMuted:      Color(t.Color.Text.Secondary),
 		Accent:         Color(t.C.Button.PrimaryBg),
-		AccentHover:    Color(t.C.Button.PrimaryBg),
-		AccentPressed:  Color(t.C.Button.PrimaryBg),
+		AccentHover:    Color(t.C.Button.PrimaryBgHover),
+		AccentPressed:  Color(t.C.Button.PrimaryBgPressed),
 		AccentText:     Color(t.C.Button.PrimaryText),
-		Danger:         Color(t.C.Desktop.Danger),
-		Warning:        Color(t.C.Tab.Spinner),
-		Success:        Color(t.C.Tab.DotConnected),
+		Danger:         Color(t.Color.Danger.Default),
+		Warning:        Color(t.Color.Warning.Default),
+		Success:        Color(t.Color.Success.Default),
 		Selection:      Color(t.C.FileList.BgSelected),
 		Focus:          Color(t.Color.Accent.Tint50),
 		Inverse:        Color(t.C.Tooltip.Bg),

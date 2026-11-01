@@ -8,16 +8,43 @@ import (
 	"sshdesk/internal/theme"
 )
 
-// ShortcutTable keeps the native editing semantics and the caller's stable list
-// handle; its cell content and recording actions remain application-owned.
-func ShortcutTable(c *ui.Context, state *ui.ListState, label, actionTitle, bindingTitle string, count int, cell func(int, int)) ui.Element {
-	p := theme.Current().C.Settings
-	columns := []ui.TableColumn{
-		{ID: "action", Title: actionTitle, Width: p.ContentMax / 2},
-		{ID: "binding", Title: bindingTitle, Width: p.ContentMax / 3},
-		{ID: "controls", Title: actionTitle, Width: p.ContentMax / 6},
+// ShortcutTable has fixed columns and content-driven height. Only the settings
+// page scrolls; action keys keep recording controls stable when filtering rows.
+func ShortcutTable(c *ui.Context, handle *ui.Handle, label, actionTitle, bindingTitle string, count int, key func(int) any, cell func(int, int)) ui.Element {
+	t := theme.Current()
+	columns := []struct {
+		id, title string
+		share     float32
+	}{
+		{"action", actionTitle, 3},
+		{"binding", bindingTitle, 2},
+		{"controls", actionTitle, 1},
 	}
-	return ui.Table(c, state, columns, count, cell).FillWidth().Height(float32(count+1) * p.RowMinHeight).Label(label)
+	frame := ui.Column(c).FillWidth().Shrink(0).Role(ui.RoleTable).Label(label).Bind(handle)
+	frame.Children(func() {
+		ui.Row(c).Key("header").FillWidth().Height(2 * t.Space.N16).Shrink(0).Role(ui.RoleRow).Children(func() {
+			for _, column := range columns {
+				ui.Row(c).Key(column.id).BasisPercent(column.share*100/6).Shrink(0).MinWidth(0).Padding(t.Space.N6, t.Space.N10).
+					AlignItems(ui.Center).Role(ui.RoleColumnHeader).Label(column.title).Children(func() {
+					Text(c, column.title, TextProps{Tone: ToneSecondary}).FontWeight(t.Font.Weight.Semibold).SingleLine()
+				})
+			}
+		})
+		Divider(c)
+		for row := range count {
+			item := ui.Row(c).Key(key(row)).FillWidth().MinHeight(2 * t.Space.N16).Shrink(0).AlignItems(ui.Stretch).Role(ui.RoleRow)
+			if item.Hovered() {
+				item.Background(Color(t.C.Button.SecondaryBgHover))
+			}
+			item.Children(func() {
+				for index, column := range columns {
+					ui.Column(c).Key(column.id).BasisPercent(column.share * 100 / 6).Shrink(0).MinWidth(0).
+						Padding(t.Space.N8).Role(ui.RoleCell).Children(func() { cell(row, index) })
+				}
+			})
+		}
+	})
+	return frame
 }
 
 type SettingsGroupProps struct {
@@ -71,12 +98,19 @@ func SettingsDivider(c *ui.Context) ui.Element {
 }
 
 type SettingsRowProps struct {
-	Key    any
-	Gap    float32
-	Inline bool
+	Key           any
+	Gap           float32
+	Inline        bool
+	Title, Detail string
+	Text          func()
+	Control       func()
+	Divider       bool
 }
 
 func SettingsRow(c *ui.Context, props SettingsRowProps) ui.Element {
+	if props.Divider {
+		SettingsDivider(c)
+	}
 	p := theme.Current().C.Settings
 	row := ui.Row(c).FillWidth().Gap(props.Gap).AlignItems(ui.Center)
 	if props.Key != nil {
@@ -84,6 +118,23 @@ func SettingsRow(c *ui.Context, props SettingsRowProps) ui.Element {
 	}
 	if !props.Inline {
 		row.MinHeight(p.RowMinHeight).Padding(p.RowPaddingY, p.RowPaddingX)
+	}
+	if props.Title != "" || props.Text != nil || props.Control != nil {
+		row.Children(func() {
+			SettingsTextColumn(c).Children(func() {
+				if props.Text != nil {
+					props.Text()
+				} else {
+					ui.Text(c, props.Title).FontSize(p.RowLabelSize).TextColor(Color(p.RowLabel))
+					if props.Detail != "" {
+						ui.Text(c, props.Detail).FontSize(p.RowDescSize).TextColor(Color(p.RowDesc))
+					}
+				}
+			})
+			if props.Control != nil {
+				props.Control()
+			}
+		})
 	}
 	return row
 }
@@ -104,7 +155,10 @@ func SettingsNavItem(c *ui.Context, props SettingsNavItemProps) ui.Element {
 	p := t.C.Settings
 	item := ui.ButtonBase(c).Key(props.Key).FillWidth().Height(p.NavItemHeight).
 		Padding(0, t.C.GroupHeader.PaddingX).Radius(p.NavItemRadius).Justify(ui.Start).AlignItems(ui.Center).
-		Gap(t.C.SiderItem.Gap).Label(props.Label).Selected(props.Selected)
+		Gap(t.C.SiderItem.Gap).Label(props.Label).Selected(props.Selected).FocusRing(false)
+	if item.FocusVisible() && !item.IsDisabled() {
+		Shadow(item, t.Shadow.ControlFocus)
+	}
 	bg, fg, icon := ui.Transparent, Color(t.Color.Text.Primary), Color(t.Color.Text.Secondary)
 	if props.Selected {
 		bg, fg, icon = Color(p.NavItemOn), Color(p.NavTextOn), Color(p.NavIconOn)
@@ -124,6 +178,7 @@ type ThemeCardProps struct {
 	Label      string
 	Appearance int
 	Selected   bool
+	Choice     *int
 }
 
 func ThemeCard(c *ui.Context, props ThemeCardProps) ui.Element {
@@ -132,18 +187,17 @@ func ThemeCard(c *ui.Context, props ThemeCardProps) ui.Element {
 	var item ui.Element
 	ui.Column(c).Grow(1).Gap(t.Space.N8).Children(func() {
 		item = ui.ButtonBase(c).Key(props.Key).FillWidth().AspectRatio(p.Aspect).Radius(p.Radius).Clip().Label(props.Label).Selected(props.Selected).
-			Border(p.BorderWidth, Color(p.Border))
+			Border(p.BorderWidth, Color(p.Border)).FocusRing(false)
 		if props.Selected {
 			item.Border(p.SelectedWidth, Color(p.Selected))
 			Shadow(item, p.SelectedShadow)
 		}
+		if item.FocusVisible() && !item.IsDisabled() {
+			Shadow(item, t.Shadow.ControlFocus)
+		}
 		item.Draw(func(painter *ui.Painter, rect ui.Rect) { drawThemeThumbnail(painter, rect, props.Appearance, t) })
 		ui.Row(c).Justify(ui.Center).Gap(t.Space.N6).AlignItems(ui.Center).Children(func() {
-			radio := ui.Box(c).Size(p.Radio, p.Radio).Radius(p.Radio).Border(t.Size.Divider, Color(t.Color.Border.Control))
-			if props.Selected {
-				radio.Border(p.RadioRing, Color(p.Selected))
-			}
-			ui.Text(c, props.Label).FontSize(t.Font.Size.Small)
+			Radio(c, props.Choice, props.Appearance, props.Label)
 		})
 	})
 	return item
@@ -163,12 +217,14 @@ func AccentSwatch(c *ui.Context, props AccentSwatchProps) ui.Element {
 	swatch := ui.ButtonBase(c).Key(props.Key).Size(p.Size, p.Size).Radius(p.Size).Label(props.Label).Selected(props.Selected)
 	if props.SystemGradient {
 		swatch.Draw(func(painter *ui.Painter, r ui.Rect) {
-			for i, ink := range props.Colors {
-				slice := r
-				slice.X += float32(i) * r.W / float32(len(props.Colors))
-				slice.W = r.W / float32(len(props.Colors))
-				painter.Fill(slice, Color(ink), 0)
-			}
+			painter.Clip(r, r.W/2, func() {
+				for i, ink := range props.Colors {
+					slice := r
+					slice.X += float32(i) * r.W / float32(len(props.Colors))
+					slice.W = r.W / float32(len(props.Colors))
+					painter.Fill(slice, Color(ink), 0)
+				}
+			})
 		})
 	} else {
 		swatch.Background(Color(props.Colors[0]))
@@ -221,9 +277,12 @@ func SchemeCard(c *ui.Context, props SchemeCardProps, preview func()) ui.Element
 	p := t.C.SchemeCard
 	item := ui.ButtonBase(c).Key(props.Name).Grow(1).Basis(0).MinWidth(0).Padding(p.Padding).Radius(p.Radius).
 		Label(props.Name).Selected(props.Selected).Background(Color(t.Color.Surface.Card)).TextColor(Color(t.Color.Text.Primary)).
-		Border(p.BorderWidth, Color(p.Border))
+		Border(p.BorderWidth, Color(p.Border)).FocusRing(false)
 	if props.Selected {
 		item.Border(p.SelectedWidth, Color(p.Selected))
+	}
+	if item.FocusVisible() && !item.IsDisabled() {
+		Shadow(item, t.Shadow.ControlFocus)
 	}
 	item.Children(func() {
 		ui.Column(c).FillWidth().Gap(t.Space.N6).Children(func() {

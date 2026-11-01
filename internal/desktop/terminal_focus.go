@@ -47,25 +47,12 @@ func (a *app) paneShortcuts(c *ui.Context) {
 	}
 }
 
-func paneFocusShadows(pane ui.Element, focused, multiple bool, surface *theme.Theme) {
-	uikit.StylePaneFocus(pane, focused, multiple, surface)
-}
-
 func terminalActivity(c *ui.Context, session *remoteSession, surface *theme.Theme) {
-	t := surface
-	b := t.C.ActivityBadge
 	if session.hasNewOutput {
-		ui.Row(c).Shrink(0).Padding(b.PaddingY, b.PaddingRight, b.PaddingY, b.PaddingLeft).Gap(b.Gap).Radius(b.Radius).
-			Background(uikit.Color(b.OutputBg)).PassThrough().Children(func() {
-			ui.Box(c).Size(b.DotSize, b.DotSize).Radius(t.Radius.Pill).Background(uikit.Color(b.OutputDot))
-			ui.Text(c, "新输出").FontSize(b.FontSize).TextColor(uikit.Color(b.OutputText)).SingleLine()
-		})
+		uikit.ActivityBadge(c.Key(uikit.ActivityNewOutput), uikit.ActivityNewOutput, surface)
 	}
 	if session.hasBell {
-		uikit.Tip(c, ui.Row(c).Shrink(0).Padding(b.PaddingY, b.PaddingRight, b.PaddingY, b.PaddingLeft).Radius(b.Radius).Label("会话响铃"), "会话响铃").
-			Background(uikit.Color(b.BellBg)).PassThrough().Children(func() {
-			ui.Icon(c, bellIcon).Size(b.BellIconSize, b.BellIconSize).TextColor(uikit.Color(b.BellText))
-		})
+		uikit.ActivityBadge(c.Key(uikit.ActivityBell), uikit.ActivityBell, surface)
 	}
 }
 

@@ -260,7 +260,7 @@ COMP={
    'dropBg':'color.accent.tint08','dropText':'color.text.accent','dropCount':'color.accent.default',
    'expandTrack':'color.accent.tint15','expandFill':'color.accent.default','expandHeight':'size.progressThin','expandDelay':'motion.duration.autoExpand'},
  'siderItem':{'paddingTop':'space.6','paddingRight':'space.6','paddingBottom':'space.6','paddingLeft':'space.8','gap':'space.9','radius':'radius.control','spacing':'space.1',
-   'bgHover':'color.state.hover','bgSelected':'color.state.selected',
+   'bgHover':'color.state.hover','bgActive':'color.state.selectedAccent','bgSelected':'color.state.selected',
    'nameSize':'font.size.bodyLg','nameWeight':'font.weight.medium','nameLineHeight':'font.lineHeight.name','nameColor':'color.text.primary',
    'subSize':'font.size.footnote','subFamily':'font.family.mono','subLineHeight':'font.lineHeight.sub','subTracking':'font.tracking.mono','subColor':'color.text.secondary',
    'dotSize':'size.dot','dotHalo':'size.dotHalo','dotOnline':'color.success.default','dotOnlineHalo':'color.success.halo','dotOffline':'color.status.offline',
@@ -613,6 +613,7 @@ COMP['filePane']={
 }
 DERIVED_COMP.update({
  'filePane':'FTP v3 原生文件面板布局补全',
+ 'siderItem.bgActive':'用户新增：目录条目聚焦 active 底色，与打开的会话独立',
  'transferRow.progressWidth':'FTP v3 停靠传输进度列宽',
  'transferRow.speedWidth':'FTP v3 停靠传输速度列宽',
  'transferRow.statusWidth':'FTP v3 停靠传输状态列固定宽度',
@@ -798,9 +799,97 @@ COMP['settings'].update({'selectWidth':'size.settingsSelect','numberWidth':'size
 
 # Shared key hints. Flat hints retain the existing search-field text geometry.
 SEM['size']['keycap']=D(P('size.18'))
-SEM['color']['keycap']={'inkBg':C(P('whiteA.a16')),'inkText':C(P('white.a60')),'accentBg':C(P('whiteA.a20'))}
+PALETTE['white']['a75']=C(A('255,255,255','.75'),'设计指定的既有白色透明度',True)
+SEM['color']['keycap']={'inkBg':C(P('whiteA.a16')),'inkText':C(P('white.a75')),'accentBg':C(P('whiteA.a20'))}
 COMP['kbd']={
  'height':'size.keycap','minWidth':'size.keycap','paddingX':'space.5','radius':'radius.keycap','fontSize':'font.size.caption',
  'bg':'color.surface.keycap','border':'color.border.keycap','text':'color.text.tertiary',
  'inkBg':'color.keycap.inkBg','inkText':'color.keycap.inkText','accentBg':'color.keycap.accentBg','accentText':'color.text.onAccent',
 }
+
+# Original UIKit component specifications. All component fields reference the
+# semantic layer; new metrics do not introduce a second palette.
+SEM['size'].update({
+ 'buttonLarge':D(P('size.32')), 'badgeSmall':D(P('size.18')), 'badgeMedium':D(20),
+ 'check':D(P('size.14')), 'radioDot':D(4.5), 'panelHeader':D(46), 'toast':D(340),
+ 'emptyMaxWidth':D(220), 'keyValueRow':D(P('size.22')), 'sparklineHeight':D(P('size.34')),
+ 'sparklineStroke':D(P('size.1_5')), 'meterHeight':D(P('size.4')), 'iconXs':D(P('size.12')),
+ 'segmentedItem':D(P('size.24')), 'latencyWarn':N(150), 'latencyBad':N(400),
+ 'tableNameMinWidth':D(160),
+})
+SEM['opacity']['sparklineFill']=N(.10)
+SEM['size'].update({'meterWarnRatio':N(.70),'meterCriticalRatio':N(.90)})
+SEM['motion']['duration'].update({'fast':MS(P('duration.120')), 'base':MS(P('duration.160')), 'autoHide':MS(3000)})
+SEM['color']['accent'].update({'hover':C(P('blue.600')), 'pressed':C(P('blue.700'))})
+SEM['color']['danger'].update({'hover':C(P('red.500')), 'pressed':C(P('red.500'))})
+SEM['color']['toast']={
+ 'action':C(P('darkTint.blue300')), 'ok':C(P('darkTint.green400')), 'error':C(P('darkTint.red400')),
+ 'warning':C(P('darkTint.amber400')),
+}
+SEM['shadow']['controlFocus']=SH([L(0,0,0,1.5,P('blue.500')),L(0,0,0,5.5,P('blueA.a16'))])
+SEM['shadow']['cardInset']=SH([L(0,0,0,.5,P('black.a06'),True)],'UIKit 卡片内描边，外框几何不变')
+DARK.update({
+ 'color.accent.hover':P('darkTint.blue300'), 'color.accent.pressed':P('darkTint.blue200'),
+ 'color.danger.hover':P('darkTint.red400'), 'color.danger.pressed':P('darkTint.red300'),
+ 'shadow.controlFocus':[L(0,0,0,1.5,P('blue.500')),L(0,0,0,5.5,P('blueA.a24'))],
+ 'shadow.cardInset':[L(0,0,0,.5,P('whiteA.a08'),True)],
+})
+COMP['card']['shadow']='shadow.cardInset'
+COMP['button'].update({
+ 'heightSm':'size.controlSm','heightLg':'size.buttonLarge','paddingXSm':'space.9','paddingXLg':'space.14',
+ 'secondaryBg':'color.surface.control','secondaryBgHover':'color.surface.controlStrong','plainBgHover':'color.state.hover',
+ 'primaryBgHover':'color.accent.hover','primaryBgPressed':'color.accent.pressed',
+ 'dangerBg':'color.danger.default','dangerBgHover':'color.danger.hover','dangerBgPressed':'color.danger.pressed',
+ 'dangerText':'color.text.onAccent','dangerPlainText':'color.danger.text','dangerPlainBgHover':'color.danger.subtle',
+ 'kbdGap':'space.6','focusShadow':'shadow.controlFocus',
+})
+COMP['iconButton'].update({
+ 'bgOn':'color.state.pressed','iconOn':'color.text.primary','bgFilled':'color.surface.control','iconHover':'color.text.primary',
+ 'iconSizeSm':'size.iconSm','iconSizeXs':'size.iconXs','focusShadow':'shadow.controlFocus',
+})
+COMP['badge'].update({
+ 'heightSm':'size.badgeSmall','heightMd':'size.badgeMedium',
+ 'warnBg':'color.warning.subtle','warnText':'color.warning.textStrong','warnDot':'color.warning.default',
+ 'errBg':'color.danger.subtle','errText':'color.danger.text','errDot':'color.danger.default',
+ 'runDot':'color.accent.default','neutralDot':'color.status.offline','mutedBg':'color.surface.field','mutedText':'color.text.tertiary',
+})
+COMP['divider']={'color':'color.border.divider','width':'size.divider','verticalHeight':'size.separatorShort'}
+COMP['spinner']={'sizeXs':'size.iconXs','sizeSm':'size.iconSm','sizeMd':'size.icon','color':'color.icon.default','period':'motion.duration.spin'}
+COMP['check']={'size':'size.check','radius':'radius.keycap','border':'color.border.keycap','on':'color.accent.default','mark':'color.text.onAccent','radioDot':'size.radioDot'}
+COMP['segmented'].update({'countText':'color.text.tertiary','countTextOn':'color.text.muted','itemHeightMd':'size.segmentedItem','heightSm':'size.controlSm'})
+COMP['banner']={
+ 'paddingX':'space.12','paddingY':'space.9','radius':'radius.railButton','gap':'space.8','icon':'size.iconSm',
+ 'neutralBg':'color.surface.control','neutralText':'color.text.strong','neutralIcon':'color.text.secondary',
+ 'infoBg':'color.accent.subtle','infoText':'color.text.accentStrong','infoIcon':'color.accent.default',
+ 'warnBg':'color.warning.subtle','warnText':'color.warning.textStrong','warnIcon':'color.warning.default',
+ 'dangerBg':'color.danger.subtle','dangerText':'color.danger.text','dangerIcon':'color.danger.default',
+}
+COMP['panel']={
+ 'width':'size.statsPanel','headerHeight':'size.panelHeader','paddingX':'space.14','sectionGap':'space.8',
+ 'divider':'color.border.divider','statLabel':'color.text.primary','statValue':'color.text.secondary','caption':'color.text.tertiary',
+}
+COMP['sparkline']={'height':'size.sparklineHeight','stroke':'size.sparklineStroke','line':'color.accent.default','fillAlpha':'opacity.sparklineFill'}
+COMP['keyValue']={'rowHeight':'size.keyValueRow','key':'color.text.secondary','value':'color.text.primary','valueDim':'color.text.tertiary','font':'font.size.footnote'}
+COMP['emptyState']={
+ 'iconTile':'size.titlebar','iconRadius':'radius.window','iconBg':'color.surface.control','icon':'color.text.secondary',
+ 'title':'font.size.bodyLg','detail':'color.text.secondary','maxWidth':'size.emptyMaxWidth',
+}
+COMP['toast']={
+ 'width':'size.toast','radius':'radius.card','bg':'color.tooltip.bg','text':'color.tooltip.text','detail':'color.tooltip.kbd',
+ 'action':'color.toast.action','okIcon':'color.toast.ok','errIcon':'color.toast.error','warnIcon':'color.toast.warning','shadow':'shadow.lift',
+ 'paddingX':'space.14','paddingY':'space.10','gap':'space.8','timeout':'motion.duration.autoHide',
+}
+COMP['popover']={'radius':'radius.window','padding':'space.12','bg':'color.surface.raised','shadow':'shadow.lift'}
+COMP['latency']={'warnMs':'size.latencyWarn','badMs':'size.latencyBad','normal':'color.text.secondary','warn':'color.warning.text','bad':'color.danger.text'}
+COMP['listRow']={'height':'size.listRow','radius':'radius.controlSm','paddingX':'space.8','gap':'space.9','meta':'color.text.secondary'}
+COMP['breadcrumb']['iconSize']='size.iconXs'
+COMP['fileList'].update({'headerBg':'color.surface.card','columnGap':'space.16','nameMinWidth':'size.tableNameMinWidth'})
+COMP['progress'].update({'heightMeter':'size.meterHeight','meterFill':'color.fill.strong','meterWarnAt':'size.meterWarnRatio','meterCritAt':'size.meterCriticalRatio','fillError':'color.danger.default'})
+COMP['paneHeader']={
+ 'heightCompact':'size.paneHeader','heightToolbar':'size.fileHeader','heightTitle':'size.panelHeader',
+ 'titleFont':'font.size.bodyLg','titleWeight':'font.weight.semibold','paddingLeft':'space.14','paddingRight':'space.8','gap':'space.7',
+}
+COMP['paneFooter']={'height':'size.paneStatusBar','paddingX':'space.14','gap':'space.10','text':'color.text.secondary','font':'font.size.footnote','divider':'color.border.divider'}
+COMP['filePaneFocus'].update({'borderFocused':'color.accent.default','borderWidthFocused':'size.focusRing'})
+SEM['motion']['drag'].update({'standardScale':N(1.02),'standardRotation':N(-.6)})
+COMP['dragLift'].update({'standardScale':'motion.drag.standardScale','standardRotation':'motion.drag.standardRotation'})

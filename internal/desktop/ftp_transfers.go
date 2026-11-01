@@ -57,15 +57,10 @@ type transferSummary struct {
 }
 
 var (
-	transferUpIcon     = uikit.LineIcon(`<path d="M12 16V3m-5 5 5-5 5 5M4 13v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6"/>`)
-	transferDownIcon   = uikit.LineIcon(`<path d="M12 3v13m-5-5 5 5 5-5M4 13v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6"/>`)
-	transferPauseIcon  = uikit.LineIcon(`<path d="M9 5v14M15 5v14"/>`)
-	transferPlayIcon   = uikit.LineIcon(`<path d="m8 4 12 8-12 8Z"/>`)
-	transferRetryIcon  = uikit.LineIcon(`<path d="M3 10a9 9 0 1 1 2 8M3 3v7h7"/>`)
-	transferTrashIcon  = uikit.LineIcon(`<path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/>`)
-	transferCheckIcon  = uikit.LineIcon(`<path d="m4 12 5 5L20 6"/>`)
-	transferErrorIcon  = uikit.LineIcon(`<circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 17h.01"/>`)
-	transferFolderIcon = uikit.LineIcon(`<path d="M3 7V5a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/>`)
+	transferUpIcon    = uikit.LineIcon(`<path d="M12 16V3m-5 5 5-5 5 5M4 13v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6"/>`)
+	transferPauseIcon = uikit.LineIcon(`<path d="M9 5v14M15 5v14"/>`)
+	transferPlayIcon  = uikit.LineIcon(`<path d="m8 4 12 8-12 8Z"/>`)
+	transferTrashIcon = uikit.LineIcon(`<path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/>`)
 )
 
 func (q *transferQueueState) summary() transferSummary {
@@ -137,6 +132,7 @@ func (a *app) tickTransfers(c *ui.Context) {
 		}
 		if task.session.state != connected {
 			task.state, task.errorText = transferFailed, "连接已断开（演示）"
+			a.transferFailureNotice(c, task)
 			continue
 		}
 		progress := task.fraction + task.speed*elapsed.Seconds()
@@ -157,6 +153,7 @@ func (a *app) tickTransfers(c *ui.Context) {
 		if task.state == transferQueued {
 			if task.session.state != connected {
 				task.state, task.errorText = transferFailed, "连接已断开（演示）"
+				a.transferFailureNotice(c, task)
 				continue
 			}
 			task.state = transferRunning
@@ -225,9 +222,10 @@ func (a *app) transferDock(c *ui.Context, maxHeight float32) {
 	}
 	setHeight()
 	dock.Margin(t.C.FTPSplit.Gutter, 0, 0, 0).Children(func() {
-		uikit.TransferDockCard(c).Children(func() {
+		card := uikit.TransferDockCard(c)
+		card.Children(func() {
 			a.transferHeader(c)
-			ui.Scroll(c).Grow(1).MinHeight(0).TrackScroll(&q.dockScroll).Children(func() {
+			scroller := ui.Scroll(c).Grow(1).MinHeight(0).TrackScroll(&q.dockScroll).Children(func() {
 				ui.Column(c).FillWidth().Children(func() {
 					if len(rows) == 0 {
 						message := "此分类暂无传输"
@@ -241,6 +239,7 @@ func (a *app) transferDock(c *ui.Context, maxHeight float32) {
 					}
 				})
 			})
+			uikit.Scrollbars(c, card, scroller, &q.dockScroll, uikit.ScrollbarProps{Label: "传输任务滚动条"})
 		})
 		if q.collapsed || !dock.Settled("rows") {
 			return
@@ -312,16 +311,16 @@ func (a *app) transferHeader(c *ui.Context) {
 		if s.running+s.queued == 0 && s.paused > 0 {
 			pauseIcon, pauseLabel = transferPlayIcon, "全部继续"
 		}
-		uikit.TransferAction(c, "pause-all", pauseLabel, pauseIcon).Disabled(s.running+s.queued+s.paused == 0).
+		uikit.TransferAction(c, "pause-all", pauseLabel, pauseIcon, s.running+s.queued+s.paused == 0).
 			OnClick(func() { a.pauseAllTransfers(c) })
-		uikit.TransferAction(c, "clear-done", "清除已完成", transferTrashIcon).Disabled(s.done == 0).OnClick(func() {
+		uikit.TransferAction(c, "clear-done", "清除已完成", transferTrashIcon, s.done == 0).OnClick(func() {
 			q.tasks = slices.DeleteFunc(q.tasks, func(task *transferTask) bool { return task.state == transferDone })
 		})
 		label := "折叠传输列表"
 		if q.collapsed {
 			label = "展开传输列表"
 		}
-		button := uikit.TransferAction(c, "toggle-dock", label, chevronIcon).Expanded(!q.collapsed)
+		button := uikit.TransferAction(c, "toggle-dock", label, chevronIcon, false).Expanded(!q.collapsed)
 		rotation := float32(0)
 		if q.collapsed {
 			rotation = 180
@@ -336,163 +335,73 @@ func (a *app) transferHeader(c *ui.Context) {
 
 func (a *app) transferFilters(c *ui.Context, summary transferSummary) {
 	q := &a.transfers
-	labels := []string{
-		fmt.Sprintf("全部 %d", len(q.tasks)),
-		fmt.Sprintf("进行中 %d", summary.running+summary.queued+summary.paused),
-		fmt.Sprintf("已完成 %d", summary.done),
-	}
-	if uikit.TransferFilters(c, "传输分类", &q.filter, labels).Changed() {
+	total, active, done := len(q.tasks), summary.running+summary.queued+summary.paused, summary.done
+	items := []uikit.SegItem{{Label: "全部", Count: &total}, {Label: "进行中", Count: &active}, {Label: "已完成", Count: &done}}
+	if uikit.TransferFilters(c, "传输分类", &q.filter, items).Changed() {
 		a.saveFilePreferences(c)
 	}
 }
 
 func (a *app) transferRow(c *ui.Context, task *transferTask) {
-	t := theme.Current()
-	p := t.C.TransferRow
-	row := uikit.TransferRow(c, uikit.TransferRowProps{Key: task.id, Zebra: task.id%2 == 0})
-	compact := row.Bounds().W < t.C.TransferDock.CompactBreakpoint
-	if row.DoubleClicked() {
+	states := [...]uikit.TransferState{
+		transferQueued: uikit.TransferQueued, transferRunning: uikit.TransferRunning,
+		transferPaused: uikit.TransferPaused, transferDone: uikit.TransferDone, transferFailed: uikit.TransferFailed,
+	}
+	view := uikit.Transfer{
+		Key: task.id, Name: task.entry.name, SourcePath: task.sourcePath,
+		TargetPath: path.Join(task.targetPath, task.entry.name),
+		Amount:     transferBytes(task.transferred) + " / " + transferBytes(task.total),
+		Percent:    fmt.Sprintf("%d%%", task.transferred*100/task.total),
+		Value:      float32(task.transferred) / float32(task.total),
+		State:      states[task.state], Download: task.sourceRemote, Zebra: task.id%2 == 0,
+		Speed: "0 B/s", Remaining: "剩余 —", Error: task.errorText,
+		Motion: uikit.MotionOverride(a.reduceMotion(c)),
+	}
+	if task.state == transferRunning {
+		view.Speed = transferBytes(int64(task.speed)) + "/s"
+		view.Remaining = transferRemaining(task.total-task.transferred, task.speed)
+	}
+	if task.state == transferDone {
+		view.Elapsed = fmt.Sprintf("用时 %.1f 秒", task.completed.Sub(task.started).Seconds())
+		view.Completed = task.completed.Format("15:04:05") + " 完成"
+	}
+	result := uikit.TransferRow(c, &view)
+	menu := []uikit.MenuEntry{}
+	if task.state == transferRunning {
+		menu = append(menu, uikit.MenuEntry{ID: "simulate-error", Label: "模拟权限错误", Icon: uikit.IconAlertCircle, OnChoose: func() {
+			task.state, task.errorText = transferFailed, "权限不足：目标目录不可写（演示）"
+			a.transferFailureNotice(c, task)
+		}})
+	}
+	menu = append(menu, uikit.MenuEntry{ID: "reveal", Label: "在文件夹中显示", Icon: uikit.IconFolder, OnChoose: func() { a.revealTransferredFile(c, task) }})
+	uikit.RowMenu(result.Root, menu)
+	if result.Root.DoubleClicked() || result.Reveal {
 		a.revealTransferredFile(c, task)
 	}
-	row.ContextMenu(func(m *ui.Menu) {
-		if task.state == transferRunning && m.Item("模拟权限错误").Chosen() {
-			task.state, task.errorText = transferFailed, "权限不足：目标目录不可写（演示）"
-		}
-		if m.Item("在文件夹中显示").Chosen() {
-			a.revealTransferredFile(c, task)
-		}
-	})
-	row.Children(func() {
-		icon, bg, foreground := transferUpIcon, p.UpBg, p.UpIcon
-		if task.sourceRemote {
-			icon, bg, foreground = transferDownIcon, p.DownBg, p.DownIcon
-		}
-		switch task.state {
-		case transferDone:
-			icon, bg, foreground = transferCheckIcon, p.DoneBg, p.DoneIcon
-		case transferFailed:
-			icon, bg, foreground = transferErrorIcon, p.ErrBg, p.ErrIcon
-		}
-		uikit.TransferIcon(c, icon, bg, foreground)
-		uikit.TransferNameColumn(c).Children(func() {
-			uikit.TransferName(c, task.entry.name)
-			if compact {
-				a.transferCompactDetail(c, task)
-				if task.state != transferDone && task.state != transferFailed {
-					a.taskProgress(c, task)
-				}
+	if result.Pause {
+		task.state = transferPaused
+	}
+	if result.Resume || result.Retry {
+		task.state, task.errorText = transferQueued, ""
+		a.transfers.lastTick = c.Now()
+		c.AnimationFrame()
+	}
+	if result.Cancel {
+		a.transfers.tasks = slices.DeleteFunc(a.transfers.tasks, func(candidate *transferTask) bool { return candidate == task })
+	}
+}
+
+func (a *app) transferFailureNotice(c *ui.Context, task *transferTask) {
+	uikit.Toast(c, uikit.ToastProps{
+		ID: fmt.Sprintf("transfer-failed-%d", task.id), Title: task.entry.name + " 传输失败", Detail: task.errorText,
+		Tone: uikit.ToneDanger, Action: "重试", OnAction: func() {
+			if !slices.Contains(a.transfers.tasks, task) {
 				return
 			}
-			uikit.TransferPath(c, task.sourcePath+" → "+path.Join(task.targetPath, task.entry.name))
-		})
-		if !compact {
-			uikit.TransferProgressColumn(c, transferBytes(task.transferred)+" / "+transferBytes(task.total), fmt.Sprintf("%d%%", task.transferred*100/task.total), func() { a.taskProgress(c, task) })
-			uikit.TransferSpeedColumn(c).Children(func() {
-				speed, remaining := "0 B/s", "剩余 —"
-				if task.state == transferRunning {
-					speed = transferBytes(int64(task.speed)) + "/s"
-					remaining = transferRemaining(task.total-task.transferred, task.speed)
-				}
-				if task.state == transferDone {
-					speed = fmt.Sprintf("用时 %.1f 秒", task.completed.Sub(task.started).Seconds())
-					remaining = task.completed.Format("15:04:05") + " 完成"
-				}
-				if task.state == transferFailed {
-					speed, remaining = "传输失败", task.errorText
-				}
-				uikit.TransferDetail(c, speed, p.SpeedText, false)
-				uikit.TransferDetail(c, remaining, t.C.FileList.Meta, true)
-			})
-		}
-		uikit.TransferStatus(c).Children(func() {
-			if !compact || task.state != transferRunning {
-				a.transferBadge(c, task)
-			} else {
-				uikit.TransferDetail(c, transferBytes(int64(task.speed))+"/s", p.SpeedText, false)
-			}
-		})
-		uikit.TransferActions(c).Children(func() { a.transferTaskActions(c, task) })
-	})
-}
-
-func (a *app) transferCompactDetail(c *ui.Context, task *transferTask) {
-	t := theme.Current()
-	text := transferBytes(task.transferred) + " / " + transferBytes(task.total)
-	text += fmt.Sprintf(" · %d%%", task.transferred*100/task.total)
-	foreground := t.C.FileList.Meta
-	switch task.state {
-	case transferRunning:
-		text += " · " + transferRemaining(task.total-task.transferred, task.speed)
-	case transferFailed:
-		text, foreground = task.errorText, t.C.TransferRow.ErrorText
-	case transferDone:
-		text = transferBytes(task.total) + " · " + task.targetPath
-	}
-	uikit.TransferDetail(c, text, foreground, true)
-}
-
-func (a *app) taskProgress(c *ui.Context, task *transferTask) {
-	t := theme.Current()
-	fill := t.C.Progress.Fill
-	switch task.state {
-	case transferPaused, transferQueued:
-		fill = t.C.Progress.FillPaused
-	case transferDone:
-		fill = t.C.Progress.FillDone
-	case transferFailed:
-		fill = t.C.TransferRow.ErrIcon
-	}
-	uikit.Progress(c, uikit.ProgressProps{Value: float32(task.transferred) / float32(task.total), Height: t.C.Progress.Height, Track: t.C.Progress.Track, Fill: fill, Animation: ui.Animation{Spring: uikit.Spring(t.C.TransferDock.Grow)}})
-}
-
-func (a *app) transferBadge(c *ui.Context, task *transferTask) {
-	p := theme.Current().C.TransferRow
-	label, bg, foreground, dot := "排队中", p.PausedBg, p.PausedText, p.PausedDot
-	switch task.state {
-	case transferRunning:
-		label, bg, foreground, dot = "上传中", p.RunBg, p.RunText, p.RunDot
-		if task.sourceRemote {
-			label = "下载中"
-		}
-	case transferPaused:
-		label = "已暂停"
-	case transferDone:
-		label, bg, foreground, dot = "已完成", p.DoneBadgeBg, p.DoneBadgeText, p.DoneDot
-	case transferFailed:
-		label, bg, foreground, dot = "失败", p.ErrBadgeBg, p.ErrBadgeText, p.ErrDot
-	}
-	uikit.TransferBadge(c, uikit.TransferBadgeProps{Label: label, Background: bg, Foreground: foreground, Dot: dot})
-}
-
-func (a *app) transferTaskActions(c *ui.Context, task *transferTask) {
-	q := &a.transfers
-	if task.state == transferDone {
-		uikit.TransferAction(c, "reveal", "在文件夹中显示", transferFolderIcon).OnClick(func() { a.revealTransferredFile(c, task) })
-		return
-	}
-	icon, label := transferPauseIcon, "暂停传输"
-	switch task.state {
-	case transferPaused:
-		icon, label = transferPlayIcon, "继续传输"
-	case transferFailed:
-		icon, label = transferRetryIcon, "重试传输"
-	}
-	uikit.TransferAction(c, "toggle-transfer", label, icon).OnClick(func() {
-		switch task.state {
-		case transferRunning, transferQueued:
-			task.state = transferPaused
-		case transferPaused, transferFailed:
 			task.state, task.errorText = transferQueued, ""
-			q.lastTick = c.Now()
-		}
-		c.AnimationFrame()
-	})
-	label = "取消传输"
-	if task.state == transferFailed {
-		label = "移除失败任务"
-	}
-	uikit.TransferAction(c, "remove-transfer", label, closeIcon).OnClick(func() {
-		q.tasks = slices.DeleteFunc(q.tasks, func(candidate *transferTask) bool { return candidate == task })
+			a.transfers.lastTick = c.Now()
+			c.AnimationFrame()
+		},
 	})
 }
 

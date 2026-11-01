@@ -7,29 +7,28 @@ import (
 	"sshdesk/internal/theme"
 )
 
-type KeyValueProps struct {
-	Mono bool
+type KV struct {
+	Key, Value string
+	Mono, Dim  bool
 }
 
-func KeyValue(c *ui.Context, label, value string, props KeyValueProps) ui.Element {
+func KeyValue(c *ui.Context, rows []KV) ui.Element {
 	t := theme.Current()
-	row := ui.Row(c)
-	if !props.Mono {
-		row.Gap(t.Space.N8)
-	}
-	return row.Children(func() {
-		name := ui.Text(c, label)
-		if props.Mono {
-			name.Font(strings.Join(t.Font.Family.Mono, ", ")).FontSize(t.Font.Size.Caption)
-		} else {
-			name.FontSize(t.Font.Size.Caption).TextColor(Color(t.Color.Text.Secondary)).Shrink(0)
-		}
-		ui.Spacer(c)
-		text := ui.Text(c, value).FontSize(t.Font.Size.Caption)
-		if props.Mono {
-			text.TextColor(Color(t.Color.Text.Secondary))
-		} else {
-			text.SingleLine().Ellipsis("…").MinWidth(0)
+	p := t.C.KeyValue
+	return ui.Column(c).FillWidth().Children(func() {
+		for _, value := range rows {
+			ui.Row(c).Key(value.Key).FillWidth().MinHeight(p.RowHeight).Gap(t.Space.N8).Children(func() {
+				name := ui.Text(c, value.Key).FontSize(p.Font).TextColor(Color(p.Key)).Shrink(0)
+				if value.Mono {
+					name.Font(strings.Join(t.Font.Family.Mono, ", "))
+				}
+				ui.Spacer(c)
+				ink := p.Value
+				if value.Dim {
+					ink = p.ValueDim
+				}
+				ui.Text(c, value.Value).FontSize(p.Font).TextColor(Color(ink)).FontFeatures("tnum").SingleLine().Ellipsis("…").MinWidth(0)
+			})
 		}
 	})
 }

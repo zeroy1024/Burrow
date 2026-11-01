@@ -40,13 +40,14 @@ func Kbd(c *ui.Context, keys string, props KbdProps) ui.Element {
 	if props.Text != nil {
 		text = *props.Text
 	}
-	e := ui.Text(c, keys).FontSize(fontSize).TextColor(Color(text)).Role(ui.RoleNone).PassThrough()
+	e := ui.Text(c, keys).FontSize(fontSize).TextColor(Color(text)).SingleLine().Role(ui.RoleNone).PassThrough()
 	if props.Tone == KbdFlat {
 		return e
 	}
-	e.Height(p.Height).MinWidth(p.MinWidth).Padding(0, p.PaddingX).Radius(p.Radius).Background(Color(background))
+	e.Height(p.Height).MinWidth(p.MinWidth).Padding(0, p.PaddingX).Radius(p.Radius).Background(Color(background)).
+		FixedLineHeight(p.Height).TextAlign(ui.Center)
 	if props.Tone == KbdKeycap {
-		e.Border(t.Size.Divider, Color(p.Border))
+		e.Border(t.Size.Divider, Color(p.Border)).FixedLineHeight(p.Height - 2*t.Size.Divider)
 	}
 	return e
 }

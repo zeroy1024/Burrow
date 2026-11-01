@@ -124,6 +124,16 @@ func (a *app) appShortcuts(c *ui.Context) {
 		bounds := tab.focused.scroll.offset.Bounds(c)
 		a.splitSession(tab.focused, tab.root.count() > 1 && bounds.H > bounds.W)
 	}
+	if count > 0 {
+		// Existing configurable bindings get first claim; these are additional
+		// tab-navigation keys, scoped out by the SDK while a modal is active.
+		if c.Shortcut(ui.Ctrl|ui.Shift, ui.KeyTab) {
+			selectTab((index + count - 1) % count)
+		}
+		if c.Shortcut(ui.Ctrl, ui.KeyTab) {
+			selectTab((index + 1) % count)
+		}
+	}
 }
 
 func (a *app) installAppMenu() func() {
@@ -132,7 +142,7 @@ func (a *app) installAppMenu() func() {
 		Click: func(*mygo.MenuItem, *mygo.Window) {
 			// Native menu callbacks do not pass through the UI modal scope.
 			if a.page().addHostOpen || a.page().groupDialogOpen || a.files.dialog != nil ||
-				a.files.conflict != nil || a.credentials.draft != nil || a.closeRequest != nil {
+				a.files.conflict != nil || a.credentials.draft != nil || a.closeRequest != nil || a.closeFileRequest != nil {
 				return
 			}
 			a.openSettings()
@@ -157,6 +167,7 @@ func (a *app) requestCloseTab(index int) {
 	tab := a.tabs[index]
 	if a.prefs.ConfirmCloseActive && slices.ContainsFunc(tab.root.sessions(), func(s *remoteSession) bool { return s.state == connected || s.state == connecting }) {
 		a.closeRequest = tab
+		a.closeFileRequest = nil
 		return
 	}
 	a.closeTab(index)
@@ -164,30 +175,44 @@ func (a *app) requestCloseTab(index int) {
 }
 
 func (a *app) closeTabDialog(c *ui.Context) {
-	open := a.closeRequest != nil
+	open := a.closeRequest != nil || a.closeFileRequest != nil
 	if !open {
 		return
 	}
-	uikit.Dialog(c, &open, func() {
-		t := theme.Current()
-		ui.Column(c).Width(t.C.Dialog.GroupWidth).Gap(t.Space.N14).Children(func() {
-			ui.Text(c, "关闭活动连接？").FontSize(t.C.Dialog.TitleSize).FontWeight(t.Font.Weight.Semibold)
-			ui.Text(c, "关闭此选项卡将结束其中的会话。").FontSize(t.Font.Size.Body)
-			ui.Row(c).Justify(ui.End).Gap(t.Space.N8).Children(func() {
-				uikit.Button(c, "取消", uikit.ButtonProps{}).OnClick(func() { a.closeRequest = nil })
-				uikit.Button(c, "关闭选项卡", uikit.ButtonProps{Variant: uikit.ButtonPrimary}).OnClick(func() {
-					index := slices.Index(a.tabs, a.closeRequest)
-					a.closeRequest = nil
-					if index >= 0 {
-						a.closeTab(index)
-						a.afterLastTabClosed()
-					}
-				})
-			})
+	t := theme.Current()
+	fileRequest := a.closeFileRequest
+	var key any = a.closeRequest
+	detail := "关闭此选项卡将结束其中的会话。"
+	if fileRequest != nil {
+		key, detail = fileRequest, "关闭此选项卡将结束文件会话。"
+	}
+	closeRequested := false
+	result := uikit.Modal(c.Key(key), &open, uikit.ModalProps{
+		Title: "关闭活动连接？", Compact: true, Width: t.C.Dialog.GroupWidth,
+		Motion: uikit.MotionOverride(a.reduceMotion(c)),
+	}, func(parts uikit.ModalParts) {
+		uikit.Text(c, detail, uikit.TextProps{})
+		ui.Row(c).Justify(ui.End).Gap(t.Space.N8).Children(func() {
+			uikit.Button(c, "取消", uikit.ButtonProps{}).OnClick(parts.RequestDismiss)
+			closeRequested = uikit.Button(c, "关闭选项卡", uikit.ButtonProps{Variant: uikit.ButtonDanger}).Clicked()
 		})
 	})
+	if closeRequested || result.Submit {
+		tabRequest := a.closeRequest
+		a.closeRequest, a.closeFileRequest = nil, nil
+		if fileRequest != nil {
+			if index := slices.Index(a.fileSessions, fileRequest); index >= 0 {
+				a.closedTabs = append(a.closedTabs, closedWorkspaceTab{host: fileRequest.host, section: sectionFiles})
+				a.closeFileSession(index)
+				a.afterLastTabClosed()
+			}
+		} else if index := slices.Index(a.tabs, tabRequest); index >= 0 {
+			a.closeTab(index)
+			a.afterLastTabClosed()
+		}
+	}
 	if !open {
-		a.closeRequest = nil
+		a.closeRequest, a.closeFileRequest = nil, nil
 	}
 }
 
@@ -207,25 +232,7 @@ func (a *app) afterLastTabClosed() {
 func (a *app) requestCloseFileTab(index int) {
 	session := a.fileSessions[index]
 	if a.prefs.ConfirmCloseActive && (session.state == connected || session.state == connecting) {
-		// Native confirmation is used here so an active file tab has the same
-		// contract as a terminal tab, without changing the transfer conflict dialog.
-		go func() {
-			result, err := mygo.Dialog.Message(mygo.MessageOptions{Parent: a.window, Type: mygo.MessageQuestion, Message: "关闭活动连接？", Detail: "关闭此选项卡将结束文件会话。", Buttons: []string{"取消", "关闭选项卡"}})
-			mygo.RunOnMain(func() {
-				if err != nil {
-					a.files.notice = err.Error()
-				} else if result.Button == 1 {
-					if i := slices.Index(a.fileSessions, session); i >= 0 {
-						a.closedTabs = append(a.closedTabs, closedWorkspaceTab{host: session.host, section: sectionFiles})
-						a.closeFileSession(i)
-						a.afterLastTabClosed()
-					}
-				}
-				if a.window != nil {
-					a.window.Invalidate()
-				}
-			})
-		}()
+		a.closeFileRequest, a.closeRequest = session, nil
 		return
 	}
 	a.closedTabs = append(a.closedTabs, closedWorkspaceTab{host: session.host, section: sectionFiles})

@@ -24,6 +24,38 @@ func Tween(duration time.Duration) ui.Animation {
 	return ui.Animation{Duration: duration, Ease: Easing(theme.Current().Motion.Easing.Out)}
 }
 
+func MotionReduced(c *ui.Context, mode MotionMode) bool {
+	switch mode {
+	case MotionReduce:
+		return true
+	case MotionAllow:
+		return false
+	}
+	return c.Preferences().ReduceMotion
+}
+
+func MotionOverride(reduced bool) MotionMode {
+	if reduced {
+		return MotionReduce
+	}
+	return MotionAllow
+}
+
+func Dur(c *ui.Context, duration time.Duration, mode ...MotionMode) time.Duration {
+	policy := MotionSystem
+	if len(mode) != 0 {
+		policy = mode[0]
+	}
+	if MotionReduced(c, policy) {
+		return theme.Current().Motion.Duration.InstantNonzero
+	}
+	return duration
+}
+
+func Anim(c *ui.Context, duration time.Duration, mode ...MotionMode) ui.Animation {
+	return Tween(Dur(c, duration, mode...))
+}
+
 // Visual encodes opacity in an alpha channel so reduced motion keeps color
 // and opacity fades while MyGo suppresses positional scalar animations.
 func Visual(e ui.Element, key any, target float32, duration time.Duration) float32 {

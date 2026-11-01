@@ -7,9 +7,9 @@
 
 | 层 | 数量 | 说明 |
 |---|---|---|
-| palette（primitives） | 279 | 原始色值与刻度，其中 49 个为推导值（derived） |
-| semantic（每个主题一份） | 430 | Light = 当前设计；Dark 覆盖其中 104 个（全部 derived） |
-| component | 893 | 只引用 semantic；换主题时自动跟随 |
+| palette（primitives） | 280 | 原始色值与刻度，其中 50 个为推导值（derived） |
+| semantic（每个主题一份） | 465 | Light = 当前设计；Dark 覆盖其中 110 个（全部 derived） |
+| component | 1044 | 只引用 semantic；换主题时自动跟随 |
 
 ## 1. 三层结构与引用规则
 
@@ -64,9 +64,9 @@ siderItem.nameColor             ← component，只能引用 semantic
 
 - 设计稿没画：`color.state.pressed`（按下）、`size.dropLine`（MyGo `ListState.Reorder` 插入线 2px）、组件 `menu.*`（按浮起层/拖动卡片推导）、`button.bgHover/bgPressed`、`iconButton.bgHover`。
 - tab 拖动、窗格拖动没有单独设计：`reorderMotion.tabDisplace / paneDisplace / paneDrop` 沿用 sider 拖动的弹簧参数。
-- 整个 Dark 主题（104 项覆盖 + `palette.graphite / darkTint / whiteA / blackA / inkDark`）。
-- FTP v3 danger 红色、原生文件面板补充尺寸与演示传输吞吐标记为 **derived**。侧栏状态与选中 token 已标 `deprecated`，保留生成供已有主题兼容，新组件不得引用。
-- 同一含义在稿子里出现过两个值时，取主稿：sider 选中行用 `common.css` 的 `#efeff1`（`sider-drag.html` 里是 `#f2f2f4`）；图标线宽用 `icons.js` 默认 1.75（拖动稿用 1.7）。
+- 整个 Dark 主题（110 项覆盖 + `palette.graphite / darkTint / whiteA / blackA / inkDark`）。
+- FTP v3 danger 红色、原生文件面板补充尺寸与演示传输吞吐标记为 **derived**。侧栏旧连接状态与会话选中 token 已标 `deprecated`，保留生成供已有主题兼容，新组件不得引用；独立的 `siderItem.bgActive` 只表示目录条目的原生焦点反馈。
+- 同一含义在稿子里出现过两个值时，取主稿：旧 sider 会话选中兼容 token 保留 `common.css` 的 `#efeff1`（`sider-drag.html` 里是 `#f2f2f4`）；新目录焦点反馈 `bgActive` 跟随 `color.state.selectedAccent`。图标线宽用 `icons.js` 默认 1.75（拖动稿用 1.7）。
 - 已知限制：深色下部分深色品牌 logo（CentOS、Debian 的深色字形）对比度偏低，实现时可以给 OS glyph 加一个 `Mix(brand, white, .35)` 提亮。
 
 ## 6. Palette
@@ -161,6 +161,7 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `palette.white.a70` | rgba(255,255,255,0.7) |  |
 | `palette.white.a85` | rgba(255,255,255,0.85) |  |
 | `palette.white.a90` | rgba(255,255,255,0.9) |  |
+| `palette.white.a75` | rgba(255,255,255,0.75) | **derived** 设计指定的既有白色透明度 |
 
 ### palette.blueA
 | token | 值 | 备注 |
@@ -549,6 +550,8 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `color.accent.tint28` | rgba(10,132,255,0.28) | ＝ | 占位内描边 |
 | `color.accent.tint35` | rgba(10,132,255,0.35) | ＝ | 标注描边 |
 | `color.accent.tint50` | rgba(10,132,255,0.5) | ＝ | 自动滚动区边线 |
+| `color.accent.hover` | #0a6fd6 | #4da3ff |  |
+| `color.accent.pressed` | #0a5bc4 | #6cb4ff |  |
 | `color.success.default` | #30c45a | #32d74b | 在线点、完成进度 |
 | `color.success.text` | #1f8a3f | #5fd97a |  |
 | `color.success.subtle` | #ebf8ef | #173523 |  |
@@ -587,6 +590,8 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `color.danger.text` | #d70015 | #ff6961 | 失败文字 |
 | `color.danger.subtle` | #fdecec | #3a1d1c | 失败图标底、失败徽章底 |
 | `color.danger.tint14` | rgba(255,59,48,0.14) | rgba(255,69,58,0.22) | 错误输入框外光晕 |
+| `color.danger.hover` | #ff3b30 | #ff453a |  |
+| `color.danger.pressed` | #ff3b30 | #ff6961 |  |
 | `color.protocol.sftpBg` | #eaf3fe | #16304d | SFTP 图标块底 |
 | `color.protocol.sftpGlyph` | #0a84ff | ＝ | SFTP 字形 |
 | `color.protocol.ftpBg` | #f2f2f4 | #2e2e31 | FTP 图标块底 |
@@ -602,8 +607,12 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `color.accentChoices.graphite` | #8e8e93 | ＝ |  |
 | `color.scrim` | rgba(0,0,0,0.18) | rgba(0,0,0,0.45) | 会话弹窗遮罩，覆盖标题栏 |
 | `color.keycap.inkBg` | rgba(255,255,255,0.16) | ＝ |  |
-| `color.keycap.inkText` | rgba(255,255,255,0.6) | ＝ |  |
+| `color.keycap.inkText` | rgba(255,255,255,0.75) | ＝ |  |
 | `color.keycap.accentBg` | rgba(255,255,255,0.2) | ＝ |  |
+| `color.toast.action` | #4da3ff | ＝ |  |
+| `color.toast.ok` | #32d74b | ＝ |  |
+| `color.toast.error` | #ff453a | ＝ |  |
+| `color.toast.warning` | #ffb340 | ＝ |  |
 
 ### radius
 | token | Light | Dark（derived） | 用途 |
@@ -798,6 +807,25 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `size.settingsNumber` | 64px | ＝ |  |
 | `size.settingsScrollback` | 96px | ＝ |  |
 | `size.keycap` | 18px | ＝ |  |
+| `size.buttonLarge` | 32px | ＝ |  |
+| `size.badgeSmall` | 18px | ＝ |  |
+| `size.badgeMedium` | 20px | ＝ |  |
+| `size.check` | 14px | ＝ |  |
+| `size.radioDot` | 4.5px | ＝ |  |
+| `size.panelHeader` | 46px | ＝ |  |
+| `size.toast` | 340px | ＝ |  |
+| `size.emptyMaxWidth` | 220px | ＝ |  |
+| `size.keyValueRow` | 22px | ＝ |  |
+| `size.sparklineHeight` | 34px | ＝ |  |
+| `size.sparklineStroke` | 1.5px | ＝ |  |
+| `size.meterHeight` | 4px | ＝ |  |
+| `size.iconXs` | 12px | ＝ |  |
+| `size.segmentedItem` | 24px | ＝ |  |
+| `size.latencyWarn` | 150 | ＝ |  |
+| `size.latencyBad` | 400 | ＝ |  |
+| `size.tableNameMinWidth` | 160px | ＝ |  |
+| `size.meterWarnRatio` | 0.7 | ＝ |  |
+| `size.meterCriticalRatio` | 0.9 | ＝ |  |
 
 ### font
 | token | Light | Dark（derived） | 用途 |
@@ -856,6 +884,8 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `shadow.inputError` | inset 0px 0px 0px 1.5px #ff3b30, 0px 0px 0px 3px rgba(255,59,48,0.14) | inset 0px 0px 0px 1.5px #ff453a, 0px 0px 0px 3px rgba(255,69,58,0.22) | 输入框错误：优先于焦点 |
 | `shadow.switchKnob` | 0px 1px 2px 0px rgba(0,0,0,0.2) | ＝ | 开关滑块 |
 | `shadow.themeSelected` | 0px 0px 0px 3px rgba(10,132,255,0.16) | 0px 0px 0px 3px rgba(10,132,255,0.24) | 外观主题卡片选中光晕 |
+| `shadow.controlFocus` | 0px 0px 0px 1.5px #0a84ff, 0px 0px 0px 5.5px rgba(10,132,255,0.16) | 0px 0px 0px 1.5px #0a84ff, 0px 0px 0px 5.5px rgba(10,132,255,0.24) |  |
+| `shadow.cardInset` | inset 0px 0px 0px 0.5px rgba(0,0,0,0.06) | inset 0px 0px 0px 0.5px rgba(255,255,255,0.08) | UIKit 卡片内描边，外框几何不变 |
 
 ### glass
 | token | Light | Dark（derived） | 用途 |
@@ -906,6 +936,7 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `opacity.modalEnterScale` | 0.96 | ＝ |  |
 | `opacity.modalExitScale` | 0.98 | ＝ |  |
 | `opacity.collapseContentFadeFactor` | 1.6 | ＝ |  |
+| `opacity.sparklineFill` | 0.1 | ＝ |  |
 
 ### motion
 | token | Light | Dark（derived） | 用途 |
@@ -935,6 +966,9 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `motion.duration.connectionStage` | 300ms | ＝ | SSH 演示连接每个阶段的停留时间 |
 | `motion.duration.test` | 10000ms | ＝ |  |
 | `motion.duration.settingsSwitchOut` | 80ms | ＝ |  |
+| `motion.duration.fast` | 120ms | ＝ |  |
+| `motion.duration.base` | 160ms | ＝ |  |
+| `motion.duration.autoHide` | 3000ms | ＝ |  |
 | `motion.easing.out` | cubic-bezier(0,0,0.58,1) | ＝ |  |
 | `motion.easing.pane` | cubic-bezier(0.2,0.8,0.2,1) | ＝ |  |
 | `motion.easing.search` | cubic-bezier(0.42,0,0.58,1) | ＝ |  |
@@ -948,6 +982,8 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `motion.drag.liftScale` | 1.03 | ＝ |  |
 | `motion.drag.autoScrollMax` | 900 | ＝ | px/s，t² 曲线 |
 | `motion.drag.autoScrollZone` | 48px | ＝ |  |
+| `motion.drag.standardScale` | 1.02 | ＝ |  |
+| `motion.drag.standardRotation` | -0.6 | ＝ |  |
 | `motion.demoTransferSpeed` | 1.30023e+07 | ＝ | **derived** 演示传输吞吐 |
 
 ## 8. Component
@@ -1128,6 +1164,7 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `siderItem.radius` | `{radius.control}` | 7px |  |
 | `siderItem.spacing` | `{space.1}` | 1px |  |
 | `siderItem.bgHover` | `{color.state.hover}` | #f7f7f8 | 行悬停 |
+| `siderItem.bgActive` | `{color.state.selectedAccent}` | #e8f2fe | **derived** 用户新增：目录条目聚焦 active 底色，与打开的会话独立 |
 | `siderItem.bgSelected` | `{color.state.selected}` | #efeff1 | **deprecated** 侧栏不再显示状态/选中 |
 | `siderItem.nameSize` | `{font.size.bodyLg}` | 13px | 主机名、标题 |
 | `siderItem.nameWeight` | `{font.weight.medium}` | 500 |  |
@@ -1168,7 +1205,7 @@ siderItem.nameColor             ← component，只能引用 semantic
 |---|---|---|---|
 | `card.bg` | `{color.surface.card}` | #ffffff | 内容卡片 / sider / FTP 面板 |
 | `card.radius` | `{radius.card}` | 10px |  |
-| `card.shadow` | `{shadow.card}` | 0px 0px 0px 0.5px rgba(0,0,0,0.06) | 卡片外描边 |
+| `card.shadow` | `{shadow.cardInset}` | inset 0px 0px 0px 0.5px rgba(0,0,0,0.06) | UIKit 卡片内描边，外框几何不变 |
 
 ### pane
 | token | 引用 | Light 值 | 说明 |
@@ -1310,6 +1347,18 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `badge.okBgOnGlass` | `{color.success.onGlass}` | rgba(48,196,90,0.15) |  |
 | `badge.runBg` | `{color.accent.subtle}` | #eaf3fe | 浅蓝底（上传、运行中、提示） |
 | `badge.runText` | `{color.text.accent}` | #0a6fd6 | 蓝色文字（徽章、提示、高亮分组） |
+| `badge.heightSm` | `{size.badgeSmall}` | 18px |  |
+| `badge.heightMd` | `{size.badgeMedium}` | 20px |  |
+| `badge.warnBg` | `{color.warning.subtle}` | #fdf3e3 |  |
+| `badge.warnText` | `{color.warning.textStrong}` | #b26a00 |  |
+| `badge.warnDot` | `{color.warning.default}` | #f5a623 | 连接中 |
+| `badge.errBg` | `{color.danger.subtle}` | #fdecec | 失败图标底、失败徽章底 |
+| `badge.errText` | `{color.danger.text}` | #d70015 | 失败文字 |
+| `badge.errDot` | `{color.danger.default}` | #ff3b30 | 失败圆点、失败图标 |
+| `badge.runDot` | `{color.accent.default}` | #0a84ff | 主强调色 #0a84ff |
+| `badge.neutralDot` | `{color.status.offline}` | #cfcfd4 | 离线点 |
+| `badge.mutedBg` | `{color.surface.field}` | #f6f6f7 | 面包屑路径框 |
+| `badge.mutedText` | `{color.text.tertiary}` | #a1a1a6 | 关闭 ×、kbd、caption |
 
 ### button
 | token | 引用 | Light 值 | 说明 |
@@ -1328,6 +1377,23 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `button.bgPressed` | `{color.state.pressed}` | #e6e6e9 | **derived** 未画 |
 | `button.bg` | `{color.surface.control}` | #f2f2f4 | 中性控件底：图标按钮 bg、分段控件、中性徽章、队列图标 |
 | `button.transition` | `{motion.duration.focus}` | 160ms | 焦点/悬停切换 |
+| `button.heightSm` | `{size.controlSm}` | 24px |  |
+| `button.heightLg` | `{size.buttonLarge}` | 32px |  |
+| `button.paddingXSm` | `{space.9}` | 9px |  |
+| `button.paddingXLg` | `{space.14}` | 14px |  |
+| `button.secondaryBg` | `{color.surface.control}` | #f2f2f4 | 中性控件底：图标按钮 bg、分段控件、中性徽章、队列图标 |
+| `button.secondaryBgHover` | `{color.surface.controlStrong}` | #ececef | sider 行内「更多」按钮 |
+| `button.plainBgHover` | `{color.state.hover}` | #f7f7f8 | 行悬停 |
+| `button.primaryBgHover` | `{color.accent.hover}` | #0a6fd6 |  |
+| `button.primaryBgPressed` | `{color.accent.pressed}` | #0a5bc4 |  |
+| `button.dangerBg` | `{color.danger.default}` | #ff3b30 | 失败圆点、失败图标 |
+| `button.dangerBgHover` | `{color.danger.hover}` | #ff3b30 |  |
+| `button.dangerBgPressed` | `{color.danger.pressed}` | #ff3b30 |  |
+| `button.dangerText` | `{color.text.onAccent}` | #ffffff |  |
+| `button.dangerPlainText` | `{color.danger.text}` | #d70015 | 失败文字 |
+| `button.dangerPlainBgHover` | `{color.danger.subtle}` | #fdecec | 失败图标底、失败徽章底 |
+| `button.kbdGap` | `{space.6}` | 6px |  |
+| `button.focusShadow` | `{shadow.controlFocus}` | 0px 0px 0px 1.5px #0a84ff, 0px 0px 0px 5.5px rgba(10,132,255,0.16) |  |
 
 ### iconButton
 | token | 引用 | Light 值 | 说明 |
@@ -1345,6 +1411,13 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `iconButton.stroke` | `{size.iconStroke}` | 1.75px | Lucide 风格线宽 |
 | `iconButton.bgPressed` | `{color.state.pressed}` | #e6e6e9 | 按下（设计稿未画） |
 | `iconButton.transition` | `{motion.duration.focus}` | 160ms | 焦点/悬停切换 |
+| `iconButton.bgOn` | `{color.state.pressed}` | #e6e6e9 | 按下（设计稿未画） |
+| `iconButton.iconOn` | `{color.text.primary}` | #1d1d1f |  |
+| `iconButton.bgFilled` | `{color.surface.control}` | #f2f2f4 | 中性控件底：图标按钮 bg、分段控件、中性徽章、队列图标 |
+| `iconButton.iconHover` | `{color.text.primary}` | #1d1d1f |  |
+| `iconButton.iconSizeSm` | `{size.iconSm}` | 14px |  |
+| `iconButton.iconSizeXs` | `{size.iconXs}` | 12px |  |
+| `iconButton.focusShadow` | `{shadow.controlFocus}` | 0px 0px 0px 1.5px #0a84ff, 0px 0px 0px 5.5px rgba(10,132,255,0.16) |  |
 
 ### floatButton
 | token | 引用 | Light 值 | 说明 |
@@ -1372,6 +1445,10 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `segmented.shadowOn` | `{shadow.segment}` | 0px 1px 2px 0px rgba(0,0,0,0.08) |  |
 | `segmented.transition` | `{motion.duration.focus}` | 160ms | 焦点/悬停切换 |
 | `segmented.bgHover` | `{color.state.hover}` | #f7f7f8 | 行悬停 |
+| `segmented.countText` | `{color.text.tertiary}` | #a1a1a6 | 关闭 ×、kbd、caption |
+| `segmented.countTextOn` | `{color.text.muted}` | #6e6e73 | 未选中 tab、rail 图标、按钮图标 |
+| `segmented.itemHeightMd` | `{size.segmentedItem}` | 24px |  |
+| `segmented.heightSm` | `{size.controlSm}` | 24px |  |
 
 ### breadcrumb
 | token | 引用 | Light 值 | 说明 |
@@ -1385,6 +1462,7 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `breadcrumb.text` | `{color.text.muted}` | #6e6e73 | 未选中 tab、rail 图标、按钮图标 |
 | `breadcrumb.current` | `{color.text.primary}` | #1d1d1f |  |
 | `breadcrumb.separator` | `{color.text.placeholder}` | #c7c7cc | 面包屑分隔符 |
+| `breadcrumb.iconSize` | `{size.iconXs}` | 12px |  |
 
 ### fileList
 | token | 引用 | Light 值 | 说明 |
@@ -1406,6 +1484,9 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `fileList.folderIcon` | `{color.icon.folder}` | #5ba7f7 |  |
 | `fileList.folderFill` | `{color.icon.folderFill}` | #d7e9fd |  |
 | `fileList.paneHeaderHeight` | `{size.fileHeader}` | 40px |  |
+| `fileList.headerBg` | `{color.surface.card}` | #ffffff | 内容卡片 / sider / FTP 面板 |
+| `fileList.columnGap` | `{space.16}` | 16px |  |
+| `fileList.nameMinWidth` | `{size.tableNameMinWidth}` | 160px |  |
 
 ### progress
 | token | 引用 | Light 值 | 说明 |
@@ -1417,6 +1498,11 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `progress.fillNeutral` | `{color.fill.strong}` | #1d1d1f | 资源条填充 |
 | `progress.fillPaused` | `{color.status.paused}` | #c7c7cc | 暂停进度 |
 | `progress.fillDone` | `{color.success.default}` | #30c45a | 在线点、完成进度 |
+| `progress.heightMeter` | `{size.meterHeight}` | 4px |  |
+| `progress.meterFill` | `{color.fill.strong}` | #1d1d1f | 资源条填充 |
+| `progress.meterWarnAt` | `{size.meterWarnRatio}` | 0.7 |  |
+| `progress.meterCritAt` | `{size.meterCriticalRatio}` | 0.9 |  |
+| `progress.fillError` | `{color.danger.default}` | #ff3b30 | 失败圆点、失败图标 |
 
 ### tooltip
 | token | 引用 | Light 值 | 说明 |
@@ -1478,6 +1564,8 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `dragLift.liftDuration` | `{motion.duration.lift}` | 120ms | 拿起 |
 | `dragLift.sourceOpacity` | `{opacity.dragSource}` | 0.4 | 拖走后源行（折叠时） |
 | `dragLift.stackBg` | `{color.surface.liftStack}` | #f9f9fa |  |
+| `dragLift.standardScale` | `{motion.drag.standardScale}` | 1.02 |  |
+| `dragLift.standardRotation` | `{motion.drag.standardRotation}` | -0.6 |  |
 
 ### dropIndicator
 | token | 引用 | Light 值 | 说明 |
@@ -1675,6 +1763,8 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `filePaneFocus.selBgInactive` | `{color.state.selected}` | #efeff1 | sider 选中行 |
 | `filePaneFocus.selTextInactive` | `{color.text.primary}` | #1d1d1f |  |
 | `filePaneFocus.transition` | `{motion.duration.focus}` | 160ms | 焦点/悬停切换 |
+| `filePaneFocus.borderFocused` | `{color.accent.default}` | #0a84ff | 主强调色 #0a84ff |
+| `filePaneFocus.borderWidthFocused` | `{size.focusRing}` | 1.5px | 焦点环宽 / 虚线落位框宽 |
 
 ### FTPSplit
 | token | 引用 | Light 值 | 说明 |
@@ -2075,6 +2165,159 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `kbd.border` | `{color.border.keycap}` | #e3e3e6 | kbd 描边 |
 | `kbd.text` | `{color.text.tertiary}` | #a1a1a6 | 关闭 ×、kbd、caption |
 | `kbd.inkBg` | `{color.keycap.inkBg}` | rgba(255,255,255,0.16) |  |
-| `kbd.inkText` | `{color.keycap.inkText}` | rgba(255,255,255,0.6) |  |
+| `kbd.inkText` | `{color.keycap.inkText}` | rgba(255,255,255,0.75) |  |
 | `kbd.accentBg` | `{color.keycap.accentBg}` | rgba(255,255,255,0.2) |  |
 | `kbd.accentText` | `{color.text.onAccent}` | #ffffff |  |
+
+### divider
+| token | 引用 | Light 值 | 说明 |
+|---|---|---|---|
+| `divider.color` | `{color.border.divider}` | #f2f2f4 | 头部底线、表头底线 |
+| `divider.width` | `{size.divider}` | 1px |  |
+| `divider.verticalHeight` | `{size.separatorShort}` | 12px |  |
+
+### spinner
+| token | 引用 | Light 值 | 说明 |
+|---|---|---|---|
+| `spinner.sizeXs` | `{size.iconXs}` | 12px |  |
+| `spinner.sizeSm` | `{size.iconSm}` | 14px |  |
+| `spinner.sizeMd` | `{size.icon}` | 16px |  |
+| `spinner.color` | `{color.icon.default}` | #6e6e73 |  |
+| `spinner.period` | `{motion.duration.spin}` | 800ms | 连接中转圈一周 |
+
+### check
+| token | 引用 | Light 值 | 说明 |
+|---|---|---|---|
+| `check.size` | `{size.check}` | 14px |  |
+| `check.radius` | `{radius.keycap}` | 4px |  |
+| `check.border` | `{color.border.keycap}` | #e3e3e6 | kbd 描边 |
+| `check.on` | `{color.accent.default}` | #0a84ff | 主强调色 #0a84ff |
+| `check.mark` | `{color.text.onAccent}` | #ffffff |  |
+| `check.radioDot` | `{size.radioDot}` | 4.5px |  |
+
+### banner
+| token | 引用 | Light 值 | 说明 |
+|---|---|---|---|
+| `banner.paddingX` | `{space.12}` | 12px |  |
+| `banner.paddingY` | `{space.9}` | 9px |  |
+| `banner.radius` | `{radius.railButton}` | 8px |  |
+| `banner.gap` | `{space.8}` | 8px |  |
+| `banner.icon` | `{size.iconSm}` | 14px |  |
+| `banner.neutralBg` | `{color.surface.control}` | #f2f2f4 | 中性控件底：图标按钮 bg、分段控件、中性徽章、队列图标 |
+| `banner.neutralText` | `{color.text.strong}` | #3a3a3f | 次级按钮文字 |
+| `banner.neutralIcon` | `{color.text.secondary}` | #8e8e93 | 次要文字、主机副标题、状态栏 |
+| `banner.infoBg` | `{color.accent.subtle}` | #eaf3fe | 浅蓝底（上传、运行中、提示） |
+| `banner.infoText` | `{color.text.accentStrong}` | #0a5bc4 | 选中文件名 |
+| `banner.infoIcon` | `{color.accent.default}` | #0a84ff | 主强调色 #0a84ff |
+| `banner.warnBg` | `{color.warning.subtle}` | #fdf3e3 |  |
+| `banner.warnText` | `{color.warning.textStrong}` | #b26a00 |  |
+| `banner.warnIcon` | `{color.warning.default}` | #f5a623 | 连接中 |
+| `banner.dangerBg` | `{color.danger.subtle}` | #fdecec | 失败图标底、失败徽章底 |
+| `banner.dangerText` | `{color.danger.text}` | #d70015 | 失败文字 |
+| `banner.dangerIcon` | `{color.danger.default}` | #ff3b30 | 失败圆点、失败图标 |
+
+### panel
+| token | 引用 | Light 值 | 说明 |
+|---|---|---|---|
+| `panel.width` | `{size.statsPanel}` | 204px | 监控侧栏（分屏时） |
+| `panel.headerHeight` | `{size.panelHeader}` | 46px |  |
+| `panel.paddingX` | `{space.14}` | 14px |  |
+| `panel.sectionGap` | `{space.8}` | 8px |  |
+| `panel.divider` | `{color.border.divider}` | #f2f2f4 | 头部底线、表头底线 |
+| `panel.statLabel` | `{color.text.primary}` | #1d1d1f |  |
+| `panel.statValue` | `{color.text.secondary}` | #8e8e93 | 次要文字、主机副标题、状态栏 |
+| `panel.caption` | `{color.text.tertiary}` | #a1a1a6 | 关闭 ×、kbd、caption |
+
+### sparkline
+| token | 引用 | Light 值 | 说明 |
+|---|---|---|---|
+| `sparkline.height` | `{size.sparklineHeight}` | 34px |  |
+| `sparkline.stroke` | `{size.sparklineStroke}` | 1.5px |  |
+| `sparkline.line` | `{color.accent.default}` | #0a84ff | 主强调色 #0a84ff |
+| `sparkline.fillAlpha` | `{opacity.sparklineFill}` | 0.1 |  |
+
+### keyValue
+| token | 引用 | Light 值 | 说明 |
+|---|---|---|---|
+| `keyValue.rowHeight` | `{size.keyValueRow}` | 22px |  |
+| `keyValue.key` | `{color.text.secondary}` | #8e8e93 | 次要文字、主机副标题、状态栏 |
+| `keyValue.value` | `{color.text.primary}` | #1d1d1f |  |
+| `keyValue.valueDim` | `{color.text.tertiary}` | #a1a1a6 | 关闭 ×、kbd、caption |
+| `keyValue.font` | `{font.size.footnote}` | 11.5px | 分组头、副标题、状态栏 |
+
+### emptyState
+| token | 引用 | Light 值 | 说明 |
+|---|---|---|---|
+| `emptyState.iconTile` | `{size.titlebar}` | 44px |  |
+| `emptyState.iconRadius` | `{radius.window}` | 12px |  |
+| `emptyState.iconBg` | `{color.surface.control}` | #f2f2f4 | 中性控件底：图标按钮 bg、分段控件、中性徽章、队列图标 |
+| `emptyState.icon` | `{color.text.secondary}` | #8e8e93 | 次要文字、主机副标题、状态栏 |
+| `emptyState.title` | `{font.size.bodyLg}` | 13px | 主机名、标题 |
+| `emptyState.detail` | `{color.text.secondary}` | #8e8e93 | 次要文字、主机副标题、状态栏 |
+| `emptyState.maxWidth` | `{size.emptyMaxWidth}` | 220px |  |
+
+### toast
+| token | 引用 | Light 值 | 说明 |
+|---|---|---|---|
+| `toast.width` | `{size.toast}` | 340px |  |
+| `toast.radius` | `{radius.card}` | 10px |  |
+| `toast.bg` | `{color.tooltip.bg}` | rgba(30,30,32,0.92) |  |
+| `toast.text` | `{color.tooltip.text}` | #ffffff |  |
+| `toast.detail` | `{color.tooltip.kbd}` | rgba(255,255,255,0.6) |  |
+| `toast.action` | `{color.toast.action}` | #4da3ff |  |
+| `toast.okIcon` | `{color.toast.ok}` | #32d74b |  |
+| `toast.errIcon` | `{color.toast.error}` | #ff453a |  |
+| `toast.warnIcon` | `{color.toast.warning}` | #ffb340 |  |
+| `toast.shadow` | `{shadow.lift}` | 0px 0px 0px 0.5px rgba(0,0,0,0.1), 0px 10px 28px 0px rgba(0,0,0,0.16), 0px 2px 6px 0px rgba(0,0,0,0.08) | 拖动中卡片 |
+| `toast.paddingX` | `{space.14}` | 14px |  |
+| `toast.paddingY` | `{space.10}` | 10px |  |
+| `toast.gap` | `{space.8}` | 8px |  |
+| `toast.timeout` | `{motion.duration.autoHide}` | 3000ms |  |
+
+### popover
+| token | 引用 | Light 值 | 说明 |
+|---|---|---|---|
+| `popover.radius` | `{radius.window}` | 12px |  |
+| `popover.padding` | `{space.12}` | 12px |  |
+| `popover.bg` | `{color.surface.raised}` | #ffffff | 浮起层：拖动卡片、ghost、分段控件选中 |
+| `popover.shadow` | `{shadow.lift}` | 0px 0px 0px 0.5px rgba(0,0,0,0.1), 0px 10px 28px 0px rgba(0,0,0,0.16), 0px 2px 6px 0px rgba(0,0,0,0.08) | 拖动中卡片 |
+
+### latency
+| token | 引用 | Light 值 | 说明 |
+|---|---|---|---|
+| `latency.warnMs` | `{size.latencyWarn}` | 150 |  |
+| `latency.badMs` | `{size.latencyBad}` | 400 |  |
+| `latency.normal` | `{color.text.secondary}` | #8e8e93 | 次要文字、主机副标题、状态栏 |
+| `latency.warn` | `{color.warning.text}` | #c7861a | 连接中文字 / 响铃 |
+| `latency.bad` | `{color.danger.text}` | #d70015 | 失败文字 |
+
+### listRow
+| token | 引用 | Light 值 | 说明 |
+|---|---|---|---|
+| `listRow.height` | `{size.listRow}` | 30px |  |
+| `listRow.radius` | `{radius.controlSm}` | 6px |  |
+| `listRow.paddingX` | `{space.8}` | 8px |  |
+| `listRow.gap` | `{space.9}` | 9px |  |
+| `listRow.meta` | `{color.text.secondary}` | #8e8e93 | 次要文字、主机副标题、状态栏 |
+
+### paneHeader
+| token | 引用 | Light 值 | 说明 |
+|---|---|---|---|
+| `paneHeader.heightCompact` | `{size.paneHeader}` | 36px |  |
+| `paneHeader.heightToolbar` | `{size.fileHeader}` | 40px |  |
+| `paneHeader.heightTitle` | `{size.panelHeader}` | 46px |  |
+| `paneHeader.titleFont` | `{font.size.bodyLg}` | 13px | 主机名、标题 |
+| `paneHeader.titleWeight` | `{font.weight.semibold}` | 600 |  |
+| `paneHeader.paddingLeft` | `{space.14}` | 14px |  |
+| `paneHeader.paddingRight` | `{space.8}` | 8px |  |
+| `paneHeader.gap` | `{space.7}` | 7px |  |
+
+### paneFooter
+| token | 引用 | Light 值 | 说明 |
+|---|---|---|---|
+| `paneFooter.height` | `{size.paneStatusBar}` | 32px |  |
+| `paneFooter.paddingX` | `{space.14}` | 14px |  |
+| `paneFooter.gap` | `{space.10}` | 10px |  |
+| `paneFooter.text` | `{color.text.secondary}` | #8e8e93 | 次要文字、主机副标题、状态栏 |
+| `paneFooter.font` | `{font.size.footnote}` | 11.5px | 分组头、副标题、状态栏 |
+| `paneFooter.divider` | `{color.border.divider}` | #f2f2f4 | 头部底线、表头底线 |

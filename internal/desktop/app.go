@@ -84,6 +84,7 @@ type app struct {
 	statusScroll       ui.ScrollState
 	statusScrollbar    scrollbarState
 	fileSessions       []*fileSession
+	fileTabScroll      ui.ScrollState
 	activeFile         int
 	nextFileSession    int
 	files              fileWorkspaceState
@@ -99,6 +100,7 @@ type app struct {
 	credentials        credentialState
 	closedTabs         []closedWorkspaceTab
 	closeRequest       *workspaceTab
+	closeFileRequest   *fileSession
 	savedWorkspace     *storedWorkspace
 	reduceTransparency bool
 }
@@ -107,7 +109,7 @@ func (a *app) page() *pageState {
 	return &a.pages[a.section]
 }
 
-// Settings is a peer page; section keeps the selected workspace for its tabs.
+// Settings is a peer page; section remembers the last workspace while it is open.
 func (a *app) activeSection() section {
 	if a.settingsUI.open {
 		return sectionSettings
@@ -183,7 +185,10 @@ func Run() error {
 	a.files.activeRemote = true
 	a.files.localPaths = map[string]string{}
 	if err := a.loadFilePreferences(); err != nil {
-		a.files.notice = "无法读取文件传输偏好：" + err.Error()
+		a.files.notice = &uikit.ToastProps{
+			ID: "无法读取文件传输偏好：" + err.Error(), Tone: uikit.ToneDanger,
+			Title: "无法读取文件传输偏好", Detail: err.Error(),
+		}
 	}
 	if err := a.loadAppPreferences(); err != nil {
 		a.terminalError = errors.Join(a.terminalError, err)
@@ -234,13 +239,16 @@ func Run() error {
 		a.window.OnClose(func(e *mygo.CloseEvent) {
 			if a.credentials.busy || a.savingSession() {
 				e.PreventDefault()
-				a.files.notice = "正在保存凭据，完成后再关闭窗口。"
+				a.files.notice = &uikit.ToastProps{ID: "save-before-close", Tone: uikit.ToneWarning, Title: "正在保存凭据，完成后再关闭窗口。"}
 				a.window.Invalidate()
 				return
 			}
 			if err := a.persistBeforeClose(); err != nil {
 				e.PreventDefault()
-				a.files.notice = "关闭前保存失败：" + err.Error()
+				a.files.notice = &uikit.ToastProps{
+					ID: "关闭前保存失败：" + err.Error(), Tone: uikit.ToneDanger,
+					Title: "关闭前保存失败", Detail: err.Error(),
+				}
 				a.window.Invalidate()
 				return
 			}
@@ -253,7 +261,7 @@ func Run() error {
 	stopQuit := mygo.App.OnBeforeQuit(func(e *mygo.QuitEvent) {
 		if a.credentials.busy || a.savingSession() {
 			e.PreventDefault()
-			a.files.notice = "密钥操作进行中，完成后再退出。"
+			a.files.notice = &uikit.ToastProps{ID: "work-before-quit", Tone: uikit.ToneWarning, Title: "密钥操作进行中，完成后再退出。"}
 			if a.window != nil {
 				a.window.Invalidate()
 			}
@@ -262,7 +270,10 @@ func Run() error {
 		a.cancelCredentialWork()
 		if err := a.persistBeforeClose(); err != nil {
 			e.PreventDefault()
-			a.files.notice = "退出前保存失败：" + err.Error()
+			a.files.notice = &uikit.ToastProps{
+				ID: "退出前保存失败：" + err.Error(), Tone: uikit.ToneDanger,
+				Title: "退出前保存失败", Detail: err.Error(),
+			}
 			if a.window != nil {
 				a.window.Invalidate()
 			}
@@ -277,8 +288,7 @@ func Run() error {
 
 func (a *app) view(c *ui.Context) {
 	t := theme.Current()
-	a.theme = uikit.UITheme(t)
-	c.SetTheme(a.theme)
+	a.theme = uikit.Install(c)
 	c.Root().Background(uikit.Color(t.C.Window.Bg))
 	root := ui.Column(c).Fill()
 	x, y, _ := root.PointerPosition()
@@ -305,12 +315,14 @@ func (a *app) view(c *ui.Context) {
 	}
 	shown := root.AnimateTo(sidebarMotionKey(a.section), target, a.positionAnimation(uikit.Tween(t.C.Desktop.SidebarDuration)))
 	root.Children(func() {
-		ui.Column(c).Key(pageHeaderKey(a.section)).FillWidth().Shrink(0).Children(func() {
-			switch a.section {
+		ui.Column(c).Key(pageHeaderKey(active)).FillWidth().Shrink(0).Children(func() {
+			switch active {
 			case sectionSSH:
 				a.titleBar(c, shown)
 			case sectionFiles:
 				a.fileTitleBar(c, shown)
+			case sectionSettings:
+				uikit.TitleBar(c).FillWidth()
 			}
 		})
 		ui.Row(c).Grow(1).MinHeight(0).AlignItems(ui.Stretch).Children(func() {
@@ -340,11 +352,11 @@ func (a *app) view(c *ui.Context) {
 		}
 	})
 	if a.catalogError != nil {
-		uikit.Notify(c, "无法加载主机配置："+a.catalogError.Error())
+		uikit.Toast(c, uikit.ToastProps{Title: "无法加载主机配置", Detail: a.catalogError.Error(), Tone: uikit.ToneDanger})
 		a.catalogError = nil
 	}
 	if a.terminalError != nil {
-		uikit.Notify(c, "终端设置："+a.terminalError.Error())
+		uikit.Toast(c, uikit.ToastProps{Title: "终端设置", Detail: a.terminalError.Error(), Tone: uikit.ToneDanger})
 		a.terminalError = nil
 	}
 	if active != sectionSettings {
@@ -364,10 +376,11 @@ func (a *app) view(c *ui.Context) {
 		a.files.drag = nil
 		c.AnimationFrame()
 	}
-	if a.files.notice != "" {
-		uikit.Notify(c, a.files.notice)
-		a.files.notice = ""
+	if a.files.notice != nil {
+		uikit.Toast(c, *a.files.notice)
+		a.files.notice = nil
 	}
+	uikit.ToastViewport(c, uikit.MotionOverride(a.reduceMotion(c)))
 }
 
 func (a *app) navigation(c *ui.Context) {

@@ -12,49 +12,141 @@ const (
 	ButtonSecondary ButtonVariant = iota
 	ButtonPrimary
 	ButtonPlain
+	ButtonDanger
+	ButtonDangerPlain
 )
 
 type ButtonProps struct {
 	Variant  ButtonVariant
+	Size     Size
+	Icon     IconName
+	Leading  *ui.SVG
+	Kbd      string
+	Loading  bool
 	Disabled bool
+	Motion   MotionMode
 }
 
 func Button(c *ui.Context, label string, props ButtonProps) ui.Element {
-	p := theme.Current().C.Button
-	if props.Variant == ButtonPlain {
-		return ui.ButtonBase(c).Height(p.Height).Padding(0, p.PaddingX).FontSize(p.FontSize).Label(label).
-			Children(func() { ui.Text(c, label) }).Disabled(props.Disabled)
+	t := theme.Current()
+	p := t.C.Button
+	height, padding := p.Height, p.PaddingX
+	switch props.Size {
+	case SizeSm, SizeXs:
+		height, padding = p.HeightSm, p.PaddingXSm
+	case SizeLg:
+		height, padding = p.HeightLg, p.PaddingXLg
 	}
-	e := ui.ButtonBase(c).Height(p.Height).Padding(0, p.PaddingX).Gap(p.Gap).
-		Radius(p.Radius).FontSize(p.FontSize).Label(label)
-	bg, fg := p.Bg, p.Text
-	if props.Variant == ButtonPrimary {
-		bg, fg = p.PrimaryBg, p.PrimaryText
-	} else {
-		e.Border(p.BorderWidth, Color(p.Border))
-		switch {
-		case e.Pressed():
-			bg = p.BgPressed
-		case e.Hovered():
-			bg = p.BgHover
+	disabled := props.Disabled || props.Loading
+	e := ui.ButtonBase(c).Height(height).Padding(0, padding).Gap(p.Gap).
+		Radius(p.Radius).FontSize(p.FontSize).Label(label).Disabled(disabled).FocusRing(false)
+	bg, hover, pressed, fg := p.SecondaryBg, p.SecondaryBgHover, p.BgPressed, p.Text
+	switch props.Variant {
+	case ButtonPrimary:
+		bg, hover, pressed, fg = p.PrimaryBg, p.PrimaryBgHover, p.PrimaryBgPressed, p.PrimaryText
+	case ButtonPlain:
+		bg, hover, pressed = t.Color.Fill.Quiet, p.PlainBgHover, p.BgPressed
+		bg.A = 0
+	case ButtonDanger:
+		bg, hover, pressed, fg = p.DangerBg, p.DangerBgHover, p.DangerBgPressed, p.DangerText
+	case ButtonDangerPlain:
+		bg, hover, pressed, fg = p.DangerPlainBgHover, p.DangerPlainBgHover, p.DangerPlainBgHover, p.DangerPlainText
+		bg.A = 0
+	}
+	if !disabled {
+		if e.Pressed() {
+			bg = pressed
+		} else if e.Hovered() {
+			bg = hover
 		}
 	}
-	e.Background(e.AnimateColor("background", Color(bg), Tween(p.Transition))).
-		TextColor(Color(fg)).Children(func() { ui.Text(c, label).SingleLine() })
-	return e.Disabled(props.Disabled)
+	if props.Variant == ButtonSecondary {
+		e.Border(p.BorderWidth, Color(p.Border))
+	}
+	e.Background(e.AnimateColor("background", Color(bg), Tween(p.Transition))).TextColor(Color(fg))
+	if e.FocusVisible() && !disabled {
+		Shadow(e, p.FocusShadow)
+	}
+	if props.Kbd != "" {
+		e.Description(label + " " + props.Kbd)
+	}
+	e.Children(func() {
+		if props.Loading {
+			Spinner(c, SpinnerProps{Size: SizeSm, Tone: buttonContentTone(props.Variant), Label: "正在处理", Motion: props.Motion}).PassThrough()
+		} else if props.Icon != "" {
+			ui.Icon(c, IconSVG(props.Icon)).Size(t.C.IconButton.IconSize, t.C.IconButton.IconSize).PassThrough()
+		} else if props.Leading != nil {
+			ui.Icon(c, props.Leading).Size(t.C.IconButton.IconSize, t.C.IconButton.IconSize).PassThrough()
+		}
+		if label != "" {
+			ui.Text(c, label).SingleLine().PassThrough()
+		}
+		if props.Kbd != "" {
+			tone := KbdKeycap
+			if props.Variant == ButtonPrimary || props.Variant == ButtonDanger {
+				tone = KbdOnAccent
+			}
+			Kbd(c, props.Kbd, KbdProps{Tone: tone}).MarginStart(p.KbdGap - p.Gap)
+		}
+	})
+	return StyleDisabled(e, disabled)
+}
+
+func buttonContentTone(variant ButtonVariant) Tone {
+	if variant == ButtonPrimary || variant == ButtonDanger {
+		return ToneOnAccent
+	}
+	if variant == ButtonDangerPlain {
+		return ToneDanger
+	}
+	return ToneNeutral
+}
+
+func StyleDisabled(e ui.Element, disabled bool) ui.Element {
+	e.Disabled(false)
+	if disabled && !e.IsDisabled() {
+		e.Disabled(true)
+		// MyGo v0.7.3 already paints Disabled at 0.5; compensate to the token's total.
+		// A disabled ancestor owns the fade for its entire subtree.
+		e.Opacity(theme.Current().Opacity.Disabled / 0.5)
+	}
+	return e
 }
 
 func StyleIconButton(e ui.Element, t *theme.Theme) ui.Element {
+	return styleIconButton(e, t, IconPlain, false)
+}
+
+func styleIconButton(e ui.Element, t *theme.Theme, variant IconVariant, on bool) ui.Element {
 	p := t.C.IconButton
-	bg := ui.Transparent
-	switch {
-	case e.Pressed():
-		bg = Color(p.BgPressed)
-	case e.Hovered():
-		bg = Color(p.BgHover)
+	bg, ink := ui.Transparent, Color(p.Icon)
+	if variant == IconFilled {
+		bg = Color(p.BgFilled)
 	}
-	return e.Size(p.Size, p.Size).Radius(p.Radius).TextColor(Color(p.Icon)).
+	if on {
+		bg, ink = Color(p.BgOn), Color(p.IconOn)
+	}
+	if !e.IsDisabled() {
+		switch {
+		case e.Pressed():
+			bg = Color(p.BgPressed)
+		case e.Hovered():
+			if !on {
+				bg = Color(p.BgHover)
+				ink = Color(p.IconHover)
+				if variant == IconOnWindow {
+					bg = Color(t.Color.State.OnWindow)
+				}
+			}
+		}
+	}
+	e.Size(p.Size, p.Size).Radius(p.Radius).FocusRing(false).
+		TextColor(e.AnimateColor("icon", ink, Tween(p.Transition))).
 		Background(e.AnimateColor("background", bg, Tween(p.Transition)))
+	if e.FocusVisible() && !e.IsDisabled() {
+		Shadow(e, p.FocusShadow)
+	}
+	return e
 }
 
 func StyleSegment(e ui.Element, p theme.SegmentedTokens, selected bool) ui.Element {

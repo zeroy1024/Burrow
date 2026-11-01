@@ -45,7 +45,7 @@ func (a *app) shortcutBinding(id string) string {
 func (a *app) shortcutSettings(c *ui.Context) {
 	t := theme.Current()
 	ui.Row(c).FillWidth().AlignItems(ui.Center).Children(func() {
-		ui.Text(c, localize(c, "快捷键")).FontSize(t.C.Settings.GroupTitleSize).FontWeight(t.C.Settings.GroupTitleWeight).Grow(1)
+		uikit.Text(c, localize(c, "快捷键"), uikit.TextProps{Style: uikit.TextSmall}).FontWeight(t.C.Settings.GroupTitleWeight).Grow(1)
 		uikit.Button(c, localize(c, "全部恢复默认"), uikit.ButtonProps{}).OnClick(func() {
 			a.prefs.Keymap = map[string]string{}
 			a.settingsUI.recording = ""
@@ -59,12 +59,12 @@ func (a *app) shortcutSettings(c *ui.Context) {
 			actions = append(actions, action)
 		}
 	}
-	a.settingsUI.shortcutList.Key = func(row int) any { return actions[row].id }
-	uikit.ShortcutTable(c, &a.settingsUI.shortcutList, localize(c, "快捷键"), localize(c, "操作"), localize(c, "快捷键"), len(actions), func(row, col int) {
+	actionKey := func(row int) any { return actions[row].id }
+	uikit.ShortcutTable(c, &a.settingsUI.shortcutTable, localize(c, "快捷键"), localize(c, "操作"), localize(c, "快捷键"), len(actions), actionKey, func(row, col int) {
 		action := actions[row]
 		switch col {
 		case 0:
-			ui.Text(c, localize(c, action.label)).FontSize(t.Font.Size.Body)
+			uikit.Text(c, localize(c, action.label), uikit.TextProps{})
 		case 1:
 			binding := a.shortcutBinding(action.id)
 			label := shortcutDisplay(binding)
@@ -75,7 +75,13 @@ func (a *app) shortcutSettings(c *ui.Context) {
 			if recording {
 				label = "按下新的快捷键…"
 			}
-			item := uikit.Button(c.Key(action.id), localize(c, label), uikit.ButtonProps{}).Font(strings.Join(t.Font.Family.Mono, ", ")).Label(localize(c, action.label) + " " + localize(c, "快捷键")).
+			buttonLabel := localize(c, label)
+			props := uikit.ButtonProps{}
+			if binding != "" && !recording {
+				props.Kbd = label
+				buttonLabel = ""
+			}
+			item := uikit.Button(c.Key(action.id), buttonLabel, props).Font(strings.Join(t.Font.Family.Mono, ", ")).Label(localize(c, action.label) + " " + localize(c, "快捷键")).
 				OnClick(func() {
 					a.settingsUI.recording = action.id
 					a.settingsUI.pendingBinding = ""
@@ -112,7 +118,7 @@ func (a *app) shortcutSettings(c *ui.Context) {
 			}
 			if recording && a.settingsUI.conflictAction != "" {
 				index := slices.IndexFunc(defaultShortcutActions, func(v shortcutAction) bool { return v.id == a.settingsUI.conflictAction })
-				ui.Text(c, localize(c, fmt.Sprintf(localize(c, "与「%s」冲突"), localize(c, defaultShortcutActions[index].label)))).FontSize(t.Font.Size.Footnote).TextColor(uikit.Color(t.Color.Danger.Text))
+				uikit.Text(c, localize(c, fmt.Sprintf(localize(c, "与「%s」冲突"), localize(c, defaultShortcutActions[index].label))), uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneDanger})
 				uikit.Button(c, localize(c, "替换"), uikit.ButtonProps{}).OnClick(func() {
 					a.prefs.Keymap[a.settingsUI.conflictAction] = ""
 					a.storeShortcut(action.id, a.settingsUI.pendingBinding)

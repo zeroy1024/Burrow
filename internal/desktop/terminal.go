@@ -6,7 +6,6 @@ import (
 	"slices"
 	"strings"
 
-	"sshdesk/internal/termtheme"
 	"sshdesk/internal/theme"
 	"sshdesk/internal/uikit"
 
@@ -134,7 +133,8 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 	t := theme.Current()
 	s := a.sessionScheme(placement.session)
 	prefs := a.terminal.prefs
-	terminalBackground := termtheme.TerminalBackground(s, t.C.Pane.Bg, prefs.Background)
+	colors := uikit.ResolveTerminalColors(s, prefs.Background)
+	terminalBackground := colors.Background
 	background := uikit.Color(terminalBackground)
 	surface := terminalSurface(terminalBackground)
 	p, f, status := surface.C.Pane, surface.C.PaneFocus, surface.C.StatusBar
@@ -149,7 +149,10 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 		topPadding += p.HeaderHeight
 	}
 	// Only the inner card clips. Its wrapper owns the focus border and overlay hairline.
-	pane := uikit.Pane(c, fmt.Sprintf("pane-wrap-%d", session.id), h.name+" 演示终端", rect, surface).Bind(&session.frame)
+	pane := uikit.Pane(c, uikit.PaneProps{
+		Key: fmt.Sprintf("pane-wrap-%d", session.id), Label: h.name + " 演示终端", Surface: surface,
+		Focused: tab.focused == session, Multiple: multiple, Lifted: a.lifted(session),
+	}).Absolute().Left(rect.X).Top(rect.Y).Size(rect.W, rect.H).Bind(&session.frame)
 	a.paneMotion(c, pane, tab, session)
 	_, catalogActive, _ := a.catalogHostTransfer()
 	frozen := !session.revealing && (a.drag != nil || catalogActive || a.resizing != nil ||
@@ -180,9 +183,10 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 	appearance := uikit.PaneVisualStyle(pane, focused, hovered, multiple, surface)
 	var card, hairline ui.Element
 	pane.Children(func() {
-		card = uikit.PaneCard(c, surface, background, t.C.Pane.Radius)
+		card = uikit.TerminalSurface(c, s, prefs.Background, func() {})
+		uikit.StylePaneCard(card, surface, background, t.C.Pane.Radius)
 		card.Children(func() {
-			// Move the native thumb outside the card's clip; the fading thumb is drawn below.
+			// Scrollbars decorates this same scroll node without replacing its handle.
 			output := ui.Scroll(c.Key("output")).Fill().MinWidth(0).MinHeight(0).
 				Bind(&session.focus).Focusable().FocusRing(false).
 				TrackScroll(&scroll.offset).Padding(
@@ -190,14 +194,9 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 				p.ContentSide,
 				bottomPadding,
 				p.ContentSide,
-			).ScrollbarInsets(
-				p.HeaderHeight,
-				-t.C.Scrollbar.TrackWidth,
-				status.HeightPane,
-				0,
 			).Font(strings.Join(prefs.FontFamily, ", ")).FontSize(prefs.FontSize).
-				LetterSpacing(prefs.Tracking).TextColor(uikit.Color(s.Foreground)).
-				Opacity(appearance.Opacity).Cache().HandleInput(scroll.input).
+				LetterSpacing(prefs.Tracking).TextColor(uikit.Color(colors.Foreground)).SelectionColor(uikit.Color(colors.Selection)).
+				Opacity(appearance.Opacity).Cache().
 				OnClick(func() { a.focusSession(tab, session) })
 			if appearance.Saturation != 1 {
 				output.Effect(terminalSaturation.Effect(shader.Options{
@@ -211,22 +210,31 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 				a.terminalScrollEdge(c, p.HeaderHeight, false, background)
 			}
 			a.terminalScrollEdge(c, status.HeightPane, true, background)
-			terminalScrollbar(c, pane, scroll, terminalBackground)
+			terminalScrollbar(c, card, output, scroll, terminalBackground)
 			var header ui.Element
 			if multiple {
-				header = uikit.PaneHeader(c, surface)
+				// A shared drag ancestor lets the title and bell keep their own hover targets.
+				header = uikit.PaneHeader(c, uikit.HeaderProps{Key: "identity", Density: uikit.DensityCompact, Surface: surface}).Root.
+					Absolute().Top(0).Left(0).Padding(0, 0, 0, p.HeaderPaddingLeft).Label("拖动窗格 " + h.name).
+					OnClick(func() { a.focusSession(tab, session) })
+				a.paneDragHandle(c, header, paneTransfer{tab: tab, session: session})
 				header.Children(func() {
-					number := slices.Index(tab.root.sessions(), session) + 1
-					uikit.PaneShortcut(c, fmt.Sprintf("⌘%d", number), focused, surface)
-					uikit.ConnectionDot(c, connectionIndicatorState(session.state), t.Size.Dot)
-					uikit.Tip(c, uikit.PaneTitle(c, h.name, appearance, surface), fmt.Sprintf("%s · %s@%s:%d", h.name, h.user, h.address, h.port))
-					uikit.PaneLogin(c, fmt.Sprintf("%s@%s:%d", h.user, h.address, h.port), appearance, surface)
-					if !focused {
-						terminalActivity(c, session, surface)
+					content := ui.Row(c).Key("drag-header-content").Grow(1).MinWidth(0).
+						FillHeight().AlignItems(ui.Center).Gap(surface.C.PaneHeader.Gap)
+					if header.Dragging() {
+						// The SDK redraws the drag source with root opacity ignored.
+						// Hide its content instead, leaving our one card preview visible.
+						content.Opacity(0)
 					}
-					handle := ui.Box(c).Key("pane-drag-handle").Absolute().Top(0).Bottom(0).Left(0).Right(0).
-						Label("拖动窗格 " + h.name).OnClick(func() { a.focusSession(tab, session) })
-					a.paneDragHandle(c, handle, paneTransfer{tab: tab, session: session})
+					content.Children(func() {
+						number := slices.Index(tab.root.sessions(), session) + 1
+						uikit.PaneBadge(c, number, focused, surface)
+						uikit.Tip(c, uikit.PaneTitle(c, h.name, appearance, surface), fmt.Sprintf("%s · %s@%s:%d", h.name, h.user, h.address, h.port))
+						uikit.PaneLogin(c, fmt.Sprintf("%s@%s:%d", h.user, h.address, h.port), appearance, surface)
+						if !focused {
+							terminalActivity(c, session, surface)
+						}
+					})
 				})
 			}
 			actionsWidth := p.ActionWidth
@@ -244,8 +252,14 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 				if !multiple {
 					uikit.PaneActionBackdrop(c, actionsWidth, a.glassRadius(c, p.ActionBlur), background, surface)
 				}
-				split := uikit.PaneIconButton(c, "分栏 "+h.name, sidebarIcon, surface).Absolute().Top(0).Left(0).Size(p.ActionWidth, p.ActionHeight).
-					Disabled(count >= maxTerminalPanes || session.closing || !canSplit(session.layoutRect, dropRight) && !canSplit(session.layoutRect, dropBottom))
+				splitShortcut := ""
+				if focused {
+					splitShortcut = shortcutDisplay(a.shortcutBinding("pane.split"))
+				}
+				split := uikit.PaneIconButton(c, "分栏 "+h.name, sidebarIcon, surface, uikit.PaneIconButtonProps{
+					Shortcut: splitShortcut,
+					Disabled: count >= maxTerminalPanes || session.closing || !canSplit(session.layoutRect, dropRight) && !canSplit(session.layoutRect, dropBottom),
+				}).Absolute().Top(0).Left(0).Size(p.ActionWidth, p.ActionHeight)
 				keyboardFocus = split.FocusVisible()
 				split.OnClick(func() { a.splitSession(session, stacked) })
 				if multiple {
@@ -268,9 +282,14 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 			if multiple {
 				header.Right(p.HeaderPaddingRight + (actionsWidth+t.Space.N10)*actionVisibility)
 			}
-			uikit.PaneFooter(c, appearance.FooterOpacity, surface).Children(func() {
-				uikit.ConnectionBadge(c, connectionIndicatorState(session.state), t.Size.DotSm, surface)
-				uikit.Latency(c, h.latency, session.state == connected, surface)
+			uikit.PaneFooter(c, uikit.FooterProps{Key: "status", Surface: surface}).Absolute().Bottom(0).Left(0).Right(0).
+				Opacity(appearance.FooterOpacity).PassThrough().Children(func() {
+				uikit.ConnectionBadge(c, connectionIndicatorState(session.state), surface)
+				latency := h.latency
+				if session.state != connected {
+					latency = -1
+				}
+				uikit.Latency(c, latency, uikit.LatencyProps{Surface: surface, Prefix: "延迟"})
 				ui.Spacer(c)
 				ui.Text(c, a.paneSizeLabel(session)).FontSize(status.FontSize).SingleLine()
 			})
@@ -281,9 +300,7 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 	if a.lifted(session) {
 		card.Opacity(0)
 		hairline.Opacity(0)
-		a.dragPlaceholder(pane)
-	} else {
-		paneFocusShadows(pane, focused, multiple, surface)
+		uikit.StylePanePlaceholder(pane)
 	}
 	a.paneDrop(
 		c,
@@ -295,7 +312,11 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 }
 
 func (a *app) terminalScrollEdge(c *ui.Context, barHeight float32, bottom bool, background ui.Color) {
-	uikit.ScrollFade(c, uikit.ScrollFadeProps{
-		Height: barHeight, Bottom: bottom, Background: background, MaskTint: uikit.Color(theme.Current().C.FadeBar.Tint), Translucent: a.translucencyEnabled(c),
+	edge := uikit.EdgeTop
+	if bottom {
+		edge = uikit.EdgeBottom
+	}
+	uikit.ScrollFade(c, edge, uikit.ScrollFadeProps{
+		Height: barHeight, Background: background, MaskTint: uikit.Color(theme.Current().C.FadeBar.Tint), Translucent: a.translucencyEnabled(c),
 	})
 }

@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"sshdesk/internal/termtheme"
 	"sshdesk/internal/theme"
 
 	"github.com/egoist/mygo/ui"
@@ -203,6 +204,83 @@ func (a *app) terminalLines(c *ui.Context, session *remoteSession, focused bool)
 				ui.RichText(c, terminalSpans(prompt, scheme, prefs, selection.Start, selection.End)...)
 			})
 			a.terminalCursor(c, session, focused, " ")
+		})
+	})
+}
+
+type terminalDragViewport struct {
+	Width, Height, ScrollY float32
+}
+
+func terminalDragViewportFor(session *remoteSession) terminalDragViewport {
+	return terminalDragViewport{
+		Width: session.contentWidth, Height: session.contentHeight,
+		ScrollY: min(session.scroll.offset.Y, session.scroll.offset.MaxY),
+	}
+}
+
+func (a *app) terminalDragContents(
+	c *ui.Context,
+	session *remoteSession,
+	viewport terminalDragViewport,
+	width, height float32,
+) {
+	t := theme.Current()
+	prefs, scheme := a.terminal.prefs, a.sessionScheme(session)
+	colors := uikit.ResolveTerminalColors(scheme, prefs.Background)
+	sourceWidth := viewport.Width
+	sourceHeight := viewport.Height - t.C.Pane.HeaderHeight - t.C.StatusBar.HeightPane
+	scale := min(width/sourceWidth, height/sourceHeight)
+	ui.Box(c).Size(width, height).Clip().PassThrough().Children(func() {
+		ui.Box(c).Absolute().Left(0).Top(0).Size(sourceWidth, sourceHeight).
+			Scale(scale, scale).TransformOrigin(0, 0).Clip().PassThrough().
+			Font(strings.Join(prefs.FontFamily, ", ")).FontSize(prefs.FontSize).
+			LetterSpacing(prefs.Tracking).TextColor(uikit.Color(colors.Foreground)).Children(func() {
+			ui.Column(c).Absolute().Left(t.C.Pane.ContentSide).Top(t.Space.N4 - viewport.ScrollY).
+				Width(sourceWidth - 2*t.C.Pane.ContentSide).MinWidth(0).Shrink(0).PassThrough().Children(func() {
+				lineView := func(line terminalLine) {
+					paragraph := ui.RichText(c).FillWidth().MinWidth(0).
+						FixedLineHeight(prefs.LineHeight).Shrink(0).PassThrough()
+					paragraph.Children(func() {
+						ui.RichText(c, terminalSpans(line, scheme, prefs, 0, 0)...).PassThrough()
+					})
+				}
+				for _, line := range session.transcript {
+					lineView(line)
+				}
+				for _, line := range session.output {
+					lineView(line)
+				}
+				if session.state != connected {
+					return
+				}
+				ui.Row(c).FillWidth().MinWidth(0).AlignItems(ui.End).PassThrough().Children(func() {
+					h := a.hosts[session.host]
+					prompt := terminalLine{
+						{Text: h.user + "@" + h.name, Foreground: terminalIndexed(2), Bold: true},
+						{Text: ":/srv/app", Foreground: terminalIndexed(4), Bold: true},
+						{Text: "# "},
+					}
+					ui.RichText(c).MinWidth(0).Shrink(1).FixedLineHeight(prefs.LineHeight).PassThrough().
+						Children(func() {
+							ui.RichText(c, terminalSpans(prompt, scheme, prefs, 0, 0)...).PassThrough()
+						})
+					cursorHeight := min(prefs.LineHeight, prefs.FontSize+termtheme.CursorHeightPadding)
+					ui.Box(c).Size(a.cellWidth, cursorHeight).Shrink(0).Radius(termtheme.CursorRadius).
+						Margin(0, 0, termtheme.CursorBottomInset, 0).PassThrough().Children(func() {
+						mark := ui.Box(c).Absolute().Left(0).Bottom(0).
+							Background(uikit.Color(scheme.Cursor)).PassThrough()
+						switch prefs.CursorShape {
+						case termtheme.CursorBar:
+							mark.Size(termtheme.CursorBarWidth, cursorHeight)
+						case termtheme.CursorUnderline:
+							mark.Size(a.cellWidth, termtheme.CursorUnderlineSize)
+						default:
+							mark.Size(a.cellWidth, cursorHeight)
+						}
+					})
+				})
+			})
 		})
 	})
 }

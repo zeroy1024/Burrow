@@ -5,9 +5,22 @@ import (
 	"sshdesk/internal/theme"
 )
 
-func Card(c *ui.Context) ui.Element {
+type CardProps struct {
+	Padding float32
+	Clip    bool
+}
+
+func Card(c *ui.Context, options ...CardProps) ui.Element {
 	p := theme.Current().C.Card
-	return Shadow(ui.Column(c).Radius(p.Radius).Background(Color(p.Bg)), p.Shadow).Clip()
+	props := CardProps{Clip: true}
+	if len(options) != 0 {
+		props = options[0]
+	}
+	card := Shadow(ui.Column(c).Radius(p.Radius).Background(Color(p.Bg)).Padding(props.Padding), p.Shadow)
+	if props.Clip {
+		card.Clip()
+	}
+	return card
 }
 
 func Workspace(c *ui.Context, key any) ui.Element {
@@ -25,14 +38,19 @@ func SidebarDivider(c *ui.Context, label string, left, shown float32) ui.Element
 }
 
 func StyleSidebarDivider(c *ui.Context, e ui.Element, visible float32, dragging bool) {
+	e.Children(func() { SplitterHandle(c, e, visible, dragging, false) })
+}
+
+func SplitterHandle(c *ui.Context, owner ui.Element, visible float32, dragging, horizontal bool) ui.Element {
 	t := theme.Current()
 	ink := Color(t.C.Desktop.DividerHandleColor)
 	if dragging {
 		ink = Color(t.C.DropIndicator.LineColor)
 	}
-	e.Children(func() {
-		ui.Box(c).Size(t.C.Desktop.DividerHandleWidth, t.C.Desktop.DividerHandleHeight).
-			Radius(t.C.Desktop.DividerHandleRadius).Background(ink).PassThrough().
-			Opacity(Visual(e, "handle", visible, t.C.Desktop.DividerFadeDuration))
-	})
+	width, height := t.C.Desktop.DividerHandleWidth, t.C.Desktop.DividerHandleHeight
+	if horizontal {
+		width, height = height, width
+	}
+	return ui.Box(c).Size(width, height).Radius(t.C.Desktop.DividerHandleRadius).Background(ink).PassThrough().
+		Opacity(Visual(owner, "handle", visible, t.C.Desktop.DividerFadeDuration))
 }

@@ -2,19 +2,22 @@
 
 ## 当前接入规则
 
-`internal/theme/tokens_src.py` 是 App token 的唯一来源，生成 `theme.go`、`tokens.json`、`tokens.md`。公共外观位于 `internal/uikit`，当前页面的表单、导航、工作区、数据和领域反馈均已接入；`uiadapt.go` 只保留应用搜索策略与原生窗口格式转换。终端正文、ANSI 配色、字体及光标参数由 `internal/termtheme` 管理。终端周边 UI 按实际终端背景选择局部明暗 token，纯策略位于 `uikit.TerminalSurface`，缓存与强调色失效仍属应用，详见 [终端配色说明](terminal-themes.md)。
+`internal/theme/tokens_src.py` 是令牌唯一来源，生成 `theme.go`、`tokens.json`、`tokens.md`。本轮完整组件规格、实际消费者和明确差异以 [UIKit 覆盖清单](uikit-coverage.md) 为准；下面历史记录不作为当前实现或本轮视觉验收证据。
 
-- 页面使用 `uikit.Button/Input/Modal`，原 `button/primaryButton/textInput/modal` 等私有纯转发已经清除。这些入口保留 MyGo Base API 的输入、焦点和关闭行为，尺寸、颜色、描边、圆角、遮罩和阴影读取对应 component token。具体范围和原生业务宿主例外见 [UIKit 迁移说明](uikit.md) 与 [覆盖清单](uikit-coverage.md)。
-- 所有应用主动创建的文字提示通过 `uikit.Tip/StyleTooltip/TestResultTooltip` 共用 `C.Tooltip`。导航提示仍位于按钮右侧，其余提示位于上方并由 MyGo 处理边缘避让。
-- 普通线性图标在初始化解析 SVG 时读取 `C.IconButton.Stroke`，浅／深主题共用这一几何参数；修改线宽后需重启应用。OS 品牌资源保留原有描边和形状。
-- `C.PaneFocus.RingFocused` 本身只包含单层蓝色描边，渲染端完整消费，不再截取阴影数组。
-- `uikit.Tween` 明确使用 `motion.easing.out`，按钮、列表、分段控件和两种会话标签的状态过渡使用各自映射到 `motion.duration.focus` 的 160ms token。拿起保持 120ms，让位、落位、取消继续使用现有弹簧。
-- 搜索几何变化使用 `C.Search.Transition/Easing`；分组数字滚动显式使用 `C.GroupHeader.CountMotion`（350ms 弹簧）。有变化文案的切换按钮采用固定 key，避免文案变化重建动画状态。
-- 减少动态效果时由 MyGo 禁用位移、缩放和旋转；颜色／透明度使用 `AnimateColor` 通道保留过渡。文件搜索、FTP 本地面板和监控面板将几何与透明度分开处理。
-- Shell 拖动预览使用 `C.DragGhost` 的 220×140px 静态骨架卡片，按实际终端背景选择明暗颜色；`C.PaneReveal` 定义落位后的 8px → 0、220ms 模糊过渡。落位窗格直接采用最终尺寸，首帧绘制完成后启动渐清晰，不等待模拟数据或网络输出，不再创建终端快照和放大飞入动画。减少动态效果时保留这段局部视觉过渡。
-- SSH 和文件会话共用 `uikit.TabConnectionIndicator` 的状态槽与旋转参数。SSH 演示连接的阶段间隔由 `C.ConnectionIndicator.StageDuration`（300ms）提供，连接日志沿用终端 ANSI 配色与字体；标签、Shell 状态栏和监控等待态读取同一会话状态。
-
-系统菜单、文件选择器保留系统外观。设置中的 Select、Switch 和快捷键表保留 MyGo 控件语义及 `uikit.UITheme` 映射，数字输入组合原文本控件与 Stepper；内部输入与框架自带提示遵循 MyGo。当前页面没有独立 Checkbox/泛型 Radio 调用。原生手势阈值／长按等待、Tooltip 显示等待仍由框架管理。未使用或已废弃的设计 token 不代表当前界面已实现对应功能。
+- 依赖为 `desktop → uikit → theme / termtheme / MyGo`。UIKit只读取主题及显式传入的终端scheme/展示数据，不访问配置、文件、网络或钥匙串，不接管后台任务。
+- 根视图每次通过 `uikit.Install` 设置 `UITheme`；订阅仍只在应用生命周期注册。`WithAccent` 同时重建hover/pressed色和焦点阴影，基础控件/原生宿主共用语义颜色。
+- Text/Icon、Button/IconButton、Badge/Count/StatusPill、Spinner/Divider/Kbd及完整表单均有实际规格实现。不是将原生函数换名；未使用的公共变体也保留真实渲染/输入能力。
+- 命名图标按名称与描边宽度缓存不可变几何，颜色每帧读取；应用SVG和OS品牌保留素材入口，品牌色不是控件状态色。
+- 卡片按原始UIKit规格使用0.5pt内描边；终端外框仍保留原PaneFocus策略，不把按钮焦点光晕强套给终端窗格。
+- `MotionMode`区分跟随系统、强制减少和允许。应用解析原`system/on/off`后传入；减少动态时禁用位移/缩放/旋转，颜色和透明度继续通过`AnimateColor`。
+- Tab连接中在减少动态时保持静态3/4环，这是用户已确认的原稿文字/设计图冲突处理。通用Spinner周期、Progress不定进度均读token；不定进度减少动态时显示静态条纹。
+- Kbd四种Tone用于搜索、提交按钮、设置快捷键、Popover菜单及Tooltip。快捷键只作为提示/描述，不借`Element.Shortcut`显示元数据而误消费事件；实际绑定由页面保留。
+- SSH/文件目录条目的右键和更多通过RowMenuOn共用同一Popover及MenuEntry，包含图标/Kbd/危险项等；右键使用鼠标位置锚点，更多使用按钮锚点。目录保留“连接、编辑、复制、删除”，其他既有系统菜单沿用原实现。
+- Tooltip使用SDK TooltipBase的计时/定位/避让与语义宿主，内容组合Text/Kbd；Toast使用SDK队列、动作与悬停暂停，不自建消息生命周期。
+- Switch/Checkbox/Radio通过公开Base和C.Switch/C.Check绘制；Select为泛型统一弹层，禁用项不进入SDK可选序列。数字输入继续文本编辑+Stepper，端口为字符串草稿，ENV明确保留逗号。
+- DataTable使用真实List.Rows虚拟化；唯一path选择、排序、列宽、键盘与源保活在共享UI适配，应用保留目录/动作。公开表格角色、列名值和排序描述已接入；固定SDK的原生Grid关联限制已获用户接受并记录。
+- TerminalSurface接收每会话scheme和BackgroundSource；TerminalChrome只负责周边UI对比度，缓存/强调色失效仍由应用持有。终端页头状态点按用户决定移除，页脚StatusPill共用session.state。
+- Settings关闭仍清理临时UI并复用稳定句柄。没有新增真实后端、永久测试、画廊、截图基线或CI，未升级依赖。
 
 ## 历史接入记录
 

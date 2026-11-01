@@ -19,35 +19,38 @@ import (
 )
 
 type hostDraft struct {
-	afterClose                                                                      func()
-	name, address, user, port, group, system                                        string
-	protocol, auth, keyID, password, passphrase                                     string
-	jumpID, keepalive, initCommand, termScheme                                      string
-	remoteDir, localDir, encoding, ftpMode, ftpTLS                                  string
-	env                                                                             []string
-	envInput, newGroup                                                              string
-	id                                                                              hostID
-	editing, deleting, files, portEdited                                            bool
-	passwordChanged, passphraseChanged, passwordSaved, showPassword, showPassphrase bool
-	advanced, entered, closing, selectedName, creatingGroup                         bool
-	closeStarted                                                                    time.Time
-	errors                                                                          map[string]string
-	focused                                                                         map[string]bool
-	handles                                                                         map[string]*ui.Handle
-	scroll                                                                          ui.ScrollState
-	advancedHeight                                                                  float32
-	testCancel                                                                      context.CancelFunc
-	testResults                                                                     <-chan connectionTestResult
-	testResult                                                                      *connectionTestResult
-	testVisible                                                                     bool
-	choosingDirectory                                                               bool
-	listedAgent                                                                     bool
-	agentCount                                                                      int
-	agentError                                                                      error
-	submitted                                                                       bool
-	saving                                                                          bool
-	agentResults                                                                    <-chan sessionAgentResult
-	generation                                                                      string
+	afterClose                                              func()
+	name, address, user, port, group, system                string
+	protocol, auth, keyID, password, passphrase             string
+	jumpID, keepalive, initCommand, termScheme              string
+	remoteDir, localDir, encoding, ftpMode, ftpTLS          string
+	env                                                     []string
+	envInput, newGroup                                      string
+	id                                                      hostID
+	editing, deleting, files, portEdited                    bool
+	passwordChanged, passphraseChanged, passwordSaved       bool
+	advanced, entered, closing, selectedName, creatingGroup bool
+	closeStarted                                            time.Time
+	errors                                                  map[string]string
+	focused                                                 map[string]bool
+	handles                                                 map[string]*ui.Handle
+	scroll                                                  ui.ScrollState
+	advancedHeight                                          float32
+	testCancel                                              context.CancelFunc
+	testResults                                             <-chan connectionTestResult
+	testResult                                              *connectionTestResult
+	testVisible                                             bool
+	choosingDirectory                                       bool
+	listedAgent                                             bool
+	agentCount                                              int
+	agentError                                              error
+	submitted                                               bool
+	saving                                                  bool
+	agentResults                                            <-chan sessionAgentResult
+	generation                                              string
+	initialValues                                           [20]string
+	initialEnv                                              []string
+	initialPortEdited                                       bool
 }
 
 type sessionAgentResult struct {
@@ -129,6 +132,18 @@ func (a *app) startEditHostDraft(id hostID) {
 func (d *hostDraft) initState() {
 	d.errors, d.focused, d.handles = map[string]string{}, map[string]bool{}, map[string]*ui.Handle{}
 	d.generation = newSessionID()
+	d.initialValues, d.initialEnv, d.initialPortEdited = d.inputValues(), slices.Clone(d.env), d.portEdited
+}
+
+func (d *hostDraft) inputValues() [20]string {
+	return [20]string{d.name, d.address, d.user, d.port, d.group, d.system,
+		d.protocol, d.auth, d.keyID, d.jumpID, d.keepalive, d.initCommand, d.termScheme,
+		d.remoteDir, d.localDir, d.encoding, d.ftpMode, d.ftpTLS, d.envInput, d.newGroup}
+}
+
+func (d *hostDraft) dirty() bool {
+	return d.inputValues() != d.initialValues || !slices.Equal(d.env, d.initialEnv) ||
+		d.portEdited != d.initialPortEdited || d.passwordChanged || d.passphraseChanged
 }
 
 func (d *hostDraft) defaultPort() int {
@@ -404,12 +419,12 @@ func (a *app) saveSessionDraft(c *ui.Context, d *hostDraft, connect bool) {
 	initializeSession(&h)
 	rollback, release, err := snapshotSessionSecrets(h, d.passwordChanged, d.passphraseChanged)
 	if err != nil {
-		uikit.Notify(c, "读取原有凭据失败："+err.Error())
+		uikit.Toast(c, uikit.ToastProps{Tone: uikit.ToneDanger, Title: "读取原有凭据失败", Detail: err.Error()})
 		return
 	}
 	defer release()
 	if err := a.storeSessionSecrets(&h, d.password, d.passwordChanged, d.passphrase, d.passphraseChanged); err != nil {
-		uikit.Notify(c, "保存凭据失败："+errors.Join(err, rollback()).Error())
+		uikit.Toast(c, uikit.ToastProps{Tone: uikit.ToneDanger, Title: "保存凭据失败", Detail: errors.Join(err, rollback()).Error()})
 		return
 	}
 	id := hostID(len(a.hosts))
@@ -439,7 +454,7 @@ func (a *app) saveSessionDraft(c *ui.Context, d *hostDraft, connect bool) {
 		}
 	})
 	if err != nil {
-		uikit.Notify(c, "保存会话失败："+errors.Join(err, rollback()).Error())
+		uikit.Toast(c, uikit.ToastProps{Tone: uikit.ToneDanger, Title: "保存会话失败", Detail: errors.Join(err, rollback()).Error()})
 		return
 	}
 	a.page().query = ""

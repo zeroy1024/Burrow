@@ -27,14 +27,23 @@ func SessionTabsScroll(c *ui.Context, scroll *ui.ScrollState) ui.Element {
 	if scroll != nil {
 		e.TrackScroll(scroll)
 	}
-	return e.ScrollbarInsets(0, 0, -theme.Current().Space.N12, 0)
+	// Tabs scroll by wheel/trackpad and programmatic reveal. Native thumbs
+	// paint outside the node's clip, so place them beyond the window.
+	width, height := c.Size()
+	return e.ScrollbarInsets(0, -width, -height, -width)
 }
 
 func SessionTabsRow(c *ui.Context) ui.Element {
-	return ui.Row(c).Gap(theme.Current().C.Titlebar.TabsGap).FillHeight()
+	return ui.Row(c).Gap(theme.Current().C.Titlebar.TabsGap).FillHeight().Role(ui.RoleTabList).FocusGroup(ui.Horizontal)
 }
 
 func TitleBarActions(c *ui.Context) ui.Element {
 	p := theme.Current().C.Titlebar
 	return ui.Row(c).Padding(0, p.ActionsPaddingRight).Gap(p.ActionsGap).Shrink(0)
+}
+
+func CountTabs(c *ui.Context, selected *int, items []SegItem) ui.Element {
+	// Segmented's Start alignment keeps form columns compact; these filters
+	// live in a horizontal header and must share its vertical center.
+	return Segmented(c, selected, items, SegmentedProps{Size: SizeSm}).AlignSelf(ui.Center)
 }

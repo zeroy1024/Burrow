@@ -31,10 +31,14 @@ func (a *app) currentFileSession() *fileSession {
 }
 
 func (a *app) activateFileTab(index int) {
+	a.selectFileTab(index)
+	a.focusWorkspace()
+}
+
+func (a *app) selectFileTab(index int) {
 	a.settingsUI.previousFocus = ui.Handle{}
 	a.closeSettings()
 	a.activeFile = index
-	a.focusWorkspace()
 }
 
 func (a *app) openCatalogHost(id hostID) {
@@ -47,12 +51,6 @@ func (a *app) openCatalogHost(id hostID) {
 
 func (a *app) openFileHost(id hostID) {
 	a.closeSettings()
-	for i, session := range a.fileSessions {
-		if session.host == id {
-			a.activateFileTab(i)
-			return
-		}
-	}
 	a.openNewFileHost(id)
 }
 
@@ -110,46 +108,49 @@ func (a *app) updateFileConnections(c *ui.Context) {
 
 func (a *app) fileTitleBar(c *ui.Context, shown float32) {
 	t := theme.Current()
-	uikit.TitleBar(c).Children(func() {
+	uikit.TitleBar(c).PaddingEnd(t.C.Window.Gutter).Children(func() {
 		uikit.TitleBarLeading(c, t.C.Rail.Width+a.page().sidebarWidth*shown).Children(func() {
 			label := "收起站点栏"
 			if a.page().sidebarCollapsed {
 				label = "展开站点栏"
 			}
-			uikit.IconButton(c, sidebarIcon, uikit.IconButtonProps{Key: "sidebar-toggle", Label: label}).
-				Disabled(a.activeSection() == sectionSettings).
+			uikit.IconButton(c, sidebarIcon, uikit.IconButtonProps{Key: "sidebar-toggle", Label: label, Variant: uikit.IconOnWindow, Disabled: a.activeSection() == sectionSettings}).
 				OnClick(func() { a.page().sidebarCollapsed = !a.page().sidebarCollapsed })
 		})
-		uikit.SessionTabsViewport(c).Children(func() {
-			uikit.SessionTabsScroll(c.Key("file-session-tabs"), nil).Children(func() {
-				uikit.SessionTabsRow(c).Children(func() {
-					var closing *fileSession
-					for index, session := range a.fileSessions {
-						if a.fileTabButton(c, index, session) {
-							closing = session
-						}
+		tabs := uikit.SessionTabs(c, nil, nil, uikit.SessionTabsProps{
+			Scroll: &a.fileTabScroll, ScrollKey: "file-session-tabs", Motion: uikit.MotionOverride(a.reduceMotion(c)),
+			BuildTabs: func(list ui.Element) ui.Element {
+				var closing *fileSession
+				for index, session := range a.fileSessions {
+					if a.fileTabButton(c, list, index, session) {
+						closing = session
 					}
-					uikit.IconButton(c, plusIcon, uikit.IconButtonProps{Label: "新建文件会话"}).Menu(func(m *ui.Menu) {
-						for _, group := range a.catalogGroups() {
-							m.Submenu(group.name, func(sub *ui.Menu) {
-								for _, id := range group.hosts {
-									if sub.Item(a.hosts[id].name).Chosen() {
-										a.openFileHost(id)
-									}
-								}
-							})
-						}
-					})
-					if closing != nil {
-						a.requestCloseFileTab(slices.Index(a.fileSessions, closing))
+				}
+				var menu []uikit.MenuEntry
+				for _, group := range a.catalogGroups() {
+					entry := uikit.MenuEntry{ID: fmt.Sprintf("group-%d", group.id), Label: group.name}
+					for _, id := range group.hosts {
+						entry.Children = append(entry.Children, uikit.MenuEntry{ID: fmt.Sprintf("host-%d", id), Label: a.hosts[id].name,
+							OnChoose: func() { a.openFileHost(id) }})
 					}
-				})
-			})
+					entry.Disabled = len(entry.Children) == 0
+					menu = append(menu, entry)
+				}
+				add := uikit.IconButton(c, plusIcon, uikit.IconButtonProps{Key: "新建文件会话", Label: "新建文件会话", Variant: uikit.IconOnWindow})
+				uikit.MenuOn(c, add, menu)
+				if closing != nil {
+					a.requestCloseFileTab(slices.Index(a.fileSessions, closing))
+				}
+				return add
+			},
 		})
+		if tabs.Select >= 0 {
+			a.selectFileTab(tabs.Select)
+		}
 	})
 }
 
-func (a *app) fileTabButton(c *ui.Context, index int, session *fileSession) bool {
+func (a *app) fileTabButton(c *ui.Context, list ui.Element, index int, session *fileSession) bool {
 	h := a.hosts[session.host]
 	selected := a.activeFile == index
 	hint := fmt.Sprintf("%s@%s:%d · 演示会话", h.user, h.address, h.port)
@@ -164,12 +165,17 @@ func (a *app) fileTabButton(c *ui.Context, index int, session *fileSession) bool
 	props := uikit.SessionTabProps{
 		Key: session, Title: h.name, Hint: hint, Selected: selected, Variant: uikit.SessionTabFiles,
 		State: connectionIndicatorState(session.state), CloseLabel: "关闭文件标签 " + h.name, CloseIcon: closeIcon,
+		ReduceMotion: a.reduceMotion(c),
 	}
 	button := uikit.SessionTab(c, props)
+	input := uikit.SessionTabInput(c, list, button, index, len(a.fileSessions))
+	if input.Select >= 0 {
+		a.selectFileTab(input.Select)
+	}
 	button.OnClick(func() {
 		a.activateFileTab(slices.Index(a.fileSessions, session))
 	})
-	closing := false
+	closing := input.Close
 	button.ContextMenu(func(m *ui.Menu) {
 		if m.Item("编辑会话…").Chosen() {
 			a.startEditHostDraft(session.host)
@@ -211,11 +217,15 @@ func connectionIndicatorState(state connectionState) uikit.ConnState {
 func (a *app) catalogHostIcon(c *ui.Context, id hostID) {
 	h := a.hosts[id]
 	if a.section == sectionFiles {
-		uikit.ProtocolIcon(c, h.protocol == "ftp", folderLockIcon, folderIcon)
+		protocol := uikit.ProtocolSFTP
+		if h.protocol == "ftp" {
+			protocol = uikit.ProtocolFTP
+		}
+		uikit.ProtocolIcon(c, protocol, uikit.SizeDefault)
 		return
 	}
 	style := systems[h.os]
-	uikit.OsLogo(c, style.icon, style.color)
+	uikit.OsLogo(c, style.name, uikit.SizeDefault)
 }
 
 func (a *app) deleteFileSite(id hostID) error {
@@ -293,32 +303,31 @@ func (a *app) deleteFileSite(id hostID) error {
 	}
 	if deleted.session.PasswordSaved {
 		if err := mygo.Secrets.Delete("session/" + deleted.session.ID + "/password"); err != nil {
-			a.files.notice = "会话已移除，但钥匙串清理失败：" + err.Error()
+			a.files.notice = &uikit.ToastProps{ID: "会话已移除，但钥匙串清理失败：" + err.Error(), Tone: uikit.ToneDanger, Title: "会话已移除，但钥匙串清理失败", Detail: err.Error()}
 		}
 	}
 	return nil
 }
 
-func (a *app) deleteSiteDialogContents(c *ui.Context) {
+func (a *app) deleteSiteDialogContents(c *ui.Context, parts uikit.ModalParts) bool {
 	t := theme.Current()
-	id := a.page().draft.id
-	h := a.hosts[id]
-	ui.Text(c, "删除会话「"+h.name+"」？").FontSize(t.C.Dialog.TitleSize).
-		FontWeight(t.Font.Weight.Semibold)
-	ui.Text(c, "将从当前页面的目录移除，并关闭此条目的会话。服务器文件不受影响。").
-		FontSize(t.Font.Size.Small).TextColor(uikit.Color(t.Color.Text.Secondary))
+	var confirm bool
+	uikit.Text(c, "将从当前页面的目录移除，并关闭此条目的会话。服务器文件不受影响。", uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneSecondary})
 	ui.Row(c).Justify(ui.End).Gap(t.Space.N8).Children(func() {
-		uikit.Button(c, "取消", uikit.ButtonProps{}).OnClick(func() { a.page().addHostOpen = false })
-		uikit.Button(c, "删除", uikit.ButtonProps{}).TextColor(uikit.Color(t.C.Tab.TextErrorSelected)).OnClick(func() {
-			if a.fileSiteBusy(id) {
-				uikit.Notify(c, "请先取消或清除该会话的传输任务")
-				return
-			}
-			if err := a.deleteFileSite(id); err != nil {
-				uikit.Notify(c, "删除会话失败："+err.Error())
-				return
-			}
-			a.page().addHostOpen = false
-		})
+		uikit.Button(c, "取消", uikit.ButtonProps{}).OnClick(parts.RequestDismiss)
+		confirm = uikit.Button(c, "删除", uikit.ButtonProps{Variant: uikit.ButtonDanger}).Clicked()
 	})
+	return confirm
+}
+
+func (a *app) confirmDeleteSite(c *ui.Context, id hostID) {
+	if a.fileSiteBusy(id) {
+		uikit.Notify(c, "请先取消或清除该会话的传输任务")
+		return
+	}
+	if err := a.deleteFileSite(id); err != nil {
+		uikit.Toast(c, uikit.ToastProps{ID: "删除会话失败：" + err.Error(), Tone: uikit.ToneDanger, Title: "删除会话失败", Detail: err.Error()})
+		return
+	}
+	a.page().addHostOpen = false
 }

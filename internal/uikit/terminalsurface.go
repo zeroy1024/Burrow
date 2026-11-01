@@ -4,13 +4,28 @@ import (
 	"image/color"
 	"math"
 
+	"github.com/egoist/mygo/ui"
 	"sshdesk/internal/termtheme"
 	"sshdesk/internal/theme"
 )
 
-// TerminalSurface adapts neutral chrome to the rendered terminal background.
+type TerminalColors struct{ Background, Foreground, Selection, SelectionForeground color.NRGBA }
+
+func ResolveTerminalColors(scheme *termtheme.Scheme, source termtheme.BackgroundSource) TerminalColors {
+	return TerminalColors{Background: termtheme.TerminalBackground(scheme, theme.Current().Color.Surface.Terminal, source),
+		Foreground: scheme.Foreground, Selection: scheme.SelectionBg, SelectionForeground: scheme.SelectionFg}
+}
+
+// TerminalSurface receives the session's scheme explicitly; another pane can
+// use a different scheme without installing a window-wide theme.
+func TerminalSurface(c *ui.Context, scheme *termtheme.Scheme, source termtheme.BackgroundSource, body func()) ui.Element {
+	colors := ResolveTerminalColors(scheme, source)
+	return ui.Box(c).Background(Color(colors.Background)).TextColor(Color(colors.Foreground)).SelectionColor(Color(colors.Selection)).Children(body)
+}
+
+// TerminalChrome adapts neutral chrome to the rendered terminal background.
 // The caller owns the base surfaces, accent updates and any caching.
-func TerminalSurface(background color.NRGBA, light, dark *theme.Theme) *theme.Theme {
+func TerminalChrome(background color.NRGBA, light, dark *theme.Theme) *theme.Theme {
 	lightText := light.C.PaneFocus.NameFocused
 	darkText := dark.C.PaneFocus.NameFocused
 	base := light
@@ -37,6 +52,7 @@ func TerminalSurface(background color.NRGBA, light, dark *theme.Theme) *theme.Th
 	surface.C.PaneFocus.CursorRingUnfocused = neutral(surface.C.PaneFocus.CursorRingUnfocused, 3)
 	surface.C.StatusBar.Text = neutral(surface.C.StatusBar.Text, 4.5)
 	surface.C.StatusBar.HostColor = primary
+	surface.C.Latency.Normal = neutral(surface.C.Latency.Normal, 4.5)
 	surface.C.IconButton.Icon = neutral(surface.C.IconButton.Icon, 3)
 	surface.C.IconButton.IconSubtle = neutral(surface.C.IconButton.IconSubtle, 3)
 	surface.C.IconButton.IconFaint = neutral(surface.C.IconButton.IconFaint, 3)
