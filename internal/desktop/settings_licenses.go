@@ -9,6 +9,7 @@ import (
 	"github.com/egoist/mygo/ui"
 	"sshdesk/internal/termtheme"
 	"sshdesk/internal/theme"
+	"sshdesk/internal/uikit"
 )
 
 // License texts are copied verbatim from the dependency versions in go.mod.
@@ -53,28 +54,27 @@ func (a *app) aboutSettings(c *ui.Context) {
 	t := theme.Current()
 	if a.settingMatches("关于", "版本 SSH Desk") {
 		ui.Column(c).FillWidth().AlignItems(ui.Center).Gap(t.Space.N8).Padding(t.Space.N16).Children(func() {
-			ui.Icon(c, terminalIcon).Size(t.C.Modal.IconTile*2, t.C.Modal.IconTile*2).TextColor(tokenColor(t.Color.Accent.Default))
+			ui.Icon(c, terminalIcon).Size(t.C.Modal.IconTile*2, t.C.Modal.IconTile*2).TextColor(uikit.Color(t.Color.Accent.Default))
 			ui.Text(c, localize(c, "SSH Desk")).FontSize(t.Font.Size.Title).FontWeight(t.Font.Weight.Semibold)
 			ui.Row(c).Gap(t.Space.N8).AlignItems(ui.Center).Children(func() {
-				ui.Text(c, localize(c, "0.1.0 · 原型构建")).FontSize(t.Font.Size.Body).TextColor(tokenColor(t.Color.Text.Secondary))
-				button(c, localize(c, "复制")).OnClick(func() {
+				ui.Text(c, localize(c, "0.1.0 · 原型构建")).FontSize(t.Font.Size.Body).TextColor(uikit.Color(t.Color.Text.Secondary))
+				uikit.Button(c, localize(c, "复制"), uikit.ButtonProps{}).OnClick(func() {
 					if err := mygo.Clipboard.Write(transfer.TextData("SSH Desk 0.1.0 (prototype)")); err != nil {
 						a.settingsUI.notice = err.Error()
 					}
 				})
 			})
-			ui.Text(c, localize(c, "当前为本地原型构建，尚未配置更新与反馈服务。")).FontSize(t.Font.Size.Footnote).TextColor(tokenColor(t.Color.Text.Tertiary))
+			ui.Text(c, localize(c, "当前为本地原型构建，尚未配置更新与反馈服务。")).FontSize(t.Font.Size.Footnote).TextColor(uikit.Color(t.Color.Text.Tertiary))
 		})
 	}
 	fields := make([]settingField, 0, len(dependencyNotices))
 	for index, notice := range dependencyNotices {
 		fields = append(fields, settingField{notice.name, notice.license, func() {
-			anchor := button(c, localize(c, "查看")).OnClick(func() { a.settingsUI.license = index + 1 })
+			anchor := uikit.Button(c, localize(c, "查看"), uikit.ButtonProps{}).OnClick(func() { a.settingsUI.license = index + 1 })
 			open := a.settingsUI.license == index+1
 			ui.PopoverBase(c, anchor, &open, func(panel ui.Element) {
-				panel.Width(t.C.Settings.ContentMax * 3 / 4).MaxHeight(t.C.Settings.ContentMax / 2).
-					Padding(t.Space.N14).Radius(t.Radius.Popover).Background(tokenColor(t.Color.Surface.Card))
-				applyShadow(panel, t.C.Menu.Shadow)
+				uikit.StylePopover(panel).Width(t.C.Settings.ContentMax * 3 / 4).MaxHeight(t.C.Settings.ContentMax / 2).
+					Padding(t.Space.N14)
 				panel.Children(func() {
 					ui.Text(c, localize(c, notice.name+" · "+notice.license)).FontSize(t.Font.Size.Body).FontWeight(t.Font.Weight.Semibold)
 					ui.Scroll(c).FillWidth().MaxHeight(t.C.Settings.ContentMax / 3).Children(func() {

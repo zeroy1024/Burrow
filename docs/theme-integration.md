@@ -2,9 +2,9 @@
 
 ## 当前接入规则
 
-`internal/theme/tokens_src.py` 是 App token 的唯一来源，生成 `theme.go`、`tokens.json`、`tokens.md`。SSH、文件传输和设置共用 `uiadapt.go` 的适配入口；终端正文、ANSI 配色、字体及光标参数由 `internal/termtheme` 管理。终端周边 UI 按实际终端背景选择局部明暗 token，详见 [终端配色说明](terminal-themes.md)。
+`internal/theme/tokens_src.py` 是 App token 的唯一来源，生成 `theme.go`、`tokens.json`、`tokens.md`。公共外观位于 `internal/uikit`；会话弹窗和设置页直接使用公共组件，SSH 和文件工作区仍经 `uiadapt.go` 转发。终端正文、ANSI 配色、字体及光标参数由 `internal/termtheme` 管理。终端周边 UI 按实际终端背景选择局部明暗 token，详见 [终端配色说明](terminal-themes.md)。
 
-- 普通按钮与主按钮使用 `button` / `primaryButton`，输入框使用 `textInput`，弹窗使用 `modal`。这些入口保留 MyGo Base API 的输入、焦点和关闭行为，尺寸、颜色、描边、圆角、遮罩和阴影读取对应 component token。
+- 已迁移页面使用 `uikit.Button/Input/Modal`，工作区的 `button/primaryButton/textInput/modal` 仅转发同一实现。这些入口保留 MyGo Base API 的输入、焦点和关闭行为，尺寸、颜色、描边、圆角、遮罩和阴影读取对应 component token。具体范围见 [UIKit 迁移说明](uikit.md)。
 - 所有应用主动创建的文字提示通过 `tooltip` / `styleTooltip` 共用 `C.Tooltip`。导航提示仍位于按钮右侧，其余提示位于上方并由 MyGo 处理边缘避让。
 - 普通线性图标在初始化解析 SVG 时读取 `C.IconButton.Stroke`，浅／深主题共用这一几何参数；修改线宽后需重启应用。OS 品牌资源保留原有描边和形状。
 - `C.PaneFocus.RingFocused` 本身只包含单层蓝色描边，渲染端完整消费，不再截取阴影数组。

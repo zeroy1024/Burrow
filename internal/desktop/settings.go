@@ -14,6 +14,7 @@ import (
 	"github.com/egoist/mygo/ui"
 	"sshdesk/internal/termtheme"
 	"sshdesk/internal/theme"
+	"sshdesk/internal/uikit"
 )
 
 type settingsCategory struct {
@@ -51,7 +52,6 @@ func (a *app) settingsPage(c *ui.Context) {
 
 func (a *app) settingsSidebar(c *ui.Context, shown float32) {
 	t := theme.Current()
-	p := t.C.Settings
 	ui.Column(c).Fill().Children(func() {
 		ui.Text(c, localize(c, "设置")).FontSize(t.C.Sider.TitleSize).FontWeight(t.C.Sider.TitleWeight).
 			Padding(t.C.Sider.HeaderPaddingTop, t.C.Sider.HeaderPaddingRight, t.C.Sider.HeaderPaddingBottom, t.C.Sider.HeaderPaddingLeft)
@@ -59,29 +59,16 @@ func (a *app) settingsSidebar(c *ui.Context, shown float32) {
 			localize(c, "搜索设置"), localize(c, "搜索设置"))
 		ui.Column(c).FillWidth().Padding(t.C.Catalog.ListPaddingY, t.C.Catalog.ListPaddingX).Gap(t.C.Catalog.RowGap).Children(func() {
 			for index, category := range settingsCategories {
-				item := ui.ButtonBase(c).Key(category.id).FillWidth().Height(p.NavItemHeight).
-					Padding(0, t.C.GroupHeader.PaddingX).Radius(p.NavItemRadius).Justify(ui.Start).AlignItems(ui.Center).
-					Gap(t.C.SiderItem.Gap).Label(localize(c, category.label)).Selected(a.settingsCategory == index)
-				bg, fg, icon := ui.Transparent, tokenColor(t.Color.Text.Primary), tokenColor(t.Color.Text.Secondary)
-				if a.settingsCategory == index {
-					bg, fg, icon = tokenColor(p.NavItemOn), tokenColor(p.NavTextOn), tokenColor(p.NavIconOn)
-				} else if item.Hovered() {
-					bg = tokenColor(t.Color.State.Hover)
-				}
-				item.Background(bg).TextColor(fg).
-					OnClick(func() { a.selectSettingsCategory(index) }).Children(func() {
-					ui.Box(c).Size(p.NavIconTile, p.NavIconTile).AlignItems(ui.Center).Justify(ui.Center).Children(func() {
-						ui.Icon(c, category.icon).Size(t.Size.Icon, t.Size.Icon).TextColor(icon).PassThrough()
-					})
-					ui.Text(c, localize(c, category.label)).FontSize(t.Font.Size.Body).FontWeight(t.Font.Weight.Medium).PassThrough()
-				})
+				uikit.SettingsNavItem(c, uikit.SettingsNavItemProps{
+					Key: category.id, Label: localize(c, category.label), Icon: category.icon, Selected: a.settingsCategory == index,
+				}).OnClick(func() { a.selectSettingsCategory(index) })
 			}
 		})
 		ui.Box(c).Grow(1)
-		ui.Row(c).FillWidth().BorderWidth(t.Size.Divider, 0, 0, 0).BorderColor(tokenColor(t.Color.Border.Subtle)).
+		ui.Row(c).FillWidth().BorderWidth(t.Size.Divider, 0, 0, 0).BorderColor(uikit.Color(t.Color.Border.Subtle)).
 			Padding(t.Space.N10, t.Space.N16).Gap(t.Space.N8).AlignItems(ui.Center).Children(func() {
-			ui.Icon(c, infoIcon).Size(t.Size.Icon, t.Size.Icon).TextColor(tokenColor(t.Color.Text.Tertiary))
-			ui.Text(c, localize(c, "SSH Desk 0.1.0 · 原型")).FontSize(t.Font.Size.Small).TextColor(tokenColor(t.Color.Text.Tertiary))
+			ui.Icon(c, infoIcon).Size(t.Size.Icon, t.Size.Icon).TextColor(uikit.Color(t.Color.Text.Tertiary))
+			ui.Text(c, localize(c, "SSH Desk 0.1.0 · 原型")).FontSize(t.Font.Size.Small).TextColor(uikit.Color(t.Color.Text.Tertiary))
 		})
 	})
 }
@@ -91,7 +78,7 @@ func (a *app) settings(c *ui.Context) {
 	p := t.C.Settings
 	workspaceCard(c).Key("settings-content").Grow(1).MinWidth(0).FillHeight().Children(func() {
 		ui.Row(c).FillWidth().Shrink(0).Padding(p.HeaderPaddingTop, p.HeaderPaddingRight, p.HeaderPaddingBottom, p.HeaderPaddingLeft).
-			BorderWidth(0, 0, t.Size.Divider, 0).BorderColor(tokenColor(t.Color.Border.Divider)).AlignItems(ui.Center).Children(func() {
+			BorderWidth(0, 0, t.Size.Divider, 0).BorderColor(uikit.Color(t.Color.Border.Divider)).AlignItems(ui.Center).Children(func() {
 			category := settingsCategories[a.settingsCategory]
 			ui.Column(c).Grow(1).Gap(t.Space.N4).Children(func() {
 				title, subtitle := category.label, category.subtitle
@@ -99,7 +86,7 @@ func (a *app) settings(c *ui.Context) {
 					title, subtitle = "搜索结果", "匹配设置名称与说明 · 修改立即生效"
 				}
 				ui.Text(c, localize(c, title)).FontSize(p.TitleSize).FontWeight(p.TitleWeight)
-				ui.Text(c, localize(c, subtitle)).FontSize(p.SubtitleSize).TextColor(tokenColor(p.Subtitle))
+				ui.Text(c, localize(c, subtitle)).FontSize(p.SubtitleSize).TextColor(uikit.Color(p.Subtitle))
 			})
 		})
 		ui.Box(c).Grow(1).MinHeight(0).FillWidth().Children(func() {
@@ -110,10 +97,10 @@ func (a *app) settings(c *ui.Context) {
 						Padding(p.ContentPaddingY, p.ContentPaddingX).Gap(p.GroupGap)
 					content.Children(func() {
 						if a.settingsUI.notice != "" {
-							ui.Text(c, localize(c, a.settingsUI.notice)).FontSize(t.Font.Size.Footnote).TextColor(tokenColor(t.Color.Danger.Text))
+							ui.Text(c, localize(c, a.settingsUI.notice)).FontSize(t.Font.Size.Footnote).TextColor(uikit.Color(t.Color.Danger.Text))
 						}
 						if a.terminalError != nil {
-							ui.Text(c, localize(c, a.terminalError.Error())).FontSize(t.Font.Size.Footnote).TextColor(tokenColor(t.Color.Danger.Text))
+							ui.Text(c, localize(c, a.terminalError.Error())).FontSize(t.Font.Size.Footnote).TextColor(uikit.Color(t.Color.Danger.Text))
 						}
 						if strings.TrimSpace(a.settingsUI.query) != "" {
 							count := 0
@@ -124,7 +111,7 @@ func (a *app) settings(c *ui.Context) {
 								}
 							}
 							if count == 0 {
-								ui.Text(c, localize(c, "没有匹配的设置")).FontSize(t.Font.Size.Body).TextColor(tokenColor(t.Color.Text.Tertiary))
+								ui.Text(c, localize(c, "没有匹配的设置")).FontSize(t.Font.Size.Body).TextColor(uikit.Color(t.Color.Text.Tertiary))
 							}
 						} else {
 							a.settingsCategoryContent(c, a.settingsCategory)
@@ -133,7 +120,7 @@ func (a *app) settings(c *ui.Context) {
 				})
 			})
 			ui.Box(c).Absolute().Left(0).Right(0).Bottom(0).Height(p.FadeHeight).PassThrough().
-				LinearGradient(ui.LinearGradient{Angle: 180, Stops: []ui.GradientStop{{Color: tokenColor(theme.WithAlpha(t.Color.Surface.Card, 0))}, {At: 1, Color: tokenColor(t.Color.Surface.Card)}}})
+				LinearGradient(ui.LinearGradient{Angle: 180, Stops: []ui.GradientStop{{Color: uikit.Color(theme.WithAlpha(t.Color.Surface.Card, 0))}, {At: 1, Color: uikit.Color(t.Color.Surface.Card)}}})
 		})
 	})
 }
@@ -194,15 +181,15 @@ func (a *app) settingsText(c *ui.Context, text string, size float32, col color.N
 	text = localize(c, text)
 	query := []rune(strings.ToLower(strings.TrimSpace(a.settingsUI.query)))
 	if len(query) == 0 {
-		ui.Text(c, localize(c, text)).FontSize(size).TextColor(tokenColor(col))
+		ui.Text(c, localize(c, text)).FontSize(size).TextColor(uikit.Color(col))
 		return
 	}
 	var spans []ui.Span
 	at := 0
 	for _, r := range text {
-		ink := tokenColor(col)
+		ink := uikit.Color(col)
 		if at < len(query) && unicode.ToLower(r) == query[at] {
-			ink = tokenColor(theme.Current().Color.Text.Accent)
+			ink = uikit.Color(theme.Current().Color.Text.Accent)
 			at++
 		}
 		spans = append(spans, ui.Span{Text: string(r), Color: ink})
@@ -222,49 +209,46 @@ func (a *app) settingsGroup(c *ui.Context, title, footnote string, fields []sett
 	}
 	t := theme.Current()
 	p := t.C.Settings
-	ui.Column(c).Key(title).FillWidth().Gap(p.GroupTitleGap).Children(func() {
-		ui.Text(c, localize(c, title)).FontSize(p.GroupTitleSize).FontWeight(p.GroupTitleWeight).TextColor(tokenColor(p.GroupTitle))
-		ui.Column(c).FillWidth().Radius(p.GroupRadius).Background(tokenColor(p.GroupBg)).Border(p.GroupBorderWidth, tokenColor(p.GroupBorder)).Children(func() {
-			for index, field := range visible {
-				if index > 0 {
-					ui.Row(c).FillWidth().Padding(0, 0, 0, p.RowDividerInset).Children(func() { ui.Box(c).FillWidth().Height(t.Size.Divider).Background(tokenColor(p.RowDivider)) })
-				}
-				ui.Row(c).Key(field.label).FillWidth().MinHeight(p.RowMinHeight).Padding(p.RowPaddingY, p.RowPaddingX).Gap(t.Space.N16).AlignItems(ui.Center).Children(func() {
-					ui.Column(c).Grow(1).MinWidth(0).Gap(t.Space.N4).Children(func() {
-						a.settingsText(c, field.label, p.RowLabelSize, p.RowLabel)
-						if field.description != "" {
-							a.settingsText(c, field.description, p.RowDescSize, p.RowDesc)
-						}
-					})
-					ui.Row(c).Gap(t.Space.N6).Shrink(0).AlignItems(ui.Center).Children(field.control)
-				})
+	uikit.SettingsGroup(c, uikit.SettingsGroupProps{Key: title, Title: localize(c, title), Footnote: localize(c, footnote)}, func() {
+		for index, field := range visible {
+			if index > 0 {
+				uikit.SettingsDivider(c)
 			}
-		})
-		if footnote != "" {
-			ui.Text(c, localize(c, footnote)).FontSize(p.GroupFootnoteSize).TextColor(tokenColor(p.GroupFootnote))
+			uikit.SettingsRow(c, uikit.SettingsRowProps{Key: field.label, Gap: t.Space.N16}).Children(func() {
+				uikit.SettingsTextColumn(c).Children(func() {
+					a.settingsText(c, field.label, p.RowLabelSize, p.RowLabel)
+					if field.description != "" {
+						a.settingsText(c, field.description, p.RowDescSize, p.RowDesc)
+					}
+				})
+				ui.Row(c).Gap(t.Space.N6).Shrink(0).AlignItems(ui.Center).Children(field.control)
+			})
 		}
 	})
 }
 
 func settingsRow(c *ui.Context, label string, content func()) {
 	t := theme.Current()
-	ui.Row(c).FillWidth().Gap(t.Space.N16).AlignItems(ui.Center).Children(func() { ui.Text(c, localize(c, label)).FontSize(t.C.Settings.RowLabelSize).Grow(1); content() })
+	uikit.SettingsRow(c, uikit.SettingsRowProps{Gap: t.Space.N16, Inline: true}).Children(func() {
+		ui.Text(c, localize(c, label)).FontSize(t.C.Settings.RowLabelSize).Grow(1)
+		content()
+	})
 }
 
 func settingsSegment(c *ui.Context, id string, options []string, current int, change func(int)) {
 	p := theme.Current().C.Segmented
-	ui.Row(c).Key(id).Padding(p.Padding).Radius(p.Radius).Background(tokenColor(p.Bg)).FocusGroup(ui.Horizontal).Children(func() {
+	ui.Row(c).Key(id).Padding(p.Padding).Radius(p.Radius).Background(uikit.Color(p.Bg)).FocusGroup(ui.Horizontal).Children(func() {
 		for index, label := range options {
 			item := ui.ButtonBase(c).Key(index).Label(localize(c, label)).Selected(index == current).Height(theme.Current().C.Input.Height-2*p.Padding).
 				Padding(0, p.ItemPaddingX).FontSize(p.FontSize).Radius(p.ItemRadius).OnClick(func() { change(index) })
-			styleSegment(item, p, index == current).Children(func() { ui.Text(c, localize(c, label)).SingleLine().PassThrough() })
+			uikit.StyleSegment(item, p, index == current).Children(func() { ui.Text(c, localize(c, label)).SingleLine().PassThrough() })
 		}
 	})
 }
 
 func (a *app) preferenceSwitch(c *ui.Context, label string, value *bool) {
 	p := theme.Current().C.Switch
-	if ui.Switch(c, value).Size(p.W, p.H).Label(localize(c, label)).Changed() {
+	if uikit.Switch(c, value, "").Size(p.W, p.H).Label(localize(c, label)).Changed() {
 		a.preferencesChanged()
 	}
 }
@@ -278,7 +262,7 @@ func (a *app) generalSettings(c *ui.Context) {
 			index = 0
 		}
 		selected := options[index]
-		if ui.Select(c, &selected, options).Width(theme.Current().C.Settings.ContentMax / 3).Label(localize(c, "语言")).Changed() {
+		if uikit.SelectNative(c, "", &selected, options).Width(theme.Current().C.Settings.ContentMax / 3).Label(localize(c, "语言")).Changed() {
 			a.prefs.Locale = tags[slices.Index(options, selected)]
 			mygo.App.SetLocale(a.prefs.Locale)
 			a.preferencesChanged()
@@ -301,24 +285,7 @@ func (a *app) appearanceSettings(c *ui.Context) {
 	a.settingsGroup(c, "应用主题", "", []settingField{{"应用主题", "", func() {
 		ui.Row(c).Gap(t.Space.N12).Width(t.C.Settings.ContentMax * 2 / 3).Children(func() {
 			for index, label := range []string{"浅色", "深色", "跟随系统"} {
-				ui.Column(c).Grow(1).Gap(t.Space.N8).Children(func() {
-					p := t.C.ThemeCard
-					selected := a.appearance == index
-					item := ui.ButtonBase(c).Key(index).FillWidth().AspectRatio(p.Aspect).Radius(p.Radius).Clip().Label(localize(c, label)).Selected(selected).
-						Border(p.BorderWidth, tokenColor(p.Border)).OnClick(func() { a.setAppearance(index) })
-					if selected {
-						item.Border(p.SelectedWidth, tokenColor(p.Selected))
-						applyShadow(item, p.SelectedShadow)
-					}
-					item.Draw(func(painter *ui.Painter, r ui.Rect) { drawThemeThumbnail(painter, r, index, t) })
-					ui.Row(c).Justify(ui.Center).Gap(t.Space.N6).AlignItems(ui.Center).Children(func() {
-						radio := ui.Box(c).Size(p.Radio, p.Radio).Radius(p.Radio).Border(t.Size.Divider, tokenColor(t.Color.Border.Control))
-						if selected {
-							radio.Border(p.RadioRing, tokenColor(p.Selected))
-						}
-						ui.Text(c, localize(c, label)).FontSize(t.Font.Size.Small)
-					})
-				})
+				uikit.ThemeCard(c, uikit.ThemeCardProps{Key: index, Label: localize(c, label), Appearance: index, Selected: a.appearance == index}).OnClick(func() { a.setAppearance(index) })
 			}
 		})
 	}}})
@@ -331,35 +298,26 @@ func (a *app) appearanceSettings(c *ui.Context) {
 				values = append(values, termtheme.Hex(ink))
 			}
 			for index, value := range values {
-				swatch := ui.ButtonBase(c).Key(value).Size(p.Size, p.Size).Radius(p.Size).Label(localize(c, a.accentLabel(index))).Selected(a.prefs.Accent == value).
+				swatches := colors
+				if index > 0 {
+					swatches = colors[index-1 : index]
+				}
+				uikit.AccentSwatch(c, uikit.AccentSwatchProps{
+					Key: value, Label: localize(c, a.accentLabel(index)), Selected: strings.EqualFold(a.prefs.Accent, value),
+					Colors: swatches, SystemGradient: index == 0,
+				}).Selected(a.prefs.Accent == value).
 					OnClick(func() { a.prefs.Accent = value; a.syncAppearance(); a.preferencesChanged() })
-				if index == 0 {
-					swatch.Draw(func(painter *ui.Painter, r ui.Rect) {
-						for i, ink := range colors {
-							slice := r
-							slice.X += float32(i) * r.W / float32(len(colors))
-							slice.W = r.W / float32(len(colors))
-							painter.Fill(slice, tokenColor(ink), 0)
-						}
-					})
-				} else {
-					swatch.Background(tokenColor(colors[index-1]))
-				}
-				if strings.EqualFold(a.prefs.Accent, value) {
-					applyShadow(swatch, theme.Shadow{{Spread: p.RingGap, Color: p.RingInset}, {Spread: p.RingGap + p.RingWidth, Color: t.Color.Accent.Default}})
-				}
-				tooltip(c, swatch, localize(c, a.accentLabel(index)))
 			}
 		})
 	}}, {"预览", "", func() {
 		ui.Row(c).Gap(t.Space.N12).AlignItems(ui.Center).Children(func() {
-			primaryButton(c, localize(c, "主按钮"))
+			uikit.Button(c, localize(c, "主按钮"), uikit.ButtonProps{Variant: uikit.ButtonPrimary})
 			settingsSegment(c, "accent-preview", []string{"项目一", "项目二"}, 0, func(int) {})
 			on := true
-			ui.Box(c).Width(t.Space.N24 * 2).Height(t.C.Progress.Height).Radius(t.C.Progress.Radius).Background(tokenColor(t.C.Progress.Track)).Children(func() {
-				ui.Box(c).Width(t.Space.N24).Height(t.C.Progress.Height).Radius(t.C.Progress.Radius).Background(tokenColor(t.C.Progress.Fill))
+			ui.Box(c).Width(t.Space.N24 * 2).Height(t.C.Progress.Height).Radius(t.C.Progress.Radius).Background(uikit.Color(t.C.Progress.Track)).Children(func() {
+				ui.Box(c).Width(t.Space.N24).Height(t.C.Progress.Height).Radius(t.C.Progress.Radius).Background(uikit.Color(t.C.Progress.Fill))
 			})
-			ui.Switch(c, &on).Disabled(true).Label(localize(c, "开关预览"))
+			uikit.Switch(c, &on, "").Disabled(true).Label(localize(c, "开关预览"))
 		})
 	}}})
 	a.settingsGroup(c, "辅助功能", "关闭应用内动态效果时，系统减少动态效果仍对 MyGo 内建控件生效。", []settingField{
@@ -373,41 +331,12 @@ func (a *app) appearanceSettings(c *ui.Context) {
 			if locked {
 				value = false
 			}
-			if ui.Switch(c, &value).Label(localize(c, "窗口半透明")).Disabled(locked).Changed() {
+			if uikit.Switch(c, &value, "").Label(localize(c, "窗口半透明")).Disabled(locked).Changed() {
 				a.prefs.Translucency = value
 				a.preferencesChanged()
 			}
 		}},
 	})
-}
-
-func drawThemeThumbnail(p *ui.Painter, r ui.Rect, index int, t *theme.Theme) {
-	light, dark := theme.ForAppearance(false), theme.ForAppearance(true)
-	sample := light
-	if index == 1 {
-		sample = dark
-	}
-	p.Fill(r, tokenColor(sample.C.Window.Bg), t.C.ThemeCard.Radius)
-	body := ui.Rect{X: r.X + t.Space.N6, Y: r.Y + t.Space.N12, W: r.W - 2*t.Space.N6, H: r.H - t.Space.N18}
-	p.Fill(body, tokenColor(sample.Color.Surface.Card), t.C.Input.Radius)
-	sidebar := body
-	sidebar.W = body.W / 4
-	p.Fill(sidebar, tokenColor(sample.Color.Surface.Control), t.C.Input.Radius)
-	if index == 2 {
-		right := r
-		right.X += r.W / 2
-		right.W = r.W / 2
-		p.Fill(right, tokenColor(dark.C.Window.Bg), 0)
-		right.X += t.Space.N4
-		right.Y += t.Space.N12
-		right.W -= t.Space.N10
-		right.H -= t.Space.N18
-		p.Fill(right, tokenColor(dark.Color.Surface.Card), t.C.Input.Radius)
-	}
-	for i := 0; i < 3; i++ {
-		line := ui.Rect{X: body.X + body.W/3, Y: body.Y + t.Space.N8 + float32(i)*t.Space.N8, W: body.W / 2, H: t.Space.N2}
-		p.Fill(line, tokenColor(sample.Color.Border.Control), t.Space.N2)
-	}
 }
 
 func (a *app) accentLabel(index int) string {
@@ -434,12 +363,12 @@ func (a *app) terminalPreview(c *ui.Context) {
 	t := theme.Current()
 	scheme := termtheme.Current()
 	prefs := a.terminal.prefs
-	ui.Column(c).FillWidth().Radius(t.C.Settings.GroupRadius).Border(t.C.Settings.GroupBorderWidth, tokenColor(t.C.Settings.GroupBorder)).Clip().Children(func() {
-		ui.Row(c).FillWidth().Padding(t.Space.N10, t.Space.N14).Background(tokenColor(t.Color.Surface.Card)).Children(func() {
-			ui.Text(c, localize(c, "预览")).FontSize(t.Font.Size.Small).FontWeight(t.Font.Weight.Semibold).TextColor(tokenColor(t.Color.Text.Muted)).Grow(1)
-			ui.Text(c, localize(c, fmt.Sprintf("%s · %s %.1f / %.0f · %s", scheme.Name, prefs.FontFamily[0], prefs.FontSize, prefs.LineHeight, localize(c, []string{"块状光标", "竖线光标", "下划线光标"}[prefs.CursorShape])))).FontSize(t.Font.Size.Footnote).TextColor(tokenColor(t.Color.Text.Tertiary))
+	ui.Column(c).FillWidth().Radius(t.C.Settings.GroupRadius).Border(t.C.Settings.GroupBorderWidth, uikit.Color(t.C.Settings.GroupBorder)).Clip().Children(func() {
+		ui.Row(c).FillWidth().Padding(t.Space.N10, t.Space.N14).Background(uikit.Color(t.Color.Surface.Card)).Children(func() {
+			ui.Text(c, localize(c, "预览")).FontSize(t.Font.Size.Small).FontWeight(t.Font.Weight.Semibold).TextColor(uikit.Color(t.Color.Text.Muted)).Grow(1)
+			ui.Text(c, localize(c, fmt.Sprintf("%s · %s %.1f / %.0f · %s", scheme.Name, prefs.FontFamily[0], prefs.FontSize, prefs.LineHeight, localize(c, []string{"块状光标", "竖线光标", "下划线光标"}[prefs.CursorShape])))).FontSize(t.Font.Size.Footnote).TextColor(uikit.Color(t.Color.Text.Tertiary))
 		})
-		ui.Column(c).FillWidth().Padding(t.Space.N14).Background(tokenColor(termtheme.TerminalBackground(scheme, t.C.Pane.Bg, prefs.Background))).
+		ui.Column(c).FillWidth().Padding(t.Space.N14).Background(uikit.Color(termtheme.TerminalBackground(scheme, t.C.Pane.Bg, prefs.Background))).
 			Font(strings.Join(prefs.FontFamily, ", ")).FontSize(prefs.FontSize).Children(func() {
 			lines := terminalPreviewLines()
 			for _, line := range lines {
@@ -461,7 +390,7 @@ func (a *app) terminalPreview(c *ui.Context) {
 				if prefs.CursorBlink {
 					c.After(600 * time.Millisecond)
 				}
-				ui.Box(c).Size(width, height).Background(tokenColor(scheme.Cursor)).Opacity(shown)
+				ui.Box(c).Size(width, height).Background(uikit.Color(scheme.Cursor)).Opacity(shown)
 			})
 		})
 	})
@@ -481,14 +410,14 @@ func (a *app) terminalColorSettings(c *ui.Context) {
 	if a.settingMatches("配色方案", "方案 跟随应用明暗 固定一种 配色 浅色外观时 深色外观时") {
 		ui.Column(c).FillWidth().Gap(t.C.Settings.GroupTitleGap).Children(func() {
 			ui.Row(c).FillWidth().AlignItems(ui.Center).Children(func() {
-				ui.Text(c, localize(c, "配色方案")).FontSize(t.C.Settings.GroupTitleSize).FontWeight(t.C.Settings.GroupTitleWeight).TextColor(tokenColor(t.C.Settings.GroupTitle)).Grow(1)
-				button(c, localize(c, "导入配色…")).Height(t.Size.ControlSm).Disabled(a.terminal.importing).OnClick(a.chooseTerminalTheme)
+				ui.Text(c, localize(c, "配色方案")).FontSize(t.C.Settings.GroupTitleSize).FontWeight(t.C.Settings.GroupTitleWeight).TextColor(uikit.Color(t.C.Settings.GroupTitle)).Grow(1)
+				uikit.Button(c, localize(c, "导入配色…"), uikit.ButtonProps{}).Height(t.Size.ControlSm).Disabled(a.terminal.importing).OnClick(a.chooseTerminalTheme)
 			})
-			ui.Column(c).FillWidth().Radius(t.C.Settings.GroupRadius).Background(tokenColor(t.C.Settings.GroupBg)).Border(t.C.Settings.GroupBorderWidth, tokenColor(t.C.Settings.GroupBorder)).Children(func() {
-				ui.Row(c).FillWidth().Padding(t.C.Settings.RowPaddingY, t.C.Settings.RowPaddingX).AlignItems(ui.Center).Gap(t.Space.N12).Children(func() {
+			uikit.SettingsGroupBody(c).Children(func() {
+				uikit.SettingsRow(c, uikit.SettingsRowProps{Gap: t.Space.N12}).MinHeight(0).Children(func() {
 					ui.Column(c).Grow(1).Gap(t.Space.N4).Children(func() {
 						ui.Text(c, localize(c, "方案")).FontSize(t.C.Settings.RowLabelSize)
-						ui.Text(c, localize(c, "跟随：按应用当前明暗，在下方两种配色间自动切换")).FontSize(t.C.Settings.RowDescSize).TextColor(tokenColor(t.C.Settings.RowDesc))
+						ui.Text(c, localize(c, "跟随：按应用当前明暗，在下方两种配色间自动切换")).FontSize(t.C.Settings.RowDescSize).TextColor(uikit.Color(t.C.Settings.RowDesc))
 					})
 					index := 0
 					if a.terminal.mode.Kind == termtheme.FixedScheme {
@@ -516,7 +445,7 @@ func (a *app) terminalColorSettings(c *ui.Context) {
 					}
 				}
 			})
-			ui.Text(c, localize(c, "点击卡片：按配色自身明暗放进浅色或深色槽位。导入支持 Ghostty 主题格式。")).FontSize(t.C.Settings.GroupFootnoteSize).TextColor(tokenColor(t.C.Settings.GroupFootnote))
+			ui.Text(c, localize(c, "点击卡片：按配色自身明暗放进浅色或深色槽位。导入支持 Ghostty 主题格式。")).FontSize(t.C.Settings.GroupFootnoteSize).TextColor(uikit.Color(t.C.Settings.GroupFootnote))
 		})
 	}
 	a.settingsGroup(c, "背景", "", []settingField{{"终端背景", "配色自带：任何外观都用配色的背景色。与卡片一致：用卡片底色", func() {
@@ -528,8 +457,8 @@ func (a *app) terminalColorSettings(c *ui.Context) {
 
 func (a *app) schemeSelectRow(c *ui.Context, label string, value *string) {
 	t := theme.Current()
-	ui.Row(c).FillWidth().MinHeight(t.C.Settings.RowMinHeight).Padding(t.C.Settings.RowPaddingY, t.C.Settings.RowPaddingX).
-		BorderWidth(t.Size.Divider, 0, 0, 0).BorderColor(tokenColor(t.C.Settings.RowDivider)).AlignItems(ui.Center).Children(func() {
+	uikit.SettingsRow(c, uikit.SettingsRowProps{}).
+		BorderWidth(t.Size.Divider, 0, 0, 0).BorderColor(uikit.Color(t.C.Settings.RowDivider)).AlignItems(ui.Center).Children(func() {
 		ui.Text(c, localize(c, label)).FontSize(t.C.Settings.RowLabelSize).Grow(1)
 		selected := *value
 		if a.settingsSchemeSelect(c, label, &selected) {
@@ -567,7 +496,7 @@ func (a *app) schemeGrid(c *ui.Context) {
 			if a.settingsUI.allSchemes {
 				label = "收起 ▴"
 			}
-			button(c, localize(c, label)).OnClick(func() { a.settingsUI.allSchemes = !a.settingsUI.allSchemes })
+			uikit.Button(c, localize(c, label), uikit.ButtonProps{}).OnClick(func() { a.settingsUI.allSchemes = !a.settingsUI.allSchemes })
 		}
 	})
 }
@@ -588,8 +517,17 @@ func (a *app) schemeCard(c *ui.Context, name string) {
 			badge = "☾ 深色"
 		}
 	}
-	item := ui.ButtonBase(c).Key(name).Grow(1).Basis(0).MinWidth(0).Padding(p.Padding).Radius(p.Radius).Label(name).Selected(selected).Background(tokenColor(t.Color.Surface.Card)).TextColor(tokenColor(t.Color.Text.Primary)).
-		Border(p.BorderWidth, tokenColor(p.Border)).OnClick(func() {
+	item := uikit.SchemeCard(c, uikit.SchemeCardProps{
+		Name: name, Badge: localize(c, badge), Selected: selected, Background: scheme.Background, Colors: scheme.ANSI[:8],
+	}, func() {
+		prefs := a.terminal.prefs
+		prefs.FontSize = p.PreviewFontSize
+		prefs.LineHeight = p.PreviewLineHeight
+		lines := []terminalLine{{{Text: "deploy@web", Foreground: terminalIndexed(2)}, {Text: ":~$ ls"}}, {{Text: "src  ", Foreground: terminalIndexed(4)}, {Text: "bin  ", Foreground: terminalIndexed(6)}, {Text: "a.js", Foreground: terminalIndexed(5)}}, {{Text: "WARN ", Foreground: terminalIndexed(3)}, {Text: "ERR ", Foreground: terminalIndexed(1)}, {Text: "ok"}}}
+		for _, line := range lines {
+			ui.RichText(c, terminalSpans(line, scheme, prefs, 0, 0)...).FixedLineHeight(p.PreviewLineHeight).SingleLine().PassThrough()
+		}
+	}).OnClick(func() {
 		a.changeTerminalSettings(func() {
 			if a.terminal.mode.Kind == termtheme.FixedScheme {
 				a.terminal.mode = termtheme.Fixed(name)
@@ -600,36 +538,9 @@ func (a *app) schemeCard(c *ui.Context, name string) {
 			}
 		})
 	})
-	if selected {
-		item.Border(p.SelectedWidth, tokenColor(p.Selected))
-	}
 	if _, imported := a.terminal.imported[name]; imported && !termtheme.IsBundled(name) {
 		item.ContextMenu(a.importedThemeMenu(c, name))
 	}
-	item.Children(func() {
-		ui.Column(c).FillWidth().Gap(t.Space.N6).Children(func() {
-			ui.Column(c).FillWidth().Height(p.PreviewHeight).Radius(p.PreviewRadius).Padding(t.Space.N6).Background(tokenColor(scheme.Background)).Font(strings.Join(t.Font.Family.Mono, ", ")).FontSize(p.PreviewFontSize).Clip().Children(func() {
-				prefs := a.terminal.prefs
-				prefs.FontSize = p.PreviewFontSize
-				prefs.LineHeight = p.PreviewLineHeight
-				lines := []terminalLine{{{Text: "deploy@web", Foreground: terminalIndexed(2)}, {Text: ":~$ ls"}}, {{Text: "src  ", Foreground: terminalIndexed(4)}, {Text: "bin  ", Foreground: terminalIndexed(6)}, {Text: "a.js", Foreground: terminalIndexed(5)}}, {{Text: "WARN ", Foreground: terminalIndexed(3)}, {Text: "ERR ", Foreground: terminalIndexed(1)}, {Text: "ok"}}}
-				for _, line := range lines {
-					ui.RichText(c, terminalSpans(line, scheme, prefs, 0, 0)...).FixedLineHeight(p.PreviewLineHeight).SingleLine().PassThrough()
-				}
-			})
-			ui.Row(c).FillWidth().Gap(p.StripeGap).Children(func() {
-				for _, ink := range scheme.ANSI[:8] {
-					ui.Box(c).Grow(1).Height(p.StripeHeight).Radius(p.StripeRadius).Background(tokenColor(ink)).PassThrough()
-				}
-			})
-			ui.Row(c).FillWidth().Gap(t.Space.N4).AlignItems(ui.Center).Children(func() {
-				ui.Text(c, name).Grow(1).MinWidth(0).FontSize(p.NameSize).FontWeight(p.NameWeight).SingleLine().PassThrough()
-				if badge != "" {
-					ui.Text(c, localize(c, badge)).FontSize(p.BadgeSize).FontWeight(p.BadgeWeight).TextColor(tokenColor(p.BadgeText)).Background(tokenColor(p.BadgeBg)).Radius(t.Radius.Chip).PassThrough()
-				}
-			})
-		})
-	})
 }
 
 func (a *app) terminalTextSettings(c *ui.Context) {
@@ -647,7 +558,7 @@ func (a *app) terminalTextSettings(c *ui.Context) {
 	a.settingsGroup(c, "字体", "", []settingField{
 		{"字体", "", func() {
 			selected := a.terminal.prefs.FontFamily[0]
-			if ui.Select(c, &selected, a.settingsUI.fonts).Width(t.C.Settings.SelectWidth).Label(localize(c, "字体")).Changed() {
+			if uikit.SelectNative(c, "", &selected, a.settingsUI.fonts).Width(t.C.Settings.SelectWidth).Label(localize(c, "字体")).Changed() {
 				a.changeTerminalSettings(func() { a.terminal.prefs.FontFamily = []string{selected, "monospace"} })
 			}
 		}},
@@ -662,18 +573,18 @@ func (a *app) terminalTextSettings(c *ui.Context) {
 					a.terminal.prefs.LineHeight = max(a.terminal.prefs.LineHeight, float32(math.Ceil(value*1.2)))
 				})
 			}
-			ui.Text(c, localize(c, "px")).FontSize(t.Font.Size.Small).TextColor(tokenColor(t.Color.Text.Tertiary))
+			ui.Text(c, localize(c, "px")).FontSize(t.Font.Size.Small).TextColor(uikit.Color(t.Color.Text.Tertiary))
 		}},
 		{"行高", "", func() {
 			value := float64(a.terminal.prefs.LineHeight)
 			if settingsNumberInput(c, "行高", &value, math.Ceil(float64(a.terminal.prefs.FontSize)*1.2), 40, 1, t.C.Settings.NumberWidth, false) {
 				a.changeTerminalSettings(func() { a.terminal.prefs.LineHeight = float32(value); a.prefs.LineHeightEdited = true })
 			}
-			ui.Text(c, localize(c, "px")).FontSize(t.Font.Size.Small).TextColor(tokenColor(t.Color.Text.Tertiary))
+			ui.Text(c, localize(c, "px")).FontSize(t.Font.Size.Small).TextColor(uikit.Color(t.Color.Text.Tertiary))
 		}},
 		{"粗体使用亮色", "ANSI 0–7 粗体改用 8–15 亮色（xterm 行为）", func() {
 			value := a.terminal.prefs.BoldIsBright
-			if ui.Switch(c, &value).Label(localize(c, "粗体使用亮色")).Changed() {
+			if uikit.Switch(c, &value, "").Label(localize(c, "粗体使用亮色")).Changed() {
 				a.changeTerminalSettings(func() { a.terminal.prefs.BoldIsBright = value })
 			}
 		}},
@@ -686,7 +597,7 @@ func (a *app) terminalTextSettings(c *ui.Context) {
 		}},
 		{"闪烁", "", func() {
 			value := a.terminal.prefs.CursorBlink
-			if ui.Switch(c, &value).Label(localize(c, "光标闪烁")).Changed() {
+			if uikit.Switch(c, &value, "").Label(localize(c, "光标闪烁")).Changed() {
 				a.changeTerminalSettings(func() { a.terminal.prefs.CursorBlink = value })
 			}
 		}},
@@ -712,10 +623,10 @@ func (a *app) terminalNumberSetting(c *ui.Context, label string, destination *fl
 func (a *app) fileSettings(c *ui.Context) {
 	t := theme.Current()
 	a.settingsGroup(c, "目录", "", []settingField{{"默认本地目录", "展开本地面板时打开的目录", func() {
-		if textInput(c, &a.prefs.DefaultLocalDir).Width(t.C.Settings.SelectWidth).Font(strings.Join(t.Font.Family.Mono, ", ")).Label(localize(c, "默认本地目录")).Changed() {
+		if uikit.Input(c, &a.prefs.DefaultLocalDir, uikit.InputProps{}).Width(t.C.Settings.SelectWidth).Font(strings.Join(t.Font.Family.Mono, ", ")).Label(localize(c, "默认本地目录")).Changed() {
 			a.preferencesChanged()
 		}
-		keyedIconButton(c, "default-local-folder", "选择本地目录", filesIcon).OnClick(a.chooseDefaultLocalDirectory)
+		uikit.IconButton(c, filesIcon, uikit.IconButtonProps{Key: "default-local-folder", Label: "选择本地目录"}).OnClick(a.chooseDefaultLocalDirectory)
 	}}})
 	a.settingsGroup(c, "传输", "", []settingField{
 		{"同时传输数", "", func() {

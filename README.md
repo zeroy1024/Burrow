@@ -123,6 +123,7 @@ internal/desktop/ftp_files.go  演示目录、选择、历史与重名处理
 internal/desktop/ftp_dialogs.go  文件操作与传输重名对话框
 internal/desktop/ftp_transfers.go  演示队列与底部传输面板
 internal/desktop/ftp_config.go  文件面板与队列偏好持久化
+internal/uikit/            公共基础、表单、弹窗与设置组件
 mygo.json                 macOS 应用打包配置
 ```
 
@@ -139,10 +140,12 @@ go vet ./...
 go test ./...
 ```
 
-`theme.go`、`tokens.json`、`tokens.md` 由生成器维护。适配器位于 `internal/desktop/uiadapt.go`，新增组件每次 build 读取 `theme.Current()`，优先使用 component token；终端正文每次渲染读取 `termtheme.Current()`，与 App token 独立。
+`theme.go`、`tokens.json`、`tokens.md` 由生成器维护。公共组件位于 `internal/uikit`，会话弹窗和设置页已接入；`internal/desktop/uiadapt.go` 为尚未迁移的工作区转发公共实现。组件每次 build 读取 `theme.Current()`，优先使用 component token；终端正文每次渲染读取 `termtheme.Current()`，与 App token 独立。
 
 普通按钮、输入框、弹窗和 Tooltip 使用统一适配入口；状态颜色与透明度过渡采用 160ms token，拿起和布局弹簧分别保留自己的参数。普通线性图标共用 token 描边，品牌图形保持独立。新增切换按钮使用固定 key，显示文案不作为动画身份。
 
 当前接入规则、框架保留项与历史差异见 [主题接入说明](docs/theme-integration.md)。目录列表的垂直自动滚动使用 token；MyGo v0.7.3 尚未开放原生手势启动阈值和长按参数。终端配色、设置与验收边界见 [终端配色说明](docs/terminal-themes.md)。
 
 会话弹窗、七类设置、真实连接测试及持久化边界见 [会话与设置实现说明](docs/session-settings.md)，内含浅深色截图与 MyGo API 组合实现记录。
+
+公共组件第一批的范围、控件状态契约和后续边界见 [UIKit 迁移说明](docs/uikit.md)。

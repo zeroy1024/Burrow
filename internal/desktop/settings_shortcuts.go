@@ -7,6 +7,7 @@ import (
 
 	"github.com/egoist/mygo/ui"
 	"sshdesk/internal/theme"
+	"sshdesk/internal/uikit"
 )
 
 type shortcutAction struct{ id, label, group, binding string }
@@ -45,7 +46,7 @@ func (a *app) shortcutSettings(c *ui.Context) {
 	t := theme.Current()
 	ui.Row(c).FillWidth().AlignItems(ui.Center).Children(func() {
 		ui.Text(c, localize(c, "快捷键")).FontSize(t.C.Settings.GroupTitleSize).FontWeight(t.C.Settings.GroupTitleWeight).Grow(1)
-		button(c, localize(c, "全部恢复默认")).OnClick(func() {
+		uikit.Button(c, localize(c, "全部恢复默认"), uikit.ButtonProps{}).OnClick(func() {
 			a.prefs.Keymap = map[string]string{}
 			a.settingsUI.recording = ""
 			a.settingsUI.conflictAction = ""
@@ -79,14 +80,14 @@ func (a *app) shortcutSettings(c *ui.Context) {
 			if recording {
 				label = "按下新的快捷键…"
 			}
-			item := button(c.Key(action.id), localize(c, label)).Font(strings.Join(t.Font.Family.Mono, ", ")).Label(localize(c, action.label) + " " + localize(c, "快捷键")).
+			item := uikit.Button(c.Key(action.id), localize(c, label), uikit.ButtonProps{}).Font(strings.Join(t.Font.Family.Mono, ", ")).Label(localize(c, action.label) + " " + localize(c, "快捷键")).
 				OnClick(func() {
 					a.settingsUI.recording = action.id
 					a.settingsUI.pendingBinding = ""
 					a.settingsUI.conflictAction = ""
 				})
 			if recording {
-				applyShadow(item, t.Shadow.InputFocus)
+				uikit.Shadow(item, t.Shadow.InputFocus)
 				item.Focus().HandleInput(func(ev ui.InputEvent) bool {
 					if ev.Kind != ui.InputKeyDown {
 						return false
@@ -116,14 +117,14 @@ func (a *app) shortcutSettings(c *ui.Context) {
 			}
 			if recording && a.settingsUI.conflictAction != "" {
 				index := slices.IndexFunc(defaultShortcutActions, func(v shortcutAction) bool { return v.id == a.settingsUI.conflictAction })
-				ui.Text(c, localize(c, fmt.Sprintf(localize(c, "与「%s」冲突"), localize(c, defaultShortcutActions[index].label)))).FontSize(t.Font.Size.Footnote).TextColor(tokenColor(t.Color.Danger.Text))
-				button(c, localize(c, "替换")).OnClick(func() {
+				ui.Text(c, localize(c, fmt.Sprintf(localize(c, "与「%s」冲突"), localize(c, defaultShortcutActions[index].label)))).FontSize(t.Font.Size.Footnote).TextColor(uikit.Color(t.Color.Danger.Text))
+				uikit.Button(c, localize(c, "替换"), uikit.ButtonProps{}).OnClick(func() {
 					a.prefs.Keymap[a.settingsUI.conflictAction] = ""
 					a.storeShortcut(action.id, a.settingsUI.pendingBinding)
 				})
 			}
 		case 2:
-			button(c, localize(c, "恢复默认")).Label(localize(c, "恢复默认：") + localize(c, action.label)).OnClick(func() { delete(a.prefs.Keymap, action.id); a.preferencesChanged() })
+			uikit.Button(c, localize(c, "恢复默认"), uikit.ButtonProps{}).Label(localize(c, "恢复默认：") + localize(c, action.label)).OnClick(func() { delete(a.prefs.Keymap, action.id); a.preferencesChanged() })
 		}
 	}).FillWidth().Height(float32(len(actions)+1) * t.C.Settings.RowMinHeight).Label(localize(c, "快捷键"))
 }
