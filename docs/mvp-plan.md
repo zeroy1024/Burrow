@@ -52,5 +52,34 @@
 
 - 现有受控Docker SSH/FTP集成：race通过，0 skip/fail；额外20个不同loopback smoke分支最终通过，临时服务、程序和秘密已回收。
 - 最终 `go test ./...`、`go test -race ./...`、`go vet ./...`、`go build ./...`、全源码gofmt只读检查及diff检查通过。
-- `go tool mygo build -skip-dmg`通过，生成并签名 `build/darwin-arm64/SSH Desk.app`（18.5MB）。未启动GUI。
+- `go tool mygo build -skip-dmg`通过，生成并签名 `build/darwin-arm64/SSH Desk.app`（本轮最终18.7MB）。未启动GUI。
 - 未运行GUI/像素验收；SDK与命令式字节smoke不等于应用队列和冲突Modal的端到端验收。
+
+
+## 第二轮应用调用链复核
+
+对 `887f4b1` 继续按完整目标审查，发现已有协议检查没有覆盖的应用路径；本轮修正以下真实问题：
+
+- native Resize 回调成为真实终端行列数的唯一来源；显示窗口之外不重新启动监控。
+- Shell/SFTP 初始化竞争同一 SSH channel 槽位时等待真实就绪通知，保持原初始化时间上界，不把暂时占用误报为连接失败。
+- 首条初始命令由通道有序异步写入，输出消费者可先建立；后续写入排在其后，取消不会继续使用调用方缓冲区。关闭 Shell 只向当前通道发送 HUP，并丢弃排空待关闭输出，避免 PTY 背压阻止收敛。
+- 文件标签显式重连按 UUID 和页面类别采用保存的新协议；SFTP 转 FTP 只清该视图的 SSH group。FTP 非匿名用户名在原表单内必填。
+- 本地目标锁按 NFC/case folding 保守协调；未授权替换时使用真实原子 NoReplace，竞争后重新决策冲突。普通文件重命名也采用 NoReplace。
+- 目录继续前递归核对已完成目标；不把目标目录被移走后的新空目录算作完整结果。
+- 暂存文件的内容摘要、提交阶段和基线写入队列记录。网络中断或取消导致提交结果未知时，恢复先核对实际状态，不直接重传制造 keep-both 副本。
+- “对所有重名项应用”覆盖同次入队的多个任务、目录子项和已等待冲突，并跨正常退出恢复；队列记录升至 v2，原 v1 仅按真实旧合同迁移。
+
+这些修正保留布局和 UI 组件。验证中的临时命令工具不进入仓库，不增加永久测试。
+
+
+### 第二轮真实验证
+
+- 真实loopback SSH追加命令式验证：8MiB初始命令能立即返回Conn，消费输出后完成首写；16个并发后续Write保持整次写入有序；Close/Cancel/进行中的16MiB写入取消后缓冲区复用均通过race。当前Shell关闭、兄弟Shell存活与owner worker Join均实测通过。现有SSH/SFTP集成复验28个用例/子用例，0skip/fail。
+- MyGo真实隐藏原生窗口、真实Window.Update事件循环下，10个进程用例的11条队列控制器分支通过，最终无race：目录与空文件、浏览标签关闭、批次apply-all、暂停/正常退出journal/新进程离线恢复与hash、取消清part、本地大小写/Unicode等价名并发保留两者、已完成子项缺失明确失败，以及服务端RNTO成功但延迟回复时取消/退出后恢复不重复提交。
+- 队列证据与清理记录位于 `/private/tmp/sshdesk-queue-native-x8expv1d/verification-summary.json` 和 `cleanup-results.json`；54份复制的desktop源码在验证结束与工作树一致。临时工具、服务、凭据和字节fixtures均已回收。
+- 初次隐藏帧等待和controller误读worker清单导致的失败属于临时验证器问题，保留原失败日志，修正后重跑；没有将退出66或失败命令算通过。以上是控制器功能验证，不是原界面点击或视觉验收。
+
+另行复查了公开MyGo v0.7.4源码（仅下载到任务临时依赖目录，未升级项目）：原生终端仍无Tracking/BoldIsBright及实时精确行数接口；仅升级补丁版不能补齐全部显示能力。[上游发布记录](https://github.com/egoist/mygo/releases/tag/v0.7.4)的滚动条改动也不等于把内部VT滚动状态公开给UIKit。仍保留原先明确的部分实现状态。
+
+
+补充取消语义：原型冲突框取消会终止本次选择的剩余项；现在按批次取消尚未完成任务、清同批冲突，保留Done和其他批次。追加真实hidden `-race` 单分支复验通过，实际Cancel1次、同批part清零、Done内容保留且独立8MiB任务hash一致。证据 `/private/tmp/sshdesk-queue-cancel-b5wbz7br/verification-summary.json`。最终全项目race/vet/build和原生打包已通过；取消分支修改后再做desktop检查及最终打包，不把旧包当当前产物。

@@ -23,8 +23,36 @@ var ErrSFTPInitPending = errors.New("an SFTP channel is still being initialized"
 // not retain a transport lease and does not cache clients or connections.
 var sftpInitializers = struct {
 	sync.Mutex
-	owners map[*sshclient.Connection]struct{}
-}{owners: make(map[*sshclient.Connection]struct{})}
+	owners map[*sshclient.Connection]chan struct{}
+}{owners: make(map[*sshclient.Connection]chan struct{})}
+
+// WaitSFTPReady waits for the current protocol initializer to actually leave
+// its worker, including a canceled initializer still blocked in an SSH write.
+func WaitSFTPReady(ctx context.Context, owner *sshclient.Connection) error {
+	for {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		select {
+		case <-owner.Done():
+			return sshclient.ErrClosed
+		default:
+		}
+		sftpInitializers.Lock()
+		done := sftpInitializers.owners[owner]
+		sftpInitializers.Unlock()
+		if done == nil {
+			return nil
+		}
+		select {
+		case <-done:
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-owner.Done():
+			return sshclient.ErrClosed
+		}
+	}
+}
 
 type sftpClient struct {
 	client   *sftp.Client
@@ -71,11 +99,13 @@ func newSFTP(ctx context.Context, owner *sshclient.Connection, open func(context
 		sftpInitializers.Unlock()
 		return nil, ErrSFTPInitPending
 	}
-	sftpInitializers.owners[owner] = struct{}{}
+	initializerDone := make(chan struct{})
+	sftpInitializers.owners[owner] = initializerDone
 	sftpInitializers.Unlock()
 	releaseInitializer := sync.OnceFunc(func() {
 		sftpInitializers.Lock()
 		delete(sftpInitializers.owners, owner)
+		close(initializerDone)
 		sftpInitializers.Unlock()
 	})
 
@@ -108,7 +138,6 @@ func newSFTP(ctx context.Context, owner *sshclient.Connection, open func(context
 				err = errors.New("SFTP server returned an empty initial directory")
 			}
 		}
-		releaseInitializer()
 		opened := result{client: client, stream: stream, home: home, err: err}
 		select {
 		case ready <- opened:
@@ -337,7 +366,7 @@ func (c *sftpClient) Mkdir(ctx context.Context, name string) error {
 	return c.change(ctx, name, func(wire string) error { return c.client.Mkdir(wire) })
 }
 
-func (c *sftpClient) Rename(ctx context.Context, oldName, newName string) error {
+func (c *sftpClient) Rename(ctx context.Context, oldName, newName string, options ...RenameOptions) error {
 	oldWire, err := c.wirePath(oldName)
 	if err != nil {
 		return err
@@ -347,6 +376,21 @@ func (c *sftpClient) Rename(ctx context.Context, oldName, newName string) error 
 		return err
 	}
 	_, err = sftpOperation(c, ctx, func() (struct{}, error) {
+		if len(options) > 0 && options[0].NoReplace {
+			if _, statErr := c.client.Lstat(newWire); statErr == nil {
+				return struct{}{}, fs.ErrExist
+			} else if !errors.Is(statErr, fs.ErrNotExist) {
+				return struct{}{}, statErr
+			}
+			renameErr := c.client.Rename(oldWire, newWire)
+			var status *sftp.StatusError
+			if errors.As(renameErr, &status) && (status.Code == 4 || status.Code == 11) {
+				if _, statErr := c.client.Lstat(newWire); statErr == nil {
+					return struct{}{}, errors.Join(fs.ErrExist, renameErr)
+				}
+			}
+			return struct{}{}, renameErr
+		}
 		// OpenSSH's extension supplies replacement semantics needed by the
 		// explicit overwrite policy. Standard SFTP rename handles other servers.
 		if _, supported := c.client.HasExtension("posix-rename" + "@" + "openssh.com"); supported {

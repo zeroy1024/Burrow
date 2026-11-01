@@ -168,6 +168,9 @@ func (d *hostDraft) changed(field string) {
 	d.cancelTest()
 	d.testVisible = false
 	delete(d.errors, field)
+	if field == "protocol" || field == "auth" {
+		delete(d.errors, "user")
+	}
 }
 
 func (d *hostDraft) changeProtocol(protocol string) {
@@ -266,6 +269,10 @@ func (a *app) draftError(d *hostDraft, field string) string {
 		if err != nil || p < 1 || p > 65535 {
 			return "端口需在 1–65535 之间"
 		}
+	case "user":
+		if d.files && d.protocol == "FTP" && d.auth != "anonymous" && strings.TrimSpace(d.user) == "" {
+			return "请填写用户名"
+		}
 	case "key":
 		if d.auth == "key" && !slices.ContainsFunc(a.keys, func(k managedKey) bool { return k.ID == d.keyID }) {
 			return "请选择私钥"
@@ -323,7 +330,7 @@ func (a *app) draftError(d *hostDraft, field string) string {
 func (a *app) validateDraft(d *hostDraft) bool {
 	d.errors = map[string]string{}
 	first := ""
-	for _, field := range []string{"name", "host", "port", "key", "group", "keepalive", "env"} {
+	for _, field := range []string{"name", "host", "port", "user", "key", "group", "keepalive", "env"} {
 		if message := a.draftError(d, field); message != "" {
 			d.errors[field] = message
 			if first == "" {

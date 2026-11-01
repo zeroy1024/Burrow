@@ -19,6 +19,10 @@ type Entry struct {
 	Owner       string
 }
 
+type RenameOptions struct {
+	NoReplace bool
+}
+
 type Client interface {
 	InitialPath(context.Context) (string, error)
 	ReadDir(context.Context, string) ([]Entry, error)
@@ -27,7 +31,9 @@ type Client interface {
 	OpenRead(context.Context, string, int64) (io.ReadCloser, error)
 	OpenWrite(context.Context, string, int64, bool) (io.WriteCloser, error)
 	Mkdir(context.Context, string) error
-	Rename(context.Context, string, string) error
+	// NoReplace is atomic for Local and standard SFTP. FTP has no conditional
+	// rename command; its adapter checks the target before RNFR/RNTO instead.
+	Rename(context.Context, string, string, ...RenameOptions) error
 	Remove(context.Context, string, bool) error
 	Done() <-chan struct{}
 	Close() error

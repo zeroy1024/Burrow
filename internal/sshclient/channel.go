@@ -7,6 +7,7 @@ import (
 	"io"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -24,14 +25,45 @@ type Stream struct {
 	lease           *lease
 	session         *ssh.Session
 	stdin           io.Writer
+	input           chan streamWrite
+	initialized     chan struct{}
+	initializedOnce sync.Once
 	output          *io.PipeReader
 	sink            *io.PipeWriter
 	onError         func(error)
+	shell           bool
 	done            chan struct{}
 	waitErr         error
 	abortOnce       sync.Once
 	remoteCloseOnce sync.Once
 	errorOnce       sync.Once
+	discardOutput   atomic.Bool
+}
+
+type streamOutput struct{ stream *Stream }
+
+func (output streamOutput) Write(p []byte) (int, error) {
+	s := output.stream
+	if s.discardOutput.Load() {
+		return len(p), nil
+	}
+	n, err := s.sink.Write(p)
+	if err != nil && s.discardOutput.Load() {
+		// A canceled view stops displaying output, but SSH must keep draining
+		// this channel's receive window for the peer to complete channel close.
+		return len(p), nil
+	}
+	return n, err
+}
+
+type streamWrite struct {
+	data []byte
+	done chan streamWriteResult
+}
+
+type streamWriteResult struct {
+	n   int
+	err error
 }
 
 // Conn is an independent interactive Shell on a shared Connection.
@@ -51,6 +83,10 @@ func (c *Connection) OpenShell(ctx context.Context, opts ShellOptions) (*Conn, e
 	}
 	return &Conn{Stream: stream, columns: opts.Columns, rows: opts.Rows}, nil
 }
+
+// InitializationDone closes after the initial-command write finishes or the
+// channel closes. Write failures are reported through ShellOptions.OnError.
+func (c *Conn) InitializationDone() <-chan struct{} { return c.initialized }
 
 // OpenSubsystem opens a binary subsystem without a PTY. Its stdout is the
 // protocol stream; stderr is drained separately and never mixed into it.
@@ -87,6 +123,8 @@ func (c *Connection) open(ctx context.Context, subsystem string, opts ShellOptio
 		s := &Stream{
 			owner: c, lease: l, session: session, output: output, sink: sink,
 			onError: opts.OnError, done: make(chan struct{}),
+			input: make(chan streamWrite), initialized: make(chan struct{}),
+			shell: subsystem == "",
 		}
 		if !l.bind(s.abort) {
 			s.abort()
@@ -113,6 +151,9 @@ func (c *Connection) open(ctx context.Context, subsystem string, opts ShellOptio
 			publish(result{err: ctx.Err()})
 		default:
 			publish(result{stream: s})
+			// Publish before starting the first write: its echoed output may
+			// need the caller's reader before stdin can make progress.
+			c.workers.Go(func() { s.writeInput(opts.InitCommand) })
 		}
 	}()
 	select {
@@ -135,7 +176,7 @@ func (c *Connection) open(ctx context.Context, subsystem string, opts ShellOptio
 }
 
 func (s *Stream) startShell(opts ShellOptions) error {
-	s.session.Stdout, s.session.Stderr = s.sink, s.sink
+	s.session.Stdout, s.session.Stderr = streamOutput{s}, streamOutput{s}
 	for _, value := range opts.Env {
 		name, value, ok := strings.Cut(value, "=")
 		if !ok || name == "" || strings.ContainsRune(name, '\x00') || strings.ContainsRune(value, '\x00') {
@@ -154,12 +195,53 @@ func (s *Stream) startShell(opts ShellOptions) error {
 		return fmt.Errorf("start SSH shell: %w", err)
 	}
 	s.owner.workers.Go(func() { s.finish(s.session.Wait()) })
-	if opts.InitCommand != "" {
-		if _, err := io.WriteString(s.stdin, opts.InitCommand+"\n"); err != nil {
-			return fmt.Errorf("write SSH initial command: %w", err)
+	return nil
+}
+
+func (s *Stream) writeInput(initial string) {
+	select {
+	case <-s.lease.done:
+		s.completeInitialization()
+		return
+	default:
+	}
+	if initial != "" {
+		_, err := io.WriteString(s.stdin, initial+"\n")
+		if err != nil {
+			s.inputFailed(fmt.Errorf("write SSH initial command: %w", err))
+			s.completeInitialization()
+			return
 		}
 	}
-	return nil
+	s.completeInitialization()
+	for {
+		select {
+		case <-s.lease.done:
+			return
+		case request := <-s.input:
+			n, err := s.stdin.Write(request.data)
+			if err != nil {
+				s.inputFailed(fmt.Errorf("write SSH input: %w", err))
+			}
+			request.done <- streamWriteResult{n: n, err: err}
+			if err != nil {
+				return
+			}
+		}
+	}
+}
+
+func (s *Stream) completeInitialization() {
+	s.initializedOnce.Do(func() { close(s.initialized) })
+}
+
+func (s *Stream) inputFailed(err error) {
+	select {
+	case <-s.lease.done:
+		// An explicit close/cancel already owns the view's final state.
+	default:
+		s.fail(err)
+	}
 }
 
 func (s *Stream) startSubsystem(name string) error {
@@ -179,7 +261,7 @@ func (s *Stream) startSubsystem(name string) error {
 		_, _ = io.Copy(io.Discard, stderr)
 	})
 	s.owner.workers.Go(func() {
-		_, err := io.Copy(s.sink, stdout)
+		_, err := io.Copy(streamOutput{s}, stdout)
 		s.finish(err)
 	})
 	return nil
@@ -191,6 +273,7 @@ func (s *Stream) finish(err error) {
 	s.sink.Close()
 	s.closeRemote()
 	s.lease.release(false)
+	s.completeInitialization()
 	close(s.done)
 }
 
@@ -202,11 +285,18 @@ func (s *Stream) Write(p []byte) (int, error) {
 		return 0, io.ErrClosedPipe
 	default:
 	}
-	n, err := s.stdin.Write(p)
-	if err != nil {
-		s.fail(fmt.Errorf("write SSH input: %w", err))
+	request := streamWrite{data: append([]byte(nil), p...), done: make(chan streamWriteResult, 1)}
+	select {
+	case <-s.lease.done:
+		return 0, io.ErrClosedPipe
+	case s.input <- request:
 	}
-	return n, err
+	select {
+	case <-s.lease.done:
+		return 0, io.ErrClosedPipe
+	case result := <-request.done:
+		return result.n, result.err
+	}
 }
 
 func (s *Stream) fail(err error) {
@@ -222,12 +312,22 @@ func (s *Stream) closeRemote() {
 	s.remoteCloseOnce.Do(func() {
 		// Session.Close can block on network I/O. Keep it off the caller/UI thread
 		// and join it when the connection owner shuts down.
-		s.owner.workers.Go(func() { s.session.Close() })
+		s.owner.workers.Go(func() {
+			if s.shell {
+				// OpenSSH can keep a PTY alive while a canceled stdin write is
+				// flow-controlled. Hang up this shell's process group first;
+				// a peer that does not support signals still receives Close.
+				s.session.Signal(ssh.SIGHUP)
+			}
+			s.session.Close()
+		})
 	})
 }
 
 func (s *Stream) abort() {
 	s.abortOnce.Do(func() {
+		s.completeInitialization()
+		s.discardOutput.Store(true)
 		s.output.Close()
 		s.sink.Close()
 		s.closeRemote()

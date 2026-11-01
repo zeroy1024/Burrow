@@ -387,9 +387,12 @@ func (a *app) latestSessionEndpoint(current host, temporary bool) (host, hostID,
 	if temporary {
 		return current, -1, false
 	}
+	currentFiles := current.protocol == "sftp" || current.protocol == "ftp"
 	for index, saved := range a.hosts {
-		if saved.session.ID == current.session.ID && saved.protocol == current.protocol {
-			return cloneHostEndpoint(saved), hostID(index), !saved.session.UpdatedAt.Equal(current.session.UpdatedAt)
+		savedFiles := saved.protocol == "sftp" || saved.protocol == "ftp"
+		if saved.session.ID == current.session.ID && savedFiles == currentFiles {
+			changed := saved.protocol != current.protocol || !saved.session.UpdatedAt.Equal(current.session.UpdatedAt)
+			return cloneHostEndpoint(saved), hostID(index), changed
 		}
 	}
 	return current, -1, false

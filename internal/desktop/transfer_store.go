@@ -20,10 +20,17 @@ import (
 
 type storedTransferQueue struct {
 	Version     int                        `json:"version"`
+	NextBatchID int                        `json:"nextBatchId"`
+	Batches     []storedTransferBatch      `json:"batches"`
 	NextID      int                        `json:"nextId"`
 	Sessions    []storedTransferSession    `json:"sessions"`
 	Connections []storedTransferConnection `json:"connections"`
 	Tasks       []storedTransferTask       `json:"tasks"`
+}
+
+type storedTransferBatch struct {
+	ID     int `json:"id"`
+	Policy int `json:"policy"`
 }
 
 type storedTransferSession struct {
@@ -41,6 +48,7 @@ type storedTransferConnection struct {
 
 type storedTransferTask struct {
 	ID             int                 `json:"id"`
+	Batch          int                 `json:"batch"`
 	Session        int                 `json:"session"`
 	Entry          fileclient.Entry    `json:"entry"`
 	State          transferState       `json:"state"`
@@ -61,15 +69,19 @@ type storedTransferTask struct {
 }
 
 type storedTransferNode struct {
-	Source      string                `json:"source"`
-	Destination string                `json:"destination,omitempty"`
-	Temporary   string                `json:"temporary,omitempty"`
-	Entry       fileclient.Entry      `json:"entry"`
-	Approved    *fileclient.Entry     `json:"approved,omitempty"`
-	Children    []*storedTransferNode `json:"children,omitempty"`
-	Total       int64                 `json:"total"`
-	Done        bool                  `json:"done,omitempty"`
-	Skipped     bool                  `json:"skipped,omitempty"`
+	Source       string                `json:"source"`
+	Destination  string                `json:"destination,omitempty"`
+	Temporary    string                `json:"temporary,omitempty"`
+	Entry        fileclient.Entry      `json:"entry"`
+	Committing   bool                  `json:"committing,omitempty"`
+	CommitLegacy bool                  `json:"commitLegacy,omitempty"`
+	Staged       *fileclient.Entry     `json:"staged,omitempty"`
+	Digest       string                `json:"digest,omitempty"`
+	Approved     *fileclient.Entry     `json:"approved,omitempty"`
+	Children     []*storedTransferNode `json:"children,omitempty"`
+	Total        int64                 `json:"total"`
+	Done         bool                  `json:"done,omitempty"`
+	Skipped      bool                  `json:"skipped,omitempty"`
 }
 
 // prepareTransferQuit leaves the application context alive until every transfer
@@ -153,7 +165,7 @@ func (a *app) finishTransferQuitIfReady() {
 }
 
 func (a *app) transferSnapshot() *storedTransferQueue {
-	result := &storedTransferQueue{Version: 1, NextID: a.transfers.nextID,
+	result := &storedTransferQueue{Version: 2, NextID: a.transfers.nextID, NextBatchID: a.transfers.nextBatchID,
 		Sessions: []storedTransferSession{}, Connections: []storedTransferConnection{}, Tasks: []storedTransferTask{}}
 	groups := map[*sshConnectionGroup]int{}
 	groupID := func(group *sshConnectionGroup) int {
@@ -174,6 +186,7 @@ func (a *app) transferSnapshot() *storedTransferQueue {
 		return id
 	}
 	sessions := map[*fileSession]int{}
+	batches := map[*transferBatch]bool{}
 	for _, task := range a.transfers.tasks {
 		sessionID := sessions[task.session]
 		if sessionID == 0 {
@@ -186,17 +199,21 @@ func (a *app) transferSnapshot() *storedTransferQueue {
 			})
 		}
 		job := task.job
+		if !batches[job.batch] {
+			batches[job.batch] = true
+			result.Batches = append(result.Batches, storedTransferBatch{ID: job.batch.id, Policy: int(job.batch.policy.Load())})
+		}
 		entry := task.entry
 		if job.root != nil && job.root.destination != "" {
 			entry.name = transferBase(!job.sourceRemote, job.root.destination)
 		}
-		stored := storedTransferTask{ID: task.id, Session: sessionID,
+		stored := storedTransferTask{ID: task.id, Session: sessionID, Batch: job.batch.id,
 			Entry: fileclient.Entry{Name: entry.name, Size: entry.size, Directory: entry.dir, Symlink: entry.symlink,
 				Modified: entry.modified, Owner: entry.owner, Permissions: entry.permissions},
 			State: task.state, Transferred: task.transferred, Started: task.started, Completed: task.completed,
 			Error: task.errorText, CleanupPending: task.cleanupPending || task.removeRequested,
 			SourceRemote: job.sourceRemote, SourcePath: job.sourcePath, TargetPath: job.targetPath,
-			Name: job.name, Policy: job.policy, Total: job.total, DoneBytes: job.doneBytes,
+			Name: job.name, Policy: int(job.batch.policy.Load()), Total: job.total, DoneBytes: job.doneBytes,
 			Root: snapshotTransferNode(job.root)}
 		for name := range job.temporary {
 			stored.Temporary = append(stored.Temporary, name)
@@ -212,7 +229,7 @@ func snapshotTransferNode(node *transferNode) *storedTransferNode {
 		return nil
 	}
 	stored := &storedTransferNode{Source: node.source, Destination: node.destination, Temporary: node.temporary,
-		Entry: node.entry, Approved: node.approved, Total: node.total, Done: node.done, Skipped: node.skipped}
+		Entry: node.entry, Approved: node.approved, Committing: node.committing, CommitLegacy: node.commitLegacy, Staged: node.staged, Digest: node.digest, Total: node.total, Done: node.done, Skipped: node.skipped}
 	for _, child := range node.children {
 		stored.Children = append(stored.Children, snapshotTransferNode(child))
 	}
@@ -252,6 +269,9 @@ func (a *app) restoreTransfers() (err error) {
 		}
 		return err
 	}
+	if err := migrateTransferQueue(&saved); err != nil {
+		return err
+	}
 	if err := validateTransferQueue(&saved); err != nil {
 		return err
 	}
@@ -287,9 +307,15 @@ func (a *app) restoreTransfers() (err error) {
 		}
 		sessions[stored.ID] = session
 	}
+	batches := map[int]*transferBatch{}
+	for _, stored := range saved.Batches {
+		batch := &transferBatch{id: stored.ID}
+		batch.policy.Store(int32(stored.Policy))
+		batches[stored.ID] = batch
+	}
 	for _, stored := range saved.Tasks {
 		job := &transferJob{sourceRemote: stored.SourceRemote, sourcePath: stored.SourcePath,
-			targetPath: stored.TargetPath, name: stored.Name, policy: stored.Policy,
+			targetPath: stored.TargetPath, name: stored.Name, policy: stored.Policy, batch: batches[stored.Batch],
 			root: restoreTransferNode(stored.Root), total: stored.Total, doneBytes: stored.DoneBytes,
 			temporary: map[string]struct{}{}}
 		for _, name := range stored.Temporary {
@@ -307,7 +333,7 @@ func (a *app) restoreTransfers() (err error) {
 			state: state, transferred: stored.Transferred, total: stored.Total, started: stored.Started,
 			completed: stored.Completed, errorText: stored.Error, cleanupPending: stored.CleanupPending, job: job})
 	}
-	q.nextID = saved.NextID
+	q.nextID, q.nextBatchID = saved.NextID, saved.NextBatchID
 	return nil
 }
 
@@ -316,7 +342,7 @@ func restoreTransferNode(stored *storedTransferNode) *transferNode {
 		return nil
 	}
 	node := &transferNode{source: stored.Source, destination: stored.Destination, temporary: stored.Temporary,
-		entry: stored.Entry, approved: stored.Approved, total: stored.Total, done: stored.Done, skipped: stored.Skipped}
+		entry: stored.Entry, approved: stored.Approved, committing: stored.Committing, commitLegacy: stored.CommitLegacy, staged: stored.Staged, digest: stored.Digest, total: stored.Total, done: stored.Done, skipped: stored.Skipped}
 	for _, child := range stored.Children {
 		node.children = append(node.children, restoreTransferNode(child))
 	}
@@ -369,9 +395,68 @@ func sameTransferEndpoint(left, right storedSession) bool {
 		left.Auth == right.Auth && left.KeyID == right.KeyID && left.ID == right.ID
 }
 
+// Version 1 used one private session per enqueue batch, but only stored policy
+// per task and had no commit acknowledgement state. Preserve those boundaries;
+// a pending old part must be reconciled before it can be uploaded again.
+func migrateTransferQueue(saved *storedTransferQueue) error {
+	if saved.Version == 2 {
+		return nil
+	}
+	if saved.Version != 1 {
+		return errors.New("传输记录版本无效")
+	}
+	policies := map[int]map[int]bool{}
+	for _, task := range saved.Tasks {
+		if policies[task.Session] == nil {
+			policies[task.Session] = map[int]bool{}
+		}
+		if task.Policy != 0 {
+			policies[task.Session][task.Policy] = true
+		}
+	}
+	decisions := map[int]int{}
+	for id, values := range policies {
+		policy := 0
+		if len(values) == 1 {
+			for value := range values {
+				policy = value
+			}
+		}
+		decisions[id] = policy
+		saved.Batches = append(saved.Batches, storedTransferBatch{ID: id, Policy: policy})
+		saved.NextBatchID = max(saved.NextBatchID, id)
+	}
+	var markPending func(*storedTransferNode)
+	markPending = func(node *storedTransferNode) {
+		if node == nil {
+			return
+		}
+		if node.Temporary != "" && !node.Done && !node.Skipped && !node.Committing {
+			node.CommitLegacy = true
+		}
+		for _, child := range node.Children {
+			markPending(child)
+		}
+	}
+	for index := range saved.Tasks {
+		task := &saved.Tasks[index]
+		task.Batch, task.Policy = task.Session, decisions[task.Session]
+		markPending(task.Root)
+	}
+	saved.Version = 2
+	return nil
+}
+
 func validateTransferQueue(saved *storedTransferQueue) error {
-	if saved.Version != 1 || saved.NextID < 0 {
+	if saved.Version != 2 || saved.NextID < 0 || saved.NextBatchID < 0 {
 		return errors.New("传输记录版本或计数无效")
+	}
+	batches := map[int]storedTransferBatch{}
+	for _, batch := range saved.Batches {
+		if batch.ID <= 0 || batch.ID > saved.NextBatchID || batches[batch.ID].ID != 0 || batch.Policy < 0 || batch.Policy > 3 {
+			return errors.New("传输批次无效")
+		}
+		batches[batch.ID] = batch
 	}
 	groups := map[int]storedTransferConnection{}
 	for _, group := range saved.Connections {
@@ -428,9 +513,9 @@ func validateTransferQueue(saved *storedTransferQueue) error {
 	ids := map[int]bool{}
 	for _, task := range saved.Tasks {
 		if task.ID <= 0 || task.ID > saved.NextID || ids[task.ID] || sessions[task.Session].ID == 0 ||
-			task.State < transferQueued || task.State > transferFailed || task.Transferred < 0 ||
+			task.State < transferQueued || task.State > transferFailed || task.Transferred < 0 || batches[task.Batch].ID == 0 || task.Policy != batches[task.Batch].Policy ||
 			task.Total < 0 || task.DoneBytes < 0 || task.Entry.Size < 0 || task.Policy < 0 || task.Policy > 3 ||
-			task.CleanupPending && task.State == transferDone ||
+			task.CleanupPending && task.State != transferFailed ||
 			!transferSafeName(task.Name) || !transferSafeName(task.Entry.Name) ||
 			task.SourcePath == "" || task.TargetPath == "" || strings.ContainsRune(task.SourcePath+task.TargetPath, '\x00') {
 			return errors.New("传输任务记录无效")
@@ -511,6 +596,23 @@ func validateTransferNode(node *storedTransferNode, sourceRemote bool, source, d
 	if node == nil || depth > 256 || node.Source != source || !canonicalTransferPath(sourceRemote, source) ||
 		!transferSafeName(node.Entry.Name) || node.Entry.Symlink || node.Entry.Size < 0 || node.Total < 0 || node.Done && node.Skipped {
 		return 0, 0, errors.New("传输清单节点无效")
+	}
+	if node.Committing && node.CommitLegacy || (node.Committing || node.CommitLegacy) &&
+		(node.Entry.Directory || node.Done || node.Skipped || node.Temporary == "") {
+		return 0, 0, errors.New("传输提交阶段无效")
+	}
+	if node.Digest != "" {
+		decoded, err := hex.DecodeString(node.Digest)
+		if err != nil || len(decoded) != 32 || hex.EncodeToString(decoded) != node.Digest || node.Entry.Directory {
+			return 0, 0, errors.New("传输内容基线无效")
+		}
+	}
+	if node.Staged != nil && (node.Entry.Directory || node.Staged.Directory || node.Staged.Symlink ||
+		node.Staged.Size != node.Entry.Size || node.Digest == "") {
+		return 0, 0, errors.New("传输暂存基线无效")
+	}
+	if node.Committing && (node.Staged == nil || node.Digest == "") {
+		return 0, 0, errors.New("传输提交缺少已验证基线")
 	}
 	targetRemote := !sourceRemote
 	if node.Destination != "" {

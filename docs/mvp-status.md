@@ -23,13 +23,25 @@
 
 ## 验证证据
 
-- 最终原有 `go test ./...`、`go test -race ./...`、`go vet ./...`、`go build ./...`、gofmt与diff检查通过。MyGo darwin/arm64原生打包与签名通过，产物 `build/darwin-arm64/SSH Desk.app`，18.5MB。
+- 最终原有 `go test ./...`、`go test -race ./...`、`go vet ./...`、`go build ./...`、gofmt与diff检查通过。MyGo darwin/arm64原生打包与签名通过，产物 `build/darwin-arm64/SSH Desk.app`，18.7MB。
 - 已有协议集成：受控 Docker loopback fixture，`go test -race -tags=integration ./internal/sshclient ./internal/fileclient -count=1 -timeout=180s`，0 skip、0 fail。
 - 临时额外 smoke：20个不同分支最终通过，包含local真实CRUD/Lstat/取消、SFTP偏移与递归/七种编码、SSH key跳板与独立父连接、Env/InitCommand/PTY/Exec上限取消、Keepalive，以及FTP六组合/不可信CA拒绝。临时程序、服务和秘密已回收，没有新增永久测试。
-- 协议日志保留于本轮 `/private/tmp/sshdesk-mvp-verify-zd9q9zub`。它们验证SDK与命令式I/O，未执行应用GUI、队列弹窗和像素验收；不将skip、编译或未运行用例称为通过。
+- 协议日志保留于本轮 `/private/tmp/sshdesk-mvp-verify-zd9q9zub`。这一阶段验证SDK与命令式I/O，不将skip、编译或未运行用例称为通过。
 
 ## 使用限制
 
-强制杀进程/断电没有逐笔崩溃日志；正常退出队列才有完整恢复保证。源/目标符号链接传输不支持。FTP主动模式需要可回连网络条件，TLS需要服务器提供可信证书。缺少内嵌公钥的旧加密PEM在无口令迁移时明确失败并保留原数据，不伪造fingerprint。
+强制杀进程/断电没有逐笔崩溃日志；正常退出会收敛并记录队列；目录续传核验已完成子项，提交不确定时核对状态与摘要，不保证服务器支持的原子语义超过协议能力。源/目标符号链接传输不支持。FTP主动模式需要可回连网络条件，TLS需要服务器提供可信证书。缺少内嵌公钥的旧加密PEM在无口令迁移时明确失败并保留原数据，不伪造fingerprint。
 
 保持固定SDK和不重设计UI的约束下，本轮选择真实原生终端而不自行重写VT或使用私有接口。上表显示偏好和滚动条差异仍是具体未完成项，不能视为原设计全部能力已在真实终端达到同等效果。
+
+
+## 第二轮应用控制器验证
+
+`887f4b1`后的复核修复了通道初始化竞争、PTY尺寸覆盖、隐藏监控重启、长初始命令背压、协议切换重连、同批冲突、同名并发、目录续传及不确定提交。
+
+真实MyGo隐藏窗口事件循环运行10个进程用例、11条业务分支，最终退出均0且无race；包含暂停→保存v2 journal→新进程离线恢复→继续及SHA-256校验、取消清理和延迟RNTO回复的不确定提交恢复。证据：[本地汇总](/private/tmp/sshdesk-queue-native-x8expv1d/verification-summary.json)。临时工具/服务/秘密已回收；原失败验证器日志保留并明确未算通过。没有原GUI点击、截图或像素验收。
+
+持有保存目录的浏览视图在显式重连时采用最新配置；后台传输保持入队的端点/跳板/凭据版本快照。重启后两者都不自动连接，不将跨workspace和queue的独立恢复对象说成仍复用同一个活跃transport。
+
+
+补充复验：一次取消终止同批未完成任务和待处理冲突，保留已完成文件及独立批次，真实 `.part` 清理为零；真实隐藏原生进程 `-race` 退出0。补充证据位于 `/private/tmp/sshdesk-queue-cancel-b5wbz7br/verification-summary.json`，临时服务和文件均已回收。前11条分支没有为凑数量重复运行。

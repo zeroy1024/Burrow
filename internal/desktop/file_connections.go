@@ -60,15 +60,20 @@ func (a *app) openFileClient(ctx context.Context, session *fileSession, complete
 		}
 		complete(client, err)
 	}
-	deliver := func(client fileclient.Client, err error) {
+	deliver := func(client fileclient.Client, err error, release context.CancelFunc) {
 		if client != nil {
 			a.sshWorkers.Go(func() {
+				if release != nil {
+					defer release()
+				}
 				select {
 				case <-ctx.Done():
 					client.Close()
 				case <-client.Done():
 				}
 			})
+		} else if release != nil {
+			release()
 		}
 		a.window.Update(func() { finish(client, err) })
 	}
@@ -99,7 +104,7 @@ func (a *app) openFileClient(ctx context.Context, session *fileSession, complete
 				}
 			}
 			if err != nil {
-				deliver(nil, err)
+				deliver(nil, err, nil)
 				return
 			}
 			options := fileOptions{Encoding: "UTF-8", FTPMode: "passive", FTPTLS: "none"}
@@ -120,7 +125,7 @@ func (a *app) openFileClient(ctx context.Context, session *fileSession, complete
 				})
 			}
 			secret = ""
-			deliver(client, err)
+			deliver(client, err, nil)
 		})
 		return nil
 	}
@@ -131,12 +136,39 @@ func (a *app) openFileClient(ctx context.Context, session *fileSession, complete
 			encoding = h.session.Files.Encoding
 		}
 		a.sshWorkers.Go(func() {
-			err := connection.WaitChannelReady(ctx)
+			clientCtx, cancelClient := context.WithCancel(ctx)
+			setupCtx, cancelSetup := context.WithTimeout(ctx, 20*time.Second)
+			stopSetup := context.AfterFunc(setupCtx, cancelClient)
 			var client fileclient.Client
-			if err == nil {
-				client, err = fileclient.NewSFTP(ctx, connection, fileclient.SFTPOptions{Encoding: encoding})
+			var err error
+			for {
+				if err = connection.WaitChannelReady(setupCtx); err != nil {
+					break
+				}
+				if err = fileclient.WaitSFTPReady(setupCtx, connection); err != nil {
+					break
+				}
+				client, err = fileclient.NewSFTP(clientCtx, connection, fileclient.SFTPOptions{Encoding: encoding})
+				if !errors.Is(err, sshclient.ErrChannelPending) && !errors.Is(err, fileclient.ErrSFTPInitPending) {
+					break
+				}
 			}
-			deliver(client, err)
+			// The setup budget bounds waits and initialization, while the successful
+			// file subsystem keeps its independent lifetime until the caller closes it.
+			stopSetup()
+			setupErr := setupCtx.Err()
+			cancelSetup()
+			if setupErr != nil {
+				err = setupErr
+			}
+			if err != nil {
+				cancelClient()
+				if client != nil {
+					err = errors.Join(err, client.Close())
+					client = nil
+				}
+			}
+			deliver(client, err, cancelClient)
 		})
 	}
 	a.acquireSSH(request)
@@ -153,7 +185,9 @@ func (a *app) startFileSession(session *fileSession, refresh bool) {
 		if changed {
 			session.ftpSecret = ""
 		}
-		if endpoint.protocol != "ftp" {
+		if endpoint.protocol == "ftp" {
+			session.connection = nil
+		} else {
 			session.connection = a.reconnectSSHGroup(session.connection, endpoint)
 		}
 	}

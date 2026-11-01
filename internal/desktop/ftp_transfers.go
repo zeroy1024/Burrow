@@ -44,6 +44,7 @@ type transferTask struct {
 type transferQueueState struct {
 	tasks        []*transferTask
 	nextID       int
+	nextBatchID  int
 	collapsed    bool
 	filter       int
 	displaySpeed float64
@@ -100,6 +101,7 @@ func (a *app) enqueueFiles(
 	targetPath string,
 ) {
 	var snapshot *fileSession
+	var batch *transferBatch
 	for _, entry := range entries {
 		if !transferSafeName(entry.name) {
 			uikit.Toast(c, uikit.ToastProps{ID: "transfer-invalid-name", Tone: uikit.ToneDanger,
@@ -108,6 +110,9 @@ func (a *app) enqueueFiles(
 		}
 		if snapshot == nil {
 			snapshot = a.snapshotTransferSession(session)
+			a.transfers.nextBatchID++
+			batch = &transferBatch{id: a.transfers.nextBatchID}
+			batch.policy.Store(int32(transferPolicy(a.prefs.ConflictPolicy)))
 		}
 		a.transfers.nextID++
 		sourcePath := entry.path
@@ -121,7 +126,7 @@ func (a *app) enqueueFiles(
 		task := &transferTask{id: a.transfers.nextID, session: snapshot, view: session, entry: entry,
 			sourceRemote: sourceRemote, sourcePath: sourcePath, targetPath: targetPath, state: transferQueued}
 		task.job = &transferJob{sourceRemote: sourceRemote, sourcePath: sourcePath,
-			targetPath: targetPath, name: entry.name, policy: transferPolicy(a.prefs.ConflictPolicy),
+			targetPath: targetPath, name: entry.name, policy: transferPolicy(a.prefs.ConflictPolicy), batch: batch,
 			temporary: map[string]struct{}{}}
 		a.transfers.tasks = append(a.transfers.tasks, task)
 	}

@@ -154,7 +154,7 @@ func (c *localClient) Mkdir(ctx context.Context, name string) error {
 	return os.Mkdir(name, 0755)
 }
 
-func (c *localClient) Rename(ctx context.Context, oldName, newName string) error {
+func (c *localClient) Rename(ctx context.Context, oldName, newName string, options ...RenameOptions) error {
 	oldName, err := c.path(ctx, oldName)
 	if err != nil {
 		return err
@@ -162,6 +162,12 @@ func (c *localClient) Rename(ctx context.Context, oldName, newName string) error
 	newName, err = c.path(ctx, newName)
 	if err != nil {
 		return err
+	}
+	if len(options) > 0 && options[0].NoReplace {
+		if err := renameLocalNoReplace(oldName, newName); err != nil {
+			return &os.LinkError{Op: "rename", Old: oldName, New: newName, Err: err}
+		}
+		return nil
 	}
 	return os.Rename(oldName, newName)
 }

@@ -62,7 +62,7 @@ func (a *app) applyFileAction(c *ui.Context, dialog *fileActionDialog) bool {
 				if err == nil {
 					err = fs.ErrExist
 				} else if errors.Is(err, fs.ErrNotExist) {
-					err = client.Rename(ctx, selected[0].path, reveal)
+					err = client.Rename(ctx, selected[0].path, reveal, fileclient.RenameOptions{NoReplace: true})
 				}
 			}
 		case "delete":

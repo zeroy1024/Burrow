@@ -97,33 +97,40 @@ func (a *app) startSSHSession(session *remoteSession, refresh bool) {
 		if options := session.config.SSH; options != nil {
 			env, initCommand = slices.Clone(options.Env), options.InitCommand
 		}
+		onError := func(err error) {
+			a.window.Update(func() {
+				if session.ssh == run && ctx.Err() == nil && session.state != connectionFailed {
+					session.state = connectionFailed
+					showSSHMessage(session, err.Error())
+				}
+			})
+		}
 		a.sshWorkers.Go(func() {
 			setupCtx, cancelSetup := context.WithTimeout(channelCtx, 2*time.Minute)
 			defer cancelSetup()
 			stopSetup := context.AfterFunc(setupCtx, cancelChannel)
+			defer stopSetup()
 			var conn *sshclient.Conn
-			err := connection.WaitChannelReady(setupCtx)
-			if err == nil {
+			var err error
+			for {
+				err = connection.WaitChannelReady(setupCtx)
+				if err != nil {
+					break
+				}
 				conn, err = connection.OpenShell(channelCtx, sshclient.ShellOptions{
 					Columns: columns, Rows: rows, Env: env, InitCommand: initCommand,
-					OnError: func(err error) {
-						a.window.Update(func() {
-							if session.ssh == run && ctx.Err() == nil {
-								session.state = connectionFailed
-								showSSHMessage(session, err.Error())
-							}
-						})
-					},
+					OnError: onError,
 				})
-			}
-			if !stopSetup() && setupCtx.Err() != nil {
-				err = setupCtx.Err()
-				if conn != nil {
-					conn.Close()
+				if !errors.Is(err, sshclient.ErrChannelPending) {
+					break
 				}
 			}
 			if err != nil {
+				setupErr := setupCtx.Err()
 				cancelChannel()
+				if setupErr != nil {
+					err = setupErr
+				}
 			}
 			a.window.Update(func() {
 				a.completeSSHRequest(request)
@@ -137,9 +144,29 @@ func (a *app) startSSHSession(session *remoteSession, refresh bool) {
 					request.failed(err)
 					return
 				}
+				if channelCtx.Err() != nil || session.state == connectionFailed {
+					conn.Close()
+					return
+				}
 				run.conn = conn
 				a.attachSSH(session, run)
 			})
+			if err != nil {
+				return
+			}
+			// The reader must attach before a large initial command can finish:
+			// its remote echo may exceed the channel's receive window.
+			select {
+			case <-conn.InitializationDone():
+			case <-setupCtx.Done():
+			}
+			stopSetup()
+			if setupCtx.Err() != nil {
+				cancelChannel()
+				if ctx.Err() == nil {
+					onError(setupCtx.Err())
+				}
+			}
 		})
 	}
 	a.acquireSSH(request)

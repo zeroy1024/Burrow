@@ -571,7 +571,7 @@ func (c *ftpClient) pathCommand(ctx context.Context, name string, expected int, 
 	})
 }
 
-func (c *ftpClient) Rename(ctx context.Context, oldName, newName string) error {
+func (c *ftpClient) Rename(ctx context.Context, oldName, newName string, options ...RenameOptions) error {
 	oldWire, err := c.wirePath(oldName)
 	if err != nil {
 		return err
@@ -579,6 +579,16 @@ func (c *ftpClient) Rename(ctx context.Context, oldName, newName string) error {
 	newWire, err := c.wirePath(newName)
 	if err != nil {
 		return err
+	}
+	// FTP provides no atomic no-replace RNTO variant. This preflight prevents
+	// replacing an already visible target, but cannot exclude another client
+	// creating it between LIST and RNTO.
+	if len(options) > 0 && options[0].NoReplace {
+		if _, err := c.Stat(ctx, newName); err == nil {
+			return fs.ErrExist
+		} else if !errors.Is(err, fs.ErrNotExist) {
+			return err
+		}
 	}
 	return c.run(ctx, func(context.Context) error {
 		oldWire, err := c.absolutePath(oldWire)

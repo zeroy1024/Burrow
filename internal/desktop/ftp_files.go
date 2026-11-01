@@ -171,6 +171,9 @@ func (a *app) resolveFileConflicts(c *ui.Context) {
 	if conflict == nil {
 		return
 	}
+	if conflict.applyAll {
+		conflict.task.job.batch.policy.Store(int32(conflict.choice))
+	}
 	select {
 	case conflict.reply <- transferConflictChoice{choice: conflict.choice, applyAll: conflict.applyAll}:
 	default:

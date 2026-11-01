@@ -111,7 +111,7 @@ func (m *monitorState) stop() {
 func (a *app) updateMonitor(c *ui.Context) {
 	m := &a.monitor
 	var session *remoteSession
-	if a.statusVisible && a.activeSection() == sectionSSH {
+	if a.statusVisible && a.activeSection() == sectionSSH && a.window != nil && a.window.IsVisible() {
 		if tab := a.currentTab(); tab != nil {
 			session = tab.focused
 		}

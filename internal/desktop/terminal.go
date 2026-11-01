@@ -164,8 +164,10 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 			}
 			session.contentWidth, session.contentHeight = rect.W, rect.H
 		}
-		session.columns = max(1, int((rect.W-2*p.ContentSide)/a.cellWidth))
-		session.rows = max(1, int((rect.H-topPadding-bottomPadding)/prefs.LineHeight))
+		if session.terminal == nil {
+			session.columns = max(1, int((rect.W-2*p.ContentSide)/a.cellWidth))
+			session.rows = max(1, int((rect.H-topPadding-bottomPadding)/prefs.LineHeight))
+		}
 	} else {
 		c.After(p.FrameInterval)
 	}
