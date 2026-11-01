@@ -8,8 +8,8 @@ import (
 
 	"sshdesk/internal/termtheme"
 	"sshdesk/internal/theme"
+	"sshdesk/internal/uikit"
 
-	"github.com/egoist/mygo/plugins/glass"
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/shader"
 )
@@ -44,11 +44,11 @@ func (a *app) terminals(c *ui.Context, size ui.Point) {
 			}
 		}
 		area.Children(func() {
-			workspaceCard(c).Fill().MinWidth(0).Center().Gap(t.Space.N12).Children(func() {
+			uikit.Card(c).Fill().MinWidth(0).Center().Gap(t.Space.N12).Children(func() {
 				ui.Icon(c, terminalIcon).Size(t.C.Pane.EmptyIconSize, t.C.Pane.EmptyIconSize).TextColor(tokenColor(t.Color.Text.Secondary))
 				ui.Text(c, "选择一台主机，开始会话").FontSize(t.C.Pane.EmptyTitleSize).FontWeight(t.C.Pane.EmptyTitleWeight)
 				ui.Text(c, "左侧主机可拖入终端窗格").FontSize(t.Font.Size.Body).TextColor(tokenColor(t.Color.Text.Secondary))
-				button(c, "添加 SSH 主机").OnClick(func() { a.startHostDraft() })
+				uikit.Button(c, "添加 SSH 主机", uikit.ButtonProps{}).OnClick(func() { a.startHostDraft() })
 			})
 		})
 		return
@@ -152,9 +152,7 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 		topPadding += p.HeaderHeight
 	}
 	// Only the inner card clips. Its wrapper owns the focus border and overlay hairline.
-	pane := ui.Box(c).Key(fmt.Sprintf("pane-wrap-%d", session.id)).Absolute().
-		Left(rect.X).Top(rect.Y).Size(rect.W, rect.H).Bind(&session.frame).
-		MinWidth(0).MinHeight(0).Radius(p.Radius).Label(h.name + " 演示终端")
+	pane := uikit.Pane(c, fmt.Sprintf("pane-wrap-%d", session.id), h.name+" 演示终端", rect, surface).Bind(&session.frame)
 	a.paneMotion(c, pane, tab, session)
 	_, catalogActive, _ := a.catalogHostTransfer()
 	frozen := !session.revealing && (a.drag != nil || catalogActive || a.resizing != nil ||
@@ -182,33 +180,10 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 	})
 	scroll := &session.scroll
 	focused, hovered := tab.focused == session, pane.Hovered()
-	opacity, saturation, footerOpacity := float32(1), float32(1), float32(1)
-	titleColor, loginColor := tokenColor(f.NameFocused), tokenColor(p.Host)
-	titleWeight := f.NameWeightFocused
-	if multiple && !focused {
-		opacity, saturation, footerOpacity = f.ContentOpacityUnfocused, f.ContentSaturateUnfocused, f.StatusOpacityUnfocused
-		titleColor, loginColor, titleWeight = tokenColor(f.NameUnfocused), tokenColor(f.HostUnfocused), f.NameWeightUnfocused
-		if hovered {
-			opacity, saturation = f.ContentOpacityHover, f.ContentSaturateHover
-			titleColor = tokenColor(f.NameFocused)
-		}
-	}
-	opacity = animateVisual(pane, "output-opacity", opacity, f.Transition)
-	saturation = animateVisual(pane, "output-saturation", saturation, f.Transition)
-	footerOpacity = animateVisual(pane, "footer-opacity", footerOpacity, f.Transition)
-	if !multiple {
-		opacity, saturation, footerOpacity = 1, 1, 1
-	}
-	titleColor = pane.AnimateColor("host-color", titleColor, tokenTween(f.Transition))
-	loginColor = pane.AnimateColor("login-color", loginColor, tokenTween(f.Transition))
+	appearance := uikit.PaneVisualStyle(pane, focused, hovered, multiple, surface)
 	var card, hairline ui.Element
 	pane.Children(func() {
-		card = ui.Column(c).Key("card").Absolute().Top(0).Right(0).Bottom(0).Left(0).
-			Radius(p.Radius).Background(background).Clip().
-			Draw(func(p *ui.Painter, r ui.Rect) {
-				// Absolute children paint after the scroll content, so paint its backdrop here.
-				p.Fill(r, background, t.C.Pane.Radius)
-			})
+		card = uikit.PaneCard(c, surface, background, t.C.Pane.Radius)
 		card.Children(func() {
 			// Move the native thumb outside the card's clip; the fading thumb is drawn below.
 			output := ui.Scroll(c.Key("output")).Fill().MinWidth(0).MinHeight(0).
@@ -225,11 +200,11 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 				0,
 			).Font(strings.Join(prefs.FontFamily, ", ")).FontSize(prefs.FontSize).
 				LetterSpacing(prefs.Tracking).TextColor(tokenColor(s.Foreground)).
-				Opacity(opacity).Cache().HandleInput(scroll.input).
+				Opacity(appearance.Opacity).Cache().HandleInput(scroll.input).
 				OnClick(func() { a.focusSession(tab, session) })
-			if saturation != 1 {
+			if appearance.Saturation != 1 {
 				output.Effect(terminalSaturation.Effect(shader.Options{
-					Uniforms: map[string]any{"Saturation": saturation},
+					Uniforms: map[string]any{"Saturation": appearance.Saturation},
 				}))
 			}
 			output.Children(func() {
@@ -242,27 +217,13 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 			terminalScrollbar(c, pane, scroll, terminalBackground)
 			var header ui.Element
 			if multiple {
-				header = ui.Row(c).Key("identity").Absolute().Top(0).Left(0).Height(p.HeaderHeight).Padding(
-					0,
-					0,
-					0,
-					p.HeaderPaddingLeft,
-				).Gap(p.HeaderGap).PassThrough()
+				header = uikit.PaneHeader(c, surface)
 				header.Children(func() {
-					labelColor, labelBackground := tokenColor(f.KbdText), tokenColor(f.KbdBg)
-					if focused {
-						labelColor, labelBackground = tokenColor(f.KbdTextFocused), tokenColor(f.KbdBgFocused)
-					}
 					number := slices.Index(tab.root.sessions(), session) + 1
-					ui.Text(c, fmt.Sprintf("⌘%d", number)).FontSize(f.KbdSize).FontWeight(f.KbdWeight).
-						FixedLineHeight(f.KbdLineHeight).SingleLine().Padding(f.KbdPaddingY, f.KbdPaddingX).Radius(f.KbdRadius).
-						Background(labelBackground).TextColor(labelColor)
+					uikit.PaneShortcut(c, fmt.Sprintf("⌘%d", number), focused, surface)
 					statusDot(c, session.state, t.Size.Dot)
-					tooltip(c, ui.Text(c, h.name).FontSize(p.HeaderFontSize).FontWeight(titleWeight).TextColor(titleColor).
-						SingleLine().Ellipsis("…").MinWidth(0).Shrink(1), fmt.Sprintf("%s · %s@%s:%d", h.name, h.user, h.address, h.port))
-					ui.Text(c, fmt.Sprintf("%s@%s:%d", h.user, h.address, h.port)).
-						Font(strings.Join(p.HostFamily, ", ")).FontSize(p.HostSize).TextColor(loginColor).
-						SingleLine().Ellipsis("…").Grow(1).MinWidth(0)
+					uikit.Tip(c, uikit.PaneTitle(c, h.name, appearance, surface), fmt.Sprintf("%s · %s@%s:%d", h.name, h.user, h.address, h.port))
+					uikit.PaneLogin(c, fmt.Sprintf("%s@%s:%d", h.user, h.address, h.port), appearance, surface)
 					if !focused {
 						terminalActivity(c, session, surface)
 					}
@@ -275,7 +236,7 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 			if multiple {
 				actionsWidth = 3*p.ActionWidth + 2*p.ActionGap
 			}
-			actions := ui.Box(c).Key("pane-actions").Absolute().Top(p.ActionTop).Right(p.ActionRight).Size(actionsWidth, p.ActionHeight)
+			actions := uikit.PaneActions(c, actionsWidth, surface)
 			x, y, over := pane.PointerPosition()
 			inActionBand := x >= pane.Bounds().W-actionsWidth-p.ActionRevealPadding && y <= p.HeaderHeight+p.ActionRight
 			nearActions := over && inActionBand
@@ -284,22 +245,19 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 			stacked := count > 1 && bounds.H > bounds.W
 			actions.Children(func() {
 				if !multiple {
-					ui.Box(c).Absolute().Top(0).Left(0).Size(actionsWidth, p.ActionHeight).Radius(p.ActionRadius).PassThrough().
-						Material(glass.Blur{Radius: a.glassRadius(c, p.ActionBlur)})
-					ui.Box(c).Absolute().Top(0).Left(0).Size(actionsWidth, p.ActionHeight).Radius(p.ActionRadius).PassThrough().
-						Background(background.Alpha(p.ActionTint))
+					uikit.PaneActionBackdrop(c, actionsWidth, a.glassRadius(c, p.ActionBlur), background, surface)
 				}
-				split := terminalIconButton(c, "分栏 "+h.name, sidebarIcon, surface).Absolute().Top(0).Left(0).Size(p.ActionWidth, p.ActionHeight).
+				split := uikit.PaneIconButton(c, "分栏 "+h.name, sidebarIcon, surface).Absolute().Top(0).Left(0).Size(p.ActionWidth, p.ActionHeight).
 					Disabled(count >= maxTerminalPanes || session.closing || !canSplit(session.layoutRect, dropRight) && !canSplit(session.layoutRect, dropBottom))
 				keyboardFocus = split.FocusVisible()
 				split.OnClick(func() { a.splitSession(session, stacked) })
 				if multiple {
-					expand := terminalIconButton(c, "放大或恢复 "+h.name, expandIcon, surface).Absolute().Top(0).Left(p.ActionWidth+p.ActionGap).Size(p.ActionWidth, p.ActionHeight)
+					expand := uikit.PaneIconButton(c, "放大或恢复 "+h.name, expandIcon, surface).Absolute().Top(0).Left(p.ActionWidth+p.ActionGap).Size(p.ActionWidth, p.ActionHeight)
 					keyboardFocus = keyboardFocus || expand.FocusVisible()
 					expand.OnClick(func() {
 						a.togglePaneZoom(tab, session)
 					})
-					close := terminalIconButton(c, "关闭窗格 "+h.name, closeIcon, surface).Absolute().Top(0).Left(2*(p.ActionWidth+p.ActionGap)).Size(p.ActionWidth, p.ActionHeight)
+					close := uikit.PaneIconButton(c, "关闭窗格 "+h.name, closeIcon, surface).Absolute().Top(0).Left(2*(p.ActionWidth+p.ActionGap)).Size(p.ActionWidth, p.ActionHeight)
 					keyboardFocus = keyboardFocus || close.FocusVisible()
 					close.OnClick(func() { a.closePane(session) })
 				}
@@ -309,14 +267,11 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 			if showForPane || nearActions || keyboardFocus {
 				target = 1
 			}
-			actionVisibility := animateVisual(actions, "visibility", target, f.Transition)
-			actions.Opacity(actionVisibility)
+			actionVisibility := uikit.StylePaneActions(actions, target, surface)
 			if multiple {
 				header.Right(p.HeaderPaddingRight + (actionsWidth+t.Space.N10)*actionVisibility)
 			}
-			ui.Row(c).Key("status").Absolute().Bottom(0).Left(0).Right(0).Height(status.HeightPane).
-				Opacity(footerOpacity).
-				Padding(0, status.PaddingX).Gap(status.GapPane).PassThrough().TextColor(tokenColor(status.Text)).Children(func() {
+			uikit.PaneFooter(c, appearance.FooterOpacity, surface).Children(func() {
 				badge := surface.C.Badge
 				label, tint := "已连接", tokenColor(badge.OkBg)
 				color := tokenColor(badge.OkText)
@@ -339,9 +294,7 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 				ui.Text(c, a.paneSizeLabel(session)).FontSize(status.FontSize).SingleLine()
 			})
 		})
-		hairline = ui.Box(c).Key("hairline").Absolute().Top(0).Right(0).Bottom(0).Left(0).
-			Radius(p.Radius).PassThrough()
-		applyShadow(hairline, p.Outline)
+		hairline = uikit.PaneHairline(c, surface)
 	})
 	paneReveal(c, card, session)
 	if a.lifted(session) {
@@ -360,53 +313,8 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 	return pane
 }
 
-func terminalIconButton(c *ui.Context, label string, icon *ui.SVG, surface *theme.Theme) ui.Element {
-	button := styleIconButton(ui.ButtonBase(c).Key(label).Label(label), surface)
-	tooltip(c, button, label)
-	size := surface.C.IconButton.IconSize
-	button.Children(func() { ui.Icon(c, icon).Size(size, size) })
-	return button
-}
-
 func (a *app) terminalScrollEdge(c *ui.Context, barHeight float32, bottom bool, background ui.Color) {
-	t := theme.Current()
-	fade := t.C.FadeBar
-	angle := float32(180)
-	if bottom {
-		angle = 0
-	}
-	band := func() ui.Element {
-		element := ui.Box(c).Absolute().Left(0).Right(0).Height(barHeight).PassThrough()
-		if bottom {
-			return element.Bottom(0)
-		}
-		return element.Top(0)
-	}
-	// Each layer progressively masks a stronger blur before tinting with the pane surface.
-	layers := [...]struct{ radius, solid, end float32 }{
-		{radius: fade.Blur1, solid: fade.Mask1Solid, end: fade.Mask1End},
-		{radius: fade.Blur2, solid: fade.Mask2Solid, end: fade.Mask2End},
-		{radius: fade.Blur3, solid: fade.Mask3Solid, end: fade.Mask3End},
-	}
-	if !a.translucencyEnabled(c) {
-		band().Background(background)
-		return
-	}
-	for _, layer := range layers {
-		band().Material(glass.Blur{
-			Radius: layer.radius,
-			Mask: &ui.LinearGradient{
-				From: tokenColor(fade.Tint), To: ui.Transparent,
-				Angle: angle, Start: layer.solid, End: layer.end,
-			},
-		})
-	}
-	band().LinearGradient(ui.LinearGradient{
-		Angle: angle,
-		Stops: []ui.GradientStop{
-			{Color: background.Alpha(fade.TintStart), At: 0},
-			{Color: background.Alpha(fade.TintMid), At: fade.TintMidStop},
-			{Color: background.Alpha(fade.TintEnd), At: 1},
-		},
+	uikit.ScrollFade(c, uikit.ScrollFadeProps{
+		Height: barHeight, Bottom: bottom, Background: background, MaskTint: uikit.Color(theme.Current().C.FadeBar.Tint), Translucent: a.translucencyEnabled(c),
 	})
 }

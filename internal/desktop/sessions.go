@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"sshdesk/internal/theme"
+	"sshdesk/internal/uikit"
 
 	"github.com/egoist/mygo/ui"
 )
@@ -34,57 +35,39 @@ func statusDot(c *ui.Context, state connectionState, size float32) {
 }
 
 func (a *app) sidebar(c *ui.Context, shown float32) {
-	t := theme.Current()
 	directoryLabel, searchLabel, placeholder := "远程主机目录", "搜索主机、地址或系统", "搜索主机、标签"
+	title := "远程会话"
 	if a.section == sectionFiles {
 		directoryLabel, searchLabel, placeholder = "文件站点目录", "搜索站点、地址或系统", "搜索站点、标签"
+		title = "文件传输"
 	}
-	ui.Column(c).Width(a.page().sidebarWidth).FillHeight().Left(a.page().sidebarWidth * (shown - 1)).
-		Label(directoryLabel).Children(func() {
-		ui.Row(c).Shrink(0).Padding(
-			t.C.Sider.HeaderPaddingTop,
-			t.C.Sider.HeaderPaddingRight,
-			t.C.Sider.HeaderPaddingBottom,
-			t.C.Sider.HeaderPaddingLeft,
-		).Children(func() {
-			title := "远程会话"
-			if a.section == sectionFiles {
-				title = "文件传输"
+	uikit.Sider(c, directoryLabel).Width(a.page().sidebarWidth).Left(a.page().sidebarWidth * (shown - 1)).Children(func() {
+		header := uikit.SiderHeader(c, uikit.SiderHeaderProps{Title: title, AddLabel: "添加", AddIcon: plusIcon})
+		header.Add.Menu(func(m *ui.Menu) {
+			if m.Item("新建分组").Chosen() {
+				a.startGroupDraft()
 			}
-			ui.Text(c, title).FontSize(t.C.Sider.TitleSize).FontWeight(t.C.Sider.TitleWeight)
-			ui.Spacer(c)
-			iconButton(c, "添加", plusIcon).Size(t.C.Sider.AddButtonSize, t.C.Sider.AddButtonSize).
-				Radius(t.C.Sider.AddButtonRadius).Background(tokenColor(t.C.Sider.AddButtonBg)).Menu(func(m *ui.Menu) {
-				if m.Item("新建分组").Chosen() {
-					a.startGroupDraft()
-				}
-				label := "添加主机"
-				if a.section == sectionFiles {
-					label = "添加站点"
-				}
-				if m.Item(label).Chosen() {
-					a.startHostDraft()
-				}
-			})
+			label := "添加主机"
+			if a.section == sectionFiles {
+				label = "添加站点"
+			}
+			if m.Item(label).Chosen() {
+				a.startHostDraft()
+			}
 		})
 		a.sidebarSearch(c.Key("host-search"), &a.page().query, &a.page().search, searchLabel, placeholder)
 		a.catalogList(c)
-		ui.Row(c).Shrink(0).Gap(t.Space.N8).Padding(t.C.Sider.FooterPaddingY, t.C.Sider.FooterPaddingX).
-			BorderWidth(t.Size.Hairline, 0, 0, 0).BorderColor(tokenColor(t.C.Sider.FooterBorder)).
-			TextColor(tokenColor(t.C.Sider.FooterText)).Children(func() {
-			ui.Icon(c, serverIcon).Size(t.Size.IconSm, t.Size.IconSm)
-			count := 0
-			for _, h := range a.hosts {
-				if a.catalogModeMatches(h) {
-					count++
-				}
+		count := 0
+		for _, h := range a.hosts {
+			if a.catalogModeMatches(h) {
+				count++
 			}
-			summary := fmt.Sprintf("%d 台主机", count)
-			if a.section == sectionFiles {
-				summary = fmt.Sprintf("%d 个站点", count)
-			}
-			ui.Text(c, summary).FontSize(t.C.Sider.FooterSize)
-		})
+		}
+		summary := fmt.Sprintf("%d 台主机", count)
+		if a.section == sectionFiles {
+			summary = fmt.Sprintf("%d 个站点", count)
+		}
+		uikit.SiderFooter(c, serverIcon, summary)
 	})
 }
 

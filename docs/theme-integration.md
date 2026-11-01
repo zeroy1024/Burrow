@@ -2,7 +2,7 @@
 
 ## 当前接入规则
 
-`internal/theme/tokens_src.py` 是 App token 的唯一来源，生成 `theme.go`、`tokens.json`、`tokens.md`。公共外观位于 `internal/uikit`；会话弹窗和设置页直接使用公共组件，SSH 和文件工作区仍经 `uiadapt.go` 转发。终端正文、ANSI 配色、字体及光标参数由 `internal/termtheme` 管理。终端周边 UI 按实际终端背景选择局部明暗 token，详见 [终端配色说明](terminal-themes.md)。
+`internal/theme/tokens_src.py` 是 App token 的唯一来源，生成 `theme.go`、`tokens.json`、`tokens.md`。公共外观位于 `internal/uikit`；会话弹窗、设置页及 SSH/文件工作区的导航与容器直接使用公共组件，尚有消费者的适配入口经 `uiadapt.go` 转发。终端正文、ANSI 配色、字体及光标参数由 `internal/termtheme` 管理。终端周边 UI 按实际终端背景选择局部明暗 token，详见 [终端配色说明](terminal-themes.md)。
 
 - 已迁移页面使用 `uikit.Button/Input/Modal`，工作区的 `button/primaryButton/textInput/modal` 仅转发同一实现。这些入口保留 MyGo Base API 的输入、焦点和关闭行为，尺寸、颜色、描边、圆角、遮罩和阴影读取对应 component token。具体范围见 [UIKit 迁移说明](uikit.md)。
 - 所有应用主动创建的文字提示通过 `tooltip` / `styleTooltip` 共用 `C.Tooltip`。导航提示仍位于按钮右侧，其余提示位于上方并由 MyGo 处理边缘避让。

@@ -9,9 +9,9 @@ import (
 	"strings"
 
 	"sshdesk/internal/theme"
+	"sshdesk/internal/uikit"
 
 	"github.com/egoist/mygo"
-	"github.com/egoist/mygo/plugins/glass"
 	"github.com/egoist/mygo/ui"
 )
 
@@ -28,11 +28,11 @@ var (
 
 func (a *app) fileWorkspace(c *ui.Context) {
 	t := theme.Current()
-	workspace := ui.Column(c).Key("file-workspace").Grow(1).MinWidth(0).MinHeight(0)
+	workspace := uikit.FileWorkspace(c)
 	workspace.Children(func() {
 		session := a.currentFileSession()
 		if session == nil {
-			workspaceCard(c).Grow(1).FillWidth().Center().Gap(t.Space.N12).Children(func() {
+			uikit.Card(c).Grow(1).FillWidth().Center().Gap(t.Space.N12).Children(func() {
 				ui.Icon(c, filesIcon).Size(t.C.Pane.EmptyIconSize, t.C.Pane.EmptyIconSize).
 					TextColor(tokenColor(t.Color.Text.Secondary))
 				ui.Text(c, "选择站点，浏览远程文件").FontSize(t.C.Pane.EmptyTitleSize)
@@ -51,7 +51,7 @@ func (a *app) fileWorkspace(c *ui.Context) {
 
 func (a *app) fileConnectionPage(c *ui.Context, session *fileSession) {
 	t := theme.Current()
-	workspaceCard(c).FillWidth().Grow(1).Center().Gap(t.Space.N12).Children(func() {
+	uikit.Card(c).FillWidth().Grow(1).Center().Gap(t.Space.N12).Children(func() {
 		ui.Icon(c, filesIcon).Size(t.C.Pane.EmptyIconSize, t.C.Pane.EmptyIconSize).
 			TextColor(tokenColor(t.Color.Text.Secondary))
 		message := "会话已断开"
@@ -86,7 +86,7 @@ func (a *app) toggleLocalFiles(c *ui.Context) {
 func (a *app) filePanels(c *ui.Context, session *fileSession) {
 	t := theme.Current()
 	split := t.C.FTPSplit
-	area := ui.Box(c).Key("file-panels").Grow(1).FillWidth().MinWidth(0).MinHeight(0).ClipX()
+	area := uikit.FilePanels(c)
 	if c.Shortcut(ui.Super|ui.Shift, ui.KeyL) {
 		a.toggleLocalFiles(c)
 	}
@@ -139,8 +139,7 @@ func (a *app) filePanels(c *ui.Context, session *fileSession) {
 			localPane()
 		}
 		if target == 1 && area.Settled("local-open") {
-			divider := ui.Box(c).Key("file-divider").Absolute().Left(localWidth).Top(0).Bottom(0).
-				Width(split.Gutter).Cursor(ui.CursorResizeEW).Focusable().Role(ui.RoleSplitter).Label("调整本地面板宽度")
+			divider := uikit.FileDivider(c, localWidth)
 			dx, _, dragging := divider.Dragged()
 			if dragging {
 				a.files.ratio = min(max((localWidth+dx)/available, split.MinLocal/available), 1-split.MinRemote/available)
@@ -162,15 +161,7 @@ func (a *app) filePanels(c *ui.Context, session *fileSession) {
 				a.saveFilePreferences(c)
 			}
 			divider.Range(float64(split.MinLocal), float64(available-split.MinRemote), float64(localWidth))
-			if divider.Hovered() || dragging || divider.FocusVisible() {
-				color := split.Grip
-				if dragging {
-					color = split.GripActive
-				}
-				divider.Center().Children(func() {
-					ui.Box(c).Size(split.GripW, split.GripH).Radius(split.GripW).Background(tokenColor(color)).PassThrough()
-				})
-			}
+			uikit.StyleFileDivider(c, divider, dragging)
 		}
 	})
 }
@@ -178,12 +169,7 @@ func (a *app) filePanels(c *ui.Context, session *fileSession) {
 func (a *app) filePane(c *ui.Context, session *fileSession, pane *filePaneState, targetWidth float32) {
 	t := theme.Current()
 	compact := targetWidth < t.C.FilePane.CompactWidth
-	card := ui.Box(c).Key(pane.remote).Fill().Radius(t.C.Card.Radius).Background(tokenColor(t.C.Card.Bg)).Clip().
-		Focusable().FocusRing(false).Bind(&pane.focus).
-		Label(map[bool]string{true: "远程文件", false: "本地文件"}[pane.remote])
-	card.DrawOver(func(p *ui.Painter, rect ui.Rect) {
-		p.Stroke(rect, tokenColor(t.Color.Border.Card), t.C.Card.Radius, t.Size.Divider)
-	})
+	card := uikit.FilePane(c, pane.remote, map[bool]string{true: "远程文件", false: "本地文件"}[pane.remote], &pane.focus)
 	if card.FocusWithin() {
 		a.files.activeRemote = pane.remote
 	}
@@ -217,8 +203,7 @@ func (a *app) filePane(c *ui.Context, session *fileSession, pane *filePaneState,
 			a.fileToolbar(c, session, pane, compact)
 			a.fileColumns(c, pane, compact)
 		})
-		ui.Row(c).Absolute().Bottom(0).Left(0).Right(0).Height(footerHeight).Padding(0, t.C.StatusBar.PaddingX).
-			Gap(t.Space.N8).Children(func() { a.fileStatus(c, session, pane, compact) })
+		uikit.FilePaneFooter(c).Children(func() { a.fileStatus(c, session, pane, compact) })
 	})
 	a.fileDropTarget(c, card, session, pane, pane.path, folderTarget == "")
 	if folderTarget == "" {
@@ -239,26 +224,13 @@ func (a *app) filePane(c *ui.Context, session *fileSession, pane *filePaneState,
 
 func (a *app) fileToolbar(c *ui.Context, session *fileSession, pane *filePaneState, compact bool) {
 	t := theme.Current()
-	ui.Row(c).Height(t.C.FilePane.HeaderHeight).Padding(0, t.Space.N8).
-		Gap(t.C.FilePane.ToolGap).FillWidth().Children(func() {
+	uikit.FilePaneHeader(c).Children(func() {
 		if pane.remote {
 			label := "显示本地面板 ⌘⇧L"
 			if a.files.localOpen {
 				label = "隐藏本地面板 ⌘⇧L"
 			}
-			toggle := tooltip(c, ui.ToggleBase(c, &a.files.localOpen).Size(t.C.PaneToggle.Size, t.C.PaneToggle.Size).
-				Radius(t.C.PaneToggle.Radius).Label(label), label)
-			bg, icon := ui.Transparent, tokenColor(t.C.PaneToggle.Icon)
-			glyph := sidebarIcon
-			if toggle.Hovered() {
-				bg = tokenColor(t.C.PaneToggle.BgHover)
-			}
-			if a.files.localOpen {
-				bg, icon, glyph = tokenColor(t.C.PaneToggle.BgOn), tokenColor(t.C.PaneToggle.IconOn), fileSidebarOnIcon
-			}
-			animation := tokenTween(t.C.PaneToggle.Transition)
-			toggle.Background(toggle.AnimateColor("bg", bg, animation)).TextColor(toggle.AnimateColor("fg", icon, animation)).
-				Children(func() { ui.Icon(c, glyph).Size(t.C.IconButton.IconSize, t.C.IconButton.IconSize) })
+			toggle := uikit.PaneToggle(c, &a.files.localOpen, uikit.PaneToggleProps{Label: label, Icon: sidebarIcon, IconOn: fileSidebarOnIcon})
 			if toggle.Changed() {
 				if !a.files.localOpen {
 					a.files.activeRemote = true
@@ -267,10 +239,9 @@ func (a *app) fileToolbar(c *ui.Context, session *fileSession, pane *filePaneSta
 			}
 		}
 		a.filePaneLabel(c, pane)
-		iconButton(c, "后退", fileBackIcon).Disabled(pane.historyIndex == 0).
-			OnClick(func() { a.fileHistory(c, session, pane, -1) })
-		iconButton(c, "前进", fileForwardIcon).Disabled(pane.historyIndex+1 >= len(pane.history)).
-			OnClick(func() { a.fileHistory(c, session, pane, 1) })
+		history := uikit.HistoryButtons(c, pane.historyIndex != 0, pane.historyIndex+1 < len(pane.history), fileBackIcon, fileForwardIcon)
+		history.Back.OnClick(func() { a.fileHistory(c, session, pane, -1) })
+		history.Forward.OnClick(func() { a.fileHistory(c, session, pane, 1) })
 		if compact {
 			a.fileSearchSlot(c, session, pane)
 			label := "搜索当前文件夹"
@@ -333,7 +304,7 @@ func (a *app) fileSearchSlot(c *ui.Context, session *fileSession, pane *filePane
 
 func fileSearchInput(c *ui.Context, pane *filePaneState) ui.Element {
 	t := theme.Current()
-	return textInput(c.Key("file-query"), &pane.query).Bind(&pane.search).
+	return uikit.Input(c.Key("file-query"), &pane.query, uikit.InputProps{}).Bind(&pane.search).
 		MinWidth(0).Height(t.C.Breadcrumb.Height).Padding(0, t.C.Search.PaddingX).
 		Radius(t.C.Search.Radius).Background(tokenColor(t.C.Search.Bg)).
 		FontSize(t.C.Search.FontSize).FixedLineHeight(t.C.Search.LineHeight).
@@ -341,35 +312,18 @@ func fileSearchInput(c *ui.Context, pane *filePaneState) ui.Element {
 }
 
 func (a *app) filePaneLabel(c *ui.Context, pane *filePaneState) {
-	t := theme.Current()
-	focus := t.C.FilePaneFocus
 	label := "本地"
 	if pane.remote {
 		label = "远程"
 	}
-	active := a.files.activeRemote == pane.remote
-	bg, color, weight := ui.Transparent, tokenColor(focus.LabelTextInactive), focus.LabelWeightInactive
-	if a.files.localOpen && active {
-		bg, color, weight = tokenColor(focus.LabelBgActive), tokenColor(focus.LabelTextActive), focus.LabelWeightActive
-	}
-	if !a.files.localOpen {
-		color, weight = tokenColor(t.Color.Text.Primary), focus.LabelWeightActive
-	}
-	badge := ui.Row(c).Height(t.C.Breadcrumb.Height).Padding(0, focus.LabelPaddingX).Radius(focus.LabelRadius).Shrink(0)
-	animation := tokenTween(focus.Transition)
-	badge.Background(badge.AnimateColor("label-bg", bg, animation)).Children(func() {
-		text := ui.Text(c, label).FontSize(t.Font.Size.Body).FontWeight(weight).SingleLine()
-		text.TextColor(text.AnimateColor("label-fg", color, animation))
-	})
+	uikit.PaneLabel(c, label, a.files.localOpen, a.files.activeRemote == pane.remote)
 }
 
 func (a *app) fileBreadcrumbs(c *ui.Context, session *fileSession, pane *filePaneState) {
-	t := theme.Current()
 	parts := strings.Split(strings.Trim(pane.path, "/"), "/")
-	labels, targets := []string{}, []string{}
+	segments := []uikit.PathSegment{}
 	if pane.remote {
-		labels = append(labels, a.hosts[session.host].name)
-		targets = append(targets, "/")
+		segments = append(segments, uikit.PathSegment{Label: a.hosts[session.host].name, Target: "/"})
 	}
 	current := ""
 	if pane.remote {
@@ -378,102 +332,20 @@ func (a *app) fileBreadcrumbs(c *ui.Context, session *fileSession, pane *filePan
 	for _, part := range parts {
 		if part != "" {
 			current = path.Join(current, part)
-			labels = append(labels, part)
-			targets = append(targets, current)
+			segments = append(segments, uikit.PathSegment{Label: part, Target: current})
 		}
 	}
-	if len(labels) == 0 {
-		labels, targets = []string{"/"}, []string{"/"}
+	if len(segments) == 0 {
+		segments = append(segments, uikit.PathSegment{Label: "/", Target: "/"})
 	}
-	family := strings.Join(t.Font.Family.Ui, ", ")
-	font := ui.Font{Family: family, Size: t.Font.Size.Body, Weight: t.Font.Weight.Regular}
-	measure := func(label string) float32 {
-		width, _ := ui.ShapeText(label, font, 0).Size()
-		return width
+	icon := fileLaptopIcon
+	if pane.remote {
+		icon = serverIcon
 	}
-	widths := make([]float32, len(labels))
-	visible := make([]int, len(labels))
-	for i, label := range labels {
-		widths[i], visible[i] = measure(label), i
+	bar := uikit.PathBar(c, uikit.PathBarProps{Path: pane.path, Segments: segments, Icon: icon, Separator: fileForwardIcon})
+	for _, item := range bar.Items {
+		item.Element.OnClick(func() { a.navigateFiles(c, session, pane, item.Target) })
 	}
-	ellipsisWidth := measure("…")
-	// Absolute content leaves the available width to the toolbar, rather than
-	// letting a longer path or its collapsed form change its own width budget.
-	bar := tooltip(c, ui.Box(c).Key("file-breadcrumbs").Grow(1).MinWidth(0).Clip().Height(t.C.Breadcrumb.Height).
-		Radius(t.C.Breadcrumb.Radius).Background(tokenColor(t.C.Breadcrumb.BgOnGlass)).
-		Font(family).FontSize(font.Size).FontWeight(font.Weight).Label("当前目录 "+pane.path), pane.path)
-	width := bar.LayoutBounds().W
-	available := max(0, width-2*t.C.Breadcrumb.PaddingX)
-	required := func(indices []int) float32 {
-		result := t.Size.Icon + float32(len(indices)-1)*t.Font.Size.Caption +
-			float32(2*len(indices)-1)*t.C.Breadcrumb.Gap
-		for _, index := range indices {
-			if index < 0 {
-				result += ellipsisWidth
-			} else {
-				result += widths[index]
-			}
-		}
-		return result
-	}
-	bestWidth := required(visible)
-	if bestWidth > available {
-		// Keep the root and as many recent ancestors as fit, hiding the middle
-		// only when doing so saves space. A very short ancestor can be narrower than “…”.
-		for tail := 2; tail < len(labels); tail++ {
-			candidate := []int{0, -1}
-			for index := tail; index < len(labels); index++ {
-				candidate = append(candidate, index)
-			}
-			if size := required(candidate); size < bestWidth {
-				visible, bestWidth = candidate, size
-			}
-			if bestWidth <= available {
-				break
-			}
-		}
-	}
-	// Bounds are from the previous frame. Rebuild once if this frame lays the
-	// bar out at a new width, including after a resize or a search animation.
-	bar.DrawOver(func(_ *ui.Painter, r ui.Rect) {
-		if r.W != width {
-			c.Invalidate()
-		}
-	})
-	bar.Children(func() {
-		ui.Row(c).Absolute().Top(0).Bottom(0).Left(t.C.Breadcrumb.PaddingX).Right(t.C.Breadcrumb.PaddingX).
-			Gap(t.C.Breadcrumb.Gap).AlignItems(ui.Center).Children(func() {
-			icon := fileLaptopIcon
-			if pane.remote {
-				icon = serverIcon
-			}
-			ui.Icon(c, icon).Size(t.Size.Icon, t.Size.Icon).TextColor(tokenColor(t.C.Breadcrumb.Text)).Shrink(0)
-			for position, index := range visible {
-				if position > 0 {
-					ui.Icon(c, fileForwardIcon).Size(t.Font.Size.Caption, t.Font.Size.Caption).
-						TextColor(tokenColor(t.C.Breadcrumb.Separator)).Shrink(0)
-				}
-				label, target := "…", ""
-				if index < 0 {
-					target = targets[visible[position+1]-1]
-				} else {
-					label, target = labels[index], targets[index]
-				}
-				key := struct {
-					target   string
-					overflow bool
-				}{target: target, overflow: index < 0}
-				item := tooltip(c, ui.ButtonBase(c).Key(key).Label(label), target).Shrink(1).MinWidth(0).
-					TextColor(tokenColor(t.C.Breadcrumb.Text))
-				if index == len(labels)-1 {
-					item.TextColor(tokenColor(t.C.Breadcrumb.Current))
-				}
-				item.OnClick(func() { a.navigateFiles(c, session, pane, target) }).Children(func() {
-					ui.Text(c, label).SingleLine().MinWidth(0).FontSize(font.Size)
-				})
-			}
-		})
-	})
 }
 
 func (a *app) fileColumns(c *ui.Context, pane *filePaneState, compact bool) {
@@ -840,40 +712,7 @@ func (a *app) uploadFinderPaths(c *ui.Context, session *fileSession, paths []str
 }
 
 func (a *app) fileScrollEdge(c *ui.Context, height float32, bottom bool) {
-	t := theme.Current()
-	fade := t.C.FadeBar
-	angle := float32(180)
-	if bottom {
-		angle = 0
-	}
-	band := func() ui.Element {
-		e := ui.Box(c).Absolute().Left(0).Right(0).Height(height).PassThrough()
-		if bottom {
-			return e.Bottom(0)
-		}
-		return e.Top(0)
-	}
-	if !a.translucencyEnabled(c) {
-		band().Background(tokenColor(t.C.Card.Bg))
-		return
-	}
-	for _, layer := range []struct{ radius, solid, end float32 }{
-		{radius: fade.Blur1, solid: fade.Mask1Solid, end: fade.Mask1End},
-		{radius: fade.Blur2, solid: fade.Mask2Solid, end: fade.Mask2End},
-		{radius: fade.Blur3, solid: fade.Mask3Solid, end: fade.Mask3End},
-	} {
-		band().Material(glass.Blur{
-			Radius: layer.radius,
-			Mask: &ui.LinearGradient{
-				From: tokenColor(t.C.Card.Bg), To: ui.Transparent, Angle: angle,
-				Start: layer.solid, End: layer.end,
-			},
-		})
-	}
-	background := tokenColor(t.C.Card.Bg)
-	band().LinearGradient(ui.LinearGradient{Angle: angle, Stops: []ui.GradientStop{
-		{Color: background.Alpha(fade.TintStart), At: 0},
-		{Color: background.Alpha(fade.TintMid), At: fade.TintMidStop},
-		{Color: background.Alpha(fade.TintEnd), At: 1},
-	}})
+	background := uikit.Color(theme.Current().C.Card.Bg)
+	uikit.ScrollFade(c, uikit.ScrollFadeProps{Height: height, Bottom: bottom, Background: background,
+		MaskTint: background, Translucent: a.translucencyEnabled(c)})
 }

@@ -5,6 +5,7 @@ import (
 
 	"sshdesk/internal/termtheme"
 	"sshdesk/internal/theme"
+	"sshdesk/internal/uikit"
 
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/shader"
@@ -47,21 +48,7 @@ func (a *app) paneShortcuts(c *ui.Context) {
 }
 
 func paneFocusShadows(pane ui.Element, focused, multiple bool, surface *theme.Theme) {
-	t := surface.C.PaneFocus
-	focusTarget, hoverTarget := float32(0), float32(0)
-	if multiple && focused {
-		focusTarget = 1
-	}
-	if multiple && !focused && pane.Hovered() {
-		hoverTarget = 1
-	}
-	focus := animateVisual(pane, "focus-ring", focusTarget, t.Transition)
-	hover := animateVisual(pane, "hover-ring", hoverTarget, t.Transition)
-	if !multiple {
-		return
-	}
-	applyShadowOpacity(pane, t.RingHover, hover)
-	applyShadowOpacity(pane, t.RingFocused, focus)
+	uikit.StylePaneFocus(pane, focused, multiple, surface)
 }
 
 func terminalActivity(c *ui.Context, session *remoteSession, surface *theme.Theme) {

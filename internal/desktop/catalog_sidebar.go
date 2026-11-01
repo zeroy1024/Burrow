@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"sshdesk/internal/theme"
+	"sshdesk/internal/uikit"
 
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
@@ -136,18 +137,11 @@ func (a *app) catalogHeader(c *ui.Context, slot catalogSlot) ui.Element {
 	t := theme.Current()
 	group := slot.group
 	expanded := a.catalogExpanded(group)
-	header := ui.ButtonBase(c).Key(slot.key).Height(t.C.GroupHeader.Height).Shrink(0).
-		FillWidth().Padding(0, t.C.GroupHeader.PaddingX).Gap(t.C.GroupHeader.Gap).Radius(t.C.GroupHeader.Radius).
-		Label(group.name).Expanded(expanded).TextColor(tokenColor(t.C.GroupHeader.Text))
+	header := uikit.SiderGroup(c, uikit.SiderGroupProps{Key: slot.key, Title: group.name, Expanded: expanded})
 	a.trackCatalogDrag(c, header, slot)
 	highlight := a.page().catalogDrag != nil && a.page().catalogDrag.phase == catalogDragging &&
 		a.page().catalogDrag.kind == catalogHostDrag && a.page().catalogDrag.hoverGroup == group
-	background, text, chevron := ui.Transparent, tokenColor(t.C.GroupHeader.Text), tokenColor(t.C.GroupHeader.Text)
-	if highlight {
-		background, text, chevron = tokenColor(t.C.GroupHeader.DropBg), tokenColor(t.C.GroupHeader.DropText), tokenColor(t.C.GroupHeader.DropCount)
-	}
-	animation := tokenTween(t.C.GroupHeader.Transition)
-	header.Background(header.AnimateColor("header-bg", background, animation))
+	uikit.StyleSiderGroup(header, highlight)
 	if a.page().catalogDrag == nil {
 		header.OnClick(func() {
 			a.page().lastGroup = group
@@ -166,31 +160,18 @@ func (a *app) catalogHeader(c *ui.Context, slot catalogSlot) ui.Element {
 		})
 	}
 	header.Children(func() {
-		rotation := float32(-90)
-		if expanded {
-			rotation = 0
-		}
-		arrow := ui.Icon(c, chevronIcon).Key("chevron").Size(t.Font.Size.Caption, t.Font.Size.Caption)
-		arrow.TextColor(arrow.AnimateColor("color", chevron, animation)).
-			AnimatePose(ui.Pose{Rotate: rotation}, a.catalogDisplaceAnimation())
-		label := ui.Text(c, group.name).FontSize(t.C.GroupHeader.FontSize).FontWeight(t.C.GroupHeader.Weight)
-		label.TextColor(label.AnimateColor("color", text, animation))
-		ui.Spacer(c)
 		motion := a.catalogMotion(slot.key)
 		count := a.catalogModeCount(group.hosts)
 		if count != motion.count {
 			motion.down, motion.count = count < motion.count, count
 		}
-		countAnimation := ui.Animation{Spring: tokenSpring(t.C.GroupHeader.CountMotion)}
-		ui.Text(c, strconv.Itoa(count)).Key("count").FontSize(t.C.GroupHeader.CountSize).TextColor(tokenColor(t.C.GroupHeader.Count)).
-			ContentTransition(ui.ContentTransition{Numeric: true, Down: motion.down, Animation: &countAnimation})
+		uikit.SiderGroupContents(c, uikit.SiderGroupContentProps{
+			Title: group.name, Expanded: expanded, Highlighted: highlight, Count: count, CountDown: motion.down,
+			Chevron: chevronIcon, ArrowAnimation: a.catalogDisplaceAnimation(),
+		})
 		if highlight && a.groupCollapsed(group) && !a.page().catalogDrag.autoExpanded[group] {
 			progress := min(1, float32(c.Now().Sub(a.page().catalogDrag.hoverStarted))/float32(t.C.GroupHeader.ExpandDelay))
-			ui.Box(c).Absolute().Bottom(0).Left(0).Right(0).Height(t.C.GroupHeader.ExpandHeight).
-				Background(tokenColor(t.C.GroupHeader.ExpandTrack)).PassThrough().Children(func() {
-				ui.Box(c).Absolute().Top(0).Bottom(0).Left(0).WidthPercent(progress * 100).
-					Background(tokenColor(t.C.GroupHeader.ExpandFill)).PassThrough()
-			})
+			uikit.SiderGroupExpand(c, progress)
 		}
 	})
 	return header
@@ -244,9 +225,7 @@ func (a *app) catalogHostMenu(c *ui.Context, id hostID) func(*ui.Menu) {
 func (a *app) catalogHostRow(c *ui.Context, slot catalogSlot) ui.Element {
 	t := theme.Current()
 	id, h := hostID(slot.key.id), a.hosts[slot.key.id]
-	row := ui.ButtonBase(c).Key(slot.key).Height(t.C.Catalog.RowHeight).Shrink(0).FillWidth().
-		Padding(0, t.C.SiderItem.PaddingRight, 0, t.C.SiderItem.PaddingLeft).Gap(t.C.SiderItem.Gap).Radius(t.C.SiderItem.Radius).
-		Role(ui.RoleListItem).Label(h.name).Description(h.user + "@" + h.address).TextColor(tokenColor(t.C.SiderItem.NameColor))
+	row := uikit.SiderRow(c, uikit.SiderRowProps{Key: slot.key, Title: h.name, Subtitle: h.user + "@" + h.address})
 	if row.Clicked() {
 		a.page().lastGroup = slot.group
 	}
@@ -289,20 +268,9 @@ func (a *app) catalogHostRow(c *ui.Context, slot catalogSlot) ui.Element {
 	}
 	row.Children(func() {
 		a.catalogHostContents(c, id)
-		action := tooltip(c, ui.ButtonBase(c).Key("host-actions").Size(t.C.SiderItem.MoreSize, t.C.SiderItem.MoreSize).Shrink(0).Radius(t.C.SiderItem.MoreRadius).
-			TextColor(tokenColor(t.C.SiderItem.MoreIcon)).
-			Label("更多操作 "+h.name), "更多操作").Description(h.system)
-		actionBackground := ui.Transparent
-		if a.page().catalogDrag == nil && action.Hovered() {
-			actionBackground = tokenColor(t.C.SiderItem.MoreBg)
-		}
-		action.Background(action.AnimateColor("background", actionBackground, catalogColorAnimation()))
-		target := float32(0)
-		if a.page().catalogDrag == nil && (row.Hovered() || row.FocusVisible() || action.FocusVisible()) {
-			target = 1
-		}
-		action.Opacity(animateVisual(action, "more", target, t.C.SiderItem.Transition)).
-			Disabled(a.page().catalogDrag != nil).Children(func() { ui.Icon(c, moreIcon).Size(t.Size.Icon, t.Size.Icon) })
+		action := uikit.SiderMore(c, row, uikit.SiderMoreProps{
+			Label: "更多操作 " + h.name, Description: h.system, Icon: moreIcon, Disabled: a.page().catalogDrag != nil,
+		})
 		if a.page().catalogDrag == nil {
 			action.Menu(a.catalogHostMenu(c, id))
 		}
@@ -311,14 +279,9 @@ func (a *app) catalogHostRow(c *ui.Context, slot catalogSlot) ui.Element {
 }
 
 func (a *app) catalogHostContents(c *ui.Context, id hostID) {
-	t := theme.Current()
 	h := a.hosts[id]
 	a.catalogHostIcon(c, id)
-	ui.Column(c).Grow(1).MinWidth(0).Gap(t.Space.N1).Children(func() {
-		ui.Text(c, h.name).FontSize(t.C.SiderItem.NameSize).FontWeight(t.C.SiderItem.NameWeight).FixedLineHeight(t.C.SiderItem.NameLineHeight).SingleLine().Ellipsis("…")
-		ui.Text(c, h.user+"@"+h.address).Font(strings.Join(t.C.SiderItem.SubFamily, ", ")).FontSize(t.C.SiderItem.SubSize).FixedLineHeight(t.C.SiderItem.SubLineHeight).
-			TextColor(tokenColor(t.C.SiderItem.SubColor)).SingleLine().Ellipsis("…")
-	})
+	uikit.SiderRowLabel(c, h.name, h.user+"@"+h.address)
 }
 
 func (a *app) catalogDragPreview(c *ui.Context) {

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math"
 	"slices"
-	"strconv"
 
 	"sshdesk/internal/theme"
 	"sshdesk/internal/uikit"
@@ -22,10 +21,8 @@ func keyedIconButton(c *ui.Context, key, label string, icon *ui.SVG) ui.Element 
 
 func (a *app) titleBar(c *ui.Context, shown float32) {
 	t := theme.Current()
-	bar := c.TitleBar()
-	ui.Row(c).Height(max(t.C.Titlebar.Height, bar.Height)).Shrink(0).Gap(t.Space.N6).DragWindow().Children(func() {
-		ui.Row(c).Width(max(t.C.Rail.Width+a.page().sidebarWidth*shown, bar.Left+t.C.Titlebar.Height)).Shrink(0).
-			PaddingStart(bar.Left + t.C.Titlebar.LeftGap).DragWindow().Children(func() {
+	uikit.TitleBar(c).Children(func() {
+		uikit.TitleBarLeading(c, t.C.Rail.Width+a.page().sidebarWidth*shown).Children(func() {
 			label := "收起会话栏"
 			if a.page().sidebarCollapsed {
 				label = "展开会话栏"
@@ -34,14 +31,9 @@ func (a *app) titleBar(c *ui.Context, shown float32) {
 				Disabled(a.activeSection() == sectionSettings).
 				OnClick(func() { a.page().sidebarCollapsed = !a.page().sidebarCollapsed })
 		})
-		ui.Box(c).Grow(1).MinWidth(0).Height(t.C.Tab.StripHeight).Clip().Children(func() {
+		uikit.SessionTabsViewport(c).Children(func() {
 			// Clip the native indicator outside the viewport while retaining native scrolling.
-			strip := ui.ScrollHorizontal(c.Key("session-tabs")).Fill().TrackScroll(&a.tabScroll).ScrollbarInsets(
-				0,
-				0,
-				-t.Space.N12,
-				0,
-			).HandleInput(func(ev ui.InputEvent) bool {
+			strip := uikit.SessionTabsScroll(c.Key("session-tabs"), &a.tabScroll).HandleInput(func(ev ui.InputEvent) bool {
 				if ev.Kind == ui.InputPointerDown && ev.Button == 0 {
 					a.tabPress = ui.Point{X: ev.X, Y: ev.Y}
 				}
@@ -52,7 +44,7 @@ func (a *app) titleBar(c *ui.Context, shown float32) {
 				return true
 			})
 			strip.Children(func() {
-				ui.Row(c).Gap(t.C.Titlebar.TabsGap).FillHeight().Children(func() {
+				uikit.SessionTabsRow(c).Children(func() {
 					var pendingClose func()
 					for i, tab := range a.tabs {
 						if close := a.tabButton(c, i, tab); close != nil {
@@ -80,7 +72,7 @@ func (a *app) titleBar(c *ui.Context, shown float32) {
 			})
 			a.tabStripTarget(c, strip)
 		})
-		ui.Row(c).Padding(0, t.C.Titlebar.ActionsPaddingRight).Gap(t.C.Titlebar.ActionsGap).Shrink(0).Children(func() {
+		uikit.TitleBarActions(c).Children(func() {
 			status := iconButton(c, "服务器监控", activityIcon).Expanded(a.statusVisible).
 				Disabled(a.activeSection() == sectionSettings)
 			if a.statusVisible {
@@ -92,37 +84,22 @@ func (a *app) titleBar(c *ui.Context, shown float32) {
 }
 
 func (a *app) tabButton(c *ui.Context, index int, tab *workspaceTab) func() {
-	t := theme.Current()
-	contentHeight := t.C.Tab.ContentHeight
 	var pendingClose func()
 	session := tab.focused
 	h := a.hosts[session.host]
-	button := ui.ButtonBase(c).Key(tab.id).Height(t.C.Tab.Height).
-		Padding(0, t.C.Tab.PaddingRight, 0, t.C.Tab.PaddingLeft).Gap(t.C.Tab.Gap).Radius(t.C.Tab.Radius).
-		Bind(&tab.frame).Transition(ui.ElementTransition{
-		Position:  true,
-		Animation: &ui.Animation{Spring: tokenSpring(t.C.ReorderMotion.TabDisplace)},
-	}).
-		AlignItems(ui.Center).
-		Role(ui.RoleTab).Label(h.name).Selected(a.activeTab == index)
-	background, foreground := ui.Transparent, tokenColor(t.C.Tab.Text)
 	hint := fmt.Sprintf("%s@%s:%d", h.user, h.address, h.port)
-	if a.activeTab == index {
-		background, foreground = tokenColor(t.C.Tab.BgSelected), tokenColor(t.C.Tab.TextSelected)
-		applyShadow(button, t.C.Tab.ShadowSelected)
-	} else if button.Hovered() {
-		background = tokenColor(t.C.Tab.BgHover)
-	}
 	switch session.state {
 	case connecting:
 		hint = "正在连接 " + h.address + "…（演示）"
 	case disconnected:
-		foreground, hint = tokenColor(t.C.Tab.TextDisconnected), "已断开 · 可从菜单重新连接"
+		hint = "已断开 · 可从菜单重新连接"
 	}
-	animation := tokenTween(t.C.Tab.StateTransition)
-	button.Background(button.AnimateColor("background", background, animation)).
-		TextColor(button.AnimateColor("text", foreground, animation))
-	tooltip(c, button, hint)
+	props := uikit.SessionTabProps{
+		Key: tab.id, Title: h.name, Hint: hint, Selected: a.activeTab == index,
+		State: connectionIndicatorState(session.state), Handle: &tab.frame,
+		Extra: tab.root.count() - 1, CloseLabel: "关闭标签 " + h.name, DragLabel: "拖动标签 " + h.name, CloseIcon: closeIcon,
+	}
+	button := uikit.SessionTab(c, props)
 	button.OnClick(func() { a.activateTab(slices.Index(a.tabs, tab)) })
 	button.ContextMenu(func(m *ui.Menu) {
 		current := tab.focused
@@ -147,25 +124,11 @@ func (a *app) tabButton(c *ui.Context, index int, tab *workspaceTab) func() {
 		}
 	})
 	button.Children(func() {
-		ui.Box(c).Width(t.C.Tab.SpinnerSize).Height(contentHeight).Shrink(0).Center().Children(func() {
-			tabConnectionIndicator(c, session.state)
-		})
-		// Center the visible glyphs as well as their font line boxes.
-		ui.Text(c, h.name).FontSize(t.C.Tab.FontSize).FontWeight(t.C.Tab.WeightSelected).FixedLineHeight(contentHeight).Top(t.C.Tab.TitleOffset).SingleLine()
-		if tab.root.count() > 1 {
-			ui.Text(c, "+"+strconv.Itoa(tab.root.count()-1)).FontSize(t.Font.Size.Caption).
-				FixedLineHeight(contentHeight).Top(t.C.Tab.CountOffset).TextColor(tokenColor(t.C.Tab.Text))
-		}
-		close := iconButton(c, "关闭标签 "+h.name, closeIcon).Size(t.Size.Icon, contentHeight)
-		closeVisible := float32(0)
-		if a.activeTab == index || button.Hovered() || close.Focused() {
-			closeVisible = 1
-		}
-		close.Opacity(animateVisual(close, "visible", closeVisible, t.C.Tab.StateTransition)).
-			OnClick(func() { a.requestCloseTab(slices.Index(a.tabs, tab)) })
-		handle := ui.Box(c).Key("tab-drag-handle").Absolute().Top(0).Bottom(0).Left(0).Right(t.C.Tab.DragHandleInset).
-			Label("拖动标签 " + h.name).OnClick(func() { a.activateTab(slices.Index(a.tabs, tab)) })
-		a.paneDragHandle(c, handle, paneTransfer{tab: tab, session: tab.focused, fromTab: true})
+		props.State = connectionIndicatorState(session.state)
+		parts := uikit.SessionTabContents(c, button, props)
+		parts.Close.OnClick(func() { a.requestCloseTab(slices.Index(a.tabs, tab)) })
+		parts.DragHandle.OnClick(func() { a.activateTab(slices.Index(a.tabs, tab)) })
+		a.paneDragHandle(c, parts.DragHandle, paneTransfer{tab: tab, session: tab.focused, fromTab: true})
 	})
 	if d := a.drag; d != nil && d.kind == dragTab && d.originTab == tab && d.phase != dragLanded {
 		button.Opacity(0)

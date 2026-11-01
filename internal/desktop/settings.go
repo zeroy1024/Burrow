@@ -45,7 +45,7 @@ func (a *app) settingsPage(c *ui.Context) {
 	p := t.C.Settings
 	a.settingsUI.locale = c.Locale()
 	ui.Row(c).Key("settings-page").Fill().Gap(t.Space.N8).Children(func() {
-		workspaceCard(c).Width(p.NavWidth).Shrink(0).FillHeight().Children(func() { a.settingsSidebar(c, 1) })
+		uikit.Card(c).Width(p.NavWidth).Shrink(0).FillHeight().Children(func() { a.settingsSidebar(c, 1) })
 		a.settings(c)
 	})
 }
@@ -76,7 +76,7 @@ func (a *app) settingsSidebar(c *ui.Context, shown float32) {
 func (a *app) settings(c *ui.Context) {
 	t := theme.Current()
 	p := t.C.Settings
-	workspaceCard(c).Key("settings-content").Grow(1).MinWidth(0).FillHeight().Children(func() {
+	uikit.Card(c).Key("settings-content").Grow(1).MinWidth(0).FillHeight().Children(func() {
 		ui.Row(c).FillWidth().Shrink(0).Padding(p.HeaderPaddingTop, p.HeaderPaddingRight, p.HeaderPaddingBottom, p.HeaderPaddingLeft).
 			BorderWidth(0, 0, t.Size.Divider, 0).BorderColor(uikit.Color(t.Color.Border.Divider)).AlignItems(ui.Center).Children(func() {
 			category := settingsCategories[a.settingsCategory]

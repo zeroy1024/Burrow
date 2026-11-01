@@ -5,18 +5,15 @@ import (
 	"strings"
 
 	"sshdesk/internal/theme"
+	"sshdesk/internal/uikit"
 
 	"github.com/egoist/mygo/ui"
 )
 
 func (a *app) serverStatus(c *ui.Context) {
 	t := theme.Current()
-	ui.Row(c).Height(t.C.Stats.HeaderHeight).Shrink(0).Padding(0, t.Space.N14).Children(func() {
-		ui.Text(c, "服务器状态").FontSize(t.Font.Size.BodyLg).FontWeight(t.Font.Weight.Semibold)
-		ui.Spacer(c)
-		iconButton(c, "关闭服务器状态", closeIcon).Size(t.C.IconButton.SizeXs, t.C.IconButton.SizeSm).
-			OnClick(func() { a.statusVisible = false })
-	})
+	header := uikit.SidePanelHeader(c, "服务器状态", "关闭服务器状态", closeIcon)
+	header.Close.OnClick(func() { a.statusVisible = false })
 	id, ok := a.focusedHost()
 	if !ok {
 		ui.Text(c, "选择一个终端查看状态").FontSize(t.Font.Size.Small).TextColor(tokenColor(t.Color.Text.Secondary)).Padding(t.Space.N14)
@@ -33,7 +30,7 @@ func (a *app) serverStatus(c *ui.Context) {
 		return
 	}
 	h := a.hosts[id]
-	viewport := ui.Box(c).Key("status-viewport").Grow(1).MinHeight(0).Clip()
+	viewport := uikit.SidePanelViewport(c)
 	viewport.Children(func() {
 		ui.Scroll(c).Fill().MinHeight(0).TrackScroll(&a.statusScroll).
 			ScrollbarInsets(0, -t.C.Scrollbar.TrackWidth, 0, 0).

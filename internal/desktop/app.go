@@ -371,14 +371,7 @@ func (a *app) view(c *ui.Context) {
 }
 
 func (a *app) navigation(c *ui.Context) {
-	t := theme.Current()
-	r := t.C.Rail
-	ui.Column(c).Width(r.Width).Shrink(0).Padding(
-		r.PaddingTop,
-		t.Space.N6,
-		r.PaddingBottom,
-		t.Space.N6,
-	).Gap(r.Gap).AlignItems(ui.Center).Label("主导航").Children(func() {
+	uikit.Rail(c).Children(func() {
 		a.navigationButton(
 			c,
 			sectionSSH,
@@ -402,50 +395,22 @@ func (a *app) navigation(c *ui.Context) {
 }
 
 func (a *app) navigationButton(c *ui.Context, target section, label string, icon *ui.SVG) {
-	t := theme.Current()
-	r := t.C.Rail
-	button := ui.ButtonBase(c).Key(label).Size(r.ButtonSize, r.ButtonSize).Radius(r.ButtonRadius).
-		Label(label).Description(label).Selected(a.navigationSelected(target)).
-		TextColor(tokenColor(r.Icon))
+	props := uikit.RailButtonProps{Key: label, Label: label, Icon: icon, Selected: a.navigationSelected(target)}
 	if target == sectionSettings {
-		button.Bind(&a.settingsButton)
+		props.Handle = &a.settingsButton
 	}
-	button.OnClick(func() {
+	uikit.RailButton(c, props).OnClick(func() {
 		opening := target == sectionSettings && !a.settingsUI.open
 		a.switchSection(target)
 		if opening {
 			a.settingsUI.previousFocus = a.settingsButton
 		}
 	})
-	background := ui.Transparent
-	switch {
-	case button.Pressed():
-		background = tokenColor(t.C.Desktop.RailPressed)
-	case a.navigationSelected(target):
-		background = tokenColor(r.BgOn)
-	case button.Hovered():
-		background = tokenColor(t.C.Desktop.RailHover)
-	}
-	button.Background(button.AnimateColor("background", background, tokenTween(r.Transition)))
-	button.Children(func() {
-		ui.Icon(c, icon).Size(t.Size.IconMd, t.Size.IconMd)
-	})
-	ui.TooltipBase(c, button, func(tip ui.Element) {
-		p := t.C.Tooltip
-		styleTooltip(tip).AttachTo(button, ui.AnchorRight, ui.AnchorLeft).
-			MarginStart(p.RailOffset).Children(func() { ui.Text(c, label) })
-	})
 }
 
 func (a *app) workspace(c *ui.Context, shown float32) {
 	t := theme.Current()
-	panel := ui.Row(c).Key(a.section).Fill().MinWidth(0).AlignItems(ui.Stretch).
-		Padding(
-			0,
-			t.C.Window.Gutter,
-			t.C.Window.Gutter,
-			0,
-		)
+	panel := uikit.Workspace(c, a.section)
 	statusTarget := float32(1)
 	if a.section != sectionSSH || !a.statusVisible {
 		statusTarget = 0
@@ -453,7 +418,7 @@ func (a *app) workspace(c *ui.Context, shown float32) {
 	statusShown := panel.AnimateTo("status", statusTarget, a.positionAnimation(tokenTween(t.C.Desktop.SidebarDuration)))
 	statusOpacity := animateVisual(panel, "status-opacity", statusTarget, t.C.Desktop.SidebarDuration)
 	panel.Children(func() {
-		workspaceCard(c).Key("sessions").Width(a.page().sidebarWidth * shown).Shrink(0).
+		uikit.Card(c).Key("sessions").Width(a.page().sidebarWidth * shown).Shrink(0).
 			MarginEnd(t.C.Window.Gutter * shown).Hidden(shown == 0).Children(func() {
 			a.sidebar(c, shown)
 		})
@@ -470,7 +435,7 @@ func (a *app) workspace(c *ui.Context, shown float32) {
 			X: width - t.C.Rail.Width - t.C.Window.Gutter - sidebarWidth - statusWidth,
 			Y: height - max(t.C.Titlebar.Height, c.TitleBar().Height) - t.C.Window.Gutter,
 		})
-		status := workspaceCard(c).Key("status").Width(t.Size.StatsPanel * statusShown).Shrink(0).
+		status := uikit.Card(c).Key("status").Width(t.Size.StatsPanel * statusShown).Shrink(0).
 			MarginStart(t.C.Window.Gutter * statusShown).Hidden(statusShown == 0 && statusOpacity == 0)
 		if a.reduceMotion(c) && !a.statusVisible && statusOpacity > 0 {
 			// Geometry changes immediately; the old panel can still fade over the
@@ -478,16 +443,10 @@ func (a *app) workspace(c *ui.Context, shown float32) {
 			status.Absolute().Top(0).Right(0).Bottom(0).Width(t.Size.StatsPanel)
 		}
 		status.Opacity(statusOpacity).Children(func() {
-			ui.Column(c).Width(t.Size.StatsPanel).FillHeight().
-				Children(func() { a.serverStatus(c) })
+			uikit.SidePanelBody(c).Children(func() { a.serverStatus(c) })
 		})
 		a.sidebarResizeHandle(c, shown)
 	})
-}
-
-func workspaceCard(c *ui.Context) ui.Element {
-	t := theme.Current().C.Card
-	return applyShadow(ui.Column(c).Radius(t.Radius).Background(tokenColor(t.Bg)), t.Shadow).Clip()
 }
 
 func (a *app) sidebarResizeHandle(c *ui.Context, shown float32) {
@@ -500,10 +459,7 @@ func (a *app) sidebarResizeHandle(c *ui.Context, shown float32) {
 		label = "调整设置栏宽度"
 	}
 	// The transparent resize target covers the gap above both cards.
-	edge := ui.Box(c).Key("resize-sidebar").Absolute().Top(0).Bottom(0).
-		Left(a.page().sidebarWidth * shown).Width(t.C.Window.Gutter * shown).
-		Hidden(shown != 1).Cursor(ui.CursorResizeEW).Focusable().FocusRing(false).Center().Role(ui.RoleSplitter).
-		Label(label)
+	edge := uikit.SidebarDivider(c, label, a.page().sidebarWidth*shown, shown)
 	var delta float32
 	dx, _, dragging := edge.Dragged()
 	if dragging {
@@ -524,13 +480,5 @@ func (a *app) sidebarResizeHandle(c *ui.Context, shown float32) {
 	if edge.Hovered() || dragging || edge.FocusVisible() {
 		visible = 1
 	}
-	color := tokenColor(t.C.Desktop.DividerHandleColor)
-	if dragging {
-		color = tokenColor(t.C.DropIndicator.LineColor)
-	}
-	edge.Children(func() {
-		ui.Box(c).Size(t.C.Desktop.DividerHandleWidth, t.C.Desktop.DividerHandleHeight).
-			Radius(t.C.Desktop.DividerHandleRadius).Background(color).PassThrough().
-			Opacity(animateVisual(edge, "handle", visible, t.C.Desktop.DividerFadeDuration))
-	})
+	uikit.StyleSidebarDivider(c, edge, visible, dragging)
 }
