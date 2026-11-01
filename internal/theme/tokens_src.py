@@ -795,3 +795,12 @@ COMP['input']['lineHeight']='font.lineHeight.input'
 COMP['search']['lineHeight']='font.lineHeight.input'
 SEM['size'].update({'settingsSelect':D(220),'settingsNumber':D(64),'settingsScrollback':D(96)})
 COMP['settings'].update({'selectWidth':'size.settingsSelect','numberWidth':'size.settingsNumber','scrollbackWidth':'size.settingsScrollback'})
+
+# Shared key hints. Flat hints retain the existing search-field text geometry.
+SEM['size']['keycap']=D(P('size.18'))
+SEM['color']['keycap']={'inkBg':C(P('whiteA.a16')),'inkText':C(P('white.a60')),'accentBg':C(P('whiteA.a20'))}
+COMP['kbd']={
+ 'height':'size.keycap','minWidth':'size.keycap','paddingX':'space.5','radius':'radius.keycap','fontSize':'font.size.caption',
+ 'bg':'color.surface.keycap','border':'color.border.keycap','text':'color.text.tertiary',
+ 'inkBg':'color.keycap.inkBg','inkText':'color.keycap.inkText','accentBg':'color.keycap.accentBg','accentText':'color.text.onAccent',
+}

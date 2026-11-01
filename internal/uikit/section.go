@@ -1,0 +1,63 @@
+package uikit
+
+import (
+	"sshdesk/internal/theme"
+
+	"github.com/egoist/mygo/ui"
+)
+
+type SectionProps struct {
+	Key            any
+	Title, Summary string
+	Chevron        *ui.SVG
+	Reduced        bool
+}
+
+func Section(c *ui.Context, open *bool, contentHeight *float32, props SectionProps, body func()) ui.Element {
+	t := theme.Current()
+	p := t.C.Collapse
+	var trigger ui.Element
+	root := ui.Column(c).FillWidth().BorderWidth(t.Size.Divider, 0, 0, 0).BorderColor(Color(t.C.Modal.Divider))
+	if props.Key != nil {
+		root.Key(props.Key)
+	}
+	root.Children(func() {
+		parts := ui.CollapsibleBase(c, open)
+		trigger = parts.Trigger.FillWidth().Height(p.HeaderHeight).Padding(0, t.C.Modal.BodyPaddingX).
+			Gap(t.Space.N8).AlignItems(ui.Center).Label(props.Title)
+		target := float32(0)
+		if *open {
+			target = 1
+		}
+		progress := trigger.AnimateTo("advanced-progress", target, Tween(p.Duration))
+		if props.Reduced {
+			progress = target
+		}
+		trigger.Children(func() {
+			ui.Icon(c, props.Chevron).Size(p.Chevron, p.Chevron).Rotate(-p.ChevronRotate + p.ChevronRotate*progress).
+				TextColor(Color(p.ChevronColor)).PassThrough()
+			ui.Text(c, props.Title).FontSize(p.TitleSize).FontWeight(p.TitleWeight).TextColor(Color(p.Title)).PassThrough()
+			summary := ui.Text(c, props.Summary).Grow(1).MinWidth(0).SingleLine().FontSize(p.SummarySize).TextColor(Color(p.Summary)).PassThrough()
+			summary.Opacity(Visual(summary, "summary", 1-target, t.Motion.Duration.Exit))
+		})
+		if !*open && progress == 0 {
+			return
+		}
+		clip := ui.Column(c).FillWidth().Shrink(0).ClipY().Disabled(!*open)
+		if progress < 1 {
+			clip.Height(progress * *contentHeight)
+		}
+		clip.Children(func() {
+			inner := ui.Column(c).FillWidth().Shrink(0).Padding(0, t.C.Modal.BodyPaddingX, t.Space.N20, t.C.Modal.BodyPaddingX).Gap(t.C.FormRow.RowGap)
+			inner.Opacity(min(1, progress*p.ContentFadeFactor))
+			inner.Children(body)
+			if height := inner.Bounds().H; height > 0 {
+				*contentHeight = height
+			}
+		})
+		if *contentHeight == 0 {
+			c.AnimationFrame()
+		}
+	})
+	return trigger
+}

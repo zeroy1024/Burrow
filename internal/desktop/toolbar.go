@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"sshdesk/internal/theme"
+	"sshdesk/internal/uikit"
 
 	"github.com/egoist/mygo/ui"
 )
@@ -16,11 +17,7 @@ func iconButton(c *ui.Context, label string, icon *ui.SVG) ui.Element {
 }
 
 func keyedIconButton(c *ui.Context, key, label string, icon *ui.SVG) ui.Element {
-	t := theme.Current()
-	button := styleIconButton(ui.ButtonBase(c).Key(key).Label(label), t)
-	tooltip(c, button, label)
-	button.Children(func() { ui.Icon(c, icon).Size(t.C.IconButton.IconSize, t.C.IconButton.IconSize) })
-	return button
+	return uikit.IconButton(c, icon, uikit.IconButtonProps{Label: label, Key: key})
 }
 
 func (a *app) titleBar(c *ui.Context, shown float32) {

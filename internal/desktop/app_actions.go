@@ -8,6 +8,7 @@ import (
 	"github.com/egoist/mygo/ui"
 	"sshdesk/internal/termtheme"
 	"sshdesk/internal/theme"
+	"sshdesk/internal/uikit"
 )
 
 type closedWorkspaceTab struct {
@@ -31,10 +32,7 @@ func (a *app) glassRadius(c *ui.Context, radius float32) float32 {
 }
 
 func (a *app) positionAnimation(animation ui.Animation) ui.Animation {
-	if a.prefs.ReduceMotion == "on" {
-		return ui.Animation{Duration: theme.Current().Motion.Duration.InstantNonzero}
-	}
-	return animation
+	return uikit.Position(animation, a.prefs.ReduceMotion)
 }
 
 func (a *app) actionPressed(c *ui.Context, id string) bool {

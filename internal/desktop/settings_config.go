@@ -16,6 +16,7 @@ import (
 	"github.com/egoist/mygo/ui"
 	"sshdesk/internal/termtheme"
 	"sshdesk/internal/theme"
+	"sshdesk/internal/uikit"
 )
 
 type appPreferences struct {
@@ -246,13 +247,7 @@ func (a *app) flushAppPreferences() error {
 }
 
 func (a *app) reduceMotion(c *ui.Context) bool {
-	switch a.prefs.ReduceMotion {
-	case "on":
-		return true
-	case "off":
-		return false
-	}
-	return c.Preferences().ReduceMotion
+	return uikit.Reduced(c, a.prefs.ReduceMotion)
 }
 
 func (a *app) syncAppearance() {

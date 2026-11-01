@@ -8,8 +8,8 @@
 | 层 | 数量 | 说明 |
 |---|---|---|
 | palette（primitives） | 279 | 原始色值与刻度，其中 49 个为推导值（derived） |
-| semantic（每个主题一份） | 426 | Light = 当前设计；Dark 覆盖其中 104 个（全部 derived） |
-| component | 881 | 只引用 semantic；换主题时自动跟随 |
+| semantic（每个主题一份） | 430 | Light = 当前设计；Dark 覆盖其中 104 个（全部 derived） |
+| component | 893 | 只引用 semantic；换主题时自动跟随 |
 
 ## 1. 三层结构与引用规则
 
@@ -601,6 +601,9 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `color.accentChoices.green` | #30c45a | ＝ |  |
 | `color.accentChoices.graphite` | #8e8e93 | ＝ |  |
 | `color.scrim` | rgba(0,0,0,0.18) | rgba(0,0,0,0.45) | 会话弹窗遮罩，覆盖标题栏 |
+| `color.keycap.inkBg` | rgba(255,255,255,0.16) | ＝ |  |
+| `color.keycap.inkText` | rgba(255,255,255,0.6) | ＝ |  |
+| `color.keycap.accentBg` | rgba(255,255,255,0.2) | ＝ |  |
 
 ### radius
 | token | Light | Dark（derived） | 用途 |
@@ -794,6 +797,7 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `size.settingsSelect` | 220px | ＝ |  |
 | `size.settingsNumber` | 64px | ＝ |  |
 | `size.settingsScrollback` | 96px | ＝ |  |
+| `size.keycap` | 18px | ＝ |  |
 
 ### font
 | token | Light | Dark（derived） | 用途 |
@@ -2058,3 +2062,19 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `accentSwatch.ringGap` | `{size.accentRingGap}` | 2px |  |
 | `accentSwatch.ringWidth` | `{size.accentRing}` | 1.5px |  |
 | `accentSwatch.ringInset` | `{color.surface.card}` | #ffffff | 内容卡片 / sider / FTP 面板 |
+
+### kbd
+| token | 引用 | Light 值 | 说明 |
+|---|---|---|---|
+| `kbd.height` | `{size.keycap}` | 18px |  |
+| `kbd.minWidth` | `{size.keycap}` | 18px |  |
+| `kbd.paddingX` | `{space.5}` | 5px |  |
+| `kbd.radius` | `{radius.keycap}` | 4px |  |
+| `kbd.fontSize` | `{font.size.caption}` | 11px | kbd、状态栏徽章、计数 |
+| `kbd.bg` | `{color.surface.keycap}` | #ffffff | 键帽 kbd 底 |
+| `kbd.border` | `{color.border.keycap}` | #e3e3e6 | kbd 描边 |
+| `kbd.text` | `{color.text.tertiary}` | #a1a1a6 | 关闭 ×、kbd、caption |
+| `kbd.inkBg` | `{color.keycap.inkBg}` | rgba(255,255,255,0.16) |  |
+| `kbd.inkText` | `{color.keycap.inkText}` | rgba(255,255,255,0.6) |  |
+| `kbd.accentBg` | `{color.keycap.accentBg}` | rgba(255,255,255,0.2) |  |
+| `kbd.accentText` | `{color.text.onAccent}` | #ffffff |  |

@@ -7,6 +7,7 @@ import (
 
 	"sshdesk/internal/termtheme"
 	"sshdesk/internal/theme"
+	"sshdesk/internal/uikit"
 
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
@@ -276,7 +277,7 @@ func Run() error {
 
 func (a *app) view(c *ui.Context) {
 	t := theme.Current()
-	a.theme = nativeTheme(t)
+	a.theme = uikit.UITheme(t)
 	c.SetTheme(a.theme)
 	c.Root().Background(tokenColor(t.C.Window.Bg))
 	root := ui.Column(c).Fill()

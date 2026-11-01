@@ -674,6 +674,13 @@ type ColorsAccentChoices struct {
 	Graphite color.NRGBA
 }
 
+// ColorsKeycap groups tokens.
+type ColorsKeycap struct {
+	InkBg    color.NRGBA
+	InkText  color.NRGBA
+	AccentBg color.NRGBA
+}
+
 // Colors groups tokens.
 type Colors struct {
 	Bg            ColorsBg
@@ -695,6 +702,7 @@ type Colors struct {
 	Overlay       ColorsOverlay
 	AccentChoices ColorsAccentChoices
 	Scrim         color.NRGBA // 会话弹窗遮罩，覆盖标题栏
+	Keycap        ColorsKeycap
 }
 
 // Radii groups tokens.
@@ -888,6 +896,7 @@ type Sizes struct {
 	SettingsSelect          float32
 	SettingsNumber          float32
 	SettingsScrollback      float32
+	Keycap                  float32
 }
 
 // TypographyFamily groups tokens.
@@ -2223,6 +2232,22 @@ type AccentSwatchTokens struct {
 	RingInset color.NRGBA // ← color.surface.card
 }
 
+// KbdTokens groups tokens.
+type KbdTokens struct {
+	Height     float32     // ← size.keycap
+	MinWidth   float32     // ← size.keycap
+	PaddingX   float32     // ← space.5
+	Radius     float32     // ← radius.keycap
+	FontSize   float32     // ← font.size.caption
+	Bg         color.NRGBA // ← color.surface.keycap
+	Border     color.NRGBA // ← color.border.keycap
+	Text       color.NRGBA // ← color.text.tertiary
+	InkBg      color.NRGBA // ← color.keycap.inkBg
+	InkText    color.NRGBA // ← color.keycap.inkText
+	AccentBg   color.NRGBA // ← color.keycap.accentBg
+	AccentText color.NRGBA // ← color.text.onAccent
+}
+
 // Components 组件层：只由 Semantic 计算得出（见 buildComponents）。
 type Components struct {
 	Window              WindowTokens
@@ -2282,6 +2307,7 @@ type Components struct {
 	SchemeCard          SchemeCardTokens
 	ThemeCard           ThemeCardTokens
 	AccentSwatch        AccentSwatchTokens
+	Kbd                 KbdTokens
 }
 
 // Palette is the primitive tier.
@@ -2786,6 +2812,11 @@ func lightSemantic() Semantic {
 				Graphite: Palette.Gray.N600,
 			},
 			Scrim: Palette.Black.A18,
+			Keycap: ColorsKeycap{
+				InkBg:    Palette.WhiteA.A16,
+				InkText:  Palette.White.A60,
+				AccentBg: Palette.WhiteA.A20,
+			},
 		},
 		Radius: Radii{
 			Window:     Palette.Radius.N12,
@@ -2973,6 +3004,7 @@ func lightSemantic() Semantic {
 			SettingsSelect:          220,
 			SettingsNumber:          64,
 			SettingsScrollback:      96,
+			Keycap:                  Palette.Size.N18,
 		},
 		Font: Typography{
 			Family: TypographyFamily{
@@ -4246,6 +4278,20 @@ func buildComponents(s *Semantic) Components {
 			RingGap:   s.Size.AccentRingGap,
 			RingWidth: s.Size.AccentRing,
 			RingInset: s.Color.Surface.Card,
+		},
+		Kbd: KbdTokens{
+			Height:     s.Size.Keycap,
+			MinWidth:   s.Size.Keycap,
+			PaddingX:   s.Space.N5,
+			Radius:     s.Radius.Keycap,
+			FontSize:   s.Font.Size.Caption,
+			Bg:         s.Color.Surface.Keycap,
+			Border:     s.Color.Border.Keycap,
+			Text:       s.Color.Text.Tertiary,
+			InkBg:      s.Color.Keycap.InkBg,
+			InkText:    s.Color.Keycap.InkText,
+			AccentBg:   s.Color.Keycap.AccentBg,
+			AccentText: s.Color.Text.OnAccent,
 		},
 	}
 }
