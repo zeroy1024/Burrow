@@ -16,14 +16,14 @@ import (
 )
 
 var (
-	fileFolderIcon    = lineIcon(`<path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v10H3Z"/>`)
-	fileDocumentIcon  = lineIcon(`<path d="M14 2H6v20h12V6Z"/><path d="M14 2v5h5M8 12h8M8 16h6"/>`)
-	fileLaptopIcon    = lineIcon(`<rect x="4" y="4" width="16" height="12" rx="1"/><path d="M2 20h20l-2-4H4Z"/>`)
-	fileNewFolderIcon = lineIcon(`<path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v10H3ZM12 10v6m-3-3h6"/>`)
-	fileRefreshIcon   = lineIcon(`<path d="M20 8a8 8 0 1 0 0 8M20 3v6h-6"/>`)
-	fileBackIcon      = lineIcon(`<path d="m14 6-6 6 6 6"/>`)
-	fileForwardIcon   = lineIcon(`<path d="m10 6 6 6-6 6"/>`)
-	fileSidebarOnIcon = lineIcon(`<rect x="3" y="4.5" width="18" height="15" rx="3"/><path d="M9 4.5v15"/><path d="M4 6h4v12H4Z" fill="currentColor" stroke="none"/>`)
+	fileFolderIcon    = uikit.LineIcon(`<path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v10H3Z"/>`)
+	fileDocumentIcon  = uikit.LineIcon(`<path d="M14 2H6v20h12V6Z"/><path d="M14 2v5h5M8 12h8M8 16h6"/>`)
+	fileLaptopIcon    = uikit.LineIcon(`<rect x="4" y="4" width="16" height="12" rx="1"/><path d="M2 20h20l-2-4H4Z"/>`)
+	fileNewFolderIcon = uikit.LineIcon(`<path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v10H3ZM12 10v6m-3-3h6"/>`)
+	fileRefreshIcon   = uikit.LineIcon(`<path d="M20 8a8 8 0 1 0 0 8M20 3v6h-6"/>`)
+	fileBackIcon      = uikit.LineIcon(`<path d="m14 6-6 6 6 6"/>`)
+	fileForwardIcon   = uikit.LineIcon(`<path d="m10 6 6 6-6 6"/>`)
+	fileSidebarOnIcon = uikit.LineIcon(`<rect x="3" y="4.5" width="18" height="15" rx="3"/><path d="M9 4.5v15"/><path d="M4 6h4v12H4Z" fill="currentColor" stroke="none"/>`)
 )
 
 func (a *app) fileWorkspace(c *ui.Context) {
@@ -32,12 +32,8 @@ func (a *app) fileWorkspace(c *ui.Context) {
 	workspace.Children(func() {
 		session := a.currentFileSession()
 		if session == nil {
-			uikit.Card(c).Grow(1).FillWidth().Center().Gap(t.Space.N12).Children(func() {
-				ui.Icon(c, filesIcon).Size(t.C.Pane.EmptyIconSize, t.C.Pane.EmptyIconSize).
-					TextColor(tokenColor(t.Color.Text.Secondary))
-				ui.Text(c, "选择站点，浏览远程文件").FontSize(t.C.Pane.EmptyTitleSize)
-				ui.Text(c, "从左侧站点目录打开 SFTP / FTP 会话").TextColor(tokenColor(t.Color.Text.Secondary))
-			})
+			uikit.EmptyState(c, uikit.EmptyProps{Kind: uikit.EmptyFiles, Icon: filesIcon,
+				Title: "选择站点，浏览远程文件", Detail: "从左侧站点目录打开 SFTP / FTP 会话"})
 		} else if session.state != connected {
 			a.fileConnectionPage(c, session)
 		} else {
@@ -50,26 +46,22 @@ func (a *app) fileWorkspace(c *ui.Context) {
 }
 
 func (a *app) fileConnectionPage(c *ui.Context, session *fileSession) {
-	t := theme.Current()
-	uikit.Card(c).FillWidth().Grow(1).Center().Gap(t.Space.N12).Children(func() {
-		ui.Icon(c, filesIcon).Size(t.C.Pane.EmptyIconSize, t.C.Pane.EmptyIconSize).
-			TextColor(tokenColor(t.Color.Text.Secondary))
-		message := "会话已断开"
-		switch session.state {
-		case connecting:
-			message = "正在连接 " + a.hosts[session.host].name + "…"
-		case connectionFailed:
-			message = "连接失败"
-		}
-		ui.Text(c, message).FontSize(t.C.Pane.EmptyTitleSize).FontWeight(t.Font.Weight.Semibold)
-		if session.errorText != "" {
-			ui.Text(c, session.errorText).TextColor(tokenColor(t.Color.Danger.Text))
-		}
-		if session.state != connecting {
-			button(c, "重新连接").OnClick(func() { a.reconnectFileSession(session) })
-		}
-		ui.Text(c, "演示会话 · 不连接真实服务器").FontSize(t.Font.Size.Caption).TextColor(tokenColor(t.Color.Text.Secondary))
-	})
+	message := "会话已断开"
+	switch session.state {
+	case connecting:
+		message = "正在连接 " + a.hosts[session.host].name + "…"
+	case connectionFailed:
+		message = "连接失败"
+	}
+	props := uikit.EmptyProps{Kind: uikit.EmptyConnection, Icon: filesIcon, Title: message,
+		Error: session.errorText, Detail: "演示会话 · 不连接真实服务器"}
+	if session.state != connecting {
+		props.Action = "重新连接"
+	}
+	parts := uikit.EmptyState(c, props)
+	if props.Action != "" {
+		parts.Action.OnClick(func() { a.reconnectFileSession(session) })
+	}
 }
 
 func (a *app) toggleLocalFiles(c *ui.Context) {
@@ -107,10 +99,10 @@ func (a *app) filePanels(c *ui.Context, session *fileSession) {
 	if a.files.localOpen && canExpand {
 		target = 1
 	}
-	progress := area.AnimateTo("local-open", target, a.positionAnimation(ui.Animation{Spring: tokenSpring(split.Expand)}))
+	progress := area.AnimateTo("local-open", target, a.positionAnimation(ui.Animation{Spring: uikit.Spring(split.Expand)}))
 	opacity := split.RevealOpacityFrom + (1-split.RevealOpacityFrom)*min(max(progress, 0), 1)
 	if a.reduceMotion(c) {
-		opacity = animateVisual(area, "local-fade", target, split.Crossfade)
+		opacity = uikit.Visual(area, "local-fade", target, split.Crossfade)
 	}
 	remoteLeft := max(progress, 0) * (localWidth + split.Gutter)
 	remoteTargetWidth := width
@@ -169,6 +161,7 @@ func (a *app) filePanels(c *ui.Context, session *fileSession) {
 func (a *app) filePane(c *ui.Context, session *fileSession, pane *filePaneState, targetWidth float32) {
 	t := theme.Current()
 	compact := targetWidth < t.C.FilePane.CompactWidth
+	columns := fileTableColumns(t, compact)
 	card := uikit.FilePane(c, pane.remote, map[bool]string{true: "远程文件", false: "本地文件"}[pane.remote], &pane.focus)
 	if card.FocusWithin() {
 		a.files.activeRemote = pane.remote
@@ -183,25 +176,20 @@ func (a *app) filePane(c *ui.Context, session *fileSession, pane *filePaneState,
 	var folderTarget string
 	card.Children(func() {
 		entries := pane.entries()
-		ui.Scroll(c.Key("file-scroll")).Fill().TrackScroll(&pane.scroll).
-			Padding(headHeight, t.C.FilePane.ContentPadding, footerHeight, t.C.FilePane.ContentPadding).
-			ScrollbarInsets(headHeight, 0, footerHeight, 0).Children(func() {
-			ui.Column(c).FillWidth().Children(func() {
-				for i, entry := range entries {
-					if target := a.fileRow(c, session, pane, entry, i, compact); target != "" {
-						folderTarget = target
-					}
-				}
-			})
-			if len(entries) == 0 {
-				ui.Text(c, "此文件夹为空").FillWidth().Padding(t.Space.N24).TextColor(tokenColor(t.Color.Text.Secondary))
+		uikit.DataTable(c.Key("file-scroll"), &pane.scroll, columns, uikit.TableProps{
+			Count: len(entries), HeaderHeight: headHeight, FooterHeight: footerHeight,
+		}, func(index int, table uikit.TableParts) {
+			if target := a.fileRow(c, session, pane, entries[index], index, table); target != "" {
+				folderTarget = target
 			}
+		}, func() {
+			ui.Text(c, "此文件夹为空").FillWidth().Padding(t.Space.N24).TextColor(uikit.Color(t.Color.Text.Secondary))
 		})
 		a.fileScrollEdge(c, headHeight, false)
 		a.fileScrollEdge(c, footerHeight, true)
 		ui.Column(c).Absolute().Top(0).Left(0).Right(0).PassThrough().Children(func() {
 			a.fileToolbar(c, session, pane, compact)
-			a.fileColumns(c, pane, compact)
+			a.fileColumns(c, pane, columns)
 		})
 		uikit.FilePaneFooter(c).Children(func() { a.fileStatus(c, session, pane, compact) })
 	})
@@ -248,7 +236,7 @@ func (a *app) fileToolbar(c *ui.Context, session *fileSession, pane *filePaneSta
 			if pane.searchOpen {
 				label = "收起搜索"
 			}
-			keyedIconButton(c, "file-search-toggle", label, searchIcon).
+			uikit.IconButton(c, searchIcon, uikit.IconButtonProps{Key: "file-search-toggle", Label: label}).
 				Expanded(pane.searchOpen).OnClick(func() {
 				pane.searchOpen = !pane.searchOpen
 				if pane.searchOpen {
@@ -264,14 +252,14 @@ func (a *app) fileToolbar(c *ui.Context, session *fileSession, pane *filePaneSta
 			fileSearchInput(c, pane).Width(t.C.FilePane.SearchWidth)
 		}
 		if pane.remote {
-			iconButton(c, "上传文件（演示）", transferUpIcon).
+			uikit.IconButton(c, transferUpIcon, uikit.IconButtonProps{Label: "上传文件（演示）"}).
 				OnClick(func() { a.chooseUpload(c, session) })
 		}
-		iconButton(c, "新建文件夹", fileNewFolderIcon).Disabled(!fileWritable(pane, pane.path)).OnClick(func() {
+		uikit.IconButton(c, fileNewFolderIcon, uikit.IconButtonProps{Label: "新建文件夹"}).Disabled(!fileWritable(pane, pane.path)).OnClick(func() {
 			a.files.dialog = &fileActionDialog{session: session, pane: pane, kind: "mkdir", name: "新建文件夹"}
 		})
-		iconButton(c, "刷新", fileRefreshIcon).OnClick(func() { c.Toast("演示目录已刷新") })
-		iconButton(c, "更多文件操作", moreIcon).Menu(func(m *ui.Menu) { a.filePaneMenu(c, m, session, pane) })
+		uikit.IconButton(c, fileRefreshIcon, uikit.IconButtonProps{Label: "刷新"}).OnClick(func() { uikit.Notify(c, "演示目录已刷新") })
+		uikit.IconButton(c, moreIcon, uikit.IconButtonProps{Label: "更多文件操作"}).Menu(func(m *ui.Menu) { a.filePaneMenu(c, m, session, pane) })
 	})
 }
 
@@ -283,9 +271,9 @@ func (a *app) fileSearchSlot(c *ui.Context, session *fileSession, pane *filePane
 		target = 1
 	}
 	progress := slot.AnimateTo("search-open", target, ui.Animation{
-		Duration: t.C.Search.Transition, Ease: tokenEasing(t.C.Search.Easing),
+		Duration: t.C.Search.Transition, Ease: uikit.Easing(t.C.Search.Easing),
 	})
-	opacity := animateVisual(slot, "search-opacity", target, t.C.Search.Transition)
+	opacity := uikit.Visual(slot, "search-opacity", target, t.C.Search.Transition)
 	reduced := a.reduceMotion(c)
 	slot.Children(func() {
 		location := ui.Box(c).Key("file-location").WidthPercent((1 - progress) * 100).Shrink(0).
@@ -306,7 +294,7 @@ func fileSearchInput(c *ui.Context, pane *filePaneState) ui.Element {
 	t := theme.Current()
 	return uikit.Input(c.Key("file-query"), &pane.query, uikit.InputProps{}).Bind(&pane.search).
 		MinWidth(0).Height(t.C.Breadcrumb.Height).Padding(0, t.C.Search.PaddingX).
-		Radius(t.C.Search.Radius).Background(tokenColor(t.C.Search.Bg)).
+		Radius(t.C.Search.Radius).Background(uikit.Color(t.C.Search.Bg)).
 		FontSize(t.C.Search.FontSize).FixedLineHeight(t.C.Search.LineHeight).
 		Label("搜索当前文件夹").Placeholder("搜索文件")
 }
@@ -348,56 +336,33 @@ func (a *app) fileBreadcrumbs(c *ui.Context, session *fileSession, pane *filePan
 	}
 }
 
-func (a *app) fileColumns(c *ui.Context, pane *filePaneState, compact bool) {
-	t := theme.Current()
-	ui.Row(c).Height(t.C.FileList.HeaderHeight).Padding(0, t.C.FilePane.ContentPadding+t.C.FileList.RowPaddingX).
-		Gap(t.C.FileList.RowGap).FillWidth().Children(func() {
-		for i, label := range []string{"名称", "大小", "修改时间", "权限", "所有者"} {
-			if compact && i > 2 {
-				break
-			}
-			button := ui.ButtonBase(c).Key(label).Justify(ui.Start).
-				TextColor(tokenColor(t.C.FileList.HeaderText)).Label("按" + label + "排序")
-			if i == 0 {
-				button.Grow(1).MinWidth(t.C.FilePane.NameMinWidth)
-			} else {
-				button.Width(fileColumnWidth(i, t)).Shrink(0)
-			}
-			if i > 2 {
-				button.Disabled(true)
-			}
-			button.OnClick(func() {
-				if pane.sortColumn == i {
-					pane.sortDescending = !pane.sortDescending
-				} else {
-					pane.sortColumn, pane.sortDescending = i, false
-				}
-			})
-			button.Children(func() {
-				ui.Text(c, label).FontSize(t.C.FileList.HeaderSize).SingleLine()
-				if pane.sortColumn == i {
-					rotation := float32(180)
-					if pane.sortDescending {
-						rotation = 0
-					}
-					ui.Icon(c, chevronIcon).Size(t.Font.Size.Caption, t.Font.Size.Caption).Rotate(rotation)
-				}
-			})
-		}
+func (a *app) fileColumns(c *ui.Context, pane *filePaneState, columns []uikit.Column) {
+	header := uikit.SortHeader(c, uikit.SortHeaderProps{
+		Columns: columns, Column: pane.sortColumn, Descending: pane.sortDescending, Chevron: chevronIcon,
 	})
+	for index, button := range header.Buttons {
+		button.OnClick(func() {
+			if pane.sortColumn == index {
+				pane.sortDescending = !pane.sortDescending
+			} else {
+				pane.sortColumn, pane.sortDescending = index, false
+			}
+		})
+	}
 }
 
-func fileColumnWidth(index int, t *theme.Theme) float32 {
-	switch index {
-	case 1:
-		return t.C.FilePane.SizeWidth
-	case 2:
-		return t.C.FilePane.DateWidth
-	case 3:
-		return t.C.FilePane.PermissionsWidth
-	default:
-		return t.C.FilePane.OwnerWidth
+func fileTableColumns(t *theme.Theme, compact bool) []uikit.Column {
+	columns := []uikit.Column{
+		{ID: "名称", Title: "名称", SortLabel: "按名称排序", HeaderMinWidth: t.C.FilePane.NameMinWidth, Sortable: true},
+		{ID: "大小", Title: "大小", SortLabel: "按大小排序", Width: t.C.FilePane.SizeWidth, Sortable: true, TextStyle: uikit.ColumnMetadata},
+		{ID: "修改时间", Title: "修改时间", SortLabel: "按修改时间排序", Width: t.C.FilePane.DateWidth, Sortable: true, TextStyle: uikit.ColumnMetadata},
+		{ID: "权限", Title: "权限", SortLabel: "按权限排序", Width: t.C.FilePane.PermissionsWidth, TextStyle: uikit.ColumnMonoMetadata},
+		{ID: "所有者", Title: "所有者", SortLabel: "按所有者排序", Width: t.C.FilePane.OwnerWidth, TextStyle: uikit.ColumnMetadata},
 	}
+	if compact {
+		return columns[:3]
+	}
+	return columns
 }
 
 func (a *app) fileRow(
@@ -406,29 +371,13 @@ func (a *app) fileRow(
 	pane *filePaneState,
 	entry fileEntry,
 	index int,
-	compact bool,
+	table uikit.TableParts,
 ) string {
 	t := theme.Current()
-	row := ui.Row(c).Key(entry.path).Height(t.C.FileList.RowHeight).FillWidth().Shrink(0).
-		Padding(0, t.C.FileList.RowPaddingX).
-		Gap(t.C.FileList.RowGap).Radius(t.C.FileList.RowRadius).Label(entry.name).Role(ui.RoleListItem)
-	bg, text := ui.Transparent, tokenColor(t.Color.Text.Primary)
-	if index%2 != 0 {
-		bg = tokenColor(t.C.FileList.Zebra)
-	}
-	if row.Hovered() {
-		bg = tokenColor(t.Color.State.Hover)
-	}
-	if pane.selected[entry.name] {
-		if a.files.activeRemote == pane.remote {
-			bg, text = tokenColor(t.C.FilePaneFocus.SelBgActive), tokenColor(t.C.FilePaneFocus.SelTextActive)
-		} else {
-			bg, text = tokenColor(t.C.FilePaneFocus.SelBgInactive), tokenColor(t.C.FilePaneFocus.SelTextInactive)
-		}
-	}
-	animation := tokenTween(t.C.FilePaneFocus.Transition)
-	row.Background(row.AnimateColor("selection", bg, animation)).
-		TextColor(row.AnimateColor("selection-text", text, animation))
+	row := uikit.ListRow(c, uikit.ListRowProps{
+		Key: entry.path, Label: entry.name, Odd: index%2 != 0,
+		Selected: pane.selected[entry.name], Focused: a.files.activeRemote == pane.remote,
+	})
 	if row.Clicked() {
 		a.selectFile(pane, entry, row.ClickModifiers())
 	}
@@ -436,7 +385,7 @@ func (a *app) fileRow(
 		if entry.dir {
 			a.navigateFiles(c, session, pane, entry.path)
 		} else {
-			c.Toast(entry.name + " · 演示文件")
+			uikit.Notify(c, entry.name+" · 演示文件")
 		}
 	}
 	selection := pane.selection()
@@ -464,27 +413,12 @@ func (a *app) fileRow(
 		a.filePaneMenu(c, m, session, pane)
 	})
 	row.Children(func() {
-		icon, color := fileDocumentIcon, t.C.FileList.FileIcon
-		if entry.dir {
-			icon, color = fileFolderIcon, t.C.FileList.FolderIcon
-		}
-		ui.Icon(c, icon).Size(t.Size.Icon, t.Size.Icon).TextColor(tokenColor(color)).Shrink(0)
-		ui.Text(c, entry.name).FontSize(t.C.FileList.FontSize).SingleLine().Grow(1).MinWidth(0)
+		uikit.FileIcon(c, entry.dir, fileFolderIcon, fileDocumentIcon)
 		sizeText := "—"
 		if !entry.dir {
 			sizeText = transferBytes(entry.size)
 		}
-		ui.Text(c, sizeText).Width(t.C.FilePane.SizeWidth).FontSize(t.C.FileList.FontSize).
-			TextColor(tokenColor(t.C.FileList.Meta)).SingleLine()
-		ui.Text(c, entry.modified.Format("01月02日 15:04")).Width(t.C.FilePane.DateWidth).
-			FontSize(t.C.FileList.FontSize).TextColor(tokenColor(t.C.FileList.Meta)).SingleLine()
-		if !compact {
-			ui.Text(c, entry.permissions).Width(t.C.FilePane.PermissionsWidth).
-				Font(strings.Join(t.Font.Family.Mono, ", ")).FontSize(t.Font.Size.Caption).
-				TextColor(tokenColor(t.C.FileList.Meta)).SingleLine()
-			ui.Text(c, entry.owner).Width(t.C.FilePane.OwnerWidth).FontSize(t.C.FileList.FontSize).
-				TextColor(tokenColor(t.C.FileList.Meta)).SingleLine()
-		}
+		table.Cells(c, []string{entry.name, sizeText, entry.modified.Format("01月02日 15:04"), entry.permissions, entry.owner})
 	})
 	if entry.dir {
 		return a.fileDropTarget(c, row, session, pane, entry.path, true)
@@ -585,7 +519,7 @@ func (a *app) filePaneKeys(c *ui.Context, card ui.Element, session *fileSession,
 func (a *app) fileStatus(c *ui.Context, session *fileSession, pane *filePaneState, compact bool) {
 	t := theme.Current()
 	ui.Icon(c, map[bool]*ui.SVG{true: lockIcon, false: fileLaptopIcon}[pane.remote]).
-		Size(t.Size.Icon, t.Size.Icon).TextColor(tokenColor(t.C.StatusBar.Text))
+		Size(t.Size.Icon, t.Size.Icon).TextColor(uikit.Color(t.C.StatusBar.Text))
 	if !compact || !pane.remote {
 		label := "本机 · 演示"
 		if pane.remote {
@@ -599,13 +533,7 @@ func (a *app) fileStatus(c *ui.Context, session *fileSession, pane *filePaneStat
 		if a.hosts[session.host].protocol == "ftp" {
 			protocol = "FTP"
 		}
-		ui.Row(c).Padding(t.C.Badge.PaddingYCompact, t.C.Badge.PaddingXCompact).
-			Gap(t.C.Badge.Gap).Radius(t.C.Badge.Radius).Background(tokenColor(t.C.Badge.OkBg)).Children(func() {
-			ui.Box(c).Size(t.C.ActivityBadge.DotSize, t.C.ActivityBadge.DotSize).
-				Radius(t.C.Badge.Radius).Background(tokenColor(t.C.Badge.OkDot))
-			ui.Text(c, protocol+" 已连接 · 演示").FontSize(t.C.Badge.FontSizeCompact).
-				TextColor(tokenColor(t.C.Badge.OkText)).SingleLine()
-		})
+		uikit.ProtocolBadge(c, protocol)
 	}
 	count := fmt.Sprintf("%d 项", len(pane.directories[pane.path]))
 	selection := pane.selection()
@@ -616,7 +544,7 @@ func (a *app) fileStatus(c *ui.Context, session *fileSession, pane *filePaneStat
 		}
 		count += fmt.Sprintf(" · 已选 %d 项（%s）", len(selection), transferBytes(total))
 	}
-	ui.Text(c, count).FontSize(t.C.StatusBar.FontSize).TextColor(tokenColor(t.C.StatusBar.Text)).SingleLine().MinWidth(0)
+	ui.Text(c, count).FontSize(t.C.StatusBar.FontSize).TextColor(uikit.Color(t.C.StatusBar.Text)).SingleLine().MinWidth(0)
 	ui.Spacer(c)
 }
 
@@ -645,16 +573,16 @@ func (a *app) fileDropTarget(
 		return ""
 	}
 	if !writable {
-		tooltip(c, element, "此目录不可写")
+		uikit.Tip(c, element, "此目录不可写")
 		return ""
 	}
 	element.DrawOver(func(p *ui.Painter, r ui.Rect) {
 		if directory == pane.path {
-			p.Fill(r, tokenColor(t.C.DropIndicator.ZoneBg), t.C.Card.Radius)
-			p.Stroke(r, tokenColor(t.C.DropIndicator.ZoneBorder), t.C.Card.Radius, t.C.DropIndicator.ZoneBorderWidth)
+			uikit.DrawDropIndicator(p, r, uikit.DropIndicatorProps{Background: uikit.Color(t.C.DropIndicator.ZoneBg),
+				Border: uikit.Color(t.C.DropIndicator.ZoneBorder), Radius: t.C.Card.Radius, BorderWidth: t.C.DropIndicator.ZoneBorderWidth})
 		} else {
-			p.Fill(r, tokenColor(t.C.DropIndicator.PlaceholderAccentBg), t.C.FileList.RowRadius)
-			p.Stroke(r, tokenColor(t.C.DropIndicator.ZoneBorder), t.C.FileList.RowRadius, t.C.DropIndicator.ZoneBorderWidth)
+			uikit.DrawDropIndicator(p, r, uikit.DropIndicatorProps{Background: uikit.Color(t.C.DropIndicator.PlaceholderAccentBg),
+				Border: uikit.Color(t.C.DropIndicator.ZoneBorder), Radius: t.C.FileList.RowRadius, BorderWidth: t.C.DropIndicator.ZoneBorderWidth})
 		}
 	})
 	if directory == pane.path {
@@ -671,12 +599,7 @@ func (a *app) fileDropTarget(
 			label += fmt.Sprintf(" · %d 项 · %s", len(drag.entries), transferBytes(total))
 		}
 		element.Children(func() {
-			ui.Row(c).Absolute().Bottom(t.C.FilePane.StatusHeight + t.Space.N12).
-				Left(t.Space.N12).Right(t.Space.N12).Center().PassThrough().Children(func() {
-				ui.Text(c, label).Padding(t.Space.N6, t.Space.N12).Radius(t.Radius.Pill).
-					Background(tokenColor(t.C.DropIndicator.HintBg)).
-					TextColor(tokenColor(t.C.DropIndicator.HintText)).FontSize(t.Font.Size.Footnote)
-			})
+			uikit.DropHint(c, label, t.C.FilePane.StatusHeight+t.Space.N12)
 		})
 		return ""
 	}
@@ -689,7 +612,7 @@ func (a *app) chooseUpload(c *ui.Context, session *fileSession) {
 		Message: "演示传输：仅读取文件名和大小，不上传内容。",
 	})
 	if err != nil {
-		c.Toast("打开文件选择器失败：" + err.Error())
+		uikit.Notify(c, "打开文件选择器失败："+err.Error())
 		return
 	}
 	a.uploadFinderPaths(c, session, paths, session.remote.path)
@@ -700,7 +623,7 @@ func (a *app) uploadFinderPaths(c *ui.Context, session *fileSession, paths []str
 	for _, source := range paths {
 		info, err := os.Stat(source)
 		if err != nil {
-			c.Toast("无法读取文件信息：" + err.Error())
+			uikit.Notify(c, "无法读取文件信息："+err.Error())
 			return
 		}
 		entries = append(entries, fileEntry{
