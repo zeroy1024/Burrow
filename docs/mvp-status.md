@@ -52,3 +52,6 @@
 `catalog_migration.go`将无内嵌公钥的传统加密PEM迁移延迟到窗口就绪，通过原UIKit认证弹窗取得本次口令；worker解密计算真实公钥，复制原加密bytes，原子发布完整目录。取消、错口令、发布失败均补偿未发布文件并提供持续的重试Toast；编辑草稿/密钥任务存在时拒绝替换模型，发布后只清旧catalog临时引用，保留搜索/滚动句柄和会话任务。
 
 真实hidden native `-race`控制器完成4个主场景、7种入口guard和发布前guard，均退出0，SDK Secrets三入口panic trap未触发，原始源文件bytes/mode/mtime未变；再以单独microcase验证两scope的旧分组/拖动引用清理、稳定句柄和新草稿组选择。证据 `/private/tmp/sshdesk-pem-migration-dhiayfcz/runner/result.json` 与 `supplement-manifest.json`。临时controller的两次夹具/构建问题明确保留日志并重试，未算作production通过；没有永久测试或GUI视觉验收。
+
+
+剩余公开API阻塞已逐项审计，具体消费者、影响及处理路线见[SDK阻塞审计](mvp-sdk-blockers.md)。这些缺项继续标为部分实现，完整goal尚不能通过验收。
