@@ -8,6 +8,7 @@ import (
 
 	"sshdesk/internal/theme"
 
+	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
 )
 
@@ -85,9 +86,9 @@ func (a *app) sidebar(c *ui.Context, shown float32) {
 			BorderWidth(t.Size.Hairline, 0, 0, 0).BorderColor(tokenColor(t.C.Sider.FooterBorder)).
 			TextColor(tokenColor(t.C.Sider.FooterText)).Children(func() {
 			ui.Icon(c, serverIcon).Size(t.Size.IconSm, t.Size.IconSm)
-			summary := fmt.Sprintf("%d 台主机", len(a.hosts))
+			summary := fmt.Sprintf("%d 台主机", len(a.catalog().hosts))
 			if a.section == sectionFiles {
-				summary = fmt.Sprintf("%d 个站点", len(a.hosts))
+				summary = fmt.Sprintf("%d 个站点", len(a.catalog().hosts))
 			}
 			ui.Text(c, summary).FontSize(t.C.Sider.FooterSize)
 		})
@@ -97,14 +98,15 @@ func (a *app) sidebar(c *ui.Context, shown float32) {
 type hostDraft struct {
 	name, address, user, port, group, system string
 	protocol                                 string
+	auth, keyPath                            string
 	id                                       hostID
 	editing, deleting, files                 bool
 }
 
 func (a *app) startHostDraft() {
 	a.page().draft = hostDraft{
-		user: "root", port: "22", group: a.groups[0].name, system: systems[0].name,
-		protocol: "SFTP", files: a.section == sectionFiles,
+		user: "root", port: "22", group: a.catalog().groups[0].name, system: systems[0].name,
+		protocol: "SFTP", auth: "agent", files: a.section == sectionFiles,
 	}
 	a.page().addHostOpen = true
 }
@@ -118,6 +120,9 @@ func (a *app) hostDialog(c *ui.Context) {
 				return
 			}
 			title := "添加 SSH 主机"
+			if a.page().draft.editing {
+				title = "编辑 SSH 主机"
+			}
 			if a.page().draft.files {
 				title = "添加文件站点"
 				if a.page().draft.editing {
@@ -142,6 +147,35 @@ func (a *app) hostDialog(c *ui.Context) {
 				ui.Column(c).Grow(1).Gap(t.Space.N6).Children(func() { draftField(c, "用户名", &a.page().draft.user) })
 				ui.Column(c).Width(t.C.Dialog.PortWidth).Gap(t.Space.N6).Children(func() { draftField(c, "端口", &a.page().draft.port) })
 			})
+			if !a.page().draft.files || a.page().draft.protocol != "FTP" {
+				authMethods := []string{"agent", "password", "key"}
+				authNames := []string{"SSH Agent", "密码", "私钥"}
+				authName := authNames[slices.Index(authMethods, a.page().draft.auth)]
+				ui.Text(c, "认证方式").FontSize(t.Font.Size.Small)
+				ui.Select(c, &authName, authNames).OnChange(func() {
+					a.page().draft.auth = authMethods[slices.Index(authNames, authName)]
+				})
+				if a.page().draft.auth == "key" {
+					ui.Text(c, "私钥路径").FontSize(t.Font.Size.Small)
+					ui.Row(c).Gap(t.Space.N8).Children(func() {
+						textInput(c, &a.page().draft.keyPath).Label("私钥路径").Grow(1).MinWidth(0)
+						button(c, "选择…").OnClick(func() {
+							paths, err := mygo.Dialog.Open(mygo.OpenDialogOptions{
+								Parent: a.window, Title: "选择 SSH 私钥", ShowHiddenFiles: true,
+							})
+							if err != nil {
+								c.Toast("选择私钥失败：" + err.Error())
+								return
+							}
+							if len(paths) > 0 {
+								a.page().draft.keyPath = paths[0]
+							}
+						})
+					})
+				}
+				ui.Text(c, "密码和私钥口令在连接时输入，不保存到主机配置。").
+					FontSize(t.Font.Size.Small).TextColor(tokenColor(t.Color.Text.Secondary))
+			}
 			ui.Text(c, "分组").FontSize(t.Font.Size.Small)
 			groupNames := a.groupNames()
 			ui.Select(c, &a.page().draft.group, groupNames)
@@ -155,7 +189,9 @@ func (a *app) hostDialog(c *ui.Context) {
 			validPort := err == nil && port > 0 && port <= 65535
 			validHost := strings.TrimSpace(a.page().draft.name) != "" && strings.TrimSpace(a.page().draft.address) != ""
 			validUser := strings.TrimSpace(a.page().draft.user) != ""
-			canAdd := validPort && validHost && validUser
+			isFTP := a.page().draft.files && a.page().draft.protocol == "FTP"
+			validKey := isFTP || a.page().draft.auth != "key" || strings.TrimSpace(a.page().draft.keyPath) != ""
+			canAdd := validPort && validHost && validUser && validKey
 			ui.Row(c).Justify(ui.End).Gap(t.Space.N8).Children(func() {
 				button(c, "取消").OnClick(func() { a.page().addHostOpen = false })
 				label := "添加"
@@ -173,23 +209,29 @@ func (a *app) hostDialog(c *ui.Context) {
 								name: strings.TrimSpace(a.page().draft.name), address: strings.TrimSpace(a.page().draft.address),
 								user: strings.TrimSpace(a.page().draft.user), port: port,
 								os: slices.Index(names, a.page().draft.system), system: a.page().draft.system, protocol: protocol,
+								auth: a.page().draft.auth, keyPath: strings.TrimSpace(a.page().draft.keyPath),
 							}
-							id := hostID(len(a.hosts))
-							group := a.groups[slices.Index(groupNames, a.page().draft.group)]
+							if protocol == "ftp" {
+								h.auth, h.keyPath = "password", ""
+							}
+							id := a.catalog().nextHostID
+							group := a.catalog().groups[slices.Index(groupNames, a.page().draft.group)]
 							if a.page().draft.editing {
 								id = a.page().draft.id
-								previous := a.hosts[id]
+								previous := a.catalog().hosts[id]
 								previous.name, previous.address, previous.user = h.name, h.address, h.user
 								previous.port, previous.os, previous.system = h.port, h.os, h.system
 								previous.protocol = h.protocol
-								a.hosts[id] = previous
-								for _, group := range a.groups {
+								previous.auth, previous.keyPath = h.auth, h.keyPath
+								a.catalog().hosts[id] = previous
+								for _, group := range a.catalog().groups {
 									if group.name != a.page().draft.group {
 										group.hosts = slices.DeleteFunc(group.hosts, func(candidate hostID) bool { return candidate == id })
 									}
 								}
 							} else {
-								a.hosts = append(a.hosts, h)
+								a.catalog().hosts[id] = h
+								a.catalog().nextHostID++
 							}
 							if !slices.Contains(group.hosts, id) {
 								group.hosts = append(group.hosts, id)
@@ -229,7 +271,9 @@ func (a *app) groupDialog(c *ui.Context) {
 				button(c, "取消").OnClick(func() { a.page().groupDialogOpen = false })
 				primaryButton(c, "创建").Disabled(name == "" || duplicate).OnClick(func() {
 					if err := a.commitCatalogMove(func() {
-						a.groups = append(a.groups, &hostGroup{id: len(a.groups), name: name, hosts: []hostID{}})
+						catalog := a.catalog()
+						catalog.groups = append(catalog.groups, &hostGroup{id: catalog.nextGroupID, name: name, hosts: []hostID{}})
+						catalog.nextGroupID++
 					}); err != nil {
 						c.Toast("保存分组失败：" + err.Error())
 						return

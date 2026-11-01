@@ -3,26 +3,51 @@ package desktop
 import "slices"
 
 type hostGroup struct {
-	id             int
-	name           string
-	hosts          []hostID
-	collapsed      bool
-	filesCollapsed bool
+	id        int
+	name      string
+	hosts     []hostID
+	collapsed bool
 }
 
-func (a *app) groupCollapsed(group *hostGroup) bool {
-	if a.section == sectionFiles {
-		return group.filesCollapsed
-	}
-	return group.collapsed
+type catalogData struct {
+	hosts       map[hostID]host
+	groups      []*hostGroup
+	nextHostID  hostID
+	nextGroupID int
+	localPaths  map[hostID]string
 }
 
-func (a *app) setGroupCollapsed(group *hostGroup, collapsed bool) {
-	if a.section == sectionFiles {
-		group.filesCollapsed = collapsed
-		return
+func demoCatalog() catalogData {
+	values := demoHosts()
+	groups := demoGroups()
+	catalog := catalogData{
+		hosts: make(map[hostID]host, len(values)), groups: groups,
+		nextHostID: hostID(len(values)), nextGroupID: len(groups), localPaths: map[hostID]string{},
 	}
-	group.collapsed = collapsed
+	for id, value := range values {
+		value.auth = "agent"
+		catalog.hosts[hostID(id)] = value
+	}
+	return catalog
+}
+
+func (a *app) catalog() *catalogData {
+	if a.section == sectionFiles {
+		return &a.fileCatalog
+	}
+	return &a.sshCatalog
+}
+
+func (a *app) groupCollapsed(group *hostGroup) bool { return group.collapsed }
+
+func (a *app) setGroupCollapsed(group *hostGroup, collapsed bool) { group.collapsed = collapsed }
+
+func (catalog *catalogData) removeHost(id hostID) {
+	delete(catalog.hosts, id)
+	delete(catalog.localPaths, id)
+	for _, group := range catalog.groups {
+		group.hosts = slices.DeleteFunc(group.hosts, func(candidate hostID) bool { return candidate == id })
+	}
 }
 
 type hostDrag struct {
@@ -39,17 +64,18 @@ func demoGroups() []*hostGroup {
 }
 
 func (a *app) groupNames() []string {
-	names := make([]string, len(a.groups))
-	for i, group := range a.groups {
+	names := make([]string, len(a.catalog().groups))
+	for i, group := range a.catalog().groups {
 		names[i] = group.name
 	}
 	return names
 }
 
 func (a *app) moveGroup(source *hostGroup, position int) {
-	from := slices.Index(a.groups, source)
-	a.groups = slices.Delete(a.groups, from, from+1)
-	a.groups = slices.Insert(a.groups, position, source)
+	catalog := a.catalog()
+	from := slices.Index(catalog.groups, source)
+	catalog.groups = slices.Delete(catalog.groups, from, from+1)
+	catalog.groups = slices.Insert(catalog.groups, position, source)
 }
 
 // position is the destination index after removing the source from its group.

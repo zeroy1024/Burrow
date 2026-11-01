@@ -3,7 +3,6 @@ package desktop
 import (
 	"fmt"
 	"path"
-	"slices"
 	"strings"
 
 	"sshdesk/internal/theme"
@@ -11,12 +10,12 @@ import (
 	"github.com/egoist/mygo/ui"
 )
 
+const fileBrowseOnlyMessage = "当前仅支持远程目录浏览，文件传输和修改暂未开放。"
+
 func (a *app) fileDialogs(c *ui.Context) {
-	if a.files.dialog != nil {
-		a.fileActionModal(c)
-	}
-	if a.files.conflict != nil {
-		a.fileConflictModal(c)
+	if a.files.dialog != nil || a.files.conflict != nil {
+		a.files.dialog, a.files.conflict = nil, nil
+		c.Toast(fileBrowseOnlyMessage)
 	}
 }
 
@@ -34,7 +33,7 @@ func (a *app) fileActionModal(c *ui.Context) {
 				title, action = "删除文件", "删除"
 			}
 			ui.Text(c, title).FontSize(t.C.Dialog.TitleSize).FontWeight(t.Font.Weight.Semibold)
-			ui.Text(c, "操作仅修改本次会话的演示目录。").
+			ui.Text(c, fileBrowseOnlyMessage).
 				FontSize(t.Font.Size.Small).TextColor(tokenColor(t.Color.Text.Secondary))
 			var submitted bool
 			if dialog.kind == "delete" {
@@ -62,7 +61,7 @@ func (a *app) fileActionModal(c *ui.Context) {
 			}
 			ui.Row(c).Justify(ui.End).Gap(t.Space.N8).Children(func() {
 				button(c, "取消").OnClick(func() { a.files.dialog = nil })
-				primaryButton(c, action).Disabled(nameError != "").OnClick(apply)
+				primaryButton(c, action).Disabled(true)
 			})
 			if submitted && nameError == "" {
 				apply()
@@ -95,67 +94,8 @@ func fileActionNameError(dialog *fileActionDialog) string {
 }
 
 func (a *app) applyFileAction(c *ui.Context, dialog *fileActionDialog) bool {
-	pane := dialog.pane
-	if !fileWritable(pane, pane.path) {
-		dialog.errorText = "此目录不可写。"
-		return false
-	}
-	if message := fileActionNameError(dialog); message != "" {
-		dialog.errorText = message
-		return false
-	}
-	name := strings.TrimSpace(dialog.name)
-	entries := pane.directories[pane.path]
-	switch dialog.kind {
-	case "mkdir":
-		entry := fileEntry{
-			name: name, path: path.Join(pane.path, name), dir: true,
-			modified: c.Now(), permissions: "rwxr-xr-x", owner: a.hosts[dialog.session.host].user,
-		}
-		pane.directories[pane.path] = append(entries, entry)
-		pane.directories[entry.path] = []fileEntry{}
-		pane.selected, pane.anchor, pane.reveal = map[string]bool{name: true}, name, name
-	case "rename":
-		index := slices.IndexFunc(entries, func(entry fileEntry) bool { return entry.name == dialog.original })
-		if index < 0 {
-			dialog.errorText = "要重命名的项目已不存在。"
-			return false
-		}
-		oldPath, newPath := entries[index].path, path.Join(pane.path, name)
-		entries[index].name, entries[index].path = name, newPath
-		if oldPath != newPath && entries[index].dir {
-			renameDemoDirectory(pane, oldPath, newPath)
-		}
-		pane.directories[pane.path] = entries
-		delete(pane.selected, dialog.original)
-		pane.selected[name] = true
-		pane.anchor, pane.reveal = name, name
-	case "delete":
-		selected := pane.selection()
-		if dialog.original != "" {
-			selected = []fileEntry{}
-			for _, entry := range entries {
-				if entry.name == dialog.original {
-					selected = append(selected, entry)
-					break
-				}
-			}
-		}
-		for _, entry := range selected {
-			if entry.dir {
-				for directory := range pane.directories {
-					if directory == entry.path || strings.HasPrefix(directory, entry.path+"/") {
-						delete(pane.directories, directory)
-					}
-				}
-			}
-			entries = slices.DeleteFunc(entries, func(candidate fileEntry) bool { return candidate.name == entry.name })
-			delete(pane.selected, entry.name)
-		}
-		pane.directories[pane.path] = entries
-		pane.anchor, pane.reveal = "", ""
-	}
-	return true
+	dialog.errorText = fileBrowseOnlyMessage
+	return false
 }
 
 func renameDemoDirectory(pane *filePaneState, oldPath, newPath string) {

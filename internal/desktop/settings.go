@@ -208,7 +208,9 @@ func (a *app) terminalTextSettings(c *ui.Context) {
 	})
 	a.terminalNumberSetting(c, "字号", &a.terminal.prefs.FontSize, 6, 48)
 	a.terminalNumberSetting(c, "行高", &a.terminal.prefs.LineHeight, 6, 80)
-	a.terminalNumberSetting(c, "字距", &a.terminal.prefs.Tracking, -4, 8)
+	settingsRow(c, "字距", func() {
+		ui.Text(c, "当前不可用").TextColor(tokenColor(t.Color.Text.Secondary))
+	})
 	settingsRow(c, "光标形状", func() {
 		options := []string{"块状", "竖线", "下划线"}
 		selected := options[int(a.terminal.prefs.CursorShape)]
@@ -224,11 +226,11 @@ func (a *app) terminalTextSettings(c *ui.Context) {
 			a.changeTerminalSettings(func() { a.terminal.prefs.CursorBlink = checked })
 		}
 	})
+	ui.Text(c, "光标形状和闪烁设置在下次连接时生效。").FontSize(t.Font.Size.Small).
+		TextColor(tokenColor(t.Color.Text.Secondary))
 	settingsRow(c, "粗体颜色", func() {
 		checked := a.terminal.prefs.BoldIsBright
-		if ui.Checkbox(c, &checked, "使用 ANSI 亮色").Changed() {
-			a.changeTerminalSettings(func() { a.terminal.prefs.BoldIsBright = checked })
-		}
+		ui.Checkbox(c, &checked, "使用 ANSI 亮色（当前不可用）").Disabled(true)
 	})
 }
 

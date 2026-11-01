@@ -10,6 +10,7 @@ import (
 	"sshdesk/internal/theme"
 
 	"github.com/egoist/mygo/plugins/glass"
+	nativeterm "github.com/egoist/mygo/plugins/terminal"
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/shader"
 )
@@ -142,7 +143,7 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 	surface := terminalSurface(terminalBackground)
 	p, f, status := surface.C.Pane, surface.C.PaneFocus, surface.C.StatusBar
 	session, rect := placement.session, placement.rect
-	h := a.hosts[session.host]
+	h := session.endpoint
 	count := tab.root.count()
 	multiple := count > 1
 	contentGap := t.Space.N4
@@ -154,7 +155,7 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 	// Only the inner card clips. Its wrapper owns the focus border and overlay hairline.
 	pane := ui.Box(c).Key(fmt.Sprintf("pane-wrap-%d", session.id)).Absolute().
 		Left(rect.X).Top(rect.Y).Size(rect.W, rect.H).Bind(&session.frame).
-		MinWidth(0).MinHeight(0).Radius(p.Radius).Label(h.name + " 演示终端")
+		MinWidth(0).MinHeight(0).Radius(p.Radius).Label(h.name + " SSH 终端")
 	a.paneMotion(c, pane, tab, session)
 	_, catalogActive, _ := a.catalogHostTransfer()
 	frozen := !session.revealing && (a.drag != nil || catalogActive || a.resizing != nil ||
@@ -166,20 +167,14 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 			}
 			session.contentWidth, session.contentHeight = rect.W, rect.H
 		}
-		session.columns = max(1, int((rect.W-2*p.ContentSide)/a.cellWidth))
-		session.rows = max(1, int((rect.H-topPadding-bottomPadding)/prefs.LineHeight))
+		if session.terminal == nil {
+			session.columns = max(1, int((rect.W-2*p.ContentSide)/a.cellWidth))
+			session.rows = max(1, int((rect.H-topPadding-bottomPadding)/prefs.LineHeight))
+		}
 	} else {
 		c.After(p.FrameInterval)
 	}
 	pane.OnClick(func() { a.focusSession(tab, session) })
-	pane.ContextMenu(func(m *ui.Menu) {
-		if m.Item("追加演示输出").Chosen() {
-			a.receiveSessionOutput(session, fmt.Sprintf("[%s] INFO 收到新的演示输出\n", c.Now().Format("15:04:05")))
-		}
-		if m.Item("触发演示响铃").Chosen() {
-			a.receiveSessionOutput(session, "\a")
-		}
-	})
 	scroll := &session.scroll
 	focused, hovered := tab.focused == session, pane.Hovered()
 	opacity, saturation, footerOpacity := float32(1), float32(1), float32(1)
@@ -210,36 +205,65 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 				p.Fill(r, background, t.C.Pane.Radius)
 			})
 		card.Children(func() {
-			// Move the native thumb outside the card's clip; the fading thumb is drawn below.
-			output := ui.Scroll(c.Key("output")).Fill().MinWidth(0).MinHeight(0).
-				Bind(&session.focus).Focusable().FocusRing(false).
-				TrackScroll(&scroll.offset).Padding(
-				topPadding,
-				p.ContentSide,
-				bottomPadding,
-				p.ContentSide,
-			).ScrollbarInsets(
-				p.HeaderHeight,
-				-t.C.Scrollbar.TrackWidth,
-				status.HeightPane,
-				0,
-			).Font(strings.Join(prefs.FontFamily, ", ")).FontSize(prefs.FontSize).
-				LetterSpacing(prefs.Tracking).TextColor(tokenColor(s.Foreground)).
-				Opacity(opacity).Cache().HandleInput(scroll.input).
-				OnClick(func() { a.focusSession(tab, session) })
-			if saturation != 1 {
-				output.Effect(terminalSaturation.Effect(shader.Options{
-					Uniforms: map[string]any{"Saturation": saturation},
-				}))
+			if live := session.terminal; live != nil {
+				a.syncSSHTerminal(live)
+				ui.Box(c).Key("live-output").Absolute().Left(0).Top(topPadding).
+					Width(session.contentWidth).Height(max(1, session.contentHeight-topPadding-bottomPadding)).Children(func() {
+					output := nativeterm.View(c, live.view).Fill().Bind(&session.focus).
+						Label(h.name + " SSH 终端").Opacity(opacity)
+					if session.focusPending {
+						if a.sshSessionFocused(session) {
+							output.Focus()
+						}
+						session.focusPending = false
+					}
+					if saturation != 1 {
+						output.Effect(terminalSaturation.Effect(shader.Options{
+							Uniforms: map[string]any{"Saturation": saturation},
+						}))
+					}
+					if output.Focused() && !tab.focused.focusPending && tab.focused != session {
+						tab.focused = session
+						session.hasNewOutput, session.hasBell = false, false
+						c.AnimationFrame()
+					}
+				})
+			} else {
+				// Move the native thumb outside the card's clip; the fading thumb is drawn below.
+				output := ui.Scroll(c.Key("output")).Fill().MinWidth(0).MinHeight(0).
+					Bind(&session.focus).Focusable().FocusRing(false).
+					TrackScroll(&scroll.offset).Padding(
+					topPadding,
+					p.ContentSide,
+					bottomPadding,
+					p.ContentSide,
+				).ScrollbarInsets(
+					p.HeaderHeight,
+					-t.C.Scrollbar.TrackWidth,
+					status.HeightPane,
+					0,
+				).Font(strings.Join(prefs.FontFamily, ", ")).FontSize(prefs.FontSize).
+					LetterSpacing(prefs.Tracking).TextColor(tokenColor(s.Foreground)).
+					Opacity(opacity).Cache().HandleInput(scroll.input).
+					OnClick(func() { a.focusSession(tab, session) })
+				if session.focusPending && tab.focused == session {
+					output.Focus()
+					session.focusPending = false
+				}
+				if saturation != 1 {
+					output.Effect(terminalSaturation.Effect(shader.Options{
+						Uniforms: map[string]any{"Saturation": saturation},
+					}))
+				}
+				output.Children(func() {
+					a.terminalLines(c, session, focused)
+				})
+				if multiple {
+					terminalScrollEdge(c, p.HeaderHeight, false, background)
+				}
+				terminalScrollEdge(c, status.HeightPane, true, background)
+				terminalScrollbar(c, pane, scroll, terminalBackground)
 			}
-			output.Children(func() {
-				a.terminalLines(c, session, focused)
-			})
-			if multiple {
-				terminalScrollEdge(c, p.HeaderHeight, false, background)
-			}
-			terminalScrollEdge(c, status.HeightPane, true, background)
-			terminalScrollbar(c, pane, scroll, terminalBackground)
 			var header ui.Element
 			if multiple {
 				header = ui.Row(c).Key("identity").Absolute().Top(0).Left(0).Height(p.HeaderHeight).Padding(
@@ -257,7 +281,6 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 					ui.Text(c, fmt.Sprintf("⌘%d", number)).FontSize(f.KbdSize).FontWeight(f.KbdWeight).
 						FixedLineHeight(f.KbdLineHeight).SingleLine().Padding(f.KbdPaddingY, f.KbdPaddingX).Radius(f.KbdRadius).
 						Background(labelBackground).TextColor(labelColor)
-					statusDot(c, session.state, t.Size.Dot)
 					tooltip(c, ui.Text(c, h.name).FontSize(p.HeaderFontSize).FontWeight(titleWeight).TextColor(titleColor).
 						SingleLine().Ellipsis("…").MinWidth(0).Shrink(1), fmt.Sprintf("%s · %s@%s:%d", h.name, h.user, h.address, h.port))
 					ui.Text(c, fmt.Sprintf("%s@%s:%d", h.user, h.address, h.port)).
@@ -323,6 +346,8 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 				switch {
 				case session.state == connecting:
 					label, tint, color = "连接中", tokenColor(surface.Color.Warning.Subtle), tokenColor(surface.Color.Warning.Text)
+				case session.state == connectionFailed:
+					label, tint, color = "连接失败", tokenColor(surface.Color.Danger.Subtle), tokenColor(surface.Color.Danger.Text)
 				case session.state != connected:
 					label, tint, color = "未连接", tokenColor(badge.NeutralBg), tokenColor(badge.NeutralText)
 				}
@@ -331,9 +356,6 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 					ui.Text(c, label).FontSize(badge.FontSizeCompact).TextColor(color)
 				})
 				latency := "延迟 —"
-				if session.state == connected {
-					latency = fmt.Sprintf("延迟 %d ms", h.latency)
-				}
 				ui.Text(c, latency).FontSize(status.FontSize).SingleLine()
 				ui.Spacer(c)
 				ui.Text(c, a.paneSizeLabel(session)).FontSize(status.FontSize).SingleLine()

@@ -37,12 +37,13 @@ type filePaneState struct {
 	reveal         string
 	hoverFolder    string
 	hoverStarted   time.Time
+	loading        bool
+	errorText      string
 }
 
 type fileWorkspaceState struct {
 	localOpen, activeRemote bool
 	ratio                   float32
-	localPaths              map[string]string
 	resizing                bool
 	notice                  string
 	dialog                  *fileActionDialog
@@ -76,66 +77,13 @@ type fileConflict struct {
 	choice       int
 }
 
-// These directories are an in-memory fixture. Finder drops only inspect metadata;
-// no operation on this page writes, deletes or uploads the user's actual files.
+// Remote contents are populated only by successful protocol directory reads.
 func newFilePane(remote bool) *filePaneState {
-	p := &filePaneState{
-		remote: remote, selected: map[string]bool{}, directories: map[string][]fileEntry{},
-		history: []string{},
+	pane := &filePaneState{remote: remote, selected: map[string]bool{}, directories: map[string][]fileEntry{}}
+	if !remote {
+		pane.path = "~"
 	}
-	p.path = "~"
-	if remote {
-		p.path = "/var/www/html"
-	}
-	stamp := time.Date(2026, time.October, 28, 18, 50, 0, 0, time.Local)
-	add := func(dir string, entries []fileEntry) {
-		for i := range entries {
-			e := &entries[i]
-			e.path, e.modified, e.owner = path.Join(dir, e.name), stamp, "deploy"
-			e.permissions = "rw-r--r--"
-			if e.dir {
-				e.permissions = "rwxr-xr-x"
-				p.directories[e.path] = []fileEntry{}
-			}
-		}
-		p.directories[dir] = entries
-	}
-	if remote {
-		add("/", []fileEntry{{name: "var", dir: true}, {name: "home", dir: true}, {name: "backups", dir: true}})
-		add("/var", []fileEntry{{name: "www", dir: true}, {name: "backups", dir: true}})
-		add("/var/www", []fileEntry{{name: "html", dir: true}})
-		add(p.path, []fileEntry{
-			{name: "static", dir: true}, {name: "uploads", dir: true},
-			{name: ".well-known", dir: true}, {name: "wp-legacy", dir: true},
-			{name: "404.html", size: 3200}, {name: "android-chrome-192.png", size: 9 << 10},
-			{name: "android-chrome-512.png", size: 28 << 10}, {name: "app.a71b02.css", size: 1100 << 10},
-			{name: "app.a71b02.js", size: 3500 << 10}, {name: "apple-touch-icon.png", size: 13 << 10},
-			{name: "browserconfig.xml", size: 246}, {name: "favicon.ico", size: 15 << 10},
-			{name: ".htaccess", size: 1 << 10}, {name: "humans.txt", size: 312},
-			{name: "index.html", size: 8100}, {name: "logo.svg", size: 6 << 10},
-			{name: "manifest.json", size: 1 << 10}, {name: "og-image.png", size: 83 << 10},
-			{name: "robots.txt", size: 68}, {name: "sitemap.xml", size: 12 << 10},
-		})
-		add("/var/backups", []fileEntry{{name: "backup-2026-10-30.sql.gz", size: 240 << 20}})
-	} else {
-		add("~", []fileEntry{
-			{name: "Desktop", dir: true}, {name: "Documents", dir: true},
-			{name: "Downloads", dir: true}, {name: "Projects", dir: true},
-		})
-		add("~/Projects", []fileEntry{{name: "shop-site", dir: true}})
-		add("~/Projects/shop-site", []fileEntry{{name: "dist", dir: true}})
-		add("~/Projects/shop-site/dist", []fileEntry{
-			{name: "assets", dir: true}, {name: "static", dir: true},
-			{name: "app.3f9c1e.css", size: 1200 << 10}, {name: "app.3f9c1e.js", size: 3600 << 10},
-			{name: "assets-v2.8.1.zip", size: 512 << 20}, {name: "favicon.ico", size: 15 << 10},
-			{name: "index.html", size: 8400}, {name: "logo.svg", size: 6 << 10},
-			{name: "manifest.json", size: 1 << 10}, {name: "README.md", size: 2 << 10},
-			{name: "robots.txt", size: 68}, {name: "sitemap.xml", size: 12 << 10},
-			{name: "vendor.81ab2d.js", size: 2900 << 10},
-		})
-	}
-	p.history = append(p.history, p.path)
-	return p
+	return pane
 }
 
 func (p *filePaneState) entries() []fileEntry {
@@ -178,31 +126,22 @@ func (p *filePaneState) selection() []fileEntry {
 }
 
 func (a *app) navigateFiles(c *ui.Context, session *fileSession, pane *filePaneState, target string) {
-	target = path.Clean(target)
-	if pane.path == target {
+	if !pane.remote {
 		return
 	}
-	pane.path, pane.query, pane.anchor = target, "", ""
-	pane.selected, pane.scroll.Y = map[string]bool{}, 0
-	pane.history = append(pane.history[:pane.historyIndex+1], target)
-	pane.historyIndex = len(pane.history) - 1
-	if !pane.remote {
-		a.files.localPaths[a.fileSiteKey(session)] = target
-		a.saveFilePreferences(c)
+	target = path.Clean(target)
+	if pane.path == target && !pane.loading && pane.errorText == "" {
+		return
 	}
+	a.queueRemoteDirectory(session, fileNavigation{path: target, historyIndex: -1})
 }
 
 func (a *app) fileHistory(c *ui.Context, session *fileSession, pane *filePaneState, delta int) {
 	index := pane.historyIndex + delta
-	if index < 0 || index >= len(pane.history) {
+	if !pane.remote || index < 0 || index >= len(pane.history) {
 		return
 	}
-	pane.path, pane.historyIndex = pane.history[index], index
-	pane.selected, pane.scroll.Y, pane.query = map[string]bool{}, 0, ""
-	if !pane.remote {
-		a.files.localPaths[a.fileSiteKey(session)] = pane.path
-		a.saveFilePreferences(c)
-	}
+	a.queueRemoteDirectory(session, fileNavigation{path: pane.history[index], historyIndex: index})
 }
 
 func (a *app) selectFile(pane *filePaneState, entry fileEntry, modifiers ui.Modifiers) {
@@ -366,12 +305,7 @@ func (a *app) revealTransferredFile(c *ui.Context, task *transferTask) {
 	pane.query, pane.scroll.Y = "", 0
 	a.files.activeRemote = pane.remote
 	if !pane.remote {
-		a.files.localPaths[a.fileSiteKey(task.session)] = pane.path
-		a.saveFilePreferences(c)
+		a.rememberFileLocalPath(c, task.session, pane.path)
 	}
 	pane.focus.Focus()
-}
-
-func (a *app) fileSiteBusy(id hostID) bool {
-	return slices.ContainsFunc(a.transfers.tasks, func(task *transferTask) bool { return task.session.host == id })
 }

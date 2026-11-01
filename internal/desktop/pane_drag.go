@@ -216,7 +216,7 @@ func (a *app) dragPreview(c *ui.Context) {
 			ui.Row(c).Fill().Padding(0, t.C.Tab.PaddingLeft).Gap(t.C.Tab.Gap).
 				Radius(radius).Background(tokenColor(p.Bg)).PassThrough().Children(func() {
 				statusDot(c, d.session.state, t.C.Tab.DotSize)
-				ui.Text(c, a.hosts[d.session.host].name).FontSize(t.C.Tab.FontSize).
+				ui.Text(c, d.session.endpoint.name).FontSize(t.C.Tab.FontSize).
 					FontWeight(t.C.Tab.WeightSelected).TextColor(tokenColor(t.C.Tab.TextSelected)).SingleLine().PassThrough()
 			})
 			return
@@ -239,7 +239,7 @@ func (a *app) paneDragPreview(c *ui.Context, session *remoteSession) {
 	).Gap(t.Space.N8).Children(func() {
 		ui.Row(c).Height(p.HeaderHeight).Shrink(0).Gap(t.Space.N8).PassThrough().Children(func() {
 			statusDot(c, session.state, t.C.Tab.DotSize)
-			ui.Text(c, a.hosts[session.host].name).FontSize(p.FontSize).FontWeight(t.Font.Weight.Medium).
+			ui.Text(c, session.endpoint.name).FontSize(p.FontSize).FontWeight(t.Font.Weight.Medium).
 				TextColor(tokenColor(surface.C.Pane.Name)).SingleLine().Ellipsis("…").MinWidth(0).PassThrough()
 		})
 		ui.Column(c).FillWidth().Grow(1).Justify(ui.Center).Gap(t.Space.N8).PassThrough().Children(func() {
@@ -455,5 +455,5 @@ func (a *app) dragPlaceholder(pane ui.Element) {
 }
 
 func (a *app) paneSizeLabel(session *remoteSession) string {
-	return fmt.Sprintf("%d × %d · 演示", session.columns, session.rows)
+	return fmt.Sprintf("%d × %d", session.columns, session.rows)
 }

@@ -20,21 +20,38 @@ type filePreferencesState struct {
 type filePreferences struct {
 	LocalPaneOpen         bool              `json:"localPaneOpen"`
 	LocalRatio            float32           `json:"localRatio"`
-	LocalPaths            map[string]string `json:"localPaths"`
+	LocalPaths            map[string]string `json:"localPaths,omitempty"`
 	TransferDockCollapsed bool              `json:"transferDockCollapsed"`
 	TransferFilter        int               `json:"transferFilter"`
 	TransferDockHeight    float32           `json:"transferDockHeight,omitempty"`
 }
 
-func (a *app) fileSiteKey(session *fileSession) string {
-	h := a.hosts[session.host]
-	return fmt.Sprintf("%s@%s:%d", h.user, h.address, h.port)
-}
-
 func (a *app) restoreFileSession(session *fileSession) {
-	if local := a.files.localPaths[a.fileSiteKey(session)]; local != "" {
+	if session.temporary {
+		return
+	}
+	if local := a.fileCatalog.localPaths[session.host]; local != "" {
 		session.local.path = local
 		session.local.history = []string{local}
+	}
+}
+
+func (a *app) rememberFileLocalPath(c *ui.Context, session *fileSession, path string) {
+	if session.temporary {
+		return
+	}
+	if _, exists := a.fileCatalog.hosts[session.host]; !exists {
+		return
+	}
+	previous, existed := a.fileCatalog.localPaths[session.host]
+	a.fileCatalog.localPaths[session.host] = path
+	if err := a.saveCatalog(); err != nil {
+		if existed {
+			a.fileCatalog.localPaths[session.host] = previous
+		} else {
+			delete(a.fileCatalog.localPaths, session.host)
+		}
+		c.Toast("保存站点本地路径失败：" + err.Error())
 	}
 }
 
@@ -70,9 +87,6 @@ func (a *app) readFilePreferences() error {
 		return fmt.Errorf("transferDockHeight 不能为负数")
 	}
 	a.files.localOpen, a.files.ratio = prefs.LocalPaneOpen, prefs.LocalRatio
-	if prefs.LocalPaths != nil {
-		a.files.localPaths = prefs.LocalPaths
-	}
 	a.transfers.collapsed, a.transfers.filter = prefs.TransferDockCollapsed, prefs.TransferFilter
 	a.transfers.dockHeight = prefs.TransferDockHeight
 	return nil
@@ -92,7 +106,7 @@ func (a *app) writeFilePreferences() error {
 		return fmt.Errorf("配置目录不可用")
 	}
 	prefs := filePreferences{
-		LocalPaneOpen: a.files.localOpen, LocalRatio: a.files.ratio, LocalPaths: a.files.localPaths,
+		LocalPaneOpen: a.files.localOpen, LocalRatio: a.files.ratio,
 		TransferDockCollapsed: a.transfers.collapsed, TransferFilter: a.transfers.filter,
 		TransferDockHeight: a.transfers.dockHeight,
 	}

@@ -136,7 +136,7 @@ func (a *app) syncCatalogWorkspacePreview(c *ui.Context) {
 	}
 	if d.workspacePreview == nil {
 		session := &remoteSession{
-			host: d.host.id, state: disconnected,
+			host: d.host.id, endpoint: a.sshCatalog.hosts[d.host.id], state: disconnected,
 		}
 		d.workspacePreview = &paneDragState{
 			kind: dragHost, session: session, origin: d.origin, detached: true,
@@ -206,7 +206,7 @@ func (a *app) trackCatalogDrag(c *ui.Context, row ui.Element, slot catalogSlot) 
 			d.host = hostDrag{id: hostID(slot.key.id), group: slot.group}
 			d.targetIndex = slices.Index(slot.group.hosts, d.host.id)
 		} else {
-			d.targetIndex = slices.Index(a.groups, slot.group)
+			d.targetIndex = slices.Index(a.catalog().groups, slot.group)
 			if c.Preferences().ReduceMotion {
 				d.collapseFrames = 2
 			}
@@ -243,7 +243,7 @@ func (a *app) catalogExpanded(group *hostGroup) bool {
 
 func (a *app) catalogMatches(group *hostGroup, id hostID) bool {
 	query := strings.ToLower(strings.TrimSpace(a.page().query))
-	h := a.hosts[id]
+	h := a.catalog().hosts[id]
 	text := h.name + " " + h.user + " " + h.address + " " + systems[h.os].name + " " + group.name
 	return strings.Contains(strings.ToLower(text), query)
 }
@@ -268,7 +268,7 @@ func (a *app) catalogPlan(c *ui.Context) []catalogSlot {
 	slots := []catalogSlot{}
 	d := a.page().catalogDrag
 	draggingGroup := d != nil && d.phase == catalogDragging && d.kind == catalogGroupDrag
-	groups := slices.Clone(a.groups)
+	groups := slices.Clone(a.catalog().groups)
 	if draggingGroup {
 		index := slices.Index(groups, d.group)
 		groups = slices.Delete(groups, index, index+1)
@@ -331,7 +331,7 @@ func (a *app) updateCatalogDestination(c *ui.Context) {
 	// The first drag frame still has the pre-drag slots. Exclude the source
 	// by its key even before the preview replaces it with a placeholder.
 	if d.kind == catalogGroupDrag {
-		groups := slices.Clone(a.groups)
+		groups := slices.Clone(a.catalog().groups)
 		from := slices.Index(groups, d.group)
 		groups = slices.Delete(groups, from, from+1)
 		index := d.targetIndex

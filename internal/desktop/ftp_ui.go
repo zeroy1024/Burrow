@@ -2,10 +2,7 @@ package desktop
 
 import (
 	"fmt"
-	"os"
 	"path"
-	"path/filepath"
-	"slices"
 	"strings"
 
 	"sshdesk/internal/theme"
@@ -27,6 +24,8 @@ var (
 )
 
 func (a *app) fileWorkspace(c *ui.Context) {
+	// Local access and transfers are unavailable while remote browsing is read-only.
+	a.files.localOpen, a.files.activeRemote, a.files.drag = false, true, nil
 	t := theme.Current()
 	workspace := ui.Column(c).Key("file-workspace").Grow(1).MinWidth(0).MinHeight(0)
 	workspace.Children(func() {
@@ -57,7 +56,7 @@ func (a *app) fileConnectionPage(c *ui.Context, session *fileSession) {
 		message := "会话已断开"
 		switch session.state {
 		case connecting:
-			message = "正在连接 " + a.hosts[session.host].name + "…"
+			message = "正在连接 " + session.endpoint.name + "…"
 		case connectionFailed:
 			message = "连接失败"
 		}
@@ -65,31 +64,22 @@ func (a *app) fileConnectionPage(c *ui.Context, session *fileSession) {
 		if session.errorText != "" {
 			ui.Text(c, session.errorText).TextColor(tokenColor(t.Color.Danger.Text))
 		}
-		if session.state != connecting {
+		if session.state == connecting {
+			button(c, "取消连接").OnClick(func() { a.disconnectFileSession(session) })
+		} else {
 			button(c, "重新连接").OnClick(func() { a.reconnectFileSession(session) })
 		}
-		ui.Text(c, "演示会话 · 不连接真实服务器").FontSize(t.Font.Size.Caption).TextColor(tokenColor(t.Color.Text.Secondary))
 	})
 }
 
 func (a *app) toggleLocalFiles(c *ui.Context) {
-	a.files.localOpen = !a.files.localOpen
-	if !a.files.localOpen {
-		a.files.activeRemote = true
-		if session := a.currentFileSession(); session != nil {
-			session.remote.focus.Focus()
-		}
-	}
-	a.saveFilePreferences(c)
+	c.Toast("当前仅支持远程目录浏览，本地面板暂未开放。")
 }
 
 func (a *app) filePanels(c *ui.Context, session *fileSession) {
 	t := theme.Current()
 	split := t.C.FTPSplit
 	area := ui.Box(c).Key("file-panels").Grow(1).FillWidth().MinWidth(0).MinHeight(0).ClipX()
-	if c.Shortcut(ui.Super|ui.Shift, ui.KeyL) {
-		a.toggleLocalFiles(c)
-	}
 	width := area.Bounds().W
 	if width <= 0 {
 		c.AnimationFrame()
@@ -118,7 +108,7 @@ func (a *app) filePanels(c *ui.Context, session *fileSession) {
 		remoteTargetWidth -= localWidth + split.Gutter
 	}
 	area.Children(func() {
-		localVisible := target != 0 || !area.Settled("local-open") || c.Preferences().ReduceMotion && opacity > 0
+		localVisible := false
 		localOverlay := c.Preferences().ReduceMotion && target == 0 && opacity > 0
 		localPane := func() {
 			x := -(1 - progress) * (localWidth + split.Gutter)
@@ -179,7 +169,7 @@ func (a *app) filePane(c *ui.Context, session *fileSession, pane *filePaneState,
 	t := theme.Current()
 	compact := targetWidth < t.C.FilePane.CompactWidth
 	card := ui.Box(c).Key(pane.remote).Fill().Radius(t.C.Card.Radius).Background(tokenColor(t.C.Card.Bg)).Clip().
-		Focusable().FocusRing(false).Bind(&pane.focus).
+		Focusable().Role(ui.RoleGroup).FocusRing(false).Bind(&pane.focus).
 		Label(map[bool]string{true: "远程文件", false: "本地文件"}[pane.remote])
 	card.DrawOver(func(p *ui.Painter, rect ui.Rect) {
 		p.Stroke(rect, tokenColor(t.Color.Border.Card), t.C.Card.Radius, t.Size.Divider)
@@ -194,20 +184,25 @@ func (a *app) filePane(c *ui.Context, session *fileSession, pane *filePaneState,
 	a.filePaneKeys(c, card, session, pane)
 	headHeight := t.C.FilePane.HeaderHeight + t.C.FileList.HeaderHeight
 	footerHeight := t.C.FilePane.StatusHeight
-	var folderTarget string
 	card.Children(func() {
 		entries := pane.entries()
 		ui.Scroll(c.Key("file-scroll")).Fill().TrackScroll(&pane.scroll).
 			Padding(headHeight, t.C.FilePane.ContentPadding, footerHeight, t.C.FilePane.ContentPadding).
 			ScrollbarInsets(headHeight, 0, footerHeight, 0).Children(func() {
 			ui.Column(c).FillWidth().Children(func() {
+				if pane.loading {
+					ui.Text(c, "正在读取目录…").FillWidth().Padding(t.Space.N12).
+						TextColor(tokenColor(t.Color.Text.Secondary))
+				}
+				if pane.errorText != "" {
+					ui.Text(c, "读取目录失败："+pane.errorText).FillWidth().Padding(t.Space.N12).
+						TextColor(tokenColor(t.Color.Danger.Text))
+				}
 				for i, entry := range entries {
-					if target := a.fileRow(c, session, pane, entry, i, compact); target != "" {
-						folderTarget = target
-					}
+					a.fileRow(c, session, pane, entry, i, compact)
 				}
 			})
-			if len(entries) == 0 {
+			if len(entries) == 0 && !pane.loading && pane.errorText == "" {
 				ui.Text(c, "此文件夹为空").FillWidth().Padding(t.Space.N24).TextColor(tokenColor(t.Color.Text.Secondary))
 			}
 		})
@@ -220,21 +215,7 @@ func (a *app) filePane(c *ui.Context, session *fileSession, pane *filePaneState,
 		ui.Row(c).Absolute().Bottom(0).Left(0).Right(0).Height(footerHeight).Padding(0, t.C.StatusBar.PaddingX).
 			Gap(t.Space.N8).Children(func() { a.fileStatus(c, session, pane, compact) })
 	})
-	a.fileDropTarget(c, card, session, pane, pane.path, folderTarget == "")
-	if folderTarget == "" {
-		pane.hoverFolder = ""
-	}
-	if folderTarget != "" {
-		if pane.hoverFolder != folderTarget {
-			pane.hoverFolder, pane.hoverStarted = folderTarget, c.Now()
-		}
-		if c.Now().Sub(pane.hoverStarted) >= t.C.GroupHeader.ExpandDelay {
-			a.navigateFiles(c, session, pane, folderTarget)
-			pane.hoverFolder = ""
-		} else {
-			c.After(t.C.GroupHeader.ExpandDelay - c.Now().Sub(pane.hoverStarted))
-		}
-	}
+	a.fileDropTarget(c, card, session, pane, pane.path, false)
 }
 
 func (a *app) fileToolbar(c *ui.Context, session *fileSession, pane *filePaneState, compact bool) {
@@ -242,12 +223,9 @@ func (a *app) fileToolbar(c *ui.Context, session *fileSession, pane *filePaneSta
 	ui.Row(c).Height(t.C.FilePane.HeaderHeight).Padding(0, t.Space.N8).
 		Gap(t.C.FilePane.ToolGap).FillWidth().Children(func() {
 		if pane.remote {
-			label := "显示本地面板 ⌘⇧L"
-			if a.files.localOpen {
-				label = "隐藏本地面板 ⌘⇧L"
-			}
+			label := "本地面板暂未开放"
 			toggle := tooltip(c, ui.ToggleBase(c, &a.files.localOpen).Size(t.C.PaneToggle.Size, t.C.PaneToggle.Size).
-				Radius(t.C.PaneToggle.Radius).Label(label), label)
+				Radius(t.C.PaneToggle.Radius).Label(label).Disabled(true), label)
 			bg, icon := ui.Transparent, tokenColor(t.C.PaneToggle.Icon)
 			glyph := sidebarIcon
 			if toggle.Hovered() {
@@ -259,12 +237,6 @@ func (a *app) fileToolbar(c *ui.Context, session *fileSession, pane *filePaneSta
 			animation := tokenTween(t.C.PaneToggle.Transition)
 			toggle.Background(toggle.AnimateColor("bg", bg, animation)).TextColor(toggle.AnimateColor("fg", icon, animation)).
 				Children(func() { ui.Icon(c, glyph).Size(t.C.IconButton.IconSize, t.C.IconButton.IconSize) })
-			if toggle.Changed() {
-				if !a.files.localOpen {
-					a.files.activeRemote = true
-				}
-				a.saveFilePreferences(c)
-			}
 		}
 		a.filePaneLabel(c, pane)
 		iconButton(c, "后退", fileBackIcon).Disabled(pane.historyIndex == 0).
@@ -293,13 +265,11 @@ func (a *app) fileToolbar(c *ui.Context, session *fileSession, pane *filePaneSta
 			fileSearchInput(c, pane).Width(t.C.FilePane.SearchWidth)
 		}
 		if pane.remote {
-			iconButton(c, "上传文件（演示）", transferUpIcon).
-				OnClick(func() { a.chooseUpload(c, session) })
+			iconButton(c, "上传文件暂未开放", transferUpIcon).Disabled(true)
 		}
-		iconButton(c, "新建文件夹", fileNewFolderIcon).Disabled(!fileWritable(pane, pane.path)).OnClick(func() {
-			a.files.dialog = &fileActionDialog{session: session, pane: pane, kind: "mkdir", name: "新建文件夹"}
-		})
-		iconButton(c, "刷新", fileRefreshIcon).OnClick(func() { c.Toast("演示目录已刷新") })
+		iconButton(c, "新建文件夹暂未开放", fileNewFolderIcon).Disabled(true)
+		iconButton(c, "刷新", fileRefreshIcon).Disabled(pane.loading).
+			OnClick(func() { a.refreshRemoteFiles(session) })
 		iconButton(c, "更多文件操作", moreIcon).Menu(func(m *ui.Menu) { a.filePaneMenu(c, m, session, pane) })
 	})
 }
@@ -368,7 +338,7 @@ func (a *app) fileBreadcrumbs(c *ui.Context, session *fileSession, pane *filePan
 	parts := strings.Split(strings.Trim(pane.path, "/"), "/")
 	labels, targets := []string{}, []string{}
 	if pane.remote {
-		labels = append(labels, a.hosts[session.host].name)
+		labels = append(labels, session.endpoint.name)
 		targets = append(targets, "/")
 	}
 	current := ""
@@ -564,21 +534,8 @@ func (a *app) fileRow(
 		if entry.dir {
 			a.navigateFiles(c, session, pane, entry.path)
 		} else {
-			c.Toast(entry.name + " · 演示文件")
+			c.Toast("文件预览与下载暂未开放，可复制文件路径。")
 		}
-	}
-	selection := pane.selection()
-	if !pane.selected[entry.name] {
-		selection = []fileEntry{entry}
-	}
-	dragValue := fileDrag{session: session, remote: pane.remote, entries: selection}
-	row.Drag(dragValue)
-	if row.Dragging() {
-		a.files.drag, a.files.dragSeen = &dragValue, true
-	}
-	if drag := a.files.drag; drag != nil && drag.session == session && drag.remote == pane.remote &&
-		slices.ContainsFunc(drag.entries, func(source fileEntry) bool { return source.path == entry.path }) {
-		row.Opacity(t.C.DragLift.SourceOpacity)
 	}
 	if pane.reveal == entry.name {
 		row.ScrollIntoView()
@@ -599,24 +556,32 @@ func (a *app) fileRow(
 		ui.Icon(c, icon).Size(t.Size.Icon, t.Size.Icon).TextColor(tokenColor(color)).Shrink(0)
 		ui.Text(c, entry.name).FontSize(t.C.FileList.FontSize).SingleLine().Grow(1).MinWidth(0)
 		sizeText := "—"
-		if !entry.dir {
+		if !entry.dir && entry.size >= 0 {
 			sizeText = transferBytes(entry.size)
 		}
 		ui.Text(c, sizeText).Width(t.C.FilePane.SizeWidth).FontSize(t.C.FileList.FontSize).
 			TextColor(tokenColor(t.C.FileList.Meta)).SingleLine()
-		ui.Text(c, entry.modified.Format("01月02日 15:04")).Width(t.C.FilePane.DateWidth).
+		dateText := "—"
+		if !entry.modified.IsZero() {
+			dateText = entry.modified.Format("01月02日 15:04")
+		}
+		ui.Text(c, dateText).Width(t.C.FilePane.DateWidth).
 			FontSize(t.C.FileList.FontSize).TextColor(tokenColor(t.C.FileList.Meta)).SingleLine()
 		if !compact {
-			ui.Text(c, entry.permissions).Width(t.C.FilePane.PermissionsWidth).
+			permissions, owner := entry.permissions, entry.owner
+			if permissions == "" {
+				permissions = "—"
+			}
+			if owner == "" {
+				owner = "—"
+			}
+			ui.Text(c, permissions).Width(t.C.FilePane.PermissionsWidth).
 				Font(strings.Join(t.Font.Family.Mono, ", ")).FontSize(t.Font.Size.Caption).
 				TextColor(tokenColor(t.C.FileList.Meta)).SingleLine()
-			ui.Text(c, entry.owner).Width(t.C.FilePane.OwnerWidth).FontSize(t.C.FileList.FontSize).
+			ui.Text(c, owner).Width(t.C.FilePane.OwnerWidth).FontSize(t.C.FileList.FontSize).
 				TextColor(tokenColor(t.C.FileList.Meta)).SingleLine()
 		}
 	})
-	if entry.dir {
-		return a.fileDropTarget(c, row, session, pane, entry.path, true)
-	}
 	return ""
 }
 
@@ -626,35 +591,16 @@ func (a *app) filePaneMenu(c *ui.Context, m *ui.Menu, session *fileSession, pane
 	if pane.remote {
 		label = "下载所选项目"
 	}
-	if m.Item(label).Disabled(len(selection) == 0).Chosen() {
-		target := session.remote
-		if pane.remote {
-			target = session.local
-			a.files.localOpen = true
-		}
-		a.requestFileTransfer(c, fileDrag{session: session, remote: pane.remote, entries: selection}, target, target.path)
-	}
+	m.Item(label).Disabled(true)
 	m.Separator()
-	if m.Item("新建文件夹").Disabled(!fileWritable(pane, pane.path)).Chosen() {
-		a.files.dialog = &fileActionDialog{session: session, pane: pane, kind: "mkdir", name: "新建文件夹"}
-	}
-	if m.Item("重命名").Disabled(len(selection) != 1 || !fileWritable(pane, pane.path)).Chosen() {
-		a.files.dialog = &fileActionDialog{
-			session: session, pane: pane, kind: "rename",
-			name: selection[0].name, original: selection[0].name,
-		}
-	}
-	if m.Item("删除所选项目").Disabled(len(selection) == 0 || !fileWritable(pane, pane.path)).Chosen() {
-		a.files.dialog = &fileActionDialog{session: session, pane: pane, kind: "delete"}
+	m.Item("新建文件夹").Disabled(true)
+	m.Item("重命名").Disabled(true)
+	m.Item("删除所选项目").Disabled(true)
+	if m.Item("打开文件夹").Disabled(len(selection) != 1 || !selection[0].dir).Chosen() {
+		a.navigateFiles(c, session, pane, selection[0].path)
 	}
 	if m.Item("复制路径").Disabled(len(selection) != 1).Chosen() {
 		mygo.Clipboard.WriteText(selection[0].path)
-	}
-	if !pane.remote {
-		m.Separator()
-		if m.Item("打开演示项目 dist").Chosen() {
-			a.navigateFiles(c, session, pane, "~/Projects/shop-site/dist")
-		}
 	}
 }
 
@@ -664,14 +610,6 @@ func (a *app) filePaneKeys(c *ui.Context, card ui.Element, session *fileSession,
 		for _, entry := range pane.entries() {
 			pane.selected[entry.name] = true
 		}
-	}
-	if card.Shortcut(0, ui.KeyTab) && a.files.localOpen {
-		target := session.local
-		if !pane.remote {
-			target = session.remote
-		}
-		a.files.activeRemote = target.remote
-		target.focus.Focus()
 	}
 	entries := pane.entries()
 	if len(entries) == 0 {
@@ -712,30 +650,42 @@ func (a *app) filePaneKeys(c *ui.Context, card ui.Element, session *fileSession,
 
 func (a *app) fileStatus(c *ui.Context, session *fileSession, pane *filePaneState, compact bool) {
 	t := theme.Current()
-	ui.Icon(c, map[bool]*ui.SVG{true: lockIcon, false: fileLaptopIcon}[pane.remote]).
+	icon := fileLaptopIcon
+	if pane.remote {
+		icon = filesIcon
+		if session.endpoint.protocol != "ftp" {
+			icon = lockIcon
+		}
+	}
+	ui.Icon(c, icon).
 		Size(t.Size.Icon, t.Size.Icon).TextColor(tokenColor(t.C.StatusBar.Text))
 	if !compact || !pane.remote {
-		label := "本机 · 演示"
+		label := "本机"
 		if pane.remote {
-			h := a.hosts[session.host]
+			h := session.endpoint
 			label = h.user + "@" + h.name
 		}
 		ui.Text(c, label).FontSize(t.C.StatusBar.FontSize).FontWeight(t.C.StatusBar.HostWeight).SingleLine()
 	}
 	if pane.remote && !compact {
 		protocol := "SFTP"
-		if a.hosts[session.host].protocol == "ftp" {
+		if session.endpoint.protocol == "ftp" {
 			protocol = "FTP"
 		}
 		ui.Row(c).Padding(t.C.Badge.PaddingYCompact, t.C.Badge.PaddingXCompact).
 			Gap(t.C.Badge.Gap).Radius(t.C.Badge.Radius).Background(tokenColor(t.C.Badge.OkBg)).Children(func() {
 			ui.Box(c).Size(t.C.ActivityBadge.DotSize, t.C.ActivityBadge.DotSize).
 				Radius(t.C.Badge.Radius).Background(tokenColor(t.C.Badge.OkDot))
-			ui.Text(c, protocol+" 已连接 · 演示").FontSize(t.C.Badge.FontSizeCompact).
+			ui.Text(c, protocol+" 已连接").FontSize(t.C.Badge.FontSizeCompact).
 				TextColor(tokenColor(t.C.Badge.OkText)).SingleLine()
 		})
 	}
 	count := fmt.Sprintf("%d 项", len(pane.directories[pane.path]))
+	if pane.loading {
+		count = "正在读取目录…"
+	} else if pane.errorText != "" {
+		count = "读取目录失败"
+	}
 	selection := pane.selection()
 	if len(selection) > 0 {
 		var total int64
@@ -756,87 +706,21 @@ func (a *app) fileDropTarget(
 	directory string,
 	decorate bool,
 ) string {
-	t := theme.Current()
-	drag, over := ui.DragOver[fileDrag](element)
-	external := pane.remote && element.FileDragOver()
-	valid := over && drag.remote != pane.remote && drag.session == session
-	writable := fileWritable(pane, directory)
-	if source, dropped := ui.Drop[fileDrag](element); dropped && source.session == session {
-		a.requestFileTransfer(c, source, pane, directory)
+	if element.FileDragOver() {
+		element.Cursor(ui.CursorNotAllowed)
 	}
-	if pane.remote {
-		if paths := element.DroppedFiles(); len(paths) > 0 {
-			a.uploadFinderPaths(c, session, paths, directory)
-		}
+	if len(element.DroppedFiles()) > 0 {
+		c.Toast(fileBrowseOnlyMessage)
 	}
-	if !(valid || external) || !decorate {
-		return ""
-	}
-	if !writable {
-		tooltip(c, element, "此目录不可写")
-		return ""
-	}
-	element.DrawOver(func(p *ui.Painter, r ui.Rect) {
-		if directory == pane.path {
-			p.Fill(r, tokenColor(t.C.DropIndicator.ZoneBg), t.C.Card.Radius)
-			p.Stroke(r, tokenColor(t.C.DropIndicator.ZoneBorder), t.C.Card.Radius, t.C.DropIndicator.ZoneBorderWidth)
-		} else {
-			p.Fill(r, tokenColor(t.C.DropIndicator.PlaceholderAccentBg), t.C.FileList.RowRadius)
-			p.Stroke(r, tokenColor(t.C.DropIndicator.ZoneBorder), t.C.FileList.RowRadius, t.C.DropIndicator.ZoneBorderWidth)
-		}
-	})
-	if directory == pane.path {
-		direction := "下载"
-		if pane.remote {
-			direction = "上传"
-		}
-		label := "松开以" + direction + "到 " + directory
-		if valid {
-			var total int64
-			for _, entry := range drag.entries {
-				total += entry.size
-			}
-			label += fmt.Sprintf(" · %d 项 · %s", len(drag.entries), transferBytes(total))
-		}
-		element.Children(func() {
-			ui.Row(c).Absolute().Bottom(t.C.FilePane.StatusHeight + t.Space.N12).
-				Left(t.Space.N12).Right(t.Space.N12).Center().PassThrough().Children(func() {
-				ui.Text(c, label).Padding(t.Space.N6, t.Space.N12).Radius(t.Radius.Pill).
-					Background(tokenColor(t.C.DropIndicator.HintBg)).
-					TextColor(tokenColor(t.C.DropIndicator.HintText)).FontSize(t.Font.Size.Footnote)
-			})
-		})
-		return ""
-	}
-	return directory
+	return ""
 }
 
 func (a *app) chooseUpload(c *ui.Context, session *fileSession) {
-	paths, err := mygo.Dialog.Open(mygo.OpenDialogOptions{
-		Parent: a.window, Title: "选择上传文件", Multiple: true,
-		Message: "演示传输：仅读取文件名和大小，不上传内容。",
-	})
-	if err != nil {
-		c.Toast("打开文件选择器失败：" + err.Error())
-		return
-	}
-	a.uploadFinderPaths(c, session, paths, session.remote.path)
+	c.Toast(fileBrowseOnlyMessage)
 }
 
 func (a *app) uploadFinderPaths(c *ui.Context, session *fileSession, paths []string, target string) {
-	entries := []fileEntry{}
-	for _, source := range paths {
-		info, err := os.Stat(source)
-		if err != nil {
-			c.Toast("无法读取文件信息：" + err.Error())
-			return
-		}
-		entries = append(entries, fileEntry{
-			name: filepath.Base(source), path: source, size: info.Size(), dir: info.IsDir(),
-			modified: info.ModTime(), permissions: info.Mode().Perm().String(), owner: "本机",
-		})
-	}
-	a.requestFileTransfer(c, fileDrag{session: session, entries: entries}, session.remote, target)
+	c.Toast(fileBrowseOnlyMessage)
 }
 
 func fileScrollEdge(c *ui.Context, height float32, bottom bool) {

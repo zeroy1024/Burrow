@@ -1,7 +1,6 @@
 package desktop
 
 import (
-	"fmt"
 	"math"
 	"time"
 
@@ -24,6 +23,7 @@ type hostID int
 type host struct {
 	name, user, address string
 	protocol            string
+	auth, keyPath       string
 	system, uptime      string
 	os, port            int
 	latency             int
@@ -49,14 +49,17 @@ type workspaceTab struct {
 type remoteSession struct {
 	id                          int
 	host                        hostID
+	endpoint                    host
+	temporary                   bool
+	connection                  *sshConnectionGroup
+	filePeer                    *fileSession
 	state                       connectionState
-	connectionStarted           time.Time
-	connectionStep              int
+	ssh                         *sshRuntime
+	terminal                    *sshTerminal
 	scroll                      terminalScrollState
 	focus                       ui.Handle
-	transcript                  []terminalLine
+	focusPending                bool
 	output                      []terminalLine
-	textState                   terminalTextState
 	hasNewOutput                bool
 	hasBell                     bool
 	cursorStarted               time.Time
@@ -116,25 +119,21 @@ func (a *app) focusedHost() (hostID, bool) {
 }
 
 func (a *app) newSession(id hostID) *remoteSession {
+	return a.newShellSession(id, a.sshCatalog.hosts[id], false, nil)
+}
+
+func (a *app) newShellSession(id hostID, endpoint host, temporary bool, connection *sshConnectionGroup) *remoteSession {
 	a.nextSession++
+	if connection == nil {
+		connection = a.newSSHGroup(endpoint)
+	}
 	session := &remoteSession{
-		id: a.nextSession, host: id,
-		transcript: []terminalLine{}, output: []terminalLine{},
+		id: a.nextSession, host: id, endpoint: endpoint, temporary: temporary, connection: connection,
+		output: []terminalLine{},
 		scroll: terminalScrollState{offset: ui.ScrollState{Y: math.MaxFloat32}},
 	}
 	a.connectSession(session)
 	return session
-}
-
-func (a *app) connectSession(session *remoteSession) {
-	h := a.hosts[session.host]
-	session.state, session.connectionStarted, session.connectionStep = connecting, time.Time{}, 0
-	session.hasNewOutput, session.hasBell = false, false
-	session.scroll.offset.Y = math.MaxFloat32
-	appendSessionLines(session,
-		terminalLine{{Text: fmt.Sprintf("[演示] ssh -p %d %s@%s", h.port, h.user, h.address), Foreground: terminalIndexed(4)}},
-		terminalLine{{Text: fmt.Sprintf("正在连接 %s:%d…", h.address, h.port)}},
-	)
 }
 
 func disconnectSession(session *remoteSession) {
@@ -142,44 +141,9 @@ func disconnectSession(session *remoteSession) {
 	if session.state == connecting {
 		message = "连接已取消。可从标签菜单重新连接。"
 	}
+	stopSSH(session)
 	session.state = disconnected
-	appendSessionLines(session, terminalLine{{Text: message, Foreground: terminalIndexed(8)}})
-}
-
-// The prototype advances connection stages on the UI clock, shared by tabs and Shell text.
-func (a *app) updateSSHConnections(c *ui.Context) {
-	interval := theme.Current().C.ConnectionIndicator.StageDuration
-	for _, tab := range a.tabs {
-		for _, session := range tab.root.sessions() {
-			if session.state != connecting || session.closing {
-				continue
-			}
-			if session.connectionStarted.IsZero() {
-				session.connectionStarted = c.Now()
-			}
-			h := a.hosts[session.host]
-			steps := []terminalLine{
-				{{Text: "连接已建立，正在进行 SSH 握手…"}},
-				{{Text: fmt.Sprintf("握手完成，正在验证用户 %s…", h.user)}},
-				{{Text: "身份验证通过，正在启动远程 Shell…"}},
-				{{Text: fmt.Sprintf("已连接到 %s（演示会话）", h.name), Foreground: terminalIndexed(2)}},
-			}
-			elapsed := c.Now().Sub(session.connectionStarted)
-			step := min(int(elapsed/interval), len(steps))
-			for session.connectionStep < step {
-				appendSessionLines(session, steps[session.connectionStep])
-				session.connectionStep++
-			}
-			if step == len(steps) {
-				session.state = connected
-				session.cursorStarted = c.Now()
-				appendSessionLines(session, terminalLine{})
-				appendSessionLines(session, demoTranscript(h)...)
-				continue
-			}
-			c.After(time.Duration(step+1)*interval - elapsed)
-		}
-	}
+	showSSHMessage(session, message)
 }
 
 func appendSessionLines(session *remoteSession, lines ...terminalLine) {
@@ -191,6 +155,8 @@ func appendSessionLines(session *remoteSession, lines ...terminalLine) {
 
 func (a *app) focusSession(tab *workspaceTab, session *remoteSession) {
 	tab.focused = session
+	// A new pane has no bound handle yet; apply focus after its view is built.
+	session.focusPending = true
 	session.focus.Focus()
 	session.hasNewOutput, session.hasBell = false, false
 	session.cursorStarted = time.Time{}
@@ -200,22 +166,6 @@ func (a *app) activateTab(index int) {
 	a.activeTab = index
 	tab := a.tabs[index]
 	a.focusSession(tab, tab.focused)
-}
-
-// The prototype receives complete output lines; BEL is an activity event, not printable text.
-func (a *app) receiveSessionOutput(session *remoteSession, text string) {
-	background := a.currentTab().focused != session
-	lines, bell := session.textState.parse(text)
-	if background && bell {
-		session.hasBell = true
-	}
-	if len(lines) == 0 {
-		return
-	}
-	appendSessionLines(session, lines...)
-	if background {
-		session.hasNewOutput = true
-	}
 }
 
 func (a *app) openHost(id hostID) {
@@ -228,6 +178,11 @@ func (a *app) openHost(id hostID) {
 }
 
 func (a *app) closeTab(index int) {
+	if root := a.tabs[index].root; root != nil {
+		for _, session := range root.sessions() {
+			releaseSSH(session)
+		}
+	}
 	closedActive := index == a.activeTab
 	a.tabs = append(a.tabs[:index], a.tabs[index+1:]...)
 	switch {
@@ -262,7 +217,7 @@ func (a *app) splitSession(session *remoteSession, stacked bool) {
 			return
 		}
 	}
-	child := a.newSession(session.host)
+	child := a.newShellSession(session.host, session.endpoint, session.temporary, session.connection)
 	node := tab.root.find(session)
 	node.insert(child, zone)
 	child.enter, child.entering = zone, true
@@ -281,10 +236,12 @@ func (a *app) closePane(session *remoteSession) {
 	if available <= 1 || session.closing {
 		return
 	}
+	stopSSH(session)
 	session.closing = true
 }
 
 func (a *app) removePane(tab *workspaceTab, session *remoteSession) {
+	releaseSSH(session)
 	tab.root = tab.root.remove(session)
 	if tab.focused == session {
 		if tab == a.currentTab() {

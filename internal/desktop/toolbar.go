@@ -62,10 +62,10 @@ func (a *app) titleBar(c *ui.Context, shown float32) {
 						}
 					}
 					iconButton(c, "新建会话", plusIcon).Menu(func(m *ui.Menu) {
-						for _, group := range a.groups {
+						for _, group := range a.sshCatalog.groups {
 							m.Submenu(group.name, func(sub *ui.Menu) {
 								for _, id := range group.hosts {
-									if sub.Item(a.hosts[id].name).Chosen() {
+									if sub.Item(a.sshCatalog.hosts[id].name).Chosen() {
 										a.openHost(id)
 									}
 								}
@@ -80,6 +80,10 @@ func (a *app) titleBar(c *ui.Context, shown float32) {
 			a.tabStripTarget(c, strip)
 		})
 		ui.Row(c).Padding(0, t.C.Titlebar.ActionsPaddingRight).Gap(t.C.Titlebar.ActionsGap).Shrink(0).Children(func() {
+			fileLink := iconButton(c, "打开文件会话", filesIcon)
+			tab := a.currentTab()
+			fileLink.Disabled(tab == nil || tab.focused.state != connected || tab.focused.closing).
+				OnClick(func() { a.openFilesForSSH(tab.focused) })
 			status := iconButton(c, "服务器监控", activityIcon).Expanded(a.statusVisible)
 			if a.statusVisible {
 				status.Background(tokenColor(t.C.TitleAction.BgOn))
@@ -94,7 +98,7 @@ func (a *app) tabButton(c *ui.Context, index int, tab *workspaceTab) func() {
 	contentHeight := t.C.Tab.ContentHeight
 	var pendingClose func()
 	session := tab.focused
-	h := a.hosts[session.host]
+	h := session.endpoint
 	button := ui.ButtonBase(c).Key(tab.id).Height(t.C.Tab.Height).
 		Padding(0, t.C.Tab.PaddingRight, 0, t.C.Tab.PaddingLeft).Gap(t.C.Tab.Gap).Radius(t.C.Tab.Radius).
 		Bind(&tab.frame).Transition(ui.ElementTransition{
@@ -113,7 +117,9 @@ func (a *app) tabButton(c *ui.Context, index int, tab *workspaceTab) func() {
 	}
 	switch session.state {
 	case connecting:
-		hint = "正在连接 " + h.address + "…（演示）"
+		hint = "正在连接 " + h.address + "…"
+	case connectionFailed:
+		foreground, hint = tokenColor(t.C.Tab.TextErrorSelected), "连接失败 · 可从菜单重新连接"
 	case disconnected:
 		foreground, hint = tokenColor(t.C.Tab.TextDisconnected), "已断开 · 可从菜单重新连接"
 	}

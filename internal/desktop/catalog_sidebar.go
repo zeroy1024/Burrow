@@ -196,7 +196,7 @@ func (a *app) catalogHeader(c *ui.Context, slot catalogSlot) ui.Element {
 }
 
 func (a *app) catalogHostMenu(c *ui.Context, id hostID) func(*ui.Menu) {
-	h := a.hosts[id]
+	h := a.catalog().hosts[id]
 	return func(m *ui.Menu) {
 		if a.section == sectionFiles {
 			a.fileSiteMenu(c, m, id)
@@ -208,12 +208,20 @@ func (a *app) catalogHostMenu(c *ui.Context, id hostID) func(*ui.Menu) {
 		if m.Item("复制连接地址").Chosen() {
 			mygo.Clipboard.WriteText(fmt.Sprintf("%s@%s:%d", h.user, h.address, h.port))
 		}
+		m.Separator()
+		if m.Item("编辑主机…").Chosen() {
+			a.startEditHostDraft(id)
+		}
+		if m.Item("删除主机…").Chosen() {
+			a.page().draft = hostDraft{id: id, deleting: true}
+			a.page().addHostOpen = true
+		}
 	}
 }
 
 func (a *app) catalogHostRow(c *ui.Context, slot catalogSlot) ui.Element {
 	t := theme.Current()
-	id, h := hostID(slot.key.id), a.hosts[slot.key.id]
+	id, h := hostID(slot.key.id), a.catalog().hosts[hostID(slot.key.id)]
 	row := ui.ButtonBase(c).Key(slot.key).Height(t.C.Catalog.RowHeight).Shrink(0).FillWidth().
 		Padding(0, t.C.SiderItem.PaddingRight, 0, t.C.SiderItem.PaddingLeft).Gap(t.C.SiderItem.Gap).Radius(t.C.SiderItem.Radius).
 		Role(ui.RoleListItem).Label(h.name).Description(h.user + "@" + h.address).TextColor(tokenColor(t.C.SiderItem.NameColor))
@@ -279,7 +287,7 @@ func (a *app) catalogHostRow(c *ui.Context, slot catalogSlot) ui.Element {
 
 func (a *app) catalogHostContents(c *ui.Context, id hostID) {
 	t := theme.Current()
-	h := a.hosts[id]
+	h := a.catalog().hosts[id]
 	a.catalogHostIcon(c, id)
 	ui.Column(c).Grow(1).MinWidth(0).Gap(t.Space.N1).Children(func() {
 		ui.Text(c, h.name).FontSize(t.C.SiderItem.NameSize).FontWeight(t.C.SiderItem.NameWeight).FixedLineHeight(t.C.SiderItem.NameLineHeight).SingleLine().Ellipsis("…")

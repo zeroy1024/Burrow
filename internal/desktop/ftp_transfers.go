@@ -23,8 +23,6 @@ const (
 	transferFailed
 )
 
-const minimumDemoTransferTime = 8 * time.Second
-
 type transferTask struct {
 	id                     int
 	session                *fileSession
@@ -89,7 +87,6 @@ func (q *transferQueueState) summary() transferSummary {
 	return s
 }
 
-// The prototype advances only its in-memory queue; no host or local file is written.
 func (a *app) enqueueFiles(
 	c *ui.Context,
 	session *fileSession,
@@ -97,82 +94,15 @@ func (a *app) enqueueFiles(
 	entries []fileEntry,
 	targetPath string,
 ) {
-	q := &a.transfers
-	for _, entry := range entries {
-		q.nextID++
-		source := session.local.path
-		if sourceRemote {
-			source = session.remote.path
-		}
-		sourcePath := entry.path
-		if sourcePath == "" {
-			sourcePath = path.Join(source, entry.name)
-		}
-		total := max(entry.size, 1)
-		speed := min(
-			float64(theme.Current().C.TransferRow.DemoBytesPerSecond),
-			float64(total)/minimumDemoTransferTime.Seconds(),
-		)
-		q.tasks = append(q.tasks, &transferTask{
-			id: q.nextID, session: session, entry: entry, sourceRemote: sourceRemote,
-			sourcePath: sourcePath, targetPath: targetPath,
-			state: transferQueued, total: total, speed: speed,
-		})
-	}
-	q.lastTick = c.Now()
-	c.AnimationFrame()
+	c.Toast(fileBrowseOnlyMessage)
 }
 
 func (a *app) tickTransfers(c *ui.Context) {
-	q := &a.transfers
-	now := c.Now()
-	elapsed := now.Sub(q.lastTick)
-	if q.lastTick.IsZero() {
-		elapsed = 0
-	}
-	q.lastTick = now
-	running := 0
-	for _, task := range q.tasks {
-		if task.state != transferRunning {
-			continue
+	a.transfers.displaySpeed = 0
+	for _, task := range a.transfers.tasks {
+		if task.state == transferQueued || task.state == transferRunning || task.state == transferPaused {
+			task.state, task.errorText, task.speed = transferFailed, fileBrowseOnlyMessage, 0
 		}
-		if task.session.state != connected {
-			task.state, task.errorText = transferFailed, "连接已断开（演示）"
-			continue
-		}
-		progress := task.fraction + task.speed*elapsed.Seconds()
-		bytes := int64(progress)
-		task.fraction = progress - float64(bytes)
-		task.transferred = min(task.total, task.transferred+bytes)
-		if task.transferred == task.total {
-			task.state, task.completed = transferDone, now
-			a.completeFileTransfer(task)
-			continue
-		}
-		running++
-	}
-	for _, task := range q.tasks {
-		if running >= int(theme.Current().C.TransferDock.Concurrency) {
-			break
-		}
-		if task.state == transferQueued {
-			if task.session.state != connected {
-				task.state, task.errorText = transferFailed, "连接已断开（演示）"
-				continue
-			}
-			task.state = transferRunning
-			if task.started.IsZero() {
-				task.started = now
-			}
-			running++
-		}
-	}
-	summary := q.summary()
-	if summary.speed == 0 || now.Sub(q.speedAt) >= theme.Current().C.TransferRow.SpeedInterval {
-		q.displaySpeed, q.speedAt = summary.speed, now
-	}
-	if running > 0 {
-		c.AnimationFrame()
 	}
 }
 
@@ -234,7 +164,7 @@ func (a *app) transferDock(c *ui.Context, maxHeight float32) {
 					if len(rows) == 0 {
 						message := "此分类暂无传输"
 						if len(q.tasks) == 0 {
-							message = "暂无传输任务"
+							message = "文件传输暂未开放，当前仅支持远程目录浏览"
 						}
 						ui.Text(c, message).Height(p.RowHeight).Padding(t.Space.N12).
 							FontSize(t.Font.Size.Footnote).TextColor(tokenColor(t.C.FileList.Meta))
@@ -320,15 +250,14 @@ func (a *app) transferHeader(c *ui.Context) {
 		a.transferFilters(c, s)
 		ui.Spacer(c)
 		if !compact {
-			ui.Text(c, "总速度 "+transferBytes(int64(q.displaySpeed))+"/s · "+transferRemaining(s.total-s.bytes, s.speed)).
+			ui.Text(c, "当前仅支持远程目录浏览").
 				FontSize(t.Font.Size.Footnote).TextColor(tokenColor(t.C.FileList.Meta)).SingleLine().Shrink(1)
 		}
 		pauseIcon, pauseLabel := transferPauseIcon, "全部暂停"
 		if s.running+s.queued == 0 && s.paused > 0 {
 			pauseIcon, pauseLabel = transferPlayIcon, "全部继续"
 		}
-		transferAction(c, "pause-all", pauseLabel, pauseIcon).Disabled(s.running+s.queued+s.paused == 0).
-			OnClick(func() { a.pauseAllTransfers(c) })
+		transferAction(c, "pause-all", pauseLabel, pauseIcon).Disabled(true)
 		transferAction(c, "clear-done", "清除已完成", transferTrashIcon).Disabled(s.done == 0).OnClick(func() {
 			q.tasks = slices.DeleteFunc(q.tasks, func(task *transferTask) bool { return task.state == transferDone })
 		})
@@ -393,9 +322,6 @@ func (a *app) transferRow(c *ui.Context, task *transferTask) {
 		a.revealTransferredFile(c, task)
 	}
 	row.ContextMenu(func(m *ui.Menu) {
-		if task.state == transferRunning && m.Item("模拟权限错误").Chosen() {
-			task.state, task.errorText = transferFailed, "权限不足：目标目录不可写（演示）"
-		}
 		if m.Item("在文件夹中显示").Chosen() {
 			a.revealTransferredFile(c, task)
 		}
@@ -548,16 +474,8 @@ func (a *app) transferTaskActions(c *ui.Context, task *transferTask) {
 	case transferFailed:
 		icon, label = transferRetryIcon, "重试传输"
 	}
-	transferAction(c, "toggle-transfer", label, icon).OnClick(func() {
-		switch task.state {
-		case transferRunning, transferQueued:
-			task.state = transferPaused
-		case transferPaused, transferFailed:
-			task.state, task.errorText = transferQueued, ""
-			q.lastTick = c.Now()
-		}
-		c.AnimationFrame()
-	})
+	transferAction(c, "toggle-transfer", label, icon).Disabled(true)
+
 	label = "取消传输"
 	if task.state == transferFailed {
 		label = "移除失败任务"
@@ -568,18 +486,5 @@ func (a *app) transferTaskActions(c *ui.Context, task *transferTask) {
 }
 
 func (a *app) pauseAllTransfers(c *ui.Context) {
-	q := &a.transfers
-	s := q.summary()
-	resume := s.running+s.queued == 0 && s.paused > 0
-	for _, task := range q.tasks {
-		if resume && task.state == transferPaused {
-			task.state = transferQueued
-			continue
-		}
-		if !resume && (task.state == transferRunning || task.state == transferQueued) {
-			task.state = transferPaused
-		}
-	}
-	q.lastTick = c.Now()
-	c.AnimationFrame()
+	c.Toast(fileBrowseOnlyMessage)
 }

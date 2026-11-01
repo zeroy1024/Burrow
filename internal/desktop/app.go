@@ -1,13 +1,17 @@
 package desktop
 
 import (
+	"context"
+	"fmt"
 	"slices"
+	"sync"
 	"time"
 
 	"sshdesk/internal/termtheme"
 	"sshdesk/internal/theme"
 
 	"github.com/egoist/mygo"
+	nativeterm "github.com/egoist/mygo/plugins/terminal"
 	"github.com/egoist/mygo/ui"
 )
 
@@ -48,16 +52,20 @@ type pageState struct {
 }
 
 type app struct {
+	ctx              context.Context
+	cancel           context.CancelFunc
 	section          section
 	pages            [sectionSettings + 1]pageState
 	appearance       int
+	reduceMotion     bool
 	theme            *ui.Theme
-	hosts            []host
-	groups           []*hostGroup
+	sshCatalog       catalogData
+	fileCatalog      catalogData
 	tabs             []*workspaceTab
 	activeTab        int
 	nextTab          int
 	nextSession      int
+	nextConnection   int
 	tabScroll        ui.ScrollState
 	tabPress         ui.Point
 	statusVisible    bool
@@ -86,6 +94,9 @@ type app struct {
 	filePrefs        filePreferencesState
 	transfers        transferQueueState
 	settingsCategory int
+	sshPrompts       []*sshPrompt
+	sshWorkers       sync.WaitGroup
+	fileSSHLink      *fileSession
 }
 
 func (a *app) page() *pageState {
@@ -110,17 +121,19 @@ func (a *app) switchSection(target section) {
 	a.drag, a.resizing, a.pendingDock, a.dockPreview = nil, nil, nil, nil
 	a.files.drag = nil
 	a.section = target
-	if target == sectionFiles && len(a.fileSessions) == 0 && len(a.hosts) > 0 {
-		a.openFileHost(0)
-	}
 }
 
 // Run starts the native desktop application and its main window.
 func Run() error {
+	if err := nativeterm.Load(); err != nil {
+		return fmt.Errorf("load terminal emulator: %w", err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	a := &app{
-		hosts:  demoHosts(),
-		groups: demoGroups(),
-		tabs:   []*workspaceTab{},
+		ctx: ctx, cancel: cancel,
+		sshCatalog: demoCatalog(), fileCatalog: demoCatalog(),
+		tabs: []*workspaceTab{},
 	}
 	for i := range a.pages {
 		a.pages[i].sidebarWidth = theme.Current().C.Sider.Width
@@ -129,17 +142,8 @@ func Run() error {
 	a.terminalError = a.loadTerminalSettings()
 	a.files.ratio = theme.Current().C.FTPSplit.DefaultRatio
 	a.files.activeRemote = true
-	a.files.localPaths = map[string]string{}
 	if err := a.loadFilePreferences(); err != nil {
 		a.files.notice = "无法读取文件传输偏好：" + err.Error()
-	}
-	for _, id := range []hostID{0, 4, 1} {
-		if int(id) < len(a.hosts) {
-			a.openHost(id)
-		}
-	}
-	if len(a.tabs) > 0 {
-		a.activateTab(0)
 	}
 	mygo.Theme.SetSource(mygo.ThemeLight)
 	stopTokens := theme.OnChange(func(t *theme.Theme) {
@@ -172,11 +176,16 @@ func Run() error {
 			BackgroundColor:      windowColor(t.C.Window.Bg),
 			Content:              ui.View(a.view),
 		})
+		a.window.OnClosed(a.closeConnections)
 	})
-	return mygo.App.Run()
+	err := mygo.App.Run()
+	a.closeConnections()
+	a.sshWorkers.Wait()
+	return err
 }
 
 func (a *app) view(c *ui.Context) {
+	a.reduceMotion = c.Preferences().ReduceMotion
 	t := theme.Current()
 	a.theme = nativeTheme(t)
 	c.SetTheme(a.theme)
@@ -192,7 +201,6 @@ func (a *app) view(c *ui.Context) {
 	}
 	a.enforcePaneMinimum(c)
 	a.files.dragSeen = false
-	a.updateSSHConnections(c)
 	a.tickTransfers(c)
 	target := float32(1)
 	if a.page().sidebarCollapsed {
@@ -245,6 +253,10 @@ func (a *app) view(c *ui.Context) {
 		c.Toast("无法加载主机配置：" + a.catalogError.Error())
 		a.catalogError = nil
 	}
+	if a.catalogConfig.migrated {
+		c.Toast("已将旧主机目录迁移为 SSH 与文件两份独立目录，原配置已备份。")
+		a.catalogConfig.migrated = false
+	}
 	if a.terminalError != nil {
 		c.Toast("终端设置：" + a.terminalError.Error())
 		a.terminalError = nil
@@ -268,6 +280,8 @@ func (a *app) view(c *ui.Context) {
 		c.Toast(a.files.notice)
 		a.files.notice = ""
 	}
+	a.sshDialogs(c)
+	a.fileSSHLinkDialog(c)
 }
 
 func (a *app) navigation(c *ui.Context) {
