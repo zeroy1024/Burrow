@@ -11,6 +11,8 @@
 
 新增共享滚动条API及逐页面清单见[滚动条接入](scrollbars.md)。
 
+2026-11-02真实后端接入后，终端正文改用固定MyGo的原生VT View；容器、表单、导航仍沿用UIKit。本表公共组件规格不代表原生正文具有全部UIKit排版/滚动能力。字距、粗体提亮、精确回滚行数和原生滚动条列为**部分实现**，见[MVP实际差异](mvp-status.md)，不沿用原演示渲染的“完整”结论。
+
 状态是源码合同及调用链审计结论，**不等于所有交互、像素、VoiceOver 行为都已设备实测**。已有测试/构建/静态检查与未验证项分开记录在末节。组件数量及编译结果不作为逐项规格完成的替代证据。
 
 ## 分阶段推进
@@ -145,7 +147,7 @@
 
 ## 滚动条共享显隐
 
-滚动条统一为公共`ScrollbarState/ScrollbarProps/Scrollbars`，原终端、目录、状态卡机制收敛至同一个实现；新增设置、会话表单、文件预览、文件双轴表格、传输列表、选择器与菜单的接入。顶部SSH/文件会话选项卡按最新要求始终隐藏滚动条，公共SessionTabs保留滚轮横移和新标签自动露出。逐页面/卡片列表和SDK适配差异见[滚动条清单](scrollbars.md)。不以“有原生Scroll”作为已统一显隐的证据。
+滚动条统一为公共`ScrollbarState/ScrollbarProps/Scrollbars`，原演示终端、目录、状态卡机制收敛至同一个实现；真实VT正文改用SDK内部滚动条，当前无公开滚动状态适配，因此这一消费者列为部分接入；新增设置、会话表单、文件预览、文件双轴表格、传输列表、选择器与菜单的接入。顶部SSH/文件会话选项卡按最新要求始终隐藏滚动条，公共SessionTabs保留滚轮横移和新标签自动露出。逐页面/卡片列表和SDK适配差异见[滚动条清单](scrollbars.md)。不以“有原生Scroll”作为已统一显隐的证据。
 
 ## 传输完成反馈
 
@@ -196,7 +198,7 @@ SSH与文件目录的SiderRow不再注册原生ContextMenu。RowMenuOn把行右�
 
 `model.go`的`canSeparateSessions / ungroupTab / detachPaneToTab`只移动同一个`*remoteSession`。批量拆分按原窗格顺序相邻插入，活动组保留原焦点会话，后台组保留当前标签/焦点；拖出单个Shell则修复源组焦点及缩放、保留源显示比例，并激活新标签。关闭动画中的组合暂不可拆，防止把正在关闭的窗格拆成单标签后破坏原关闭流程；过期native payload在提交边界拒绝。两条路径均不调用newSession/openHost/connectSession/closeTab，不增加nextSession，不重置输出、解析状态、配置或滚动句柄，不写关闭历史。
 
-公共[SessionTabWidth](../internal/uikit/tabs.go#L108)、[SessionTabPreview](../internal/uikit/tabs.go#L123)与真实标签共用内容和测量规则；[DragMorphGhost](../internal/uikit/drag.go#L43)、[DragMorphGhostProps](../internal/uikit/drag.go#L26)、[DragMorphSettled](../internal/uikit/drag.go#L85)接入`pane_drag.go`。Shell浮卡用真实transcript/output/prompt与拖动起点的视口快照，不是骨架或空卡；有效Y按min(Y,MaxY)捕获，避免跟随底部的MaxFloat32哨兵进入绘图坐标。所有预览节点逐层PassThrough，不创建选择器、滚动Handle或连接资源。
+公共[SessionTabWidth](../internal/uikit/tabs.go#L108)、[SessionTabPreview](../internal/uikit/tabs.go#L123)与真实标签共用内容和测量规则；[DragMorphGhost](../internal/uikit/drag.go#L43)、[DragMorphGhostProps](../internal/uikit/drag.go#L26)、[DragMorphSettled](../internal/uikit/drag.go#L85)接入`pane_drag.go`。演示/预览浮卡沿用transcript绘制；真实VT浮卡在pointerdown捕获可见源已绘制正文，后台裁切并按原morph缩放，保留真实历史视口；不可见或捕获失败使用独立真实emulator Snapshot。备用Snapshot不含SDK内部历史视口位置，不承诺历史中部逐像素同位。所有节点PassThrough，单手势资源清理；备用emulator只有被动本地Conn，不开Shell、不建网络连接、不改变源PTY。
 
 进入标签栏只让手中的面板形态收拢为完整标签，浮卡持续按pointer/grab定位；周围真实标签和加号按原TabDisplace弹簧视觉让位，不插入空占位节点、不提前改模型。离开标签栏时反向变形，邻居及滚动范围平滑回收；松开后才通过原pendingDock提交，浮卡继续移动至真实新标签，并在形态/位置/内容交叉淡化均Settled后交接显示。真实插入接替让位宽度时清空临时space，避免尾部重复计算。快速native drop先构建一次真实面板形态；目标标签首个有效布局前保留计算的落点。减少动态时几何即时、透明度仍按原政策过渡。
 
@@ -261,3 +263,16 @@ SSH与文件目录的SiderRow不再注册原生ContextMenu。RowMenuOn把行右�
 历史14组隔离对照属于先前三批迁移，不能拿来证明本轮新菜单、虚拟化和完整变体已经通过运行时交互检查。
 
 本轮不新增永久测试、组件画廊、截图基线或CI；不升级依赖、不合并、不推送。未进行设备UI/像素验收、真实SSH/FTP、真实密钥操作及原生VoiceOver行列关联验证。
+
+
+## 真实后端接入后的具体差异（2026-11-02）
+
+| 能力 | 当前状态 | 公共API/消费者与影响 |
+|---|---|---|
+| TerminalSurface配色与容器 | 完整实现 | `TerminalSurface/ResolveTerminalColors/Pane/Header/Footer`仍接终端卡片；`sshColors(session)`给原生VT显式每会话颜色，设置预览继续原渲染 |
+| 真实终端Tracking/BoldIsBright | 部分实现 | `termtheme.Prefs`值与设置预览保留；MyGo v0.7.3 `terminal.Options/Font/SetFont`没有此公开能力，`ssh_terminal.go`不假装生效 |
+| 真实终端ScrollbackLines | 部分实现 | `terminal.Options.Scrollback`仅创建时字节预算；当前按行数×初始列数×16估算，不是精确行数，也没有live setter |
+| 真实终端共享Scrollbar | 部分实现 | 原生VT自己绘制/处理，无法把公开ScrollState交给UIKit；其他页面/卡片继续公共Scrollbars |
+| 拖动真实屏幕 | 完整接入、备用路径有限制 | `Window.CapturePage`+单手势bitmap保留可见源视口；不可见来源用独立真实Snapshot，未覆盖历史视口位置能力 |
+
+本轮已有协议/race/构建验证和未执行GUI/像素验收分别记入[MVP状态](mvp-status.md)。上述差异没有按“当前没有调用”豁免，没有用函数数量或构建成功代替完成证据。

@@ -47,12 +47,12 @@ func (a *app) fileConnectionPage(c *ui.Context, session *fileSession) {
 	message := "会话已断开"
 	switch session.state {
 	case connecting:
-		message = "正在连接 " + a.hosts[session.host].name + "…"
+		message = "正在连接 " + session.endpoint.name + "…"
 	case connectionFailed:
 		message = "连接失败"
 	}
 	props := uikit.EmptyProps{Kind: uikit.EmptyConnection, Icon: filesIcon, Title: message,
-		Error: session.errorText, Detail: "演示会话 · 不连接真实服务器"}
+		Error: session.errorText, Detail: session.endpoint.user + "@" + session.endpoint.address}
 	if session.state != connecting {
 		props.Action = "重新连接"
 	}
@@ -184,7 +184,13 @@ func (a *app) filePane(c *ui.Context, session *fileSession, pane *filePaneState,
 				folderTarget = target
 			}
 		}, func() {
-			uikit.EmptyMessage(c, "此文件夹为空", uikit.EmptyFolder).PassThrough()
+			message := "此文件夹为空"
+			if pane.loading {
+				message = "正在读取目录…"
+			} else if pane.errorText != "" {
+				message = pane.errorText
+			}
+			uikit.EmptyMessage(c, message, uikit.EmptyFolder).PassThrough()
 		})
 		pane.reveal = ""
 		if card.Focused() {
@@ -195,7 +201,7 @@ func (a *app) filePane(c *ui.Context, session *fileSession, pane *filePaneState,
 			if entry.dir {
 				a.navigateFiles(c, session, pane, entry.path)
 			} else {
-				uikit.Notify(c, entry.name+" · 演示文件")
+				a.files.dialog = &fileActionDialog{session: session, pane: pane, kind: "preview", preview: entry}
 			}
 		}
 		if table.Preview >= 0 && table.Preview < len(entries) && a.files.drag == nil {
@@ -243,7 +249,7 @@ func (a *app) fileToolbar(c *ui.Context, session *fileSession, pane *filePaneSta
 			}
 		}
 		a.filePaneLabel(c, pane)
-		history := uikit.HistoryButtons(c, pane.historyIndex != 0, pane.historyIndex+1 < len(pane.history), fileBackIcon, fileForwardIcon, uikit.HistoryButtonProps{BackShortcut: "⌘←", ForwardShortcut: "⌘→"})
+		history := uikit.HistoryButtons(c, pane.historyIndex > 0, pane.historyIndex+1 < len(pane.history), fileBackIcon, fileForwardIcon, uikit.HistoryButtonProps{BackShortcut: "⌘←", ForwardShortcut: "⌘→"})
 		history.Back.OnClick(func() { a.fileHistory(c, session, pane, -1) })
 		history.Forward.OnClick(func() { a.fileHistory(c, session, pane, 1) })
 		if compact {
@@ -268,13 +274,13 @@ func (a *app) fileToolbar(c *ui.Context, session *fileSession, pane *filePaneSta
 			fileSearchInput(c, pane).Width(t.C.FilePane.SearchWidth)
 		}
 		if pane.remote {
-			uikit.IconButton(c, transferUpIcon, uikit.IconButtonProps{Label: "上传文件（演示）"}).
+			uikit.IconButton(c, transferUpIcon, uikit.IconButtonProps{Label: "上传文件"}).
 				OnClick(func() { a.chooseUpload(c, session) })
 		}
 		uikit.IconButton(c, fileNewFolderIcon, uikit.IconButtonProps{Label: "新建文件夹", Disabled: !fileWritable(pane, pane.path)}).OnClick(func() {
 			a.files.dialog = &fileActionDialog{session: session, pane: pane, kind: "mkdir", name: "新建文件夹"}
 		})
-		uikit.IconButton(c, fileRefreshIcon, uikit.IconButtonProps{Label: "刷新"}).OnClick(func() { uikit.Notify(c, "演示目录已刷新") })
+		uikit.IconButton(c, fileRefreshIcon, uikit.IconButtonProps{Label: "刷新"}).OnClick(func() { a.refreshFilePane(session, pane) })
 		uikit.MenuOn(c, uikit.IconButton(c, moreIcon, uikit.IconButtonProps{Label: "更多文件操作"}), a.filePaneMenu(c, session, pane))
 	})
 }
@@ -325,7 +331,7 @@ func (a *app) fileBreadcrumbs(c *ui.Context, session *fileSession, pane *filePan
 	parts := strings.Split(strings.Trim(pane.path, "/"), "/")
 	segments := []uikit.PathSegment{}
 	if pane.remote {
-		segments = append(segments, uikit.PathSegment{Label: a.hosts[session.host].name, Target: "/"})
+		segments = append(segments, uikit.PathSegment{Label: session.endpoint.name, Target: "/"})
 	}
 	current := ""
 	if pane.remote {
@@ -437,8 +443,8 @@ func (a *app) filePaneMenu(c *ui.Context, session *fileSession, pane *filePaneSt
 		{ID: "copy-path", Label: "复制路径", Icon: uikit.IconCopy, Disabled: len(selection) != 1, OnChoose: func() { mygo.Clipboard.WriteText(selection[0].path) }},
 	}
 	if !pane.remote {
-		entries = append(entries, uikit.MenuEntry{ID: "demo-divider", Separator: true},
-			uikit.MenuEntry{ID: "demo-dist", Label: "打开演示项目 dist", Icon: uikit.IconFolder, OnChoose: func() { a.navigateFiles(c, session, pane, "~/Projects/shop-site/dist") }})
+		entries = append(entries, uikit.MenuEntry{ID: "local-divider", Separator: true},
+			uikit.MenuEntry{ID: "local-reveal", Label: "在文件管理器中显示", Icon: uikit.IconFolder, OnChoose: func() { mygo.Shell.ShowItemInFolder(pane.path) }})
 	}
 	entries = append(entries, uikit.MenuEntry{ID: "danger-divider", Separator: true},
 		uikit.MenuEntry{ID: "delete", Label: "删除所选项目", Icon: uikit.IconTrash, Danger: true, Disabled: len(selection) == 0 || !writable, OnChoose: func() {
@@ -475,9 +481,9 @@ func (a *app) fileStatus(c *ui.Context, session *fileSession, pane *filePaneStat
 	items := []string{}
 	source := ""
 	if !compact || !pane.remote {
-		source = "本机 · 演示"
+		source = "本机"
 		if pane.remote {
-			h := a.hosts[session.host]
+			h := session.endpoint
 			source = h.user + "@" + h.name
 		}
 	}
@@ -492,7 +498,7 @@ func (a *app) fileStatus(c *ui.Context, session *fileSession, pane *filePaneStat
 	footer.Children(func() {
 		if showProtocol {
 			protocol := "SFTP"
-			if a.hosts[session.host].protocol == "ftp" {
+			if session.endpoint.protocol == "ftp" {
 				protocol = "FTP"
 			}
 			uikit.ProtocolBadge(c, protocol)
@@ -564,7 +570,7 @@ func (a *app) fileDropTarget(
 func (a *app) chooseUpload(c *ui.Context, session *fileSession) {
 	paths, err := mygo.Dialog.Open(mygo.OpenDialogOptions{
 		Parent: a.window, Title: "选择上传文件", Multiple: true,
-		Message: "演示传输：仅读取文件名和大小，不上传内容。",
+		Message: "上传到当前远程目录。",
 	})
 	if err != nil {
 		uikit.Toast(c, uikit.ToastProps{ID: "打开文件选择器失败：" + err.Error(), Tone: uikit.ToneDanger, Title: "打开文件选择器失败", Detail: err.Error()})
@@ -576,7 +582,7 @@ func (a *app) chooseUpload(c *ui.Context, session *fileSession) {
 func (a *app) uploadFinderPaths(c *ui.Context, session *fileSession, paths []string, target string) {
 	entries := []fileEntry{}
 	for _, source := range paths {
-		info, err := os.Stat(source)
+		info, err := os.Lstat(source)
 		if err != nil {
 			uikit.Toast(c, uikit.ToastProps{ID: "无法读取文件信息：" + err.Error(), Tone: uikit.ToneDanger, Title: "无法读取文件信息", Detail: err.Error()})
 			return

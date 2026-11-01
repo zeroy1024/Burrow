@@ -307,28 +307,16 @@ func (a *app) deleteManagedKey(d *credentialDraft) {
 	}
 	index := slices.IndexFunc(a.keys, func(candidate managedKey) bool { return candidate.ID == key.ID })
 	previous := slices.Clone(a.keys)
+	previousWorkspace := a.savedWorkspace
+	a.savedWorkspace = a.workspaceSnapshot()
 	a.keys = slices.Delete(a.keys, index, index+1)
 	if err := a.saveCatalog(); err != nil {
 		a.keys = previous
+		a.savedWorkspace = previousWorkspace
 		d.errorText = "保存凭据目录：" + err.Error()
 		return
 	}
-	a.credentialWork(func(_ context.Context) credentialResult {
-		if err := mygo.Secrets.Delete("key/" + key.ID + "/passphrase"); err != nil {
-			return credentialResult{restoreKey: &key, restoreIndex: index, err: fmt.Errorf("删除保存的口令：%w", err)}
-		}
-		if err := mygo.Shell.TrashItem(key.Path); err != nil {
-			return credentialResult{restoreKey: &key, restoreIndex: index, err: fmt.Errorf("移动私钥到废纸篓：%w", err)}
-		}
-		if _, err := os.Stat(key.Path + ".pub"); err == nil {
-			if err := mygo.Shell.TrashItem(key.Path + ".pub"); err != nil {
-				return credentialResult{deletedID: key.ID, err: fmt.Errorf("私钥已移到废纸篓，公钥移动失败：%w", err)}
-			}
-		} else if !os.IsNotExist(err) {
-			return credentialResult{deletedID: key.ID, err: err}
-		}
-		return credentialResult{deletedID: key.ID, notice: "密钥已移到废纸篓"}
-	})
+	a.credentialWork(func(ctx context.Context) credentialResult { return trashManagedKey(ctx, key, index) })
 }
 
 func (a *app) clearCredentialPasswords() {
@@ -338,19 +326,5 @@ func (a *app) clearCredentialPasswords() {
 			ids = append(ids, h.session.ID)
 		}
 	}
-	a.credentialWork(func(ctx context.Context) credentialResult {
-		result := credentialResult{notice: "已清除所有保存的会话密码"}
-		for _, id := range ids {
-			if err := ctx.Err(); err != nil {
-				result.err = err
-				return result
-			}
-			if err := mygo.Secrets.Delete("session/" + id + "/password"); err != nil {
-				result.err = fmt.Errorf("清除保存的密码：%w", err)
-				return result
-			}
-			result.clearedIDs = append(result.clearedIDs, id)
-		}
-		return result
-	})
+	a.credentialWork(func(ctx context.Context) credentialResult { return clearStoredPasswords(ctx, ids) })
 }

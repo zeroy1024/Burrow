@@ -73,6 +73,27 @@ func (a *app) paneDragHandle(c *ui.Context, source ui.Element, transfer paneTran
 	}
 	// MyGo v0.7.3 fixes its native threshold at 4 DIPs; it exposes no hold-delay option.
 	source.Drag(transfer).Cursor(ui.CursorDefault).FocusRing(false)
+	if transfer.fromTab {
+		source.DrawOver(func(_ *ui.Painter, _ ui.Rect) {
+			if transfer.tab == a.currentTab() {
+				a.terminalCapture.tabHandle, a.terminalCapture.tabSource = source.Bounds(), transfer.session
+			}
+		})
+	} else {
+		source.HandleInput(func(ev ui.InputEvent) bool {
+			if ev.Kind == ui.InputPointerDown && ev.Button == 0 {
+				a.captureTerminalPress(transfer.session, false)
+			}
+			if ev.Kind == ui.InputPointerUp && ev.Button == 0 && a.drag == nil {
+				a.clearTerminalPreviews()
+			}
+			return false
+		})
+	}
+	if capture := &a.terminalCapture; capture.pressed && capture.session == transfer.session && capture.fromTab == transfer.fromTab {
+		source.Bind(&capture.handle)
+		capture.bound = true
+	}
 	if !source.Dragging() {
 		return
 	}
@@ -103,6 +124,7 @@ func (a *app) paneDragHandle(c *ui.Context, source ui.Element, transfer paneTran
 		d.detached = a.pointer.Y > bar.Y+bar.H+t.C.Desktop.TabDetachDistance
 	}
 	a.drag = d
+	a.terminalCapture.pressed = false
 }
 
 func (a *app) tabStripTarget(c *ui.Context, parts uikit.TabsResult, add ui.Element) {
@@ -321,7 +343,7 @@ func (a *app) dragPreview(c *ui.Context) {
 				} else {
 					uikit.ConnectionDot(c, connectionIndicatorState(d.session.state), t.C.Tab.DotSize)
 				}
-				uikit.DragTabTitle(c, a.hosts[d.session.host].name)
+				uikit.DragTabTitle(c, d.session.endpoint.name)
 			})
 			return
 		}
@@ -331,7 +353,7 @@ func (a *app) dragPreview(c *ui.Context) {
 
 func (a *app) paneTabProps(c *ui.Context, session *remoteSession) uikit.SessionTabProps {
 	return uikit.SessionTabProps{
-		Key: session.id, Title: a.hosts[session.host].name, Selected: true,
+		Key: session.id, Title: session.endpoint.name, Selected: true,
 		State: connectionIndicatorState(session.state), CloseIcon: closeIcon,
 		ReduceMotion: a.reduceMotion(c),
 	}
@@ -389,7 +411,7 @@ func (a *app) paneTabDragPreview(c *ui.Context, d *paneDragState) {
 				uikit.StatusDot(c, connectionIndicatorState(d.session.state), uikit.StatusDotProps{
 					Motion: uikit.MotionOverride(a.reduceMotion(c)),
 				}).PassThrough()
-				uikit.DragPaneTitle(c, a.hosts[d.session.host].name, surface)
+				uikit.DragPaneTitle(c, d.session.endpoint.name, surface)
 			})
 			width := p.Width - p.PaddingLeft - p.PaddingRight
 			height := p.Height - 2*p.PaddingY - p.HeaderHeight - t.Space.N8
@@ -417,7 +439,7 @@ func (a *app) paneDragPreview(c *ui.Context, session *remoteSession) {
 	uikit.DragPaneGhost(c, background, surface).Children(func() {
 		uikit.DragPaneHeader(c, surface).Children(func() {
 			uikit.ConnectionDot(c, connectionIndicatorState(session.state), t.C.Tab.DotSize)
-			uikit.DragPaneTitle(c, a.hosts[session.host].name, surface)
+			uikit.DragPaneTitle(c, session.endpoint.name, surface)
 		})
 		uikit.DragSkeleton(c, surface)
 	})
@@ -618,5 +640,5 @@ func (a *app) dockSession(tab *workspaceTab, target *remoteSession, value any, p
 }
 
 func (a *app) paneSizeLabel(session *remoteSession) string {
-	return fmt.Sprintf("%d × %d · 演示", session.columns, session.rows)
+	return fmt.Sprintf("%d × %d", session.columns, session.rows)
 }

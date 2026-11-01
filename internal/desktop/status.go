@@ -16,12 +16,13 @@ func (a *app) serverStatus(c *ui.Context) {
 		ContentPaddingX: t.Space.N16,
 		Scrollbar:       &a.statusScrollbar,
 	}, func() {
-		id, ok := a.focusedHost()
-		if !ok {
+		tab := a.currentTab()
+		if tab == nil {
 			uikit.Text(c, "选择一个终端查看状态", uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneSecondary}).Margin(t.Space.N14, -t.Space.N2, t.Space.N14, -t.Space.N2)
 			return
 		}
-		state := a.currentTab().focused.state
+		session := tab.focused
+		state := session.state
 		if state != connected {
 			message := "会话未连接"
 			if state == connecting {
@@ -30,66 +31,90 @@ func (a *app) serverStatus(c *ui.Context) {
 			uikit.Text(c, message, uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneSecondary}).Margin(t.Space.N14, -t.Space.N2, t.Space.N14, -t.Space.N2)
 			return
 		}
-		h := a.hosts[id]
+		h := session.endpoint
+		metrics := serverMetrics{}
+		var history []float64
+		notice := "正在采集服务器状态…"
+		if a.monitor.session == session {
+			if a.monitor.metrics != nil {
+				metrics, history = *a.monitor.metrics, a.monitor.history
+				notice = "每 2 秒采样 · 进程 CPU 为累计均值"
+			}
+			if a.monitor.errorText != "" {
+				notice = "监控不可用：" + a.monitor.errorText
+			}
+		}
 		ui.Column(c).Gap(t.C.Stats.SectionGap).Children(func() {
 			uikit.Text(c, h.name+" · 跟随焦点", uikit.TextProps{Style: uikit.TextCaption, Tone: uikit.ToneSecondary}).FontSize(t.Font.Size.Caption2).
 				SingleLine().Ellipsis("…")
-			if h.uptime == "" {
-				uikit.Text(c, "此演示主机暂无状态数据", uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneSecondary})
-				return
-			}
 			ui.Column(c).Gap(t.Space.N8).Children(func() {
-				uikit.MeterStat(
-					c,
-					"CPU",
-					fmt.Sprintf("%.0f%%", h.cpu),
-					h.cpu,
-				)
-				values := []float64{0.28, 0.34, 0.3, 0.46, 0.38, 0.53, 0.35, 0.44, 0.3, 0.64, 0.42, 0.5, 0.36, 0.57, 0.47}
-				uikit.Sparkline(c, values, uikit.SparklineProps{Label: "CPU 使用率趋势"})
-				uikit.Text(c, "4 核 · 负载 0.42 / 0.38 / 0.35", uikit.TextProps{Style: uikit.TextCaption, Tone: uikit.ToneSecondary})
+				value := "—"
+				if metrics.cpu != nil {
+					value = fmt.Sprintf("%.0f%%", *metrics.cpu)
+				}
+				monitorMeter(c, "CPU", value, metrics.cpu)
+				uikit.Sparkline(c, history, uikit.SparklineProps{Label: "CPU 使用率趋势"})
+				cores := "—"
+				if metrics.cores > 0 {
+					cores = fmt.Sprint(metrics.cores)
+				}
+				uikit.Text(c, cores+" 核 · 负载 "+monitorText(metrics.load), uikit.TextProps{Style: uikit.TextCaption, Tone: uikit.ToneSecondary})
 			})
-			uikit.MeterStat(
-				c,
-				"内存",
-				fmt.Sprintf("%.1f / 15 GB", h.memory*15/100),
-				h.memory,
-			)
+			memory := "—"
+			if metrics.memory != nil {
+				memory = fmt.Sprintf("%.1f / %.1f GB", float64(metrics.memoryUsed)/1e9, float64(metrics.memoryTotal)/1e9)
+			}
+			monitorMeter(c, "内存", memory, metrics.memory)
 			ui.Column(c).Gap(t.Space.N6).Children(func() {
-				uikit.MeterStat(
-					c,
-					"磁盘",
-					fmt.Sprintf("%.0f / 120 GB", h.disk*120/100),
-					h.disk,
-				)
-				uikit.Text(c, "/dev/vda1 · ext4", uikit.TextProps{Style: uikit.TextCaption, Tone: uikit.ToneSecondary})
+				disk := "—"
+				if metrics.disk != nil {
+					disk = fmt.Sprintf("%.1f / %.1f GB", float64(metrics.diskUsed)/1e9, float64(metrics.diskTotal)/1e9)
+				}
+				monitorMeter(c, "磁盘", disk, metrics.disk)
+				uikit.Text(c, monitorText(metrics.diskDevice)+" · "+monitorText(metrics.filesystem), uikit.TextProps{Style: uikit.TextCaption, Tone: uikit.ToneSecondary})
 			})
 			ui.Column(c).Gap(t.Space.N10).Children(func() {
 				uikit.Text(c, "网络", uikit.TextProps{Style: uikit.TextSmall})
-				uikit.KeyValue(c, []uikit.KV{{Key: "↓ 下行", Value: "2.4 MB/s"}, {Key: "↑ 上行", Value: "380 KB/s"}})
+				uikit.KeyValue(c, []uikit.KV{{Key: "↓ 下行", Value: monitorRate(metrics.down)}, {Key: "↑ 上行", Value: monitorRate(metrics.up)}})
 			})
 			uikit.Divider(c)
 			ui.Column(c).Gap(t.Space.N10).Children(func() {
 				uikit.Stat(c, "进程 Top", "CPU")
-				for _, process := range []struct{ name, cpu string }{
-					{name: "node", cpu: "11.2%"},
-					{name: "postgres", cpu: "5.8%"},
-					{name: "nginx", cpu: "1.4%"},
-					{name: "dockerd", cpu: "0.9%"},
-				} {
-					uikit.KeyValue(c, []uikit.KV{{Key: process.name, Value: process.cpu, Mono: true}})
+				for index := range 4 {
+					name, cpu := "—", "—"
+					if index < len(metrics.top) {
+						process := metrics.top[index]
+						name, cpu = process.name, fmt.Sprintf("%.1f%%", process.cpu)
+					}
+					uikit.KeyValue(c, []uikit.KV{{Key: name, Value: cpu, Mono: true}})
 				}
 			})
 			uikit.Divider(c)
 			ui.Column(c).Gap(t.Space.N12).Children(func() {
-				uikit.KeyValue(c, []uikit.KV{{Key: "主机名", Value: h.name}, {Key: "系统", Value: h.system},
-					{Key: "内核", Value: "5.15.0-105", Dim: true}, {Key: "运行时间", Value: h.uptime}, {Key: "进程", Value: "184"}})
+				processes := "—"
+				if metrics.processes > 0 {
+					processes = fmt.Sprint(metrics.processes)
+				}
+				uikit.KeyValue(c, []uikit.KV{{Key: "主机名", Value: monitorText(metrics.hostname)}, {Key: "系统", Value: monitorText(metrics.system)},
+					{Key: "内核", Value: monitorText(metrics.kernel), Dim: true}, {Key: "运行时间", Value: monitorUptime(metrics.uptime)}, {Key: "进程", Value: processes}})
 			})
-			uikit.Text(c, "演示数据", uikit.TextProps{Style: uikit.TextCaption, Tone: uikit.ToneSecondary})
+			uikit.Text(c, notice, uikit.TextProps{Style: uikit.TextCaption, Tone: uikit.ToneSecondary})
 			ui.Box(c).Height(t.Space.N8)
 		})
 	})
 	if result.Close {
 		a.statusVisible = false
+		a.monitor.stop()
 	}
+}
+
+func monitorMeter(c *ui.Context, label, value string, percent *float64) {
+	if percent != nil {
+		uikit.MeterStat(c, label, value, float32(*percent))
+		return
+	}
+	t := theme.Current().C.Progress
+	uikit.Stat(c, label, value, func() {
+		ui.Box(c).Height(t.HeightMeter).FillWidth().Radius(t.Radius).Background(uikit.Color(t.Track))
+	})
 }

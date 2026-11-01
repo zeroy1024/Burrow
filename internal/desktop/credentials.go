@@ -21,6 +21,7 @@ import (
 	"github.com/egoist/mygo"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
+	"sshdesk/internal/uikit"
 )
 
 type credentialState struct {
@@ -50,6 +51,7 @@ type credentialResult struct {
 	restoreKey   *managedKey
 	restoreIndex int
 	clearedIDs   []string
+	passwords    *passwordClearSnapshot
 	publicKey    string
 	notice       string
 	err          error
@@ -72,15 +74,16 @@ func (a *app) credentialWork(work func(context.Context) credentialResult) {
 		return
 	}
 	a.cancelCredentialWork()
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(a.ctx)
 	a.credentials.cancel = cancel
 	serial := a.credentials.serial
 	a.credentials.busy = true
 	a.credentials.notice = ""
-	go func() {
+	a.sshWorkers.Go(func() {
 		result := work(ctx)
 		accepted := false
 		discardNewKey := false
+		passwordRollback := false
 		mygo.RunOnMain(func() {
 			if ctx.Err() != nil || a.credentials.serial != serial {
 				return
@@ -89,17 +92,18 @@ func (a *app) credentialWork(work func(context.Context) credentialResult) {
 			cancel()
 			a.credentials.cancel = nil
 			a.credentials.busy = false
-			catalogChanged := result.key != nil || result.restoreKey != nil || len(result.clearedIDs) > 0
+			if result.passwords != nil {
+				if err := a.commitPasswordClear(result.clearedIDs); err != nil {
+					result.err = errors.Join(result.err, err)
+					passwordRollback = true
+				}
+			}
+			catalogChanged := result.key != nil || result.restoreKey != nil
 			if result.key != nil {
 				a.keys = append(a.keys, *result.key)
 			}
 			if result.restoreKey != nil {
 				a.keys = slices.Insert(a.keys, min(result.restoreIndex, len(a.keys)), *result.restoreKey)
-			}
-			for i := range a.hosts {
-				if slices.Contains(result.clearedIDs, a.hosts[i].session.ID) {
-					a.hosts[i].session.PasswordSaved = false
-				}
 			}
 			if catalogChanged {
 				if err := a.saveCatalog(); err != nil {
@@ -138,10 +142,34 @@ func (a *app) credentialWork(work func(context.Context) credentialResult) {
 			if a.window != nil {
 				a.window.Invalidate()
 			}
-			if discardNewKey {
+			if discardNewKey || passwordRollback {
 				a.credentials.busy = true
 			}
 		})
+		if result.passwords != nil {
+			var rollbackErr error
+			if !accepted || passwordRollback {
+				rollbackErr = result.passwords.restore()
+			}
+			result.passwords.release()
+			if passwordRollback || rollbackErr != nil {
+				mygo.RunOnMain(func() {
+					err := errors.Join(result.err, rollbackErr)
+					if a.credentials.serial == serial {
+						a.credentials.busy = false
+						a.credentials.notice = err.Error()
+						if a.credentials.draft != nil {
+							a.credentials.draft.errorText = err.Error()
+						}
+					} else {
+						a.files.notice = &uikit.ToastProps{ID: "password-clear-rollback", Tone: uikit.ToneDanger, Title: "恢复保存的密码失败", Detail: err.Error()}
+					}
+					if a.window != nil {
+						a.window.Invalidate()
+					}
+				})
+			}
+		}
 		if !accepted || discardNewKey {
 			if result.draft != nil {
 				clear(result.draft.data)
@@ -162,7 +190,127 @@ func (a *app) credentialWork(work func(context.Context) credentialResult) {
 				})
 			}
 		}
-	}()
+	})
+}
+
+type passwordClearSnapshot struct {
+	ids       []string
+	values    map[string][]byte
+	attempted []string
+}
+
+func (s *passwordClearSnapshot) restore() error {
+	var result error
+	for _, key := range s.attempted {
+		if err := mygo.Secrets.Set(key, s.values[key]); err != nil {
+			result = errors.Join(result, fmt.Errorf("恢复保存的会话密码：%w", err))
+		}
+	}
+	return result
+}
+
+func (s *passwordClearSnapshot) release() {
+	for _, value := range s.values {
+		clear(value)
+	}
+	s.values = nil
+}
+
+func clearStoredPasswords(ctx context.Context, ids []string) credentialResult {
+	snapshot := &passwordClearSnapshot{ids: slices.Clone(ids), values: map[string][]byte{}}
+	fail := func(err error) credentialResult {
+		err = errors.Join(err, snapshot.restore())
+		snapshot.release()
+		return credentialResult{err: err}
+	}
+	for _, id := range snapshot.ids {
+		for _, key := range []string{sessionCredentialKey(id), sessionLegacyPasswordKey(id)} {
+			if err := ctx.Err(); err != nil {
+				return fail(err)
+			}
+			value, err := mygo.Secrets.Get(key)
+			if errors.Is(err, mygo.ErrSecretNotFound) {
+				continue
+			}
+			if err != nil {
+				return fail(fmt.Errorf("读取原有会话密码：%w", err))
+			}
+			snapshot.values[key] = value
+		}
+	}
+	for _, id := range snapshot.ids {
+		for _, key := range []string{sessionCredentialKey(id), sessionLegacyPasswordKey(id)} {
+			if err := ctx.Err(); err != nil {
+				return fail(err)
+			}
+			if _, present := snapshot.values[key]; !present {
+				continue
+			}
+			snapshot.attempted = append(snapshot.attempted, key)
+			if err := mygo.Secrets.Delete(key); err != nil {
+				return fail(fmt.Errorf("清除保存的密码：%w", err))
+			}
+		}
+	}
+	return credentialResult{clearedIDs: snapshot.ids, passwords: snapshot, notice: "已清除所有保存的会话密码"}
+}
+
+// Run on the UI thread. Catalog persistence commits before cached credentials
+// and runtime flags change; the worker retains secret values until this succeeds.
+func (a *app) commitPasswordClear(ids []string) error {
+	type previousFlag struct {
+		saved    bool
+		revision string
+		updated  time.Time
+	}
+	previous := map[string]previousFlag{}
+	changed := map[string]bool{}
+	for _, id := range ids {
+		changed[id] = true
+	}
+	updated := time.Now().UTC()
+	for i := range a.hosts {
+		profile := &a.hosts[i].session
+		if changed[profile.ID] {
+			previous[profile.ID] = previousFlag{saved: profile.PasswordSaved, revision: profile.PasswordRevision, updated: profile.UpdatedAt}
+			profile.PasswordSaved, profile.PasswordRevision, profile.UpdatedAt = false, "", updated
+		}
+	}
+	if err := a.saveCatalog(); err != nil {
+		for i := range a.hosts {
+			profile := &a.hosts[i].session
+			if flag, exists := previous[profile.ID]; exists {
+				profile.PasswordSaved, profile.PasswordRevision, profile.UpdatedAt = flag.saved, flag.revision, flag.updated
+			}
+		}
+		return fmt.Errorf("保存密码清理状态：%w", err)
+	}
+	clearFlag := func(config *sessionConfig) {
+		if changed[config.ID] {
+			config.PasswordSaved, config.PasswordRevision, config.UpdatedAt = false, "", updated
+		}
+	}
+	for _, tab := range a.tabs {
+		for _, session := range tab.root.sessions() {
+			clearFlag(&session.config)
+			clearFlag(&session.endpoint.session)
+		}
+	}
+	files := map[*fileSession]bool{}
+	for _, session := range a.fileSessions {
+		files[session] = true
+	}
+	for _, task := range a.transfers.tasks {
+		files[task.session] = true
+	}
+	for session := range files {
+		if changed[session.config.ID] || changed[session.endpoint.session.ID] {
+			session.ftpSecret = ""
+		}
+		clearFlag(&session.config)
+		clearFlag(&session.endpoint.session)
+	}
+	return nil
 }
 
 func (a *app) dismissCredentialDraft() {
@@ -362,13 +510,129 @@ func managedKeyType(raw any, pub ssh.PublicKey) (string, int) {
 }
 
 func (a *app) keyUseCount(id string) int {
-	count := 0
-	for _, h := range a.hosts {
-		if h.session.KeyID == id {
-			count++
+	references := map[string]bool{}
+	add := func(config sessionConfig, capturedKey string) {
+		if config.KeyID == id || capturedKey == id {
+			references[config.ID] = true
 		}
 	}
-	return count
+	for _, h := range a.hosts {
+		add(h.session, "")
+	}
+	groups := map[*sshConnectionGroup]bool{}
+	for _, tab := range a.tabs {
+		for _, session := range tab.root.sessions() {
+			add(session.endpoint.session, "")
+			add(session.config, "")
+			if session.connection != nil {
+				groups[session.connection] = true
+			}
+		}
+	}
+	fileSessions := map[*fileSession]bool{}
+	for _, session := range a.fileSessions {
+		fileSessions[session] = true
+	}
+	for _, task := range a.transfers.tasks {
+		fileSessions[task.session] = true
+	}
+	for session := range fileSessions {
+		add(session.endpoint.session, "")
+		add(session.config, "")
+		if session.connection != nil {
+			groups[session.connection] = true
+		}
+	}
+	for group := range groups {
+		add(group.endpoint.session, "")
+		// A running group's jump hosts remain immutable after catalog edits.
+		// Their captured keys must survive until all consumers release the plan.
+		for _, step := range group.plan.steps {
+			add(step.endpoint.session, step.key.ID)
+		}
+	}
+	return len(references)
+}
+
+// Metadata has already committed on the UI thread. Keep both key files in a
+// recoverable staging directory until removing the credential and trashing the
+// directory succeeds; failures restore the original file paths and credential.
+func trashManagedKey(ctx context.Context, key managedKey, index int) credentialResult {
+	secretName := "key/" + key.ID + "/passphrase"
+	secret, err := mygo.Secrets.Get(secretName)
+	secretExists := err == nil
+	if err != nil && !errors.Is(err, mygo.ErrSecretNotFound) {
+		return credentialResult{restoreKey: &key, restoreIndex: index, err: fmt.Errorf("读取保存的口令：%w", err)}
+	}
+	defer clear(secret)
+	if err := ctx.Err(); err != nil {
+		return credentialResult{restoreKey: &key, restoreIndex: index, err: err}
+	}
+	directory, err := os.MkdirTemp(filepath.Dir(key.Path), ".delete-key-*")
+	if err != nil {
+		return credentialResult{restoreKey: &key, restoreIndex: index, err: fmt.Errorf("准备密钥删除：%w", err)}
+	}
+	type movedFile struct{ source, destination string }
+	moved := []movedFile{}
+	secretDeleted := false
+	rollback := func(cause error) credentialResult {
+		var rollbackErr error
+		privateRestored := len(moved) == 0
+		for i := len(moved) - 1; i >= 0; i-- {
+			item := moved[i]
+			if err := os.Rename(item.destination, item.source); err != nil {
+				rollbackErr = errors.Join(rollbackErr, fmt.Errorf("恢复密钥文件（保留在 %s）：%w", item.destination, err))
+			} else if item.source == key.Path {
+				privateRestored = true
+			}
+		}
+		if secretDeleted {
+			if err := mygo.Secrets.Set(secretName, secret); err != nil {
+				rollbackErr = errors.Join(rollbackErr, fmt.Errorf("恢复保存的口令：%w", err))
+			}
+		}
+		if rollbackErr == nil {
+			if err := os.Remove(directory); err != nil {
+				rollbackErr = fmt.Errorf("清理删除暂存目录：%w", err)
+			}
+		}
+		result := credentialResult{err: errors.Join(cause, rollbackErr)}
+		if privateRestored {
+			result.restoreKey, result.restoreIndex = &key, index
+		} else {
+			result.deletedID = key.ID
+		}
+		return result
+	}
+	for _, source := range []string{key.Path, key.Path + ".pub"} {
+		if source != key.Path {
+			if _, err := os.Lstat(source); errors.Is(err, os.ErrNotExist) {
+				continue
+			} else if err != nil {
+				return rollback(err)
+			}
+		}
+		destination := filepath.Join(directory, filepath.Base(source))
+		if err := os.Rename(source, destination); err != nil {
+			return rollback(fmt.Errorf("暂存密钥文件：%w", err))
+		}
+		moved = append(moved, movedFile{source: source, destination: destination})
+	}
+	if secretExists {
+		// A failed credential API call may already have changed the item. Restore
+		// its captured value on every failure after attempting deletion.
+		secretDeleted = true
+		if err := mygo.Secrets.Delete(secretName); err != nil {
+			return rollback(fmt.Errorf("删除保存的口令：%w", err))
+		}
+	}
+	if err := ctx.Err(); err != nil {
+		return rollback(err)
+	}
+	if err := mygo.Shell.TrashItem(directory); err != nil {
+		return rollback(fmt.Errorf("移动私钥到废纸篓：%w", err))
+	}
+	return credentialResult{deletedID: key.ID, notice: "密钥已移到废纸篓"}
 }
 
 func (a *app) copyManagedPublicKey(key managedKey) {
@@ -410,7 +674,7 @@ func (a *app) refreshCredentialAgent() {
 		return
 	}
 	a.credentials.agentLoading = true
-	go func() {
+	a.sshWorkers.Go(func() {
 		count, err := agentState()
 		mygo.RunOnMain(func() {
 			a.credentials.agentLoading = false
@@ -420,5 +684,5 @@ func (a *app) refreshCredentialAgent() {
 				a.window.Invalidate()
 			}
 		})
-	}()
+	})
 }

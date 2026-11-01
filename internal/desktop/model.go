@@ -1,7 +1,6 @@
 package desktop
 
 import (
-	"fmt"
 	"math"
 	"slices"
 	"time"
@@ -62,6 +61,13 @@ func (tab *workspaceTab) canSeparateSessions() bool {
 }
 
 type remoteSession struct {
+	endpoint                    host
+	temporary                   bool
+	connection                  *sshConnectionGroup
+	ssh                         *sshRuntime
+	terminal                    *sshTerminal
+	focusPending                bool
+	filePeer                    *fileSession
 	config                      sessionConfig
 	id                          int
 	host                        hostID
@@ -132,71 +138,37 @@ func (a *app) focusedHost() (hostID, bool) {
 }
 
 func (a *app) newSession(id hostID) *remoteSession {
+	return a.newShellSession(id, a.hosts[id], false, nil)
+}
+
+func (a *app) newDisconnectedSession(id hostID, endpoint host, temporary bool, connection *sshConnectionGroup) *remoteSession {
+	endpoint = cloneHostEndpoint(endpoint)
+	endpoint.protocol = ""
+	endpoint.session.Files = nil
+	if endpoint.session.SSH == nil {
+		endpoint.session.SSH = &sshOptions{}
+	}
 	a.nextSession++
-	session := &remoteSession{
-		id: a.nextSession, host: id,
-		transcript: []terminalLine{}, output: []terminalLine{},
+	if connection == nil {
+		connection = a.newSSHGroup(endpoint)
+	}
+	return &remoteSession{
+		id: a.nextSession, host: id, endpoint: endpoint, config: endpoint.session,
+		temporary: temporary, connection: connection,
 		scroll: terminalScrollState{offset: ui.ScrollState{Y: math.MaxFloat32}},
 	}
-	a.connectSession(session)
+}
+
+func (a *app) newShellSession(id hostID, endpoint host, temporary bool, connection *sshConnectionGroup) *remoteSession {
+	session := a.newDisconnectedSession(id, endpoint, temporary, connection)
+	a.startSSHSession(session, false)
 	return session
 }
 
-func (a *app) connectSession(session *remoteSession) {
-	h := a.hosts[session.host]
-	session.config = h.session
-	session.state, session.connectionStarted, session.connectionStep = connecting, time.Time{}, 0
-	session.hasNewOutput, session.hasBell = false, false
-	session.scroll.offset.Y = math.MaxFloat32
-	appendSessionLines(session,
-		terminalLine{{Text: fmt.Sprintf("[演示] ssh -p %d %s@%s", h.port, h.user, h.address), Foreground: terminalIndexed(4)}},
-		terminalLine{{Text: fmt.Sprintf("正在连接 %s:%d…", h.address, h.port)}},
-	)
-}
-
 func disconnectSession(session *remoteSession) {
-	message := "会话已断开。可从标签菜单重新连接。"
-	if session.state == connecting {
-		message = "连接已取消。可从标签菜单重新连接。"
-	}
+	stopSSH(session)
 	session.state = disconnected
-	appendSessionLines(session, terminalLine{{Text: message, Foreground: terminalIndexed(8)}})
-}
-
-// The prototype advances connection stages on the UI clock, shared by tabs and Shell text.
-func (a *app) updateSSHConnections(c *ui.Context) {
-	interval := theme.Current().C.ConnectionIndicator.StageDuration
-	for _, tab := range a.tabs {
-		for _, session := range tab.root.sessions() {
-			if session.state != connecting || session.closing {
-				continue
-			}
-			if session.connectionStarted.IsZero() {
-				session.connectionStarted = c.Now()
-			}
-			h := a.hosts[session.host]
-			steps := []terminalLine{
-				{{Text: "连接已建立，正在进行 SSH 握手…"}},
-				{{Text: fmt.Sprintf("握手完成，正在验证用户 %s…", h.user)}},
-				{{Text: "身份验证通过，正在启动远程 Shell…"}},
-				{{Text: fmt.Sprintf("已连接到 %s（演示会话）", h.name), Foreground: terminalIndexed(2)}},
-			}
-			elapsed := c.Now().Sub(session.connectionStarted)
-			step := min(int(elapsed/interval), len(steps))
-			for session.connectionStep < step {
-				appendSessionLines(session, steps[session.connectionStep])
-				session.connectionStep++
-			}
-			if step == len(steps) {
-				session.state = connected
-				session.cursorStarted = c.Now()
-				appendSessionLines(session, terminalLine{})
-				appendSessionLines(session, demoTranscript(h)...)
-				continue
-			}
-			c.After(time.Duration(step+1)*interval - elapsed)
-		}
-	}
+	showSSHMessage(session, "会话已断开。可从标签菜单重新连接。")
 }
 
 func appendSessionLines(session *remoteSession, lines ...terminalLine) {
@@ -314,8 +286,13 @@ func (a *app) detachPaneToTab(source *workspaceTab, session *remoteSession, inde
 }
 
 func (a *app) closeTab(index int) {
-	if a.tabs[index].root != nil {
-		a.closedTabs = append(a.closedTabs, closedWorkspaceTab{host: a.tabs[index].focused.host, section: sectionSSH})
+	if tab := a.tabs[index]; tab.root != nil {
+		for _, session := range tab.root.sessions() {
+			releaseSSH(session)
+		}
+		session := tab.focused
+		a.closedTabs = append(a.closedTabs, closedWorkspaceTab{host: session.host, section: sectionSSH,
+			endpoint: cloneHostEndpoint(session.endpoint), temporary: session.temporary, connection: session.connection})
 	}
 	closedActive := index == a.activeTab
 	a.tabs = append(a.tabs[:index], a.tabs[index+1:]...)
@@ -351,7 +328,7 @@ func (a *app) splitSession(session *remoteSession, stacked bool) {
 			return
 		}
 	}
-	child := a.newSession(session.host)
+	child := a.newShellSession(session.host, session.endpoint, session.temporary, session.connection)
 	node := tab.root.find(session)
 	node.insert(child, zone)
 	child.enter, child.entering = zone, true
@@ -374,6 +351,7 @@ func (a *app) closePane(session *remoteSession) {
 }
 
 func (a *app) removePane(tab *workspaceTab, session *remoteSession) {
+	releaseSSH(session)
 	tab.root = tab.root.remove(session)
 	if tab.focused == session {
 		if tab == a.currentTab() && a.activeSection() == sectionSSH {
@@ -384,4 +362,58 @@ func (a *app) removePane(tab *workspaceTab, session *remoteSession) {
 	}
 	a.markPaneLayout(tab, theme.Current().C.Desktop.PaneEnterDuration)
 	a.setPaneZoom(tab, false)
+}
+
+// Runtime endpoints are snapshots; catalog edits cannot retarget a live channel.
+func cloneHostEndpoint(endpoint host) host {
+	if options := endpoint.session.SSH; options != nil {
+		copy := *options
+		copy.Env = slices.Clone(options.Env)
+		endpoint.session.SSH = &copy
+	}
+	if options := endpoint.session.Files; options != nil {
+		copy := *options
+		endpoint.session.Files = &copy
+	}
+	return endpoint
+}
+
+// Explicit reconnect adopts saved changes. Existing channels and background jobs
+// keep their captured endpoint; the caller replaces only its own transport group.
+func (a *app) latestSessionEndpoint(current host, temporary bool) (host, hostID, bool) {
+	if temporary {
+		return current, -1, false
+	}
+	for index, saved := range a.hosts {
+		if saved.session.ID == current.session.ID && saved.protocol == current.protocol {
+			return cloneHostEndpoint(saved), hostID(index), !saved.session.UpdatedAt.Equal(current.session.UpdatedAt)
+		}
+	}
+	return current, -1, false
+}
+
+func (a *app) runtimeSSHGroups() []*sshConnectionGroup {
+	groups := map[*sshConnectionGroup]struct{}{}
+	for _, tab := range a.tabs {
+		for _, session := range tab.root.sessions() {
+			if session.connection != nil {
+				groups[session.connection] = struct{}{}
+			}
+		}
+	}
+	for _, session := range a.fileSessions {
+		if session.connection != nil {
+			groups[session.connection] = struct{}{}
+		}
+	}
+	for _, task := range a.transfers.tasks {
+		if task.session.connection != nil {
+			groups[task.session.connection] = struct{}{}
+		}
+	}
+	result := make([]*sshConnectionGroup, 0, len(groups))
+	for group := range groups {
+		result = append(result, group)
+	}
+	return result
 }

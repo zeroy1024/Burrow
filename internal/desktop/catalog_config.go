@@ -1,6 +1,7 @@
 package desktop
 
 import (
+	"bytes"
 	"cmp"
 	"encoding/json"
 	"errors"
@@ -15,8 +16,10 @@ import (
 )
 
 type catalogConfigState struct {
-	path    string
-	loadErr error
+	path       string
+	legacyPath string
+	loadErr    error
+	migrated   bool
 }
 
 type catalogConfig struct {
@@ -26,6 +29,16 @@ type catalogConfig struct {
 	Sessions  []storedSession      `json:"sessions,omitempty"`
 	Keys      []managedKey         `json:"keys,omitempty"`
 	Workspace *storedWorkspace     `json:"workspace,omitempty"`
+	SSH       legacyCatalogData    `json:"ssh,omitzero"`
+	Files     legacyCatalogData    `json:"files,omitzero"`
+}
+
+type legacyCatalogData struct {
+	NextHostID  hostID               `json:"next_host_id"`
+	NextGroupID int                  `json:"next_group_id"`
+	Groups      []catalogConfigGroup `json:"groups"`
+	Hosts       []catalogConfigHost  `json:"hosts"`
+	LocalPaths  map[hostID]string    `json:"local_paths,omitempty"`
 }
 
 type storedSession struct {
@@ -62,6 +75,8 @@ type catalogConfigHost struct {
 	OS       int           `json:"os"`
 	System   string        `json:"system"`
 	Protocol string        `json:"protocol,omitempty"`
+	Auth     string        `json:"auth,omitempty"`
+	KeyPath  string        `json:"key_path,omitempty"`
 }
 
 type catalogSnapshot struct {
@@ -101,6 +116,9 @@ func (a *app) commitCatalogMove(change func()) error {
 }
 
 func (a *app) loadCatalog() error {
+	if a.hosts == nil && a.groups == nil {
+		a.emptyCatalog()
+	}
 	err := a.readCatalog()
 	// A failed read must never turn the demo data into an overwrite of the user's file.
 	a.catalogConfig.loadErr = err
@@ -113,20 +131,29 @@ func (a *app) readCatalog() error {
 		return fmt.Errorf("locate catalog configuration directory: %w", err)
 	}
 	a.catalogConfig.path = filepath.Join(directory, "sessions.json")
+	legacy, err := os.UserConfigDir()
+	if err != nil {
+		return err
+	}
+	a.catalogConfig.legacyPath = filepath.Join(legacy, "SSH Desk", "catalog.json")
+	return a.readCatalogFile()
+}
+
+func (a *app) emptyCatalog() {
+	a.hosts, a.keys = []host{}, []managedKey{}
+	a.savedWorkspace = nil
+	a.groups = []*hostGroup{
+		{id: 0, scope: sectionSSH, name: "个人", hosts: []hostID{}},
+		{id: 1, scope: sectionFiles, name: "个人", hosts: []hostID{}},
+	}
+}
+
+func (a *app) readCatalogFile() error {
+	a.catalogConfig.migrated = false
+	directory := filepath.Dir(a.catalogConfig.path)
 	data, err := os.ReadFile(a.catalogConfig.path)
 	if errors.Is(err, os.ErrNotExist) {
-		// Read the existing prototype catalog once; subsequent writes use sessions.json.
-		legacy, pathErr := os.UserConfigDir()
-		if pathErr != nil {
-			return pathErr
-		}
-		data, err = os.ReadFile(filepath.Join(legacy, "SSH Desk", "catalog.json"))
-		if errors.Is(err, os.ErrNotExist) {
-			for i := range a.hosts {
-				initializeSession(&a.hosts[i])
-			}
-			return nil
-		}
+		return a.importLegacyCatalog(directory)
 	}
 	if err != nil {
 		return fmt.Errorf("read catalog configuration: %w", err)
@@ -135,9 +162,13 @@ func (a *app) readCatalog() error {
 	if err := json.Unmarshal(data, &config); err != nil {
 		return fmt.Errorf("decode catalog configuration: %w", err)
 	}
-	if config.Version != 0 && config.Version != 1 {
+	if config.Version != 1 {
 		return errors.New("unsupported sessions version")
 	}
+	return a.applyStoredCatalog(config, directory)
+}
+
+func (a *app) applyStoredCatalog(config catalogConfig, directory string) error {
 	if config.Sessions != nil {
 		config.Hosts = make([]catalogConfigHost, len(config.Sessions))
 		ids := map[string]bool{}
@@ -153,7 +184,7 @@ func (a *app) readCatalog() error {
 			config.Hosts[i] = catalogConfigHost{ID: hostID(i), GroupID: s.GroupID, Order: s.Order, Name: s.Name, User: s.User, Address: s.Host, Port: s.Port, OS: s.OS, System: s.System, Protocol: protocol, Session: s.sessionConfig}
 		}
 	}
-	hosts, groups, err := config.catalog(a.hosts)
+	hosts, groups, err := config.catalog(nil)
 	if err != nil {
 		return fmt.Errorf("validate catalog configuration: %w", err)
 	}
@@ -168,12 +199,273 @@ func (a *app) readCatalog() error {
 		if filepath.Clean(config.Keys[i].Path) != expected {
 			return errors.New("managed key path must be inside the application's keys directory")
 		}
-		if info, err := os.Lstat(expected); err == nil && info.Mode()&os.ModeSymlink != 0 {
-			return errors.New("managed key must not be a symbolic link")
+		info, err := os.Lstat(expected)
+		if err != nil {
+			return fmt.Errorf("read managed private key: %w", err)
 		}
+		if !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 {
+			return errors.New("managed key must be a regular file, not a symbolic link")
+		}
+		if info.Mode().Perm()&0077 != 0 {
+			return errors.New("managed private key permissions must be private")
+		}
+	}
+	if err := validateStoredWorkspace(config.Workspace, hosts, config.Keys); err != nil {
+		return fmt.Errorf("validate saved workspace: %w", err)
 	}
 	a.hosts, a.groups, a.keys = hosts, groups, config.Keys
 	a.savedWorkspace = config.Workspace
+	return nil
+}
+
+func (a *app) importLegacyCatalog(directory string) (result error) {
+	legacyPath := a.catalogConfig.legacyPath
+	if legacyPath == "" {
+		legacyPath = filepath.Join(directory, "catalog.json")
+	}
+	data, err := os.ReadFile(legacyPath)
+	if errors.Is(err, os.ErrNotExist) {
+		a.emptyCatalog()
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("read legacy catalog: %w", err)
+	}
+	var source catalogConfig
+	if err := json.Unmarshal(data, &source); err != nil {
+		return fmt.Errorf("decode legacy catalog: %w", err)
+	}
+	if source.Version != 0 && source.Version != 2 {
+		return fmt.Errorf("unsupported legacy catalog version %d", source.Version)
+	}
+	preferencesPath := filepath.Join(filepath.Dir(legacyPath), "files.json")
+	prefsData, err := os.ReadFile(preferencesPath)
+	prefsPresent := err == nil
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("read legacy file preferences: %w", err)
+	}
+	var prefs filePreferences
+	if prefsPresent {
+		if err := json.Unmarshal(prefsData, &prefs); err != nil {
+			return fmt.Errorf("decode legacy file preferences: %w", err)
+		}
+		if prefs.LocalRatio <= 0 || prefs.LocalRatio >= 1 || prefs.TransferFilter < 0 ||
+			prefs.TransferFilter > 2 || prefs.TransferDockHeight < 0 {
+			return errors.New("invalid legacy file preferences")
+		}
+	}
+	config := catalogConfig{Version: 1, Groups: []catalogConfigGroup{}, Hosts: []catalogConfigHost{}, Keys: []managedKey{}}
+	keySources := map[hostID]string{}
+	sshSource, fileSource := source.SSH, source.Files
+	if source.Version == 0 {
+		sshSource = legacyCatalogData{
+			NextHostID: hostID(len(source.Hosts)), NextGroupID: len(source.Groups),
+			Groups: source.Groups, Hosts: source.Hosts,
+		}
+		fileSource = sshSource
+		fileSource.Groups = slices.Clone(source.Groups)
+		for index := range fileSource.Groups {
+			fileSource.Groups[index].Collapsed = fileSource.Groups[index].FilesCollapsed
+		}
+	}
+	if err := appendLegacyScope(&config, sshSource, sectionSSH, prefs, keySources); err != nil {
+		return fmt.Errorf("migrate SSH catalog: %w", err)
+	}
+	if err := appendLegacyScope(&config, fileSource, sectionFiles, prefs, keySources); err != nil {
+		return fmt.Errorf("migrate file catalog: %w", err)
+	}
+	backupVersion := 2
+	if source.Version == 0 {
+		backupVersion = 1
+	}
+	if err := backupLegacyConfig(legacyPath, data, backupVersion); err != nil {
+		return err
+	}
+	if prefsPresent {
+		if err := backupLegacyConfig(preferencesPath, prefsData, backupVersion); err != nil {
+			return err
+		}
+	}
+	created := []string{}
+	defer func() {
+		if result != nil {
+			result = errors.Join(result, discardMigrationFiles(created))
+		}
+	}()
+	imported := map[string]managedKey{}
+	for index := range config.Hosts {
+		path := keySources[hostID(index)]
+		if path == "" {
+			continue
+		}
+		key, exists := imported[path]
+		if !exists {
+			var files []string
+			key, files, err = copyLegacyPrivateKey(path, directory)
+			created = append(created, files...)
+			if err != nil {
+				return fmt.Errorf("import legacy private key: %w", err)
+			}
+			imported[path] = key
+			config.Keys = append(config.Keys, key)
+		}
+		config.Hosts[index].Session.KeyID = key.ID
+	}
+	candidate := &app{}
+	if err := candidate.applyStoredCatalog(config, directory); err != nil {
+		return err
+	}
+	encoded, err := candidate.catalogBytes()
+	if err != nil {
+		return err
+	}
+	published, err := createCatalog(a.catalogConfig.path, encoded)
+	if published {
+		// A pending-file cleanup error must not remove keys referenced by the
+		// sessions file that has already been atomically published.
+		created = []string{}
+	}
+	if err != nil {
+		return fmt.Errorf("create migrated sessions: %w", err)
+	}
+	a.hosts, a.groups, a.keys = candidate.hosts, candidate.groups, candidate.keys
+	a.savedWorkspace = candidate.savedWorkspace
+	a.catalogConfig.migrated = true
+	return nil
+}
+
+func appendLegacyScope(
+	target *catalogConfig,
+	source legacyCatalogData,
+	scope section,
+	prefs filePreferences,
+	keySources map[hostID]string,
+) error {
+	if len(source.Groups) == 0 || source.NextHostID < 0 {
+		return errors.New("legacy catalog must contain groups and valid next IDs")
+	}
+	groups := make([]catalogConfigGroup, len(source.Groups))
+	byID := map[int]int{}
+	names := map[string]bool{}
+	for _, group := range source.Groups {
+		validOrder := group.Order >= 0 && group.Order < len(groups)
+		if group.ID < 0 || group.ID >= source.NextGroupID || !validOrder {
+			return errors.New("invalid legacy group id or order")
+		}
+		if _, exists := byID[group.ID]; exists || groups[group.Order].Name != "" {
+			return errors.New("duplicate legacy group id or order")
+		}
+		if strings.TrimSpace(group.Name) == "" || names[group.Name] {
+			return errors.New("empty or duplicate legacy group name")
+		}
+		groups[group.Order], byID[group.ID], names[group.Name] = group, 0, true
+	}
+	for _, group := range groups {
+		id := len(target.Groups)
+		byID[group.ID] = id
+		group.ID, group.Order = id, id
+		group.Scope = "ssh"
+		if scope == sectionFiles {
+			group.Scope = "files"
+		}
+		target.Groups = append(target.Groups, group)
+	}
+	seen := map[hostID]bool{}
+	ordered := map[int][]catalogConfigHost{}
+	for _, h := range source.Hosts {
+		if h.ID < 0 || h.ID >= source.NextHostID || seen[h.ID] {
+			return errors.New("invalid or duplicate legacy host id or next id")
+		}
+		if _, exists := byID[h.GroupID]; !exists || h.Order < 0 {
+			return errors.New("invalid legacy host group or order")
+		}
+		if h.OS < 0 || h.OS >= len(systems) || h.Port < 1 || h.Port > 65535 {
+			return errors.New("invalid legacy host system or port")
+		}
+		if strings.TrimSpace(h.Name) == "" || strings.TrimSpace(h.Address) == "" || strings.TrimSpace(h.User) == "" {
+			return errors.New("legacy host connection fields must not be empty")
+		}
+		if h.Protocol != "" && h.Protocol != "sftp" && h.Protocol != "ftp" {
+			return errors.New("invalid legacy file protocol")
+		}
+		if h.Auth == "" {
+			h.Auth = "agent"
+		}
+		if !slices.Contains([]string{"agent", "password", "key"}, h.Auth) {
+			return errors.New("invalid legacy authentication method")
+		}
+		if h.Auth == "key" && strings.TrimSpace(h.KeyPath) == "" {
+			return errors.New("legacy private key path is empty")
+		}
+		seen[h.ID] = true
+		ordered[h.GroupID] = append(ordered[h.GroupID], h)
+	}
+	for id, local := range source.LocalPaths {
+		if !seen[id] || local == "" {
+			return errors.New("legacy local path refers to an unknown site or is empty")
+		}
+	}
+	for _, group := range groups {
+		values := ordered[group.ID]
+		slices.SortFunc(values, func(a, b catalogConfigHost) int { return cmp.Compare(a.Order, b.Order) })
+		for order, value := range values {
+			if value.Order != order {
+				return errors.New("legacy host order must be consecutive within each group")
+			}
+			oldID := value.ID
+			value.ID, value.GroupID = hostID(len(target.Hosts)), byID[value.GroupID]
+			value.Session = sessionConfig{Auth: value.Auth}
+			if scope == sectionSSH {
+				value.Protocol = ""
+			} else if value.Protocol == "" {
+				value.Protocol = "sftp"
+			}
+			if value.Protocol == "ftp" {
+				value.Session.Auth = "password"
+			}
+			profile := host{protocol: value.Protocol, session: value.Session}
+			initializeSession(&profile)
+			value.Session = profile.session
+			if value.Protocol == "ftp" {
+				value.Session.Files.FTPTLS = "none"
+			}
+			if scope == sectionFiles {
+				local := source.LocalPaths[oldID]
+				if local == "" {
+					local = prefs.LocalPaths[fmt.Sprintf("%s@%s:%d", value.User, value.Address, value.Port)]
+				}
+				value.Session.Files.LocalDir = local
+			}
+			if value.Session.Auth == "key" {
+				keySources[value.ID] = filepath.Clean(value.KeyPath)
+			}
+			value.Auth, value.KeyPath = "", ""
+			target.Hosts = append(target.Hosts, value)
+		}
+	}
+	return nil
+}
+
+func backupLegacyConfig(path string, data []byte, version int) error {
+	backup := fmt.Sprintf("%s.v%d.bak", path, version)
+	file, err := os.OpenFile(backup, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	if errors.Is(err, os.ErrExist) {
+		existing, readErr := os.ReadFile(backup)
+		if readErr != nil {
+			return readErr
+		}
+		if !bytes.Equal(existing, data) {
+			return fmt.Errorf("configuration backup already exists with different contents: %s", backup)
+		}
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("create legacy configuration backup: %w", err)
+	}
+	_, writeErr := file.Write(data)
+	if err := errors.Join(writeErr, file.Sync(), file.Close()); err != nil {
+		return errors.Join(err, os.Remove(backup))
+	}
 	return nil
 }
 
@@ -321,6 +613,14 @@ func (a *app) saveCatalog() error {
 	if a.catalogConfig.path == "" {
 		return errors.New("catalog configuration has not been loaded")
 	}
+	data, err := a.catalogBytes()
+	if err != nil {
+		return err
+	}
+	return writeCatalog(a.catalogConfig.path, data)
+}
+
+func (a *app) catalogBytes() ([]byte, error) {
 	config := catalogConfig{
 		Version: 1, Keys: a.keys, Workspace: a.savedWorkspace,
 		Groups:   make([]catalogConfigGroup, len(a.groups)),
@@ -352,9 +652,30 @@ func (a *app) saveCatalog() error {
 	}
 	data, err := json.MarshalIndent(config, "", "  ")
 	if err != nil {
-		return fmt.Errorf("encode catalog configuration: %w", err)
+		return nil, fmt.Errorf("encode catalog configuration: %w", err)
 	}
-	return writeCatalog(a.catalogConfig.path, append(data, '\n'))
+	return append(data, '\n'), nil
+}
+
+// Migration creates a new destination only. Linking a fully synced pending
+// file publishes it atomically and cannot replace sessions from another process.
+func createCatalog(path string, data []byte) (published bool, result error) {
+	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+		return false, err
+	}
+	file, err := os.CreateTemp(filepath.Dir(path), ".sessions-*.json")
+	if err != nil {
+		return false, err
+	}
+	defer func() { result = errors.Join(result, os.Remove(file.Name())) }()
+	_, writeErr := file.Write(data)
+	if err := errors.Join(writeErr, file.Sync(), file.Close()); err != nil {
+		return false, err
+	}
+	if err := os.Link(file.Name(), path); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func writeCatalog(path string, data []byte) (err error) {

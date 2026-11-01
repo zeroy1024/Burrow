@@ -1,8 +1,11 @@
 package desktop
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"slices"
+	"sync"
 	"time"
 
 	"sshdesk/internal/termtheme"
@@ -10,6 +13,7 @@ import (
 	"sshdesk/internal/uikit"
 
 	"github.com/egoist/mygo"
+	nativeterm "github.com/egoist/mygo/plugins/terminal"
 	"github.com/egoist/mygo/ui"
 )
 
@@ -51,6 +55,17 @@ type pageState struct {
 }
 
 type app struct {
+	quitReady, quitPending bool
+	terminalCapture        terminalCaptureState
+	terminalPreviews       map[*remoteSession]*terminalPreview
+	monitor                monitorState
+	ctx                    context.Context
+	cancel                 context.CancelFunc
+	sshWorkers             sync.WaitGroup
+	nextConnection         int
+	sshPrompts             []*sshPrompt
+	fileSSHLink            *fileSession
+
 	section            section
 	settingsButton     ui.Handle
 	pages              [sectionSettings + 1]pageState
@@ -171,11 +186,15 @@ func (a *app) clearWorkspaceGestures() {
 func Run() error {
 	mygo.App.SetName("SSH Desk")
 	mygo.App.SetLanguages("zh-Hans", "en")
-	a := &app{
-		hosts:  demoHosts(),
-		groups: demoGroups(),
-		tabs:   []*workspaceTab{},
+	if err := nativeterm.Load(); err != nil {
+		return fmt.Errorf("加载原生终端：%w", err)
 	}
+	ctx, cancel := context.WithCancel(context.Background())
+	a := &app{ctx: ctx, cancel: cancel, tabs: []*workspaceTab{}}
+	defer func() {
+		a.cancel()
+		a.sshWorkers.Wait()
+	}()
 	for i := range a.pages {
 		a.pages[i].sidebarWidth = theme.Current().C.Sider.Width
 	}
@@ -194,6 +213,13 @@ func Run() error {
 		a.terminalError = errors.Join(a.terminalError, err)
 	}
 	a.restoreWorkspace()
+	if err := a.restoreTransfers(); err != nil {
+		detail := err.Error()
+		if a.files.notice != nil {
+			detail = a.files.notice.Title + "：" + a.files.notice.Detail + "\n" + detail
+		}
+		a.files.notice = &uikit.ToastProps{ID: "transfer-restore-error", Tone: uikit.ToneDanger, Title: "无法恢复传输记录", Detail: detail}
+	}
 	if len(a.tabs) > 0 && a.section == sectionSSH {
 		a.activateTab(a.activeTab)
 	}
@@ -222,7 +248,7 @@ func Run() error {
 			stopMenuLocale()
 		}
 	}()
-	mygo.App.WhenReady(func() {
+	openWindow := func() {
 		a.syncAppearance()
 		t := theme.Current()
 		a.window = mygo.NewWindow(mygo.WindowOptions{
@@ -237,13 +263,20 @@ func Run() error {
 			Content:              ui.View(a.view),
 		})
 		a.window.OnClose(func(e *mygo.CloseEvent) {
+			if a.quitPending {
+				e.PreventDefault()
+				a.window.Hide()
+				return
+			}
 			if a.credentials.busy || a.savingSession() {
+				a.resetQuitAttempt()
 				e.PreventDefault()
 				a.files.notice = &uikit.ToastProps{ID: "save-before-close", Tone: uikit.ToneWarning, Title: "正在保存凭据，完成后再关闭窗口。"}
 				a.window.Invalidate()
 				return
 			}
 			if err := a.persistBeforeClose(); err != nil {
+				a.resetQuitAttempt()
 				e.PreventDefault()
 				a.files.notice = &uikit.ToastProps{
 					ID: "关闭前保存失败：" + err.Error(), Tone: uikit.ToneDanger,
@@ -255,45 +288,96 @@ func Run() error {
 			for i := range a.pages {
 				a.pages[i].draft.cancelTest()
 			}
+			if !a.quitReady {
+				// Keep one stable window/dispatcher while sessions and jobs run in
+				// the background. Dock activation shows this same native window.
+				e.PreventDefault()
+				a.closeSettings()
+				a.monitor.stop()
+				a.window.Hide()
+			}
 		})
+		if stopMenuLocale != nil {
+			stopMenuLocale()
+		}
 		stopMenuLocale = a.installAppMenu()
-	})
-	stopQuit := mygo.App.OnBeforeQuit(func(e *mygo.QuitEvent) {
-		if a.credentials.busy || a.savingSession() {
-			e.PreventDefault()
-			a.files.notice = &uikit.ToastProps{ID: "work-before-quit", Tone: uikit.ToneWarning, Title: "密钥操作进行中，完成后再退出。"}
+	}
+	mygo.App.WhenReady(openWindow)
+	stopActivate := mygo.App.OnActivate(func(visible bool) {
+		if !visible && a.ctx.Err() == nil {
 			if a.window != nil {
+				a.window.Show()
+			}
+		}
+	})
+	defer stopActivate()
+	stopQuit := mygo.App.OnBeforeQuit(func(e *mygo.QuitEvent) {
+		if a.quitPending {
+			e.PreventDefault()
+			return
+		}
+		if a.credentials.busy || a.savingSession() || a.files.dialog != nil && a.files.dialog.busy {
+			a.resetQuitAttempt()
+			e.PreventDefault()
+			a.files.notice = &uikit.ToastProps{ID: "work-before-quit", Tone: uikit.ToneWarning, Title: "文件或凭据操作进行中，完成后再退出。"}
+			if a.window != nil {
+				a.window.Show()
 				a.window.Invalidate()
 			}
 			return
 		}
-		a.cancelCredentialWork()
 		if err := a.persistBeforeClose(); err != nil {
+			a.resetQuitAttempt()
 			e.PreventDefault()
-			a.files.notice = &uikit.ToastProps{
-				ID: "退出前保存失败：" + err.Error(), Tone: uikit.ToneDanger,
-				Title: "退出前保存失败", Detail: err.Error(),
-			}
+			a.files.notice = &uikit.ToastProps{ID: "quit-save-error", Tone: uikit.ToneDanger, Title: "退出前保存失败", Detail: err.Error()}
 			if a.window != nil {
+				a.window.Show()
 				a.window.Invalidate()
 			}
+			return
 		}
+		if !a.quitReady {
+			e.PreventDefault()
+			if !a.quitPending {
+				a.quitPending = true
+				a.prepareTransferQuit(func(err error) {
+					a.quitPending = false
+					if err != nil {
+						a.files.notice = &uikit.ToastProps{ID: "quit-transfer-save", Tone: uikit.ToneDanger, Title: "保存传输记录失败", Detail: err.Error()}
+						a.window.Show()
+						a.window.Invalidate()
+						return
+					}
+					a.quitReady = true
+					a.window.Update(func() { mygo.App.Quit() })
+				})
+			}
+			return
+		}
+		a.cancelCredentialWork()
 		for i := range a.pages {
 			a.pages[i].draft.cancelTest()
 		}
 	})
 	defer stopQuit()
+	stopShutdown := mygo.App.OnWillQuit(func(*mygo.QuitEvent) { a.clearTerminalPreviews(); a.monitor.stop(); a.closeConnections() })
+	defer stopShutdown()
 	return mygo.App.Run()
 }
 
 func (a *app) view(c *ui.Context) {
 	t := theme.Current()
 	a.theme = uikit.Install(c)
-	c.Root().Background(uikit.Color(t.C.Window.Bg))
+	c.Root().Background(uikit.Color(t.C.Window.Bg)).Disabled(a.transfers.quitting)
 	root := ui.Column(c).Fill()
 	x, y, _ := root.PointerPosition()
 	a.pointer = ui.Point{X: x, Y: y}
-	a.appShortcuts(c)
+	if !a.transfers.quitting {
+		a.appShortcuts(c)
+	}
+	if a.drag == nil && !a.terminalCapturePressed(c) {
+		a.clearTerminalPreviews()
+	}
 	active := a.activeSection()
 	a.updatePaneClosures(c)
 	if active == sectionSSH {
@@ -304,10 +388,9 @@ func (a *app) view(c *ui.Context) {
 	}
 	a.enforcePaneMinimum(c)
 	a.files.dragSeen = false
-	a.updateSSHConnections(c)
-	a.updateFileConnections(c)
 	a.enforceScrollback()
 	a.tickTransfers(c)
+	a.updateMonitor(c)
 	a.tickPreferences(c)
 	target := float32(1)
 	if a.page().sidebarCollapsed {
@@ -367,9 +450,11 @@ func (a *app) view(c *ui.Context) {
 			a.groupDialog(c.Key(pageDialogKey{section: a.section, kind: "group"}))
 		}
 	}
-	if active == sectionFiles {
+	if active == sectionFiles || a.files.conflict != nil {
 		a.fileDialogs(c)
 	}
+	a.sshDialogs(c)
+	a.fileSSHLinkDialog(c)
 	a.credentialDialogs(c)
 	a.closeTabDialog(c)
 	if a.files.drag != nil && !a.files.dragSeen {
@@ -494,4 +579,8 @@ func (a *app) sidebarResizeHandle(c *ui.Context, shown float32) {
 		visible = 1
 	}
 	uikit.StyleSidebarDivider(c, edge, visible, dragging)
+}
+
+func (a *app) resetQuitAttempt() {
+	a.quitReady, a.quitPending, a.transfers.quitting = false, false, false
 }

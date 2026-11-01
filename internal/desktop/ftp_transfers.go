@@ -22,32 +22,41 @@ const (
 	transferFailed
 )
 
-const minimumDemoTransferTime = 8 * time.Second
-
 type transferTask struct {
 	id                     int
 	session                *fileSession
+	view                   *fileSession
 	entry                  fileEntry
 	sourceRemote           bool
 	sourcePath, targetPath string
 	state                  transferState
 	transferred, total     int64
-	fraction               float64
 	speed                  float64
 	started, completed     time.Time
 	errorText              string
+	job                    *transferJob
+	run                    *transferRun
+	removeRequested        bool
+	failureNotice          bool
+	cleanupPending         bool
 }
 
 type transferQueueState struct {
-	tasks             []*transferTask
-	nextID            int
-	collapsed         bool
-	filter            int
-	lastTick, speedAt time.Time
-	displaySpeed      float64
-	dockScroll        ui.ScrollState
-	dockHeight        float32
-	dockResizing      bool
+	tasks        []*transferTask
+	nextID       int
+	collapsed    bool
+	filter       int
+	displaySpeed float64
+	dockScroll   ui.ScrollState
+	dockHeight   float32
+	dockResizing bool
+	conflicts    []*fileConflict
+	locks        transferLocks
+	storePath    string
+	storeErr     error
+	quitting     bool
+	storing      bool
+	quitDone     []func(error)
 }
 
 type transferSummary struct {
@@ -83,7 +92,6 @@ func (q *transferQueueState) summary() transferSummary {
 	return s
 }
 
-// The prototype advances only its in-memory queue; no host or local file is written.
 func (a *app) enqueueFiles(
 	c *ui.Context,
 	session *fileSession,
@@ -91,85 +99,44 @@ func (a *app) enqueueFiles(
 	entries []fileEntry,
 	targetPath string,
 ) {
-	q := &a.transfers
+	var snapshot *fileSession
 	for _, entry := range entries {
-		q.nextID++
-		source := session.local.path
-		if sourceRemote {
-			source = session.remote.path
+		if !transferSafeName(entry.name) {
+			uikit.Toast(c, uikit.ToastProps{ID: "transfer-invalid-name", Tone: uikit.ToneDanger,
+				Title: "文件名不能安全地用于目标路径", Detail: entry.name})
+			continue
 		}
+		if snapshot == nil {
+			snapshot = a.snapshotTransferSession(session)
+		}
+		a.transfers.nextID++
 		sourcePath := entry.path
 		if sourcePath == "" {
-			sourcePath = path.Join(source, entry.name)
+			pane := session.local
+			if sourceRemote {
+				pane = session.remote
+			}
+			sourcePath = transferJoin(sourceRemote, pane.path, entry.name)
 		}
-		total := max(entry.size, 1)
-		speed := min(
-			float64(theme.Current().C.TransferRow.DemoBytesPerSecond),
-			float64(total)/minimumDemoTransferTime.Seconds(),
-		)
-		q.tasks = append(q.tasks, &transferTask{
-			id: q.nextID, session: session, entry: entry, sourceRemote: sourceRemote,
-			sourcePath: sourcePath, targetPath: targetPath,
-			state: transferQueued, total: total, speed: speed,
-		})
+		task := &transferTask{id: a.transfers.nextID, session: snapshot, view: session, entry: entry,
+			sourceRemote: sourceRemote, sourcePath: sourcePath, targetPath: targetPath, state: transferQueued}
+		task.job = &transferJob{sourceRemote: sourceRemote, sourcePath: sourcePath,
+			targetPath: targetPath, name: entry.name, policy: transferPolicy(a.prefs.ConflictPolicy),
+			temporary: map[string]struct{}{}}
+		a.transfers.tasks = append(a.transfers.tasks, task)
 	}
-	q.lastTick = c.Now()
-	c.AnimationFrame()
+	a.scheduleTransfers()
 }
 
 func (a *app) tickTransfers(c *ui.Context) {
-	q := &a.transfers
-	now := c.Now()
-	elapsed := now.Sub(q.lastTick)
-	if q.lastTick.IsZero() {
-		elapsed = 0
-	}
-	q.lastTick = now
-	running := 0
-	for _, task := range q.tasks {
-		if task.state != transferRunning {
-			continue
-		}
-		if task.session.state != connected {
-			task.state, task.errorText = transferFailed, "连接已断开（演示）"
+	a.advanceTransferConflicts()
+	for _, task := range a.transfers.tasks {
+		if task.failureNotice {
+			task.failureNotice = false
 			a.transferFailureNotice(c, task)
-			continue
-		}
-		progress := task.fraction + task.speed*elapsed.Seconds()
-		bytes := int64(progress)
-		task.fraction = progress - float64(bytes)
-		task.transferred = min(task.total, task.transferred+bytes)
-		if task.transferred == task.total {
-			task.state, task.completed = transferDone, now
-			a.completeFileTransfer(task)
-			continue
-		}
-		running++
-	}
-	for _, task := range q.tasks {
-		if running >= a.prefs.TransferParallel {
-			break
-		}
-		if task.state == transferQueued {
-			if task.session.state != connected {
-				task.state, task.errorText = transferFailed, "连接已断开（演示）"
-				a.transferFailureNotice(c, task)
-				continue
-			}
-			task.state = transferRunning
-			if task.started.IsZero() {
-				task.started = now
-			}
-			running++
 		}
 	}
-	summary := q.summary()
-	if summary.speed == 0 || now.Sub(q.speedAt) >= theme.Current().C.TransferRow.SpeedInterval {
-		q.displaySpeed, q.speedAt = summary.speed, now
-	}
-	if running > 0 {
-		c.AnimationFrame()
-	}
+	a.scheduleTransfers()
 }
 
 func transferBytes(bytes int64) string {
@@ -351,8 +318,8 @@ func (a *app) transferRow(c *ui.Context, task *transferTask) {
 		Key: task.id, Name: task.entry.name, SourcePath: task.sourcePath,
 		TargetPath: path.Join(task.targetPath, task.entry.name),
 		Amount:     transferBytes(task.transferred) + " / " + transferBytes(task.total),
-		Percent:    fmt.Sprintf("%d%%", task.transferred*100/task.total),
-		Value:      float32(task.transferred) / float32(task.total),
+		Percent:    fmt.Sprintf("%d%%", int(transferFraction(task)*100)),
+		Value:      transferFraction(task),
 		State:      states[task.state], Download: task.sourceRemote, Zebra: task.id%2 == 0,
 		Speed: "0 B/s", Remaining: "剩余 —", Error: task.errorText,
 		Motion: uikit.MotionOverride(a.reduceMotion(c)),
@@ -367,27 +334,19 @@ func (a *app) transferRow(c *ui.Context, task *transferTask) {
 	}
 	result := uikit.TransferRow(c, &view)
 	menu := []uikit.MenuEntry{}
-	if task.state == transferRunning {
-		menu = append(menu, uikit.MenuEntry{ID: "simulate-error", Label: "模拟权限错误", Icon: uikit.IconAlertCircle, OnChoose: func() {
-			task.state, task.errorText = transferFailed, "权限不足：目标目录不可写（演示）"
-			a.transferFailureNotice(c, task)
-		}})
-	}
 	menu = append(menu, uikit.MenuEntry{ID: "reveal", Label: "在文件夹中显示", Icon: uikit.IconFolder, OnChoose: func() { a.revealTransferredFile(c, task) }})
 	uikit.RowMenu(result.Root, menu)
 	if result.Root.DoubleClicked() || result.Reveal {
 		a.revealTransferredFile(c, task)
 	}
 	if result.Pause {
-		task.state = transferPaused
+		a.pauseTransfer(task)
 	}
 	if result.Resume || result.Retry {
-		task.state, task.errorText = transferQueued, ""
-		a.transfers.lastTick = c.Now()
-		c.AnimationFrame()
+		a.resumeTransfer(task)
 	}
 	if result.Cancel {
-		a.transfers.tasks = slices.DeleteFunc(a.transfers.tasks, func(candidate *transferTask) bool { return candidate == task })
+		a.cancelTransfer(task)
 	}
 }
 
@@ -398,9 +357,7 @@ func (a *app) transferFailureNotice(c *ui.Context, task *transferTask) {
 			if !slices.Contains(a.transfers.tasks, task) {
 				return
 			}
-			task.state, task.errorText = transferQueued, ""
-			a.transfers.lastTick = c.Now()
-			c.AnimationFrame()
+			a.resumeTransfer(task)
 		},
 	})
 }
@@ -411,13 +368,10 @@ func (a *app) pauseAllTransfers(c *ui.Context) {
 	resume := s.running+s.queued == 0 && s.paused > 0
 	for _, task := range q.tasks {
 		if resume && task.state == transferPaused {
-			task.state = transferQueued
-			continue
-		}
-		if !resume && (task.state == transferRunning || task.state == transferQueued) {
-			task.state = transferPaused
+			a.resumeTransfer(task)
+		} else if !resume && (task.state == transferRunning || task.state == transferQueued) {
+			a.pauseTransfer(task)
 		}
 	}
-	q.lastTick = c.Now()
-	c.AnimationFrame()
+	a.scheduleTransfers()
 }

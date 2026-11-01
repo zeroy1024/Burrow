@@ -25,6 +25,10 @@
 
 系统文件/目录选择器及仍由操作系统绘制的原生菜单不属于应用内滚动节点，不修改macOS界面。
 
+## 真实终端后端差异（2026-11-02）
+
+以上原型统一清单中的真实SSH正文现由MyGo原生VT View绘制。它不提供公开滚动状态/getter/setter，因此无法交给UIKit `Scrollbars`，这一消费者为**部分接入**；不能继续把旧演示文字Scroll的统一结果当作真实终端已验收。SDK提供原生历史滚动和自身滚动条，其余页面/表格/Modal仍用本清单的共享实现。没有通过私有接口、重建会话或伪造ScrollState隐藏差异。
+
 ## 实现与边界
 
 - `Scrollbars(c, host, scroller, offset, props)`装饰原有Scroll/List节点，不在其数据行外新增父层；原生wheel、keyboard、惯性和List锚点继续由SDK处理。

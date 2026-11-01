@@ -28,6 +28,7 @@ func (a *app) titleBar(c *ui.Context, shown float32) {
 			StripInput: func(ev ui.InputEvent) bool {
 				if ev.Kind == ui.InputPointerDown && ev.Button == 0 {
 					a.tabPress = ui.Point{X: ev.X, Y: ev.Y}
+					a.captureTerminalTabPress(ev)
 				}
 				return false
 			},
@@ -59,6 +60,7 @@ func (a *app) titleBar(c *ui.Context, shown float32) {
 				return add
 			},
 		})
+		tabs.Scroller.DrawOver(func(_ *ui.Painter, _ ui.Rect) { a.terminalCapture.strip = tabs.Scroller.Bounds() })
 		a.tabStripTarget(c, tabs, add)
 		if tabs.Select >= 0 {
 			a.selectTab(tabs.Select)
@@ -74,11 +76,11 @@ func (a *app) tabButton(c *ui.Context, list ui.Element, index int, tab *workspac
 	t := theme.Current()
 	var pendingAction func()
 	session := tab.focused
-	h := a.hosts[session.host]
+	h := session.endpoint
 	hint := fmt.Sprintf("%s@%s:%d", h.user, h.address, h.port)
 	switch session.state {
 	case connecting:
-		hint = "正在连接 " + h.address + "…（演示）"
+		hint = "正在连接 " + h.address + "…"
 	case disconnected:
 		hint = "已断开 · 可从菜单重新连接"
 	}
@@ -103,7 +105,7 @@ func (a *app) tabButton(c *ui.Context, list ui.Element, index int, tab *workspac
 			if m.Item(localize(c, "拆分会话")).Disabled(a.drag != nil || !tab.canSeparateSessions()).Chosen() {
 				pendingAction = func() { a.ungroupTab(tab) }
 			}
-		} else if m.Item("编辑会话…").Chosen() {
+		} else if m.Item("编辑会话…").Disabled(current.temporary || current.host < 0).Chosen() {
 			a.startEditHostDraft(current.host)
 		}
 		m.Separator()

@@ -12,8 +12,11 @@ import (
 )
 
 type closedWorkspaceTab struct {
-	host    hostID
-	section section
+	endpoint   host
+	temporary  bool
+	connection *sshConnectionGroup
+	host       hostID
+	section    section
 }
 
 func (a *app) navigationSelected(target section) bool {
@@ -108,9 +111,15 @@ func (a *app) appShortcuts(c *ui.Context) {
 		a.closedTabs = a.closedTabs[:len(a.closedTabs)-1]
 		a.switchSection(closed.section)
 		if closed.section == sectionFiles {
-			a.openNewFileHost(closed.host)
+			session := a.newFileSession(closed.host, closed.endpoint, closed.temporary, closed.connection)
+			a.fileSessions = append(a.fileSessions, session)
+			a.activeFile = len(a.fileSessions) - 1
+			a.reconnectFileSession(session)
 		} else {
-			a.openHost(closed.host)
+			session := a.newShellSession(closed.host, closed.endpoint, closed.temporary, closed.connection)
+			a.nextTab++
+			a.tabs = append(a.tabs, &workspaceTab{id: a.nextTab, root: &terminalLayout{session: session}, focused: session})
+			a.activateTab(len(a.tabs) - 1)
 		}
 	}
 	if a.settingsUI.open {
@@ -121,7 +130,7 @@ func (a *app) appShortcuts(c *ui.Context) {
 	}
 	if a.section == sectionSSH && a.actionPressed(c, "pane.split") && a.currentTab() != nil {
 		tab := a.currentTab()
-		bounds := tab.focused.scroll.offset.Bounds(c)
+		bounds := tab.focused.layoutRect
 		a.splitSession(tab.focused, tab.root.count() > 1 && bounds.H > bounds.W)
 	}
 	if count > 0 {
@@ -202,7 +211,7 @@ func (a *app) closeTabDialog(c *ui.Context) {
 		a.closeRequest, a.closeFileRequest = nil, nil
 		if fileRequest != nil {
 			if index := slices.Index(a.fileSessions, fileRequest); index >= 0 {
-				a.closedTabs = append(a.closedTabs, closedWorkspaceTab{host: fileRequest.host, section: sectionFiles})
+				a.closedTabs = append(a.closedTabs, closedWorkspaceTab{host: fileRequest.host, section: sectionFiles, endpoint: cloneHostEndpoint(fileRequest.endpoint), temporary: fileRequest.temporary, connection: fileRequest.connection})
 				a.closeFileSession(index)
 				a.afterLastTabClosed()
 			}
@@ -235,7 +244,7 @@ func (a *app) requestCloseFileTab(index int) {
 		a.closeFileRequest, a.closeRequest = session, nil
 		return
 	}
-	a.closedTabs = append(a.closedTabs, closedWorkspaceTab{host: session.host, section: sectionFiles})
+	a.closedTabs = append(a.closedTabs, closedWorkspaceTab{host: session.host, section: sectionFiles, endpoint: cloneHostEndpoint(session.endpoint), temporary: session.temporary, connection: session.connection})
 	a.closeFileSession(index)
 	a.afterLastTabClosed()
 }

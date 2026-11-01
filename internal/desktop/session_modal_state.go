@@ -393,19 +393,17 @@ func (a *app) startDraftTest(c *ui.Context, d *hostDraft) {
 			return
 		}
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), theme.Current().Motion.Duration.Test)
+	ctx, cancel := context.WithTimeout(a.ctx, theme.Current().Motion.Duration.Test)
 	results := make(chan connectionTestResult, 1)
 	d.testCancel, d.testResults, d.testResult, d.testVisible = cancel, results, nil, true
 	c.Announce("正在连接…")
 	passphrase := d.passphrase
 	passphraseEdited := d.passphraseChanged
-	snapshot := *a
-	snapshot.hosts = slices.Clone(a.hosts)
-	snapshot.keys = slices.Clone(a.keys)
-	go func() {
+	test := a.prepareConnectionTest(h, password, passphrase, passphraseEdited)
+	a.sshWorkers.Go(func() {
 		defer cancel()
-		results <- snapshot.testConnection(ctx, h, password, passphrase, passphraseEdited)
-	}()
+		results <- test(ctx)
+	})
 	c.AnimationFrame()
 }
 

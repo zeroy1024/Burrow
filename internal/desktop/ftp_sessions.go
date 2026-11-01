@@ -8,19 +8,25 @@ import (
 	"sshdesk/internal/theme"
 	"sshdesk/internal/uikit"
 
-	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
 )
 
 type fileSession struct {
-	config      sessionConfig
-	id          int
-	host        hostID
-	state       connectionState
-	errorText   string
-	connectedAt time.Time
-	local       *filePaneState
-	remote      *filePaneState
+	endpoint     host
+	temporary    bool
+	connection   *sshConnectionGroup
+	runtime      *fileRuntime
+	localRuntime *fileRuntime
+	sshPeer      *remoteSession
+	ftpSecret    string
+	config       sessionConfig
+	id           int
+	host         hostID
+	state        connectionState
+	errorText    string
+	connectedAt  time.Time
+	local        *filePaneState
+	remote       *filePaneState
 }
 
 func (a *app) currentFileSession() *fileSession {
@@ -54,29 +60,37 @@ func (a *app) openFileHost(id hostID) {
 	a.openNewFileHost(id)
 }
 
-func (a *app) openNewFileHost(id hostID) {
+func (a *app) newFileSession(id hostID, endpoint host, temporary bool, connection *sshConnectionGroup) *fileSession {
+	endpoint = cloneHostEndpoint(endpoint)
+	if endpoint.session.Files == nil {
+		endpoint.session.Files = &fileOptions{Encoding: "UTF-8"}
+	}
 	a.nextFileSession++
+	if connection == nil && endpoint.protocol != "ftp" {
+		connection = a.newSSHGroup(endpoint)
+	}
 	session := &fileSession{
-		config: a.hosts[id].session,
-		id:     a.nextFileSession, host: id, state: connecting, connectedAt: time.Now(),
+		id: a.nextFileSession, host: id, endpoint: endpoint, config: endpoint.session,
+		temporary: temporary, connection: connection,
 		local: newFilePane(false), remote: newFilePane(true),
 	}
 	a.restoreFileSession(session)
+	return session
+}
+
+func (a *app) openNewFileHost(id hostID) {
+	session := a.newFileSession(id, a.hosts[id], false, nil)
 	a.fileSessions = append(a.fileSessions, session)
 	a.activeFile = len(a.fileSessions) - 1
+	a.startFileSession(session, false)
 	if a.activeSection() == sectionFiles {
 		a.focusWorkspace()
 	}
 }
 
-func (a *app) reconnectFileSession(session *fileSession) {
-	session.config = a.hosts[session.host].session
-	a.restoreFileSession(session)
-	session.state, session.errorText = connecting, ""
-	session.connectedAt = time.Now()
-}
-
 func (a *app) closeFileSession(index int) {
+	a.disconnectFileSession(a.fileSessions[index])
+	a.closeLocalFiles(a.fileSessions[index])
 	closedActive := index == a.activeFile
 	a.fileSessions = slices.Delete(a.fileSessions, index, index+1)
 	switch {
@@ -89,20 +103,6 @@ func (a *app) closeFileSession(index int) {
 	}
 	if closedActive && len(a.fileSessions) > 0 && a.activeSection() == sectionFiles {
 		a.focusWorkspace()
-	}
-}
-
-func (a *app) updateFileConnections(c *ui.Context) {
-	for _, session := range a.fileSessions {
-		if session.state != connecting {
-			continue
-		}
-		remaining := theme.Current().C.Tab.SpinnerPeriod - c.Now().Sub(session.connectedAt)
-		if remaining <= 0 {
-			session.state = connected
-			continue
-		}
-		c.After(remaining)
 	}
 }
 
@@ -151,12 +151,12 @@ func (a *app) fileTitleBar(c *ui.Context, shown float32) {
 }
 
 func (a *app) fileTabButton(c *ui.Context, list ui.Element, index int, session *fileSession) bool {
-	h := a.hosts[session.host]
+	h := session.endpoint
 	selected := a.activeFile == index
-	hint := fmt.Sprintf("%s@%s:%d · 演示会话", h.user, h.address, h.port)
+	hint := fmt.Sprintf("%s@%s:%d", h.user, h.address, h.port)
 	switch session.state {
 	case connecting:
-		hint = "正在连接 " + h.address + "…（演示）"
+		hint = "正在连接 " + h.address + "…"
 	case disconnected:
 		hint = "已断开 · 选择后可重新连接"
 	case connectionFailed:
@@ -177,20 +177,16 @@ func (a *app) fileTabButton(c *ui.Context, list ui.Element, index int, session *
 	})
 	closing := input.Close
 	button.ContextMenu(func(m *ui.Menu) {
-		if m.Item("编辑会话…").Chosen() {
+		if m.Item("编辑会话…").Disabled(session.temporary || session.host < 0).Chosen() {
 			a.startEditHostDraft(session.host)
 		}
 		m.Separator()
 		if session.state == connected || session.state == connecting {
 			if m.Item("断开文件会话").Chosen() {
-				session.state = disconnected
+				a.disconnectFileSession(session)
 			}
 		} else if m.Item("重新连接").Chosen() {
 			a.reconnectFileSession(session)
-		}
-		m.Separator()
-		if m.Item("模拟连接失败").Chosen() {
-			session.state, session.errorText = connectionFailed, "认证被拒绝（演示错误）"
 		}
 		m.Separator()
 		if m.Item("关闭选项卡").Chosen() {
@@ -235,6 +231,13 @@ func (a *app) deleteFileSite(id hostID) error {
 			return fmt.Errorf("会话正被「%s」用作跳板机，请先修改该会话", h.name)
 		}
 	}
+	for _, group := range a.runtimeSSHGroups() {
+		for _, step := range group.plan.steps {
+			if options := step.endpoint.session.SSH; options != nil && options.JumpHostID == deleted.session.ID {
+				return fmt.Errorf("运行会话仍将此条目用作跳板机，请先关闭相关会话和传输")
+			}
+		}
+	}
 	if err := a.commitCatalogMove(func() {
 		a.hosts = slices.Delete(a.hosts, int(id), int(id)+1)
 		for _, group := range a.groups {
@@ -275,7 +278,9 @@ func (a *app) deleteFileSite(id hostID) error {
 		remainingFiles[task.session] = true
 	}
 	for session := range remainingFiles {
-		if session.host > id {
+		if session.host == id {
+			session.host, session.temporary = -1, true
+		} else if session.host > id {
 			session.host--
 		}
 	}
@@ -283,6 +288,7 @@ func (a *app) deleteFileSite(id hostID) error {
 		tab := a.tabs[i]
 		for _, session := range tab.root.sessions() {
 			if session.host == id {
+				releaseSSH(session)
 				tab.root = tab.root.remove(session)
 				if tab.focused == session && tab.root != nil {
 					tab.focused = tab.root.firstSession()
@@ -301,10 +307,8 @@ func (a *app) deleteFileSite(id hostID) error {
 			a.closedTabs[i].host--
 		}
 	}
-	if deleted.session.PasswordSaved {
-		if err := mygo.Secrets.Delete("session/" + deleted.session.ID + "/password"); err != nil {
-			a.files.notice = &uikit.ToastProps{ID: "会话已移除，但钥匙串清理失败：" + err.Error(), Tone: uikit.ToneDanger, Title: "会话已移除，但钥匙串清理失败", Detail: err.Error()}
-		}
+	if err := deleteSessionCredentials(deleted.session.ID); err != nil {
+		a.files.notice = &uikit.ToastProps{ID: "会话已移除，但钥匙串清理失败：" + err.Error(), Tone: uikit.ToneDanger, Title: "会话已移除，但钥匙串清理失败", Detail: err.Error()}
 	}
 	return nil
 }

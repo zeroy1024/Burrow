@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 
@@ -29,7 +30,10 @@ type filePreferences struct {
 }
 
 func (a *app) fileSiteKey(session *fileSession) string {
-	return a.hosts[session.host].session.ID
+	if session.temporary {
+		return ""
+	}
+	return session.endpoint.session.ID
 }
 
 func (a *app) restoreFileSession(session *fileSession) {
@@ -41,15 +45,19 @@ func (a *app) restoreFileSession(session *fileSession) {
 		if options.RemoteDir != "" {
 			session.remote.path = options.RemoteDir
 			session.remote.history = []string{options.RemoteDir}
+			session.remote.historyIndex = 0
 		}
 	}
 	if local != "" {
 		session.local.path = local
 		session.local.history = []string{local}
+		session.local.historyIndex = 0
 	}
-	if local := a.files.localPaths[a.fileSiteKey(session)]; local != "" {
+	if key := a.fileSiteKey(session); key != "" && a.files.localPaths[key] != "" {
+		local := a.files.localPaths[key]
 		session.local.path = local
 		session.local.history = []string{local}
+		session.local.historyIndex = 0
 	}
 }
 
@@ -65,8 +73,17 @@ func (a *app) readFilePreferences() error {
 	}
 	a.filePrefs.path = filepath.Join(filepath.Dir(a.catalogConfig.path), "files.json")
 	data, err := os.ReadFile(a.filePrefs.path)
+	legacy := false
 	if errors.Is(err, os.ErrNotExist) {
-		return nil
+		legacyPath := filepath.Join(filepath.Dir(a.catalogConfig.legacyPath), "files.json")
+		if a.catalogConfig.legacyPath == "" || legacyPath == a.filePrefs.path {
+			return nil
+		}
+		data, err = os.ReadFile(legacyPath)
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		legacy = true
 	}
 	if err != nil {
 		return err
@@ -84,22 +101,32 @@ func (a *app) readFilePreferences() error {
 	if prefs.TransferDockHeight < 0 {
 		return fmt.Errorf("transferDockHeight 不能为负数")
 	}
+	if prefs.LocalPathKeysVersion != 0 && prefs.LocalPathKeysVersion != 1 {
+		return fmt.Errorf("不支持的站点本地路径版本 %d", prefs.LocalPathKeysVersion)
+	}
 	if prefs.LocalPathKeysVersion == 0 && a.catalogConfig.loadErr != nil {
 		return fmt.Errorf("会话配置读取失败，无法迁移站点本地路径：%w", a.catalogConfig.loadErr)
 	}
 	a.files.localOpen, a.files.ratio = prefs.LocalPaneOpen, prefs.LocalRatio
+	a.files.localPaths = map[string]string{}
 	if prefs.LocalPaths != nil {
-		a.files.localPaths = prefs.LocalPaths
-		if prefs.LocalPathKeysVersion == 0 {
+		if prefs.LocalPathKeysVersion == 1 {
+			a.files.localPaths = maps.Clone(prefs.LocalPaths)
+		} else {
 			for _, h := range a.hosts {
 				if h.protocol != "sftp" && h.protocol != "ftp" {
 					continue
 				}
-				if _, exists := a.files.localPaths[h.session.ID]; exists {
+				if local := prefs.LocalPaths[h.session.ID]; local != "" {
+					a.files.localPaths[h.session.ID] = local
+					continue
+				}
+				if h.session.Files != nil && h.session.Files.LocalDir != "" {
+					a.files.localPaths[h.session.ID] = h.session.Files.LocalDir
 					continue
 				}
 				address := fmt.Sprintf("%s@%s:%d", h.user, h.address, h.port)
-				if path, exists := a.files.localPaths[address]; exists {
+				if path, exists := prefs.LocalPaths[address]; exists {
 					a.files.localPaths[h.session.ID] = path
 				}
 			}
@@ -108,7 +135,7 @@ func (a *app) readFilePreferences() error {
 	a.transfers.collapsed, a.transfers.filter = prefs.TransferDockCollapsed, prefs.TransferFilter
 	a.transfers.dockHeight = prefs.TransferDockHeight
 	// Finish migration before newly created sites could inherit an old address key.
-	if prefs.LocalPathKeysVersion == 0 {
+	if prefs.LocalPathKeysVersion == 0 || legacy {
 		if err := a.writeFilePreferences(); err != nil {
 			return fmt.Errorf("迁移站点本地路径失败：%w", err)
 		}

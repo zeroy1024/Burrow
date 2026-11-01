@@ -156,7 +156,7 @@ Swap:         2.0Gi       0B    2.0Gi
 }
 
 func (a *app) terminalLines(c *ui.Context, session *remoteSession, focused bool) {
-	h := a.hosts[session.host]
+	h := session.endpoint
 	scheme, prefs := a.sessionScheme(session), a.terminal.prefs
 	column := ui.Column(c).FillWidth().MinWidth(0).Selectable().SelectionColor(uikit.Color(scheme.SelectionBg))
 	if session.contentWidth > 0 {
@@ -225,6 +225,9 @@ func (a *app) terminalDragContents(
 	viewport terminalDragViewport,
 	width, height float32,
 ) {
+	if a.nativeTerminalDragContents(c, session, viewport, width, height) {
+		return
+	}
 	t := theme.Current()
 	prefs, scheme := a.terminal.prefs, a.sessionScheme(session)
 	colors := uikit.ResolveTerminalColors(scheme, prefs.Background)
@@ -255,7 +258,7 @@ func (a *app) terminalDragContents(
 					return
 				}
 				ui.Row(c).FillWidth().MinWidth(0).AlignItems(ui.End).PassThrough().Children(func() {
-					h := a.hosts[session.host]
+					h := session.endpoint
 					prompt := terminalLine{
 						{Text: h.user + "@" + h.name, Foreground: terminalIndexed(2), Bold: true},
 						{Text: ":/srv/app", Foreground: terminalIndexed(4), Bold: true},

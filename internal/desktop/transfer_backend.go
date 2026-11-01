@@ -1,0 +1,926 @@
+package desktop
+
+import (
+	"context"
+	"crypto/rand"
+	"encoding/hex"
+	"errors"
+	"fmt"
+	"io"
+	"io/fs"
+	"math"
+	"os"
+	"path"
+	"path/filepath"
+	"slices"
+	"strconv"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
+
+	"sshdesk/internal/fileclient"
+)
+
+var errTransferConflictCanceled = errors.New("传输已取消")
+
+type transferConflictChoice struct {
+	choice   int
+	applyAll bool
+}
+
+type transferClientResult struct {
+	client fileclient.Client
+	err    error
+}
+
+type transferRun struct {
+	ctx            context.Context
+	cancel         context.CancelFunc
+	request        *sshConnectionRequest
+	ready          chan transferClientResult
+	bytes          atomic.Int64
+	written        atomic.Int64
+	total          atomic.Int64
+	awaitingClient bool
+}
+
+// A job and its manifest have one worker owner at a time. The next attempt only
+// starts after the preceding worker has returned and its UI callback ran.
+type transferJob struct {
+	sourceRemote           bool
+	sourcePath, targetPath string
+	name, destinationKey   string
+	policy                 int
+	root                   *transferNode
+	total, doneBytes       int64
+	temporary              map[string]struct{}
+}
+
+type transferNode struct {
+	source, destination, temporary string
+	entry                          fileclient.Entry
+	children                       []*transferNode
+	approved                       *fileclient.Entry
+	total                          int64
+	done, skipped                  bool
+}
+
+func transferPolicy(policy string) int {
+	return map[string]int{"overwrite": 1, "skip": 2, "rename": 3}[policy]
+}
+
+func transferFraction(task *transferTask) float32 {
+	if task.state == transferDone {
+		return 1
+	}
+	if task.total == 0 {
+		return 0
+	}
+	return float32(min(max(float64(task.transferred)/float64(task.total), 0), 1))
+}
+
+func (a *app) scheduleTransfers() {
+	if a.ctx.Err() != nil || a.transfers.quitting {
+		return
+	}
+	active := 0
+	for _, task := range a.transfers.tasks {
+		if task.run != nil {
+			active++
+		}
+	}
+	for _, task := range a.transfers.tasks {
+		if active >= a.prefs.TransferParallel {
+			break
+		}
+		if task.state != transferQueued || task.run != nil || task.removeRequested {
+			continue
+		}
+		if task.session.endpoint.protocol == "ftp" && task.session.endpoint.session.Auth != "anonymous" && task.session.ftpSecret == "" {
+			waiting := slices.ContainsFunc(a.transfers.tasks, func(other *transferTask) bool {
+				return other.session == task.session && other.run != nil && other.run.awaitingClient
+			})
+			if waiting {
+				continue
+			}
+		}
+		a.startTransfer(task, false)
+		active++
+	}
+}
+
+func (a *app) startTransfer(task *transferTask, cleanup bool) {
+	ctx, cancel := context.WithCancel(a.ctx)
+	run := &transferRun{ctx: ctx, cancel: cancel, ready: make(chan transferClientResult, 1), awaitingClient: true}
+	task.run, task.speed = run, 0
+	if !cleanup {
+		task.state, task.errorText = transferRunning, ""
+		if task.started.IsZero() {
+			task.started = time.Now()
+		}
+	}
+	job := task.job
+	if job.destinationKey == "" {
+		job.destinationKey = "local"
+		if !job.sourceRemote {
+			h := task.session.endpoint
+			job.destinationKey = fmt.Sprintf("%q/%q/%q/%d", h.protocol, h.user, h.address, h.port)
+		}
+	}
+	locks := &a.transfers.locks
+	// Start the worker before requesting a client: context cancellation must
+	// release it even if an application-exit UI callback is never delivered.
+	a.sshWorkers.Go(func() {
+		var remote fileclient.Client
+		var err error
+		if cleanup && job.sourceRemote {
+			// Download staging files live locally; no authentication is needed.
+		} else {
+			select {
+			case result := <-run.ready:
+				remote, err = result.client, result.err
+			case <-ctx.Done():
+				err = ctx.Err()
+			}
+		}
+		local := fileclient.NewLocal()
+		if err == nil {
+			err = ctx.Err()
+		}
+		if err == nil {
+			source, target := local, remote
+			if job.sourceRemote {
+				source, target = remote, local
+			}
+			if cleanup {
+				err = cleanupTransferFiles(ctx, target, job)
+			} else {
+				stopProgress := make(chan struct{})
+				a.sshWorkers.Go(func() { a.trackTransferProgress(task, run, stopProgress) })
+				err = a.performTransfer(ctx, task, run, job, source, target, locks)
+				close(stopProgress)
+			}
+		}
+		closeErr := local.Close()
+		if remote != nil {
+			closeErr = errors.Join(closeErr, remote.Close())
+		}
+		if err == nil {
+			err = closeErr
+		}
+		if a.ctx.Err() != nil {
+			return
+		}
+		a.window.Update(func() { a.finishTransfer(task, run, cleanup, err) })
+	})
+	if cleanup && job.sourceRemote {
+		run.awaitingClient = false
+		return
+	}
+	if task.session.endpoint.protocol == "ftp" && task.session.ftpSecret == "" && sameTransferView(task.view, task.session) {
+		task.session.ftpSecret = task.view.ftpSecret
+	}
+	run.request = a.openFileClient(ctx, task.session, func(client fileclient.Client, err error) {
+		if ctx.Err() != nil {
+			if client != nil {
+				client.Close()
+			}
+			return
+		}
+		run.awaitingClient = false
+		run.ready <- transferClientResult{client, err}
+		a.scheduleTransfers()
+	})
+}
+
+// A browser's explicit reconnect may adopt edited saved settings. Jobs retain
+// this private snapshot and the original shared transport group independently.
+func (a *app) snapshotTransferSession(view *fileSession) *fileSession {
+	snapshot := a.newFileSession(view.host, view.endpoint, view.temporary, view.connection)
+	snapshot.ftpSecret = view.ftpSecret
+	snapshot.local.path, snapshot.remote.path = view.local.path, view.remote.path
+	snapshot.local.history, snapshot.remote.history = slices.Clone(view.local.history), slices.Clone(view.remote.history)
+	snapshot.local.historyIndex, snapshot.remote.historyIndex = view.local.historyIndex, view.remote.historyIndex
+	return snapshot
+}
+
+func sameTransferView(view, snapshot *fileSession) bool {
+	if view == nil {
+		return false
+	}
+	one, two := view.endpoint, snapshot.endpoint
+	if one.address != two.address || one.port != two.port || one.user != two.user || one.protocol != two.protocol ||
+		one.session.ID != two.session.ID || one.session.Auth != two.session.Auth || one.session.KeyID != two.session.KeyID ||
+		one.session.PasswordSaved != two.session.PasswordSaved || one.session.PasswordRevision != two.session.PasswordRevision || !one.session.UpdatedAt.Equal(two.session.UpdatedAt) {
+		return false
+	}
+	if (one.session.Files == nil) != (two.session.Files == nil) ||
+		one.session.Files != nil && *one.session.Files != *two.session.Files {
+		return false
+	}
+	return one.protocol == "ftp" || view.connection == snapshot.connection
+}
+
+func (a *app) trackTransferProgress(task *transferTask, run *transferRun, stopped <-chan struct{}) {
+	ticker := time.NewTicker(200 * time.Millisecond)
+	defer ticker.Stop()
+	previous, previousAt := int64(0), time.Now()
+	for {
+		select {
+		case now := <-ticker.C:
+			bytes, total, written := run.bytes.Load(), run.total.Load(), run.written.Load()
+			speed := float64(max(written-previous, 0)) / now.Sub(previousAt).Seconds()
+			previous, previousAt = written, now
+			a.window.Update(func() {
+				if task.run != run || run.ctx.Err() != nil {
+					return
+				}
+				task.transferred, task.total, task.speed = bytes, total, speed
+				a.transfers.displaySpeed = a.transfers.summary().speed
+			})
+		case <-stopped:
+			return
+		case <-run.ctx.Done():
+			return
+		}
+	}
+}
+
+func (a *app) finishTransfer(task *transferTask, run *transferRun, cleanup bool, err error) {
+	if task.run != run {
+		return
+	}
+	task.run = nil
+	run.cancel()
+	cancelSSHRequest(run.request)
+	task.speed = 0
+	if cleanup {
+		if err == nil {
+			a.transfers.tasks = slices.DeleteFunc(a.transfers.tasks, func(candidate *transferTask) bool { return candidate == task })
+		} else {
+			task.removeRequested, task.cleanupPending = false, true
+			task.state, task.errorText = transferFailed, "取消后的临时文件清理失败："+err.Error()
+			task.failureNotice = true
+		}
+	} else {
+		task.transferred, task.total = run.bytes.Load(), run.total.Load()
+		if task.removeRequested || errors.Is(err, errTransferConflictCanceled) {
+			task.removeRequested = true
+			if len(task.job.temporary) == 0 {
+				a.transfers.tasks = slices.DeleteFunc(a.transfers.tasks, func(candidate *transferTask) bool { return candidate == task })
+			} else if a.transfers.quitting {
+				task.removeRequested, task.cleanupPending = false, true
+				task.state, task.errorText = transferFailed, "取消后的临时文件等待清理"
+			} else {
+				a.startTransfer(task, true)
+			}
+		} else if task.state == transferPaused || task.state == transferQueued {
+			// A pause may already have been followed by resume. The old worker
+			// still has to finish before the new attempt can own its manifest.
+		} else if err != nil {
+			task.state, task.errorText, task.failureNotice = transferFailed, err.Error(), true
+		} else {
+			task.state, task.completed = transferDone, time.Now()
+			if destination := task.job.root.destination; destination != "" {
+				task.entry.name = transferBase(!task.sourceRemote, destination)
+				task.targetPath = transferDir(!task.sourceRemote, destination)
+			}
+			a.completeFileTransfer(task)
+		}
+	}
+	a.transfers.displaySpeed = a.transfers.summary().speed
+	a.advanceTransferConflicts()
+	a.scheduleTransfers()
+	a.finishTransferQuitIfReady()
+}
+
+func (a *app) pauseTransfer(task *transferTask) {
+	if task.removeRequested || task.cleanupPending {
+		return
+	}
+	task.state, task.speed = transferPaused, 0
+	a.transfers.displaySpeed = a.transfers.summary().speed
+	if task.run != nil {
+		task.run.cancel()
+		cancelSSHRequest(task.run.request)
+	}
+	a.advanceTransferConflicts()
+}
+
+func (a *app) resumeTransfer(task *transferTask) {
+	if a.transfers.quitting {
+		return
+	}
+	if task.state == transferRunning || task.state == transferDone {
+		return
+	}
+	if task.cleanupPending {
+		a.cancelTransfer(task)
+		return
+	}
+	if task.removeRequested {
+		return
+	}
+	task.state, task.errorText, task.failureNotice = transferQueued, "", false
+	a.scheduleTransfers()
+}
+
+func (a *app) cancelTransfer(task *transferTask) {
+	if a.transfers.quitting {
+		return
+	}
+	if task.removeRequested {
+		return
+	}
+	task.removeRequested, task.failureNotice = true, false
+	if task.run != nil {
+		task.run.cancel()
+		cancelSSHRequest(task.run.request)
+	} else if task.job == nil || len(task.job.temporary) == 0 {
+		a.transfers.tasks = slices.DeleteFunc(a.transfers.tasks, func(candidate *transferTask) bool { return candidate == task })
+		a.scheduleTransfers()
+	} else {
+		a.startTransfer(task, true)
+	}
+	a.advanceTransferConflicts()
+}
+
+func (a *app) performTransfer(ctx context.Context, task *transferTask, run *transferRun, job *transferJob,
+	source, target fileclient.Client, locks *transferLocks,
+) error {
+	if job.root == nil {
+		sourcePath, err := transferAbsolute(ctx, source, job.sourceRemote, job.sourcePath)
+		if err != nil {
+			return err
+		}
+		targetPath, err := transferAbsolute(ctx, target, !job.sourceRemote, job.targetPath)
+		if err != nil {
+			return err
+		}
+		if !transferSafeName(job.name) {
+			return errors.New("文件名不能安全地用于目标路径")
+		}
+		root, err := buildTransferManifest(ctx, source, job.sourceRemote, sourcePath)
+		if err != nil {
+			return err
+		}
+		job.root, job.total, job.sourcePath, job.targetPath = root, root.total, sourcePath, targetPath
+	}
+	run.total.Store(job.total)
+	run.bytes.Store(job.doneBytes)
+	var releases []func()
+	defer func() {
+		for _, release := range releases {
+			release()
+		}
+	}()
+	reserve := func(name string, directory bool) error {
+		release, err := locks.acquire(ctx, job.destinationKey, name, directory, job)
+		if err == nil {
+			releases = append(releases, release)
+		}
+		return err
+	}
+	return a.copyTransferNode(ctx, task, run, job, source, target, job.root,
+		transferJoin(!job.sourceRemote, job.targetPath, job.name), reserve)
+}
+
+func buildTransferManifest(ctx context.Context, client fileclient.Client, remote bool, source string) (*transferNode, error) {
+	return buildTransferManifestAt(ctx, client, remote, source, 0)
+}
+
+func buildTransferManifestAt(ctx context.Context, client fileclient.Client, remote bool, source string, depth int) (*transferNode, error) {
+	if depth > 256 {
+		return nil, errors.New("目录层级过深，已停止传输")
+	}
+	entry, err := client.Stat(ctx, source)
+	if err != nil {
+		return nil, err
+	}
+	if entry.Symlink {
+		return nil, fmt.Errorf("符号链接不会被递归跟随：%s", source)
+	}
+	if entry.Size < 0 {
+		return nil, fmt.Errorf("文件大小无效：%s", source)
+	}
+	node := &transferNode{source: source, entry: entry}
+	if !entry.Directory {
+		node.total = entry.Size
+		return node, nil
+	}
+	entries, err := client.ReadDir(ctx, source)
+	if err != nil {
+		return nil, err
+	}
+	seen := map[string]bool{}
+	for _, child := range entries {
+		if !transferSafeName(child.Name) || seen[child.Name] {
+			return nil, errors.New("目录响应包含无效或重复文件名")
+		}
+		seen[child.Name] = true
+		nested, err := buildTransferManifestAt(ctx, client, remote, transferJoin(remote, source, child.Name), depth+1)
+		if err != nil {
+			return nil, err
+		}
+		// The checked directory component determines the destination name; a
+		// protocol Stat response must not replace it with another server path.
+		nested.entry.Name = child.Name
+		if nested.total > math.MaxInt64-node.total {
+			return nil, errors.New("传输总大小超过支持范围")
+		}
+		node.total += nested.total
+		node.children = append(node.children, nested)
+	}
+	return node, nil
+}
+
+func (a *app) copyTransferNode(ctx context.Context, task *transferTask, run *transferRun, job *transferJob,
+	source, target fileclient.Client, node *transferNode, proposed string, reserve func(string, bool) error,
+) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if node.done || node.skipped {
+		return nil
+	}
+	fresh, err := source.Stat(ctx, node.source)
+	if err != nil {
+		return err
+	}
+	if fresh.Symlink || fresh.Directory != node.entry.Directory || (!fresh.Directory && !sameTransferEntry(fresh, node.entry)) {
+		return fmt.Errorf("源文件在传输期间已改变：%s", node.source)
+	}
+	if node.destination == "" {
+		destination, approved, skip, err := a.chooseTransferDestination(ctx, task, job, target,
+			proposed, node.entry, reserve)
+		if err != nil {
+			return err
+		}
+		if skip {
+			node.skipped = true
+			job.total -= node.total
+			run.total.Store(job.total)
+			return nil
+		}
+		node.destination, node.approved = destination, approved
+		if node == job.root {
+			a.publishTransferDestination(task, run, job.sourceRemote, destination)
+		}
+	} else if err := reserve(node.destination, node.entry.Directory); err != nil {
+		return err
+	}
+	if node.entry.Directory {
+		existing, err := target.Stat(ctx, node.destination)
+		if errors.Is(err, fs.ErrNotExist) {
+			err = target.Mkdir(ctx, node.destination)
+		} else if err == nil && (!existing.Directory || existing.Symlink) {
+			err = fmt.Errorf("目标不是普通目录：%s", node.destination)
+		}
+		if err != nil {
+			return err
+		}
+		for _, child := range node.children {
+			if err := a.copyTransferNode(ctx, task, run, job, source, target, child,
+				transferJoin(!job.sourceRemote, node.destination, child.entry.Name), reserve); err != nil {
+				return err
+			}
+		}
+		node.done = true
+		return nil
+	}
+	if node.temporary == "" {
+		var suffix [16]byte
+		if _, err := rand.Read(suffix[:]); err != nil {
+			return err
+		}
+		name := ".sshdesk-" + hex.EncodeToString(suffix[:]) + ".part"
+		temporary := transferJoin(!job.sourceRemote, transferDir(!job.sourceRemote, node.destination), name)
+		if temporary == node.destination {
+			return errors.New("临时文件名称与目标相同")
+		}
+		if _, err := target.Stat(ctx, temporary); !errors.Is(err, fs.ErrNotExist) {
+			if err == nil {
+				return errors.New("临时文件名称已被占用")
+			}
+			return err
+		}
+		node.temporary = temporary
+		job.temporary[node.temporary] = struct{}{}
+	}
+	offset := int64(0)
+	partial, err := target.Stat(ctx, node.temporary)
+	if err == nil {
+		if partial.Symlink || partial.Directory || partial.Size < 0 || partial.Size > node.entry.Size {
+			return fmt.Errorf("临时文件状态无效：%s", node.temporary)
+		}
+		offset = partial.Size
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
+	run.bytes.Store(job.doneBytes + offset)
+	// Even an empty file must create a real staging file before the rename.
+	if offset < node.entry.Size || (offset == 0 && errors.Is(err, fs.ErrNotExist)) {
+		input, err := source.OpenRead(ctx, node.source, offset)
+		if err != nil {
+			return err
+		}
+		output, err := target.OpenWrite(ctx, node.temporary, offset, offset == 0)
+		if err != nil {
+			return errors.Join(err, input.Close())
+		}
+		writer := transferCountingWriter{writer: output, bytes: &run.bytes, written: &run.written}
+		var reader io.Reader = input
+		if remaining := node.entry.Size - offset; remaining < math.MaxInt64 {
+			reader = io.LimitReader(input, remaining+1)
+		}
+		copied, copyErr := io.CopyBuffer(&writer, reader, make([]byte, 64<<10))
+		closeErr := errors.Join(output.Close(), input.Close())
+		if copyErr != nil || closeErr != nil {
+			return errors.Join(copyErr, closeErr)
+		}
+		if copied != node.entry.Size-offset {
+			return fmt.Errorf("源文件大小在传输期间已改变：%s", node.source)
+		}
+	}
+	fresh, err = source.Stat(ctx, node.source)
+	if err != nil {
+		return err
+	}
+	if !sameTransferEntry(fresh, node.entry) {
+		return fmt.Errorf("源文件在传输期间已改变：%s", node.source)
+	}
+	written, err := target.Stat(ctx, node.temporary)
+	if err != nil {
+		return err
+	}
+	if written.Symlink || written.Directory || written.Size != node.entry.Size {
+		return fmt.Errorf("目标临时文件大小不匹配：%s", node.temporary)
+	}
+	current, err := target.Stat(ctx, node.destination)
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
+	if err == nil && (node.approved == nil || !sameTransferEntry(current, *node.approved)) {
+		// The destination may have changed outside this application while bytes
+		// were copied. Apply the user's policy to that actual version as well.
+		destination, approved, skip, err := a.chooseTransferDestination(ctx, task, job, target,
+			node.destination, node.entry, reserve)
+		if err != nil {
+			return err
+		}
+		if skip {
+			if err := target.Remove(ctx, node.temporary, false); err != nil {
+				return err
+			}
+			delete(job.temporary, node.temporary)
+			node.temporary = ""
+			node.skipped = true
+			job.total -= node.total
+			run.total.Store(job.total)
+			run.bytes.Store(job.doneBytes)
+			return nil
+		}
+		node.destination, node.approved = destination, approved
+		if node == job.root {
+			a.publishTransferDestination(task, run, job.sourceRemote, destination)
+		}
+	}
+	if err := target.Rename(ctx, node.temporary, node.destination); err != nil {
+		return fmt.Errorf("提交传输文件失败（临时文件已保留）：%w", err)
+	}
+	delete(job.temporary, node.temporary)
+	node.temporary, node.done = "", true
+	job.doneBytes += node.entry.Size
+	run.bytes.Store(job.doneBytes)
+	return nil
+}
+
+func (a *app) publishTransferDestination(task *transferTask, run *transferRun, sourceRemote bool, destination string) {
+	name, directory := transferBase(!sourceRemote, destination), transferDir(!sourceRemote, destination)
+	a.window.Update(func() {
+		if task.run == run {
+			task.entry.name, task.targetPath = name, directory
+		}
+	})
+}
+
+type transferCountingWriter struct {
+	writer  io.Writer
+	bytes   *atomic.Int64
+	written *atomic.Int64
+}
+
+func (w *transferCountingWriter) Write(buffer []byte) (int, error) {
+	n, err := w.writer.Write(buffer)
+	w.bytes.Add(int64(n))
+	w.written.Add(int64(n))
+	return n, err
+}
+
+func (a *app) chooseTransferDestination(ctx context.Context, task *transferTask, job *transferJob,
+	target fileclient.Client, proposed string, source fileclient.Entry, reserve func(string, bool) error,
+) (string, *fileclient.Entry, bool, error) {
+	remote := !job.sourceRemote
+	parent, original := transferDir(remote, proposed), transferBase(remote, proposed)
+	candidate, index := proposed, 2
+	for {
+		if err := reserve(candidate, source.Directory); err != nil {
+			return "", nil, false, err
+		}
+		existing, err := target.Stat(ctx, candidate)
+		if errors.Is(err, fs.ErrNotExist) {
+			return candidate, nil, false, nil
+		}
+		if err != nil {
+			return "", nil, false, err
+		}
+		choice := job.policy
+		if choice == 0 {
+			answer, err := a.askTransferConflict(ctx, task, transferDir(remote, candidate),
+				fileEntry{name: transferBase(remote, candidate), size: source.Size, dir: source.Directory})
+			if err != nil {
+				return "", nil, false, err
+			}
+			choice = answer.choice
+			if answer.applyAll {
+				job.policy = choice
+			}
+		}
+		switch choice {
+		case 1:
+			if existing.Symlink || existing.Directory != source.Directory {
+				return "", nil, false, fmt.Errorf("目标类型不同或为符号链接，请选择保留两者：%s", candidate)
+			}
+			return candidate, &existing, false, nil
+		case 2:
+			return "", nil, true, nil
+		case 3:
+			for {
+				name := transferDuplicateName(original, index, source.Directory)
+				index++
+				candidate = transferJoin(remote, parent, name)
+				if err := reserve(candidate, source.Directory); err != nil {
+					return "", nil, false, err
+				}
+				_, err := target.Stat(ctx, candidate)
+				if errors.Is(err, fs.ErrNotExist) {
+					return candidate, nil, false, nil
+				}
+				if err != nil {
+					return "", nil, false, err
+				}
+			}
+		default:
+			return "", nil, false, errTransferConflictCanceled
+		}
+	}
+}
+
+func transferDuplicateName(name string, index int, directory bool) string {
+	ext := ""
+	if !directory && !strings.HasPrefix(name, ".") {
+		ext = path.Ext(name)
+	}
+	return fmt.Sprintf("%s (%d)%s", strings.TrimSuffix(name, ext), index, ext)
+}
+
+func validTransferDestinationName(source, target string, directory bool) bool {
+	if !transferSafeName(target) {
+		return false
+	}
+	if source == target {
+		return true
+	}
+	ext := ""
+	if !directory && !strings.HasPrefix(source, ".") {
+		ext = path.Ext(source)
+	}
+	if !strings.HasSuffix(target, ext) {
+		return false
+	}
+	base := strings.TrimSuffix(source, ext)
+	stem := strings.TrimSuffix(target, ext)
+	if !strings.HasPrefix(stem, base) {
+		return false
+	}
+	suffix := strings.TrimPrefix(stem, base)
+	if suffix == "" {
+		return false
+	}
+	for suffix != "" {
+		if !strings.HasPrefix(suffix, " (") {
+			return false
+		}
+		digits, rest, ok := strings.Cut(suffix[2:], ")")
+		index, err := strconv.Atoi(digits)
+		if !ok || err != nil || index < 2 || strconv.Itoa(index) != digits {
+			return false
+		}
+		suffix = rest
+	}
+	return true
+}
+
+func sameTransferEntry(left, right fileclient.Entry) bool {
+	return left.Size == right.Size && left.Directory == right.Directory && left.Symlink == right.Symlink && left.Modified.Equal(right.Modified)
+}
+
+func transferSafeName(name string) bool {
+	return name != "" && name != "." && name != ".." && !strings.ContainsAny(name, "/\x00") && filepath.IsLocal(name)
+}
+
+func transferJoin(remote bool, parent, name string) string {
+	if remote {
+		return path.Join(parent, name)
+	}
+	return filepath.Join(parent, name)
+}
+
+func transferDir(remote bool, name string) string {
+	if remote {
+		return path.Dir(name)
+	}
+	return filepath.Dir(name)
+}
+
+func transferBase(remote bool, name string) string {
+	if remote {
+		return path.Base(name)
+	}
+	return filepath.Base(name)
+}
+
+func transferAbsolute(ctx context.Context, client fileclient.Client, remote bool, name string) (string, error) {
+	if remote {
+		if path.IsAbs(name) {
+			return path.Clean(name), nil
+		}
+		home, err := client.InitialPath(ctx)
+		if err != nil {
+			return "", err
+		}
+		if name == "~" {
+			return home, nil
+		}
+		return path.Join(home, strings.TrimPrefix(name, "~/")), nil
+	}
+	if name == "~" || strings.HasPrefix(name, "~/") {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", err
+		}
+		name = filepath.Join(home, strings.TrimPrefix(name, "~"))
+	}
+	if !filepath.IsAbs(name) {
+		return "", fs.ErrInvalid
+	}
+	return filepath.Clean(name), nil
+}
+
+func cleanupTransferFiles(ctx context.Context, target fileclient.Client, job *transferJob) error {
+	var failures []error
+	for name := range job.temporary {
+		entry, err := target.Stat(ctx, name)
+		if errors.Is(err, fs.ErrNotExist) {
+			delete(job.temporary, name)
+			clearTransferTemporary(job.root, name)
+			continue
+		}
+		if err == nil && (entry.Directory || entry.Symlink) {
+			err = errors.New("临时文件已被替换，未执行删除")
+		}
+		if err == nil {
+			err = target.Remove(ctx, name, false)
+		}
+		if err != nil {
+			failures = append(failures, fmt.Errorf("%s: %w", name, err))
+		} else {
+			delete(job.temporary, name)
+			clearTransferTemporary(job.root, name)
+		}
+	}
+	return errors.Join(failures...)
+}
+
+func clearTransferTemporary(node *transferNode, name string) {
+	if node == nil {
+		return
+	}
+	if node.temporary == name {
+		node.temporary = ""
+	}
+	for _, child := range node.children {
+		clearTransferTemporary(child, name)
+	}
+}
+
+func (a *app) askTransferConflict(ctx context.Context, task *transferTask, target string, entry fileEntry) (transferConflictChoice, error) {
+	conflict := &fileConflict{session: task.session, sourceRemote: task.sourceRemote, target: target,
+		entries: []fileEntry{entry}, reply: make(chan transferConflictChoice, 1), ctx: ctx, task: task}
+	a.window.Update(func() {
+		if ctx.Err() != nil {
+			return
+		}
+		a.transfers.conflicts = append(a.transfers.conflicts, conflict)
+		a.advanceTransferConflicts()
+	})
+	select {
+	case answer := <-conflict.reply:
+		if answer.choice == 0 {
+			return answer, errTransferConflictCanceled
+		}
+		return answer, nil
+	case <-ctx.Done():
+		return transferConflictChoice{}, ctx.Err()
+	}
+}
+
+func (a *app) advanceTransferConflicts() {
+	q := &a.transfers
+	q.conflicts = slices.DeleteFunc(q.conflicts, func(conflict *fileConflict) bool {
+		if conflict.ctx.Err() != nil {
+			if a.files.conflict == conflict {
+				a.files.conflict = nil
+			}
+			return true
+		}
+		return false
+	})
+	if a.files.dialog == nil && a.files.conflict == nil && len(q.conflicts) > 0 {
+		a.files.conflict = q.conflicts[0]
+	}
+}
+
+func (a *app) cancelFileConflict() {
+	conflict := a.files.conflict
+	if conflict == nil {
+		return
+	}
+	select {
+	case conflict.reply <- transferConflictChoice{}:
+	default:
+	}
+	a.transfers.conflicts = slices.DeleteFunc(a.transfers.conflicts, func(candidate *fileConflict) bool { return candidate == conflict })
+	a.files.conflict = nil
+	a.advanceTransferConflicts()
+}
+
+type transferLocks struct {
+	mu      sync.Mutex
+	held    map[*transferLock]struct{}
+	changed chan struct{}
+}
+
+type transferLock struct {
+	key, path string
+	directory bool
+	owner     *transferJob
+}
+
+func (l *transferLocks) acquire(ctx context.Context, key, name string, directory bool, owner *transferJob) (func(), error) {
+	for {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		l.mu.Lock()
+		if l.changed == nil {
+			l.changed = make(chan struct{})
+			l.held = map[*transferLock]struct{}{}
+		}
+		blocked := false
+		for existing := range l.held {
+			if existing.owner == owner || existing.key != key {
+				continue
+			}
+			if existing.path == name || (existing.directory && transferWithin(existing.path, name)) ||
+				(directory && transferWithin(name, existing.path)) {
+				blocked = true
+				break
+			}
+		}
+		if !blocked {
+			lock := &transferLock{key, name, directory, owner}
+			l.held[lock] = struct{}{}
+			l.mu.Unlock()
+			return sync.OnceFunc(func() {
+				l.mu.Lock()
+				delete(l.held, lock)
+				close(l.changed)
+				l.changed = make(chan struct{})
+				l.mu.Unlock()
+			}), nil
+		}
+		changed := l.changed
+		l.mu.Unlock()
+		select {
+		case <-changed:
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
+}
+
+func transferWithin(parent, child string) bool {
+	return strings.HasPrefix(child, strings.TrimSuffix(parent, "/")+"/")
+}

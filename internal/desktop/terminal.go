@@ -139,7 +139,7 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 	surface := terminalSurface(terminalBackground)
 	p, f, status := surface.C.Pane, surface.C.PaneFocus, surface.C.StatusBar
 	session, rect := placement.session, placement.rect
-	h := a.hosts[session.host]
+	h := session.endpoint
 	count := tab.root.count()
 	multiple := count > 1
 	contentGap := t.Space.N4
@@ -150,7 +150,7 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 	}
 	// Only the inner card clips. Its wrapper owns the focus border and overlay hairline.
 	pane := uikit.Pane(c, uikit.PaneProps{
-		Key: fmt.Sprintf("pane-wrap-%d", session.id), Label: h.name + " 演示终端", Surface: surface,
+		Key: fmt.Sprintf("pane-wrap-%d", session.id), Label: h.name + " SSH 终端", Surface: surface,
 		Focused: tab.focused == session, Multiple: multiple, Lifted: a.lifted(session),
 	}).Absolute().Left(rect.X).Top(rect.Y).Size(rect.W, rect.H).Bind(&session.frame)
 	a.paneMotion(c, pane, tab, session)
@@ -170,14 +170,7 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 		c.After(p.FrameInterval)
 	}
 	pane.OnClick(func() { a.focusSession(tab, session) })
-	pane.ContextMenu(func(m *ui.Menu) {
-		if m.Item("追加演示输出").Chosen() {
-			a.receiveSessionOutput(session, fmt.Sprintf("[%s] INFO 收到新的演示输出\n", c.Now().Format("15:04:05")))
-		}
-		if m.Item("触发演示响铃").Chosen() {
-			a.receiveSessionOutput(session, "\a")
-		}
-	})
+
 	scroll := &session.scroll
 	focused, hovered := tab.focused == session, pane.Hovered()
 	appearance := uikit.PaneVisualStyle(pane, focused, hovered, multiple, surface)
@@ -186,31 +179,41 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 		card = uikit.TerminalSurface(c, s, prefs.Background, func() {})
 		uikit.StylePaneCard(card, surface, background, t.C.Pane.Radius)
 		card.Children(func() {
-			// Scrollbars decorates this same scroll node without replacing its handle.
-			output := ui.Scroll(c.Key("output")).Fill().MinWidth(0).MinHeight(0).
-				Bind(&session.focus).Focusable().FocusRing(false).
-				TrackScroll(&scroll.offset).Padding(
-				topPadding,
-				p.ContentSide,
-				bottomPadding,
-				p.ContentSide,
-			).Font(strings.Join(prefs.FontFamily, ", ")).FontSize(prefs.FontSize).
-				LetterSpacing(prefs.Tracking).TextColor(uikit.Color(colors.Foreground)).SelectionColor(uikit.Color(colors.Selection)).
-				Opacity(appearance.Opacity).Cache().
-				OnClick(func() { a.focusSession(tab, session) })
-			if appearance.Saturation != 1 {
-				output.Effect(terminalSaturation.Effect(shader.Options{
-					Uniforms: map[string]any{"Saturation": appearance.Saturation},
-				}))
+			if session.terminal != nil {
+				output := a.sshTerminalView(c.Key("live-output"), session).
+					Absolute().Left(0).Top(topPadding).Width(session.contentWidth).
+					Height(max(1, session.contentHeight-topPadding-bottomPadding)).Opacity(appearance.Opacity)
+				a.recordTerminalCapture(c, session, output, card, topPadding, bottomPadding)
+				if appearance.Saturation != 1 {
+					output.Effect(terminalSaturation.Effect(shader.Options{Uniforms: map[string]any{"Saturation": appearance.Saturation}}))
+				}
+			} else {
+				// Scrollbars decorates this same scroll node without replacing its handle.
+				output := ui.Scroll(c.Key("output")).Fill().MinWidth(0).MinHeight(0).
+					Bind(&session.focus).Focusable().FocusRing(false).
+					TrackScroll(&scroll.offset).Padding(
+					topPadding,
+					p.ContentSide,
+					bottomPadding,
+					p.ContentSide,
+				).Font(strings.Join(prefs.FontFamily, ", ")).FontSize(prefs.FontSize).
+					LetterSpacing(prefs.Tracking).TextColor(uikit.Color(colors.Foreground)).SelectionColor(uikit.Color(colors.Selection)).
+					Opacity(appearance.Opacity).Cache().
+					OnClick(func() { a.focusSession(tab, session) })
+				if appearance.Saturation != 1 {
+					output.Effect(terminalSaturation.Effect(shader.Options{
+						Uniforms: map[string]any{"Saturation": appearance.Saturation},
+					}))
+				}
+				output.Children(func() {
+					a.terminalLines(c, session, focused)
+				})
+				if multiple {
+					a.terminalScrollEdge(c, p.HeaderHeight, false, background)
+				}
+				a.terminalScrollEdge(c, status.HeightPane, true, background)
+				terminalScrollbar(c, card, output, scroll, terminalBackground)
 			}
-			output.Children(func() {
-				a.terminalLines(c, session, focused)
-			})
-			if multiple {
-				a.terminalScrollEdge(c, p.HeaderHeight, false, background)
-			}
-			a.terminalScrollEdge(c, status.HeightPane, true, background)
-			terminalScrollbar(c, card, output, scroll, terminalBackground)
 			var header ui.Element
 			if multiple {
 				// A shared drag ancestor lets the title and bell keep their own hover targets.

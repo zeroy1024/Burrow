@@ -3,7 +3,6 @@ package desktop
 import (
 	"fmt"
 	"path"
-	"slices"
 	"strings"
 
 	"sshdesk/internal/theme"
@@ -84,10 +83,10 @@ func (a *app) fileActionModal(c *ui.Context) {
 	var submitted, clicked bool
 	var current uikit.ModalParts
 	result := uikit.Modal(c.Key(dialog), &open, uikit.ModalProps{
-		Compact: true, Width: t.C.Dialog.HostWidth, Title: title, Motion: uikit.MotionOverride(a.reduceMotion(c)),
+		Compact: true, Width: t.C.Dialog.HostWidth, Title: title, Disabled: dialog.busy, Motion: uikit.MotionOverride(a.reduceMotion(c)),
 	}, func(parts uikit.ModalParts) {
 		current = parts
-		uikit.Text(c, "操作仅修改本次会话的演示目录。", uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneSecondary})
+		uikit.Text(c, "操作将应用到当前目录中的实际文件。", uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneSecondary})
 		if dialog.kind == "delete" {
 			message := fmt.Sprintf("确认删除选中的 %d 项？", len(dialog.pane.selection()))
 			if dialog.original != "" {
@@ -113,7 +112,7 @@ func (a *app) fileActionModal(c *ui.Context) {
 		}
 		ui.Row(c).Key("actions").Justify(ui.End).Gap(t.Space.N8).Children(func() {
 			uikit.Button(c, "取消", uikit.ButtonProps{}).OnClick(parts.RequestDismiss)
-			clicked = uikit.Button(c, action, uikit.ButtonProps{Variant: variant, Disabled: nameError != ""}).Clicked()
+			clicked = uikit.Button(c, action, uikit.ButtonProps{Variant: variant, Disabled: nameError != "", Loading: dialog.busy}).Clicked()
 		})
 	})
 	if (clicked || submitted || result.Submit) && nameError == "" {
@@ -146,94 +145,6 @@ func fileActionNameError(dialog *fileActionDialog) string {
 		}
 	}
 	return ""
-}
-
-func (a *app) applyFileAction(c *ui.Context, dialog *fileActionDialog) bool {
-	pane := dialog.pane
-	if !fileWritable(pane, pane.path) {
-		dialog.errorText = "此目录不可写。"
-		return false
-	}
-	if message := fileActionNameError(dialog); message != "" {
-		dialog.errorText = message
-		return false
-	}
-	name := strings.TrimSpace(dialog.name)
-	entries := pane.directories[pane.path]
-	switch dialog.kind {
-	case "mkdir":
-		entry := fileEntry{
-			name: name, path: path.Join(pane.path, name), dir: true,
-			modified: c.Now(), permissions: "rwxr-xr-x", owner: a.hosts[dialog.session.host].user,
-		}
-		pane.directories[pane.path] = append(entries, entry)
-		pane.directories[entry.path] = []fileEntry{}
-		pane.table.Select(entry.path)
-		pane.reveal = entry.path
-	case "rename":
-		index := slices.IndexFunc(entries, func(entry fileEntry) bool { return entry.name == dialog.original })
-		if index < 0 {
-			dialog.errorText = "要重命名的项目已不存在。"
-			return false
-		}
-		oldPath, newPath := entries[index].path, path.Join(pane.path, name)
-		entries[index].name, entries[index].path = name, newPath
-		if oldPath != newPath && entries[index].dir {
-			renameDemoDirectory(pane, oldPath, newPath)
-		}
-		pane.directories[pane.path] = entries
-		pane.table.Selection.Remove(oldPath)
-		pane.table.Select(newPath)
-		pane.reveal = newPath
-	case "delete":
-		selected := pane.selection()
-		if dialog.original != "" {
-			selected = []fileEntry{}
-			for _, entry := range entries {
-				if entry.name == dialog.original {
-					selected = append(selected, entry)
-					break
-				}
-			}
-		}
-		for _, entry := range selected {
-			if entry.dir {
-				for directory := range pane.directories {
-					if directory == entry.path || strings.HasPrefix(directory, entry.path+"/") {
-						delete(pane.directories, directory)
-					}
-				}
-			}
-			entries = slices.DeleteFunc(entries, func(candidate fileEntry) bool { return candidate.name == entry.name })
-			pane.table.Selection.Remove(entry.path)
-		}
-		pane.directories[pane.path] = entries
-		pane.table.Cursor = -1
-		pane.reveal = ""
-	}
-	return true
-}
-
-func renameDemoDirectory(pane *filePaneState, oldPath, newPath string) {
-	moved := map[string][]fileEntry{}
-	for directory, entries := range pane.directories {
-		if directory != oldPath && !strings.HasPrefix(directory, oldPath+"/") {
-			continue
-		}
-		for index := range entries {
-			entries[index].path = newPath + strings.TrimPrefix(entries[index].path, oldPath)
-		}
-		moved[newPath+strings.TrimPrefix(directory, oldPath)] = entries
-		delete(pane.directories, directory)
-	}
-	for directory, entries := range moved {
-		pane.directories[directory] = entries
-	}
-	for index, directory := range pane.history {
-		if directory == oldPath || strings.HasPrefix(directory, oldPath+"/") {
-			pane.history[index] = newPath + strings.TrimPrefix(directory, oldPath)
-		}
-	}
 }
 
 func (a *app) fileConflictModal(c *ui.Context) {
@@ -270,6 +181,6 @@ func (a *app) fileConflictModal(c *ui.Context) {
 		return
 	}
 	if !open {
-		a.files.conflict = nil
+		a.cancelFileConflict()
 	}
 }
