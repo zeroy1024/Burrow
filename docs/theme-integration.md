@@ -2,19 +2,19 @@
 
 ## 当前接入规则
 
-`internal/theme/tokens_src.py` 是 App token 的唯一来源，生成 `theme.go`、`tokens.json`、`tokens.md`。公共外观位于 `internal/uikit`；会话弹窗、设置页及 SSH/文件工作区的导航与容器直接使用公共组件，尚有消费者的适配入口经 `uiadapt.go` 转发。终端正文、ANSI 配色、字体及光标参数由 `internal/termtheme` 管理。终端周边 UI 按实际终端背景选择局部明暗 token，详见 [终端配色说明](terminal-themes.md)。
+`internal/theme/tokens_src.py` 是 App token 的唯一来源，生成 `theme.go`、`tokens.json`、`tokens.md`。公共外观位于 `internal/uikit`，当前页面的表单、导航、工作区、数据和领域反馈均已接入；`uiadapt.go` 只保留应用搜索策略与原生窗口格式转换。终端正文、ANSI 配色、字体及光标参数由 `internal/termtheme` 管理。终端周边 UI 按实际终端背景选择局部明暗 token，纯策略位于 `uikit.TerminalSurface`，缓存与强调色失效仍属应用，详见 [终端配色说明](terminal-themes.md)。
 
-- 已迁移页面使用 `uikit.Button/Input/Modal`，工作区的 `button/primaryButton/textInput/modal` 仅转发同一实现。这些入口保留 MyGo Base API 的输入、焦点和关闭行为，尺寸、颜色、描边、圆角、遮罩和阴影读取对应 component token。具体范围见 [UIKit 迁移说明](uikit.md)。
-- 所有应用主动创建的文字提示通过 `tooltip` / `styleTooltip` 共用 `C.Tooltip`。导航提示仍位于按钮右侧，其余提示位于上方并由 MyGo 处理边缘避让。
+- 页面使用 `uikit.Button/Input/Modal`，原 `button/primaryButton/textInput/modal` 等私有纯转发已经清除。这些入口保留 MyGo Base API 的输入、焦点和关闭行为，尺寸、颜色、描边、圆角、遮罩和阴影读取对应 component token。具体范围和原生业务宿主例外见 [UIKit 迁移说明](uikit.md) 与 [覆盖清单](uikit-coverage.md)。
+- 所有应用主动创建的文字提示通过 `uikit.Tip/StyleTooltip/TestResultTooltip` 共用 `C.Tooltip`。导航提示仍位于按钮右侧，其余提示位于上方并由 MyGo 处理边缘避让。
 - 普通线性图标在初始化解析 SVG 时读取 `C.IconButton.Stroke`，浅／深主题共用这一几何参数；修改线宽后需重启应用。OS 品牌资源保留原有描边和形状。
 - `C.PaneFocus.RingFocused` 本身只包含单层蓝色描边，渲染端完整消费，不再截取阴影数组。
-- `tokenTween` 明确使用 `motion.easing.out`，按钮、列表、分段控件和两种会话标签的状态过渡使用各自映射到 `motion.duration.focus` 的 160ms token。拿起保持 120ms，让位、落位、取消继续使用现有弹簧。
+- `uikit.Tween` 明确使用 `motion.easing.out`，按钮、列表、分段控件和两种会话标签的状态过渡使用各自映射到 `motion.duration.focus` 的 160ms token。拿起保持 120ms，让位、落位、取消继续使用现有弹簧。
 - 搜索几何变化使用 `C.Search.Transition/Easing`；分组数字滚动显式使用 `C.GroupHeader.CountMotion`（350ms 弹簧）。有变化文案的切换按钮采用固定 key，避免文案变化重建动画状态。
 - 减少动态效果时由 MyGo 禁用位移、缩放和旋转；颜色／透明度使用 `AnimateColor` 通道保留过渡。文件搜索、FTP 本地面板和监控面板将几何与透明度分开处理。
 - Shell 拖动预览使用 `C.DragGhost` 的 220×140px 静态骨架卡片，按实际终端背景选择明暗颜色；`C.PaneReveal` 定义落位后的 8px → 0、220ms 模糊过渡。落位窗格直接采用最终尺寸，首帧绘制完成后启动渐清晰，不等待模拟数据或网络输出，不再创建终端快照和放大飞入动画。减少动态效果时保留这段局部视觉过渡。
-- SSH 和文件会话共用 `tabConnectionIndicator` 的状态槽与旋转参数。SSH 演示连接的阶段间隔由 `C.ConnectionIndicator.StageDuration`（300ms）提供，连接日志沿用终端 ANSI 配色与字体；标签、Shell 状态栏和监控等待态读取同一会话状态。
+- SSH 和文件会话共用 `uikit.TabConnectionIndicator` 的状态槽与旋转参数。SSH 演示连接的阶段间隔由 `C.ConnectionIndicator.StageDuration`（300ms）提供，连接日志沿用终端 ANSI 配色与字体；标签、Shell 状态栏和监控等待态读取同一会话状态。
 
-系统菜单、文件选择器保留系统外观。设置中的 `Select`、`NumberInput`、`Checkbox` 仍使用 MyGo 控件及 `nativeTheme` 的全局映射，内部布局和框架自带提示遵循 MyGo；本次没有复制这些复合控件的内部实现。原生手势阈值／长按等待、Tooltip 显示等待仍由框架管理。未使用或已废弃的设计 token 不代表当前界面已实现对应功能。
+系统菜单、文件选择器保留系统外观。设置中的 Select、Switch 和快捷键表保留 MyGo 控件语义及 `uikit.UITheme` 映射，数字输入组合原文本控件与 Stepper；内部输入与框架自带提示遵循 MyGo。当前页面没有独立 Checkbox/泛型 Radio 调用。原生手势阈值／长按等待、Tooltip 显示等待仍由框架管理。未使用或已废弃的设计 token 不代表当前界面已实现对应功能。
 
 ## 历史接入记录
 
