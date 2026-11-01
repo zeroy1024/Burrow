@@ -11,29 +11,6 @@ import (
 	"github.com/egoist/mygo/ui"
 )
 
-func statusDot(c *ui.Context, state connectionState, size float32) {
-	t := theme.Current()
-	color := tokenColor(t.C.ConnectionIndicator.Offline)
-	halo := tokenColor(t.C.ConnectionIndicator.Offline)
-	if state == connected {
-		color = tokenColor(t.C.ConnectionIndicator.Connected)
-		halo = tokenColor(t.C.ConnectionIndicator.ConnectedHalo)
-	}
-	if state == connecting {
-		color = tokenColor(t.C.ConnectionIndicator.Connecting)
-		halo = tokenColor(t.C.ConnectionIndicator.ConnectingHalo)
-	}
-	ui.Box(c).Size(size+2*t.C.ConnectionIndicator.Halo, size+2*t.C.ConnectionIndicator.Halo).Center().PassThrough().Children(func() {
-		dot := ui.Box(c).Size(size, size).Radius(t.Radius.Pill).Background(color).PassThrough()
-		if state != disconnected {
-			dot.Border(t.C.ConnectionIndicator.Halo, halo).Size(size+2*t.C.ConnectionIndicator.Halo, size+2*t.C.ConnectionIndicator.Halo).
-				Background(ui.Transparent).Children(func() {
-				ui.Box(c).Fill().Radius(t.Radius.Pill).Background(color).PassThrough()
-			})
-		}
-	})
-}
-
 func (a *app) sidebar(c *ui.Context, shown float32) {
 	directoryLabel, searchLabel, placeholder := "远程主机目录", "搜索主机、地址或系统", "搜索主机、标签"
 	title := "远程会话"
@@ -78,23 +55,23 @@ func (a *app) startGroupDraft() {
 
 func (a *app) groupDialog(c *ui.Context) {
 	t := theme.Current()
-	modal(c, &a.page().groupDialogOpen, func() {
+	uikit.Dialog(c, &a.page().groupDialogOpen, func() {
 		ui.Column(c).Width(t.C.Dialog.GroupWidth).Gap(t.Space.N14).Children(func() {
 			ui.Text(c, "新建分组").FontSize(t.C.Dialog.TitleSize).FontWeight(t.Font.Weight.Semibold)
-			ui.Text(c, "将主机拖入分组，整理主机目录。").FontSize(t.Font.Size.Small).TextColor(tokenColor(t.Color.Text.Secondary))
-			textInput(c, &a.page().groupDraft).AutoFocus().Label("分组名称").Placeholder("分组名称").FillWidth()
+			ui.Text(c, "将主机拖入分组，整理主机目录。").FontSize(t.Font.Size.Small).TextColor(uikit.Color(t.Color.Text.Secondary))
+			uikit.Input(c, &a.page().groupDraft, uikit.InputProps{}).AutoFocus().Label("分组名称").Placeholder("分组名称").FillWidth()
 			name := strings.TrimSpace(a.page().groupDraft)
 			duplicate := slices.Contains(a.groupNames(), name)
 			if duplicate {
 				ui.Text(c, "此分组名称已存在").FontSize(t.Font.Size.Caption).TextColor(a.theme.Danger)
 			}
 			ui.Row(c).Gap(t.Space.N8).Justify(ui.End).Children(func() {
-				button(c, "取消").OnClick(func() { a.page().groupDialogOpen = false })
-				primaryButton(c, "创建").Disabled(name == "" || duplicate).OnClick(func() {
+				uikit.Button(c, "取消", uikit.ButtonProps{}).OnClick(func() { a.page().groupDialogOpen = false })
+				uikit.Button(c, "创建", uikit.ButtonProps{Variant: uikit.ButtonPrimary}).Disabled(name == "" || duplicate).OnClick(func() {
 					if err := a.commitCatalogMove(func() {
 						a.groups = append(a.groups, a.newCatalogGroup(name))
 					}); err != nil {
-						c.Toast("保存分组失败：" + err.Error())
+						uikit.Notify(c, "保存分组失败："+err.Error())
 						return
 					}
 					a.page().groupDialogOpen, a.page().query = false, ""
@@ -108,6 +85,6 @@ func draftField(c *ui.Context, label string, value *string) {
 	t := theme.Current()
 	ui.Column(c).Gap(t.Space.N6).Children(func() {
 		ui.Text(c, label).FontSize(t.Font.Size.Small)
-		textInput(c, value).Label(label).FillWidth()
+		uikit.Input(c, value, uikit.InputProps{}).Label(label).FillWidth()
 	})
 }

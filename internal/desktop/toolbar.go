@@ -11,14 +11,6 @@ import (
 	"github.com/egoist/mygo/ui"
 )
 
-func iconButton(c *ui.Context, label string, icon *ui.SVG) ui.Element {
-	return keyedIconButton(c, label, label, icon)
-}
-
-func keyedIconButton(c *ui.Context, key, label string, icon *ui.SVG) ui.Element {
-	return uikit.IconButton(c, icon, uikit.IconButtonProps{Label: label, Key: key})
-}
-
 func (a *app) titleBar(c *ui.Context, shown float32) {
 	t := theme.Current()
 	uikit.TitleBar(c).Children(func() {
@@ -27,7 +19,7 @@ func (a *app) titleBar(c *ui.Context, shown float32) {
 			if a.page().sidebarCollapsed {
 				label = "展开会话栏"
 			}
-			keyedIconButton(c, "sidebar-toggle", label, sidebarIcon).
+			uikit.IconButton(c, sidebarIcon, uikit.IconButtonProps{Key: "sidebar-toggle", Label: label}).
 				Disabled(a.activeSection() == sectionSettings).
 				OnClick(func() { a.page().sidebarCollapsed = !a.page().sidebarCollapsed })
 		})
@@ -51,7 +43,7 @@ func (a *app) titleBar(c *ui.Context, shown float32) {
 							pendingClose = close
 						}
 					}
-					iconButton(c, "新建会话", plusIcon).Menu(func(m *ui.Menu) {
+					uikit.IconButton(c, plusIcon, uikit.IconButtonProps{Label: "新建会话"}).Menu(func(m *ui.Menu) {
 						for _, group := range a.catalogGroups() {
 							m.Submenu(group.name, func(sub *ui.Menu) {
 								for _, id := range group.hosts {
@@ -73,10 +65,10 @@ func (a *app) titleBar(c *ui.Context, shown float32) {
 			a.tabStripTarget(c, strip)
 		})
 		uikit.TitleBarActions(c).Children(func() {
-			status := iconButton(c, "服务器监控", activityIcon).Expanded(a.statusVisible).
+			status := uikit.IconButton(c, activityIcon, uikit.IconButtonProps{Label: "服务器监控"}).Expanded(a.statusVisible).
 				Disabled(a.activeSection() == sectionSettings)
 			if a.statusVisible {
-				status.Background(tokenColor(t.C.TitleAction.BgOn))
+				status.Background(uikit.Color(t.C.TitleAction.BgOn))
 			}
 			status.OnClick(func() { a.statusVisible = !a.statusVisible })
 		})

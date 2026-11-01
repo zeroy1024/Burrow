@@ -14,7 +14,7 @@ import (
 	"github.com/egoist/mygo/ui"
 )
 
-var credentialKeyIcon = lineIcon(`<circle cx="8" cy="8" r="5"/><path d="m12 12 9 9m-3-3 3-3m-6 0 3-3"/>`)
+var credentialKeyIcon = uikit.LineIcon(`<circle cx="8" cy="8" r="5"/><path d="m12 12 9 9m-3-3 3-3m-6 0 3-3"/>`)
 
 func (a *app) keySettings(c *ui.Context) {
 	t := theme.Current()

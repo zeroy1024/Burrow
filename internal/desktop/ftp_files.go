@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/egoist/mygo/ui"
+	"sshdesk/internal/uikit"
 )
 
 type fileEntry struct {
@@ -250,7 +251,7 @@ func (a *app) requestFileTransfer(c *ui.Context, drag fileDrag, target *filePane
 		return
 	}
 	if !fileWritable(target, directory) {
-		c.Toast("此目录不可写")
+		uikit.Notify(c, "此目录不可写")
 		return
 	}
 	a.files.conflict = &fileConflict{

@@ -8,18 +8,19 @@ import (
 	"sshdesk/internal/theme"
 
 	"github.com/egoist/mygo/ui"
+	"sshdesk/internal/uikit"
 )
 
 func (a *app) catalogDisplaceAnimation() ui.Animation {
-	return a.positionAnimation(ui.Animation{Spring: tokenSpring(theme.Current().C.ReorderMotion.Displace)})
+	return a.positionAnimation(ui.Animation{Spring: uikit.Spring(theme.Current().C.ReorderMotion.Displace)})
 }
 
 func (a *app) catalogLandingAnimation() ui.Animation {
-	return a.positionAnimation(ui.Animation{Spring: tokenSpring(theme.Current().C.ReorderMotion.Drop)})
+	return a.positionAnimation(ui.Animation{Spring: uikit.Spring(theme.Current().C.ReorderMotion.Drop)})
 }
 
 func catalogColorAnimation() ui.Animation {
-	return tokenTween(theme.Current().C.SiderItem.Transition)
+	return uikit.Tween(theme.Current().C.SiderItem.Transition)
 }
 
 type catalogDragKind uint8
@@ -504,7 +505,7 @@ func (a *app) settleCatalogDrag(c *ui.Context, commit bool) {
 			}
 		})
 		if err != nil {
-			c.Toast("保存排序失败，已恢复原位置：" + err.Error())
+			uikit.Notify(c, "保存排序失败，已恢复原位置："+err.Error())
 		} else {
 			d.phase = catalogSettling
 		}

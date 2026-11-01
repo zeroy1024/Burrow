@@ -9,6 +9,7 @@ import (
 	"sshdesk/internal/theme"
 
 	"github.com/egoist/mygo/ui"
+	"sshdesk/internal/uikit"
 )
 
 func (a *app) fileDialogs(c *ui.Context) {
@@ -24,7 +25,7 @@ func (a *app) fileActionModal(c *ui.Context) {
 	t := theme.Current()
 	dialog := a.files.dialog
 	open := true
-	modal(c.Key("file-action-dialog"), &open, func() {
+	uikit.Dialog(c.Key("file-action-dialog"), &open, func() {
 		ui.Column(c).Width(t.C.Dialog.HostWidth).Gap(t.Space.N14).Children(func() {
 			title, action := "新建文件夹", "创建"
 			switch dialog.kind {
@@ -35,7 +36,7 @@ func (a *app) fileActionModal(c *ui.Context) {
 			}
 			ui.Text(c, title).FontSize(t.C.Dialog.TitleSize).FontWeight(t.Font.Weight.Semibold)
 			ui.Text(c, "操作仅修改本次会话的演示目录。").
-				FontSize(t.Font.Size.Small).TextColor(tokenColor(t.Color.Text.Secondary))
+				FontSize(t.Font.Size.Small).TextColor(uikit.Color(t.Color.Text.Secondary))
 			var submitted bool
 			if dialog.kind == "delete" {
 				message := fmt.Sprintf("确认删除选中的 %d 项？", len(dialog.pane.selection()))
@@ -44,7 +45,7 @@ func (a *app) fileActionModal(c *ui.Context) {
 				}
 				ui.Text(c, message).FontSize(t.Font.Size.Body)
 			} else {
-				input := textInput(c, &dialog.name).AutoFocus().Label("名称").FillWidth()
+				input := uikit.Input(c, &dialog.name, uikit.InputProps{}).AutoFocus().Label("名称").FillWidth()
 				submitted = input.Submitted()
 			}
 			nameError := fileActionNameError(dialog)
@@ -53,7 +54,7 @@ func (a *app) fileActionModal(c *ui.Context) {
 				message = dialog.errorText
 			}
 			if message != "" {
-				ui.Text(c, message).FontSize(t.Font.Size.Caption).TextColor(tokenColor(t.Color.Danger.Text))
+				ui.Text(c, message).FontSize(t.Font.Size.Caption).TextColor(uikit.Color(t.Color.Danger.Text))
 			}
 			apply := func() {
 				if a.applyFileAction(c, dialog) {
@@ -61,8 +62,8 @@ func (a *app) fileActionModal(c *ui.Context) {
 				}
 			}
 			ui.Row(c).Justify(ui.End).Gap(t.Space.N8).Children(func() {
-				button(c, "取消").OnClick(func() { a.files.dialog = nil })
-				primaryButton(c, action).Disabled(nameError != "").OnClick(apply)
+				uikit.Button(c, "取消", uikit.ButtonProps{}).OnClick(func() { a.files.dialog = nil })
+				uikit.Button(c, action, uikit.ButtonProps{Variant: uikit.ButtonPrimary}).Disabled(nameError != "").OnClick(apply)
 			})
 			if submitted && nameError == "" {
 				apply()
@@ -185,15 +186,15 @@ func (a *app) fileConflictModal(c *ui.Context) {
 	conflict := a.files.conflict
 	entry := conflict.entries[conflict.index]
 	open := true
-	modal(c.Key("file-conflict-dialog"), &open, func() {
+	uikit.Dialog(c.Key("file-conflict-dialog"), &open, func() {
 		ui.Column(c).Width(t.C.Dialog.HostWidth).Gap(t.Space.N14).Children(func() {
 			ui.Text(c, "目标中已存在同名项目").FontSize(t.C.Dialog.TitleSize).FontWeight(t.Font.Weight.Semibold)
 			ui.Text(c, entry.name).FontSize(t.Font.Size.BodyLg).FontWeight(t.Font.Weight.Medium)
 			ui.Text(c, "目标："+path.Join(conflict.target, entry.name)).FontSize(t.Font.Size.Small).
-				TextColor(tokenColor(t.Color.Text.Secondary))
+				TextColor(uikit.Color(t.Color.Text.Secondary))
 			ui.Checkbox(c, &conflict.applyAll, "对所有重名项应用此选择")
 			ui.Row(c).Justify(ui.End).Gap(t.Space.N8).Children(func() {
-				button(c, "取消").OnClick(func() {
+				uikit.Button(c, "取消", uikit.ButtonProps{}).OnClick(func() {
 					a.files.conflict = nil
 					open = false
 				})
@@ -201,9 +202,9 @@ func (a *app) fileConflictModal(c *ui.Context) {
 					conflict.choice = choice
 					a.resolveFileConflicts(c)
 				}
-				button(c, "跳过").OnClick(func() { choose(2) })
-				button(c, "保留两者").OnClick(func() { choose(3) })
-				primaryButton(c, "覆盖").OnClick(func() { choose(1) })
+				uikit.Button(c, "跳过", uikit.ButtonProps{}).OnClick(func() { choose(2) })
+				uikit.Button(c, "保留两者", uikit.ButtonProps{}).OnClick(func() { choose(3) })
+				uikit.Button(c, "覆盖", uikit.ButtonProps{Variant: uikit.ButtonPrimary}).OnClick(func() { choose(1) })
 			})
 		})
 	})

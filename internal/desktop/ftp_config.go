@@ -10,6 +10,7 @@ import (
 	"sshdesk/internal/theme"
 
 	"github.com/egoist/mygo/ui"
+	"sshdesk/internal/uikit"
 )
 
 type filePreferencesState struct {
@@ -117,7 +118,7 @@ func (a *app) readFilePreferences() error {
 
 func (a *app) saveFilePreferences(c *ui.Context) {
 	if err := a.writeFilePreferences(); err != nil {
-		c.Toast("保存文件传输偏好失败：" + err.Error())
+		uikit.Notify(c, "保存文件传输偏好失败："+err.Error())
 	}
 }
 

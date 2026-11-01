@@ -8,6 +8,7 @@ import (
 	"sshdesk/internal/theme"
 
 	"github.com/egoist/mygo/ui"
+	"sshdesk/internal/uikit"
 )
 
 func demoTranscript(h host) []terminalLine {
@@ -156,7 +157,7 @@ Swap:         2.0Gi       0B    2.0Gi
 func (a *app) terminalLines(c *ui.Context, session *remoteSession, focused bool) {
 	h := a.hosts[session.host]
 	scheme, prefs := a.sessionScheme(session), a.terminal.prefs
-	column := ui.Column(c).FillWidth().MinWidth(0).Selectable().SelectionColor(tokenColor(scheme.SelectionBg))
+	column := ui.Column(c).FillWidth().MinWidth(0).Selectable().SelectionColor(uikit.Color(scheme.SelectionBg))
 	if session.contentWidth > 0 {
 		column.Width(max(1, session.contentWidth-2*theme.Current().C.Pane.ContentSide)).Shrink(0)
 	}

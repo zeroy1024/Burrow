@@ -279,7 +279,7 @@ func (a *app) view(c *ui.Context) {
 	t := theme.Current()
 	a.theme = uikit.UITheme(t)
 	c.SetTheme(a.theme)
-	c.Root().Background(tokenColor(t.C.Window.Bg))
+	c.Root().Background(uikit.Color(t.C.Window.Bg))
 	root := ui.Column(c).Fill()
 	x, y, _ := root.PointerPosition()
 	a.pointer = ui.Point{X: x, Y: y}
@@ -303,7 +303,7 @@ func (a *app) view(c *ui.Context) {
 	if a.page().sidebarCollapsed {
 		target = 0
 	}
-	shown := root.AnimateTo(sidebarMotionKey(a.section), target, a.positionAnimation(tokenTween(t.C.Desktop.SidebarDuration)))
+	shown := root.AnimateTo(sidebarMotionKey(a.section), target, a.positionAnimation(uikit.Tween(t.C.Desktop.SidebarDuration)))
 	root.Children(func() {
 		ui.Column(c).Key(pageHeaderKey(a.section)).FillWidth().Shrink(0).Children(func() {
 			switch a.section {
@@ -340,11 +340,11 @@ func (a *app) view(c *ui.Context) {
 		}
 	})
 	if a.catalogError != nil {
-		c.Toast("无法加载主机配置：" + a.catalogError.Error())
+		uikit.Notify(c, "无法加载主机配置："+a.catalogError.Error())
 		a.catalogError = nil
 	}
 	if a.terminalError != nil {
-		c.Toast("终端设置：" + a.terminalError.Error())
+		uikit.Notify(c, "终端设置："+a.terminalError.Error())
 		a.terminalError = nil
 	}
 	if active != sectionSettings {
@@ -365,7 +365,7 @@ func (a *app) view(c *ui.Context) {
 		c.AnimationFrame()
 	}
 	if a.files.notice != "" {
-		c.Toast(a.files.notice)
+		uikit.Notify(c, a.files.notice)
 		a.files.notice = ""
 	}
 }
@@ -415,8 +415,8 @@ func (a *app) workspace(c *ui.Context, shown float32) {
 	if a.section != sectionSSH || !a.statusVisible {
 		statusTarget = 0
 	}
-	statusShown := panel.AnimateTo("status", statusTarget, a.positionAnimation(tokenTween(t.C.Desktop.SidebarDuration)))
-	statusOpacity := animateVisual(panel, "status-opacity", statusTarget, t.C.Desktop.SidebarDuration)
+	statusShown := panel.AnimateTo("status", statusTarget, a.positionAnimation(uikit.Tween(t.C.Desktop.SidebarDuration)))
+	statusOpacity := uikit.Visual(panel, "status-opacity", statusTarget, t.C.Desktop.SidebarDuration)
 	panel.Children(func() {
 		uikit.Card(c).Key("sessions").Width(a.page().sidebarWidth * shown).Shrink(0).
 			MarginEnd(t.C.Window.Gutter * shown).Hidden(shown == 0).Children(func() {

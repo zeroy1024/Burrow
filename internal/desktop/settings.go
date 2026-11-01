@@ -111,7 +111,7 @@ func (a *app) settings(c *ui.Context) {
 								}
 							}
 							if count == 0 {
-								ui.Text(c, localize(c, "没有匹配的设置")).FontSize(t.Font.Size.Body).TextColor(uikit.Color(t.Color.Text.Tertiary))
+								uikit.EmptyMessage(c, localize(c, "没有匹配的设置"), uikit.EmptySettingsSearch)
 							}
 						} else {
 							a.settingsCategoryContent(c, a.settingsCategory)

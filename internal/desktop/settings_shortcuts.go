@@ -60,12 +60,7 @@ func (a *app) shortcutSettings(c *ui.Context) {
 		}
 	}
 	a.settingsUI.shortcutList.Key = func(row int) any { return actions[row].id }
-	columns := []ui.TableColumn{
-		{ID: "action", Title: localize(c, "操作"), Width: t.C.Settings.ContentMax / 2},
-		{ID: "binding", Title: localize(c, "快捷键"), Width: t.C.Settings.ContentMax / 3},
-		{ID: "controls", Title: localize(c, "操作"), Width: t.C.Settings.ContentMax / 6},
-	}
-	ui.Table(c, &a.settingsUI.shortcutList, columns, len(actions), func(row, col int) {
+	uikit.ShortcutTable(c, &a.settingsUI.shortcutList, localize(c, "快捷键"), localize(c, "操作"), localize(c, "快捷键"), len(actions), func(row, col int) {
 		action := actions[row]
 		switch col {
 		case 0:
@@ -126,7 +121,7 @@ func (a *app) shortcutSettings(c *ui.Context) {
 		case 2:
 			uikit.Button(c, localize(c, "恢复默认"), uikit.ButtonProps{}).Label(localize(c, "恢复默认：") + localize(c, action.label)).OnClick(func() { delete(a.prefs.Keymap, action.id); a.preferencesChanged() })
 		}
-	}).FillWidth().Height(float32(len(actions)+1) * t.C.Settings.RowMinHeight).Label(localize(c, "快捷键"))
+	})
 }
 
 func (a *app) storeShortcut(id, binding string) {

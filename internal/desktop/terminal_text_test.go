@@ -3,6 +3,7 @@ package desktop
 import (
 	"fmt"
 	"image/color"
+	"sshdesk/internal/uikit"
 	"strings"
 	"testing"
 
@@ -32,7 +33,7 @@ func TestTerminalPaletteAndTruecolorRemainSemantic(t *testing.T) {
 		}
 		for _, scheme := range []*termtheme.Scheme{light, dark} {
 			fg, _ := terminalSpanColors(run, scheme, prefs)
-			if fg != tokenColor(scheme.Color(index)) {
+			if fg != uikit.Color(scheme.Color(index)) {
 				t.Fatalf("color %d did not resolve against %s", index, scheme.Name)
 			}
 		}
@@ -47,7 +48,7 @@ func TestTerminalPaletteAndTruecolorRemainSemantic(t *testing.T) {
 			t.Fatalf("%s changed truecolor: %+v", scheme.Name, fg)
 		}
 		fg, _ = terminalSpanColors(lines[0][257], scheme, prefs)
-		if fg != tokenColor(scheme.Foreground) {
+		if fg != uikit.Color(scheme.Foreground) {
 			t.Fatalf("%s did not resolve the default foreground", scheme.Name)
 		}
 	}
@@ -86,18 +87,18 @@ func TestTerminalBoldDimReverseAndBackground(t *testing.T) {
 	prefs.BoldIsBright = true
 	run := terminalSpan{Foreground: terminalIndexed(1), Bold: true}
 	fg, _ := terminalSpanColors(run, scheme, prefs)
-	if fg != tokenColor(scheme.ANSI[9]) {
+	if fg != uikit.Color(scheme.ANSI[9]) {
 		t.Fatalf("bold ANSI color did not brighten: %+v", fg)
 	}
 	bold := color.NRGBA{R: 18, G: 52, B: 86, A: 255}
 	scheme.Bold = &bold
 	fg, _ = terminalSpanColors(run, scheme, prefs)
-	if fg != tokenColor(bold) {
+	if fg != uikit.Color(bold) {
 		t.Fatalf("explicit bold color was ignored: %+v", fg)
 	}
 	run.Background, run.Reverse, run.Dim = terminalIndexed(4), true, true
 	fg, bg := terminalSpanColors(run, scheme, prefs)
-	if fg != tokenColor(scheme.ANSI[4]).Alpha(0.5) || bg != tokenColor(bold) {
+	if fg != uikit.Color(scheme.ANSI[4]).Alpha(0.5) || bg != uikit.Color(bold) {
 		t.Fatalf("reverse and dim resolved incorrectly: fg=%+v bg=%+v", fg, bg)
 	}
 	for _, source := range []termtheme.BackgroundSource{termtheme.BackgroundScheme, termtheme.BackgroundCard} {
@@ -105,7 +106,7 @@ func TestTerminalBoldDimReverseAndBackground(t *testing.T) {
 		run = terminalSpan{Reverse: true}
 		fg, bg = terminalSpanColors(run, scheme, prefs)
 		expected := termtheme.TerminalBackground(scheme, theme.Current().C.Pane.Bg, source)
-		if fg != tokenColor(expected) || bg != tokenColor(scheme.Foreground) {
+		if fg != uikit.Color(expected) || bg != uikit.Color(scheme.Foreground) {
 			t.Fatalf("reverse did not use background source %s", source)
 		}
 	}
@@ -134,7 +135,7 @@ func TestTerminalOSCLinksAndBell(t *testing.T) {
 	link := color.NRGBA{R: 1, G: 2, B: 3, A: 255}
 	scheme.Link = &link
 	fg, _ := terminalSpanColors(lines[0][0], scheme, prefs)
-	if fg != tokenColor(link) {
+	if fg != uikit.Color(link) {
 		t.Fatal("explicit link color was ignored")
 	}
 }
@@ -151,12 +152,12 @@ func TestTerminalSelectionUsesRuneOffsets(t *testing.T) {
 		t.Fatalf("selection split byte offsets instead of rune offsets: %+v", spans)
 	}
 	for _, index := range []int{1, 2} {
-		if spans[index].Color != tokenColor(scheme.SelectionFg) ||
-			spans[index].Background != tokenColor(scheme.SelectionBg) {
+		if spans[index].Color != uikit.Color(scheme.SelectionFg) ||
+			spans[index].Background != uikit.Color(scheme.SelectionBg) {
 			t.Fatalf("selected span %d did not use the scheme colors", index)
 		}
 	}
-	if spans[0].Color != tokenColor(scheme.ANSI[1]) || spans[3].Color != tokenColor(scheme.ANSI[2]) {
+	if spans[0].Color != uikit.Color(scheme.ANSI[1]) || spans[3].Color != uikit.Color(scheme.ANSI[2]) {
 		t.Fatal("selection changed colors outside its range")
 	}
 }

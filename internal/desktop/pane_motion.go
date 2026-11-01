@@ -8,6 +8,7 @@ import (
 
 	"github.com/egoist/mygo/plugins/glass"
 	"github.com/egoist/mygo/ui"
+	"sshdesk/internal/uikit"
 )
 
 func canSplit(r ui.Rect, zone dropZone) bool {
@@ -140,9 +141,9 @@ func (a *app) zoomProgress(c *ui.Context, tab *workspaceTab) float32 {
 
 func (a *app) paneMotion(c *ui.Context, pane ui.Element, tab *workspaceTab, session *remoteSession) {
 	t := theme.Current()
-	animation := ui.Animation{Spring: tokenSpring(t.C.ReorderMotion.PaneDisplace)}
+	animation := ui.Animation{Spring: uikit.Spring(t.C.ReorderMotion.PaneDisplace)}
 	if tab.layoutDuration == t.C.Desktop.ZoomDuration {
-		animation = ui.Animation{Spring: tokenSpring(t.C.Desktop.ZoomSpring)}
+		animation = ui.Animation{Spring: uikit.Spring(t.C.Desktop.ZoomSpring)}
 	}
 	animation = a.positionAnimation(animation)
 	transition := ui.ElementTransition{Position: true, Size: true, Animation: &animation}
@@ -221,7 +222,7 @@ func paneReveal(c *ui.Context, card ui.Element, session *remoteSession) {
 			return
 		}
 	}
-	blur := p.Blur * (1 - tokenEasing(p.Easing)(progress))
+	blur := p.Blur * (1 - uikit.Easing(p.Easing)(progress))
 	card.Children(func() {
 		ui.Box(c).Key("drop-reveal").Absolute().Top(0).Right(0).Bottom(0).Left(0).
 			Radius(t.C.Pane.Radius).Material(glass.Blur{Radius: blur}).PassThrough()
@@ -262,7 +263,7 @@ func (a *app) terminalDivider(c *ui.Context, split splitPlacement) {
 	} else if a.resizing == node {
 		a.resizing = nil
 	}
-	animation := ui.Animation{Spring: tokenSpring(t.C.ReorderMotion.PaneDisplace)}
+	animation := ui.Animation{Spring: uikit.Spring(t.C.ReorderMotion.PaneDisplace)}
 	if held {
 		animation = ui.Animation{Duration: t.C.Desktop.InstantDuration}
 	}
@@ -291,14 +292,14 @@ func (a *app) terminalDivider(c *ui.Context, split splitPlacement) {
 	if edge.Hovered() || held || edge.FocusVisible() {
 		target = 1
 	}
-	color := tokenColor(t.C.Desktop.DividerHandleColor)
+	color := uikit.Color(t.C.Desktop.DividerHandleColor)
 	if held {
-		color = tokenColor(t.C.DropIndicator.LineColor)
+		color = uikit.Color(t.C.DropIndicator.LineColor)
 	}
 	edge.Children(func() {
 		handle := ui.Box(c).Size(t.C.Desktop.DividerHandleWidth, t.C.Desktop.DividerHandleHeight).
 			Radius(t.C.Desktop.DividerHandleRadius).Background(color).
-			Opacity(animateVisual(edge, "handle", target, t.C.Desktop.DividerFadeDuration)).PassThrough()
+			Opacity(uikit.Visual(edge, "handle", target, t.C.Desktop.DividerFadeDuration)).PassThrough()
 		if node.stacked {
 			handle.Size(t.C.Desktop.DividerHandleHeight, t.C.Desktop.DividerHandleWidth)
 		}

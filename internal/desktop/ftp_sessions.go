@@ -116,7 +116,7 @@ func (a *app) fileTitleBar(c *ui.Context, shown float32) {
 			if a.page().sidebarCollapsed {
 				label = "展开站点栏"
 			}
-			keyedIconButton(c, "sidebar-toggle", label, sidebarIcon).
+			uikit.IconButton(c, sidebarIcon, uikit.IconButtonProps{Key: "sidebar-toggle", Label: label}).
 				Disabled(a.activeSection() == sectionSettings).
 				OnClick(func() { a.page().sidebarCollapsed = !a.page().sidebarCollapsed })
 		})
@@ -129,7 +129,7 @@ func (a *app) fileTitleBar(c *ui.Context, shown float32) {
 							closing = session
 						}
 					}
-					iconButton(c, "新建文件会话", plusIcon).Menu(func(m *ui.Menu) {
+					uikit.IconButton(c, plusIcon, uikit.IconButtonProps{Label: "新建文件会话"}).Menu(func(m *ui.Menu) {
 						for _, group := range a.catalogGroups() {
 							m.Submenu(group.name, func(sub *ui.Menu) {
 								for _, id := range group.hosts {
@@ -209,23 +209,13 @@ func connectionIndicatorState(state connectionState) uikit.ConnState {
 }
 
 func (a *app) catalogHostIcon(c *ui.Context, id hostID) {
-	t := theme.Current()
 	h := a.hosts[id]
 	if a.section == sectionFiles {
-		p := t.C.ProtocolIcon
-		background, foreground, icon := p.SftpBg, p.SftpGlyph, folderLockIcon
-		if h.protocol == "ftp" {
-			background, foreground, icon = p.FtpBg, p.FtpGlyph, folderIcon
-		}
-		ui.Box(c).Size(p.Size, p.Size).Shrink(0).Radius(p.Radius).Background(tokenColor(background)).
-			Center().Children(func() { ui.Icon(c, icon).Size(p.Glyph, p.Glyph).TextColor(tokenColor(foreground)) })
+		uikit.ProtocolIcon(c, h.protocol == "ftp", folderLockIcon, folderIcon)
 		return
 	}
 	style := systems[h.os]
-	ui.Box(c).Size(t.C.OsLogo.Size, t.C.OsLogo.Size).Shrink(0).Radius(t.C.OsLogo.Radius).
-		Background(tokenColor(t.OSLogoBg(style.color))).Center().Children(func() {
-		ui.Image(c, style.icon).Size(t.C.OsLogo.GlyphSize, t.C.OsLogo.GlyphSize).TextColor(tokenColor(style.color))
-	})
+	uikit.OsLogo(c, style.icon, style.color)
 }
 
 func (a *app) deleteFileSite(id hostID) error {
@@ -316,16 +306,16 @@ func (a *app) deleteSiteDialogContents(c *ui.Context) {
 	ui.Text(c, "删除会话「"+h.name+"」？").FontSize(t.C.Dialog.TitleSize).
 		FontWeight(t.Font.Weight.Semibold)
 	ui.Text(c, "将从当前页面的目录移除，并关闭此条目的会话。服务器文件不受影响。").
-		FontSize(t.Font.Size.Small).TextColor(tokenColor(t.Color.Text.Secondary))
+		FontSize(t.Font.Size.Small).TextColor(uikit.Color(t.Color.Text.Secondary))
 	ui.Row(c).Justify(ui.End).Gap(t.Space.N8).Children(func() {
-		button(c, "取消").OnClick(func() { a.page().addHostOpen = false })
-		button(c, "删除").TextColor(tokenColor(t.C.Tab.TextErrorSelected)).OnClick(func() {
+		uikit.Button(c, "取消", uikit.ButtonProps{}).OnClick(func() { a.page().addHostOpen = false })
+		uikit.Button(c, "删除", uikit.ButtonProps{}).TextColor(uikit.Color(t.C.Tab.TextErrorSelected)).OnClick(func() {
 			if a.fileSiteBusy(id) {
-				c.Toast("请先取消或清除该会话的传输任务")
+				uikit.Notify(c, "请先取消或清除该会话的传输任务")
 				return
 			}
 			if err := a.deleteFileSite(id); err != nil {
-				c.Toast("删除会话失败：" + err.Error())
+				uikit.Notify(c, "删除会话失败："+err.Error())
 				return
 			}
 			a.page().addHostOpen = false

@@ -9,6 +9,7 @@ import (
 	"sshdesk/internal/theme"
 
 	"github.com/egoist/mygo/ui"
+	"sshdesk/internal/uikit"
 )
 
 type terminalColorKind uint8
@@ -216,7 +217,7 @@ func terminalExtendedColor(values []int) (terminalColor, int, bool) {
 func (source terminalColor) resolve(s *termtheme.Scheme, defaultColor ui.Color) ui.Color {
 	switch source.kind {
 	case terminalPalette:
-		return tokenColor(s.Color(int(source.index)))
+		return uikit.Color(s.Color(int(source.index)))
 	case terminalRGB:
 		return ui.Color{R: uint8(source.rgb >> 16), G: uint8(source.rgb >> 8), B: uint8(source.rgb), A: 255}
 	}
@@ -228,14 +229,14 @@ func terminalSpanColors(span terminalSpan, scheme *termtheme.Scheme, prefs termt
 	if span.Bold && prefs.BoldIsBright && foreground.kind == terminalPalette && foreground.index < 8 {
 		foreground.index += 8
 	}
-	fg := foreground.resolve(scheme, tokenColor(scheme.Foreground))
+	fg := foreground.resolve(scheme, uikit.Color(scheme.Foreground))
 	background := termtheme.TerminalBackground(scheme, theme.Current().C.Pane.Bg, prefs.Background)
-	bg := span.Background.resolve(scheme, tokenColor(background))
+	bg := span.Background.resolve(scheme, uikit.Color(background))
 	if span.Bold && scheme.Bold != nil {
-		fg = tokenColor(*scheme.Bold)
+		fg = uikit.Color(*scheme.Bold)
 	}
 	if span.Link != "" && scheme.Link != nil {
-		fg = tokenColor(*scheme.Link)
+		fg = uikit.Color(*scheme.Link)
 	}
 	if span.Reverse {
 		fg, bg = bg, fg
@@ -275,8 +276,8 @@ func terminalSpans(line terminalLine, scheme *termtheme.Scheme, prefs termtheme.
 			spans = append(spans, before)
 		}
 		selected := span
-		selected.Text, selected.Color = string(runes[from:to]), tokenColor(scheme.SelectionFg)
-		selected.Background = tokenColor(scheme.SelectionBg)
+		selected.Text, selected.Color = string(runes[from:to]), uikit.Color(scheme.SelectionFg)
+		selected.Background = uikit.Color(scheme.SelectionBg)
 		spans = append(spans, selected)
 		if to < length {
 			after := span

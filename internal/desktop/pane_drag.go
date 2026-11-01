@@ -7,6 +7,7 @@ import (
 
 	"sshdesk/internal/termtheme"
 	"sshdesk/internal/theme"
+	"sshdesk/internal/uikit"
 
 	"github.com/egoist/mygo/ui"
 )
@@ -210,21 +211,17 @@ func (a *app) dragPreview(c *ui.Context) {
 	visible := float32(1)
 	if d.phase == dragReturning {
 		r.X, r.Y = d.returnRect.X, d.returnRect.Y
-		animation = ui.Animation{Spring: tokenSpring(t.C.ReorderMotion.Cancel)}
+		animation = ui.Animation{Spring: uikit.Spring(t.C.ReorderMotion.Cancel)}
 		visible = 0
 	}
 	// Return the compact preview to its source without stretching it into a pane.
-	ghost := ui.Box(c).Key(d).Absolute().Left(r.X).Top(r.Y).Size(r.W, r.H).
-		Radius(radius).PassThrough().Transition(ui.ElementTransition{Position: true, Animation: &animation})
-	ghost.Opacity(animateVisual(ghost, "visible", visible, t.C.ReorderMotion.Cancel.Duration))
-	applyShadow(ghost, p.Shadow)
+	ghost := uikit.DragGhost(c, uikit.DragGhostProps{Key: d, Rect: r, Radius: radius, Animation: animation})
+	uikit.StyleDragGhost(ghost, visible, t.C.ReorderMotion.Cancel.Duration)
 	ghost.Children(func() {
 		if tabPreview {
-			ui.Row(c).Fill().Padding(0, t.C.Tab.PaddingLeft).Gap(t.C.Tab.Gap).
-				Radius(radius).Background(tokenColor(p.Bg)).PassThrough().Children(func() {
-				statusDot(c, d.session.state, t.C.Tab.DotSize)
-				ui.Text(c, a.hosts[d.session.host].name).FontSize(t.C.Tab.FontSize).
-					FontWeight(t.C.Tab.WeightSelected).TextColor(tokenColor(t.C.Tab.TextSelected)).SingleLine().PassThrough()
+			uikit.DragTabGhost(c, radius).Children(func() {
+				uikit.ConnectionDot(c, connectionIndicatorState(d.session.state), t.C.Tab.DotSize)
+				uikit.DragTabTitle(c, a.hosts[d.session.host].name)
 			})
 			return
 		}
@@ -236,25 +233,13 @@ func (a *app) paneDragPreview(c *ui.Context, session *remoteSession) {
 	t := theme.Current()
 	background := termtheme.TerminalBackground(a.sessionScheme(session), t.C.Pane.Bg, a.terminal.prefs.Background)
 	surface := terminalSurface(background)
-	p := surface.C.DragGhost
 	// PassThrough is per element in MyGo; every preview descendant must opt out of hit testing.
-	ui.Column(c).Fill().Radius(p.Radius).Background(tokenColor(background)).Clip().PassThrough().Padding(
-		p.PaddingY,
-		p.PaddingRight,
-		p.PaddingY,
-		p.PaddingLeft,
-	).Gap(t.Space.N8).Children(func() {
-		ui.Row(c).Height(p.HeaderHeight).Shrink(0).Gap(t.Space.N8).PassThrough().Children(func() {
-			statusDot(c, session.state, t.C.Tab.DotSize)
-			ui.Text(c, a.hosts[session.host].name).FontSize(p.FontSize).FontWeight(t.Font.Weight.Medium).
-				TextColor(tokenColor(surface.C.Pane.Name)).SingleLine().Ellipsis("…").MinWidth(0).PassThrough()
+	uikit.DragPaneGhost(c, background, surface).Children(func() {
+		uikit.DragPaneHeader(c, surface).Children(func() {
+			uikit.ConnectionDot(c, connectionIndicatorState(session.state), t.C.Tab.DotSize)
+			uikit.DragPaneTitle(c, a.hosts[session.host].name, surface)
 		})
-		ui.Column(c).FillWidth().Grow(1).Justify(ui.Center).Gap(t.Space.N8).PassThrough().Children(func() {
-			for _, width := range []float32{p.LineLong, p.LineMedium, p.LineLong, p.LineShort} {
-				ui.Box(c).WidthPercent(width * 100).Height(p.LineHeight).Shrink(0).
-					Radius(p.LineRadius).Background(tokenColor(p.LineColor)).PassThrough()
-			}
-		})
+		uikit.DragSkeleton(c, surface)
 	})
 }
 
@@ -452,14 +437,7 @@ func (a *app) dockSession(tab *workspaceTab, target *remoteSession, value any, p
 	}
 }
 
-func (a *app) dragPlaceholder(pane ui.Element) {
-	pane.Draw(func(p *ui.Painter, r ui.Rect) {
-		t := theme.Current()
-		p.Fill(r, tokenColor(t.C.DropIndicator.PlaceholderBg), t.C.Pane.Radius)
-		layer := t.C.DropIndicator.PlaceholderShadow[0]
-		p.StrokeDashed(r, tokenColor(layer.Color), t.C.Pane.Radius, layer.Spread)
-	})
-}
+func (a *app) dragPlaceholder(pane ui.Element) { uikit.StylePanePlaceholder(pane) }
 
 func (a *app) paneSizeLabel(session *remoteSession) string {
 	return fmt.Sprintf("%d × %d · 演示", session.columns, session.rows)

@@ -28,7 +28,7 @@ func (a *app) terminals(c *ui.Context, size ui.Point) {
 		}
 		if over {
 			area.DrawOver(func(p *ui.Painter, r ui.Rect) {
-				p.Fill(r, tokenColor(t.C.DropIndicator.ZoneBg), t.C.DropIndicator.ZoneRadius)
+				uikit.DrawDropIndicator(p, r, uikit.DropIndicatorProps{Background: uikit.Color(t.C.DropIndicator.ZoneBg), Radius: t.C.DropIndicator.ZoneRadius})
 			})
 		}
 		if dropped {
@@ -44,12 +44,9 @@ func (a *app) terminals(c *ui.Context, size ui.Point) {
 			}
 		}
 		area.Children(func() {
-			uikit.Card(c).Fill().MinWidth(0).Center().Gap(t.Space.N12).Children(func() {
-				ui.Icon(c, terminalIcon).Size(t.C.Pane.EmptyIconSize, t.C.Pane.EmptyIconSize).TextColor(tokenColor(t.Color.Text.Secondary))
-				ui.Text(c, "选择一台主机，开始会话").FontSize(t.C.Pane.EmptyTitleSize).FontWeight(t.C.Pane.EmptyTitleWeight)
-				ui.Text(c, "左侧主机可拖入终端窗格").FontSize(t.Font.Size.Body).TextColor(tokenColor(t.Color.Text.Secondary))
-				uikit.Button(c, "添加 SSH 主机", uikit.ButtonProps{}).OnClick(func() { a.startHostDraft() })
-			})
+			parts := uikit.EmptyState(c, uikit.EmptyProps{Kind: uikit.EmptyTerminal, Icon: terminalIcon,
+				Title: "选择一台主机，开始会话", Detail: "左侧主机可拖入终端窗格", Action: "添加 SSH 主机"})
+			parts.Action.OnClick(func() { a.startHostDraft() })
 		})
 		return
 	}
@@ -115,8 +112,8 @@ func (a *app) terminals(c *ui.Context, size ui.Point) {
 		area.DrawOver(func(p *ui.Painter, bounds ui.Rect) {
 			r := *preview
 			r.X, r.Y = r.X+bounds.X, r.Y+bounds.Y
-			p.Fill(r, tokenColor(t.C.DropIndicator.ZoneBg), t.C.DropIndicator.ZoneRadius)
-			p.Stroke(r, tokenColor(t.C.DropIndicator.ZoneBorder), t.C.DropIndicator.ZoneRadius, t.C.DropIndicator.ZoneBorderWidth)
+			uikit.DrawDropIndicator(p, r, uikit.DropIndicatorProps{Background: uikit.Color(t.C.DropIndicator.ZoneBg),
+				Border: uikit.Color(t.C.DropIndicator.ZoneBorder), Radius: t.C.DropIndicator.ZoneRadius, BorderWidth: t.C.DropIndicator.ZoneBorderWidth})
 		})
 	}
 }
@@ -138,7 +135,7 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 	s := a.sessionScheme(placement.session)
 	prefs := a.terminal.prefs
 	terminalBackground := termtheme.TerminalBackground(s, t.C.Pane.Bg, prefs.Background)
-	background := tokenColor(terminalBackground)
+	background := uikit.Color(terminalBackground)
 	surface := terminalSurface(terminalBackground)
 	p, f, status := surface.C.Pane, surface.C.PaneFocus, surface.C.StatusBar
 	session, rect := placement.session, placement.rect
@@ -199,7 +196,7 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 				status.HeightPane,
 				0,
 			).Font(strings.Join(prefs.FontFamily, ", ")).FontSize(prefs.FontSize).
-				LetterSpacing(prefs.Tracking).TextColor(tokenColor(s.Foreground)).
+				LetterSpacing(prefs.Tracking).TextColor(uikit.Color(s.Foreground)).
 				Opacity(appearance.Opacity).Cache().HandleInput(scroll.input).
 				OnClick(func() { a.focusSession(tab, session) })
 			if appearance.Saturation != 1 {
@@ -221,7 +218,7 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 				header.Children(func() {
 					number := slices.Index(tab.root.sessions(), session) + 1
 					uikit.PaneShortcut(c, fmt.Sprintf("⌘%d", number), focused, surface)
-					statusDot(c, session.state, t.Size.Dot)
+					uikit.ConnectionDot(c, connectionIndicatorState(session.state), t.Size.Dot)
 					uikit.Tip(c, uikit.PaneTitle(c, h.name, appearance, surface), fmt.Sprintf("%s · %s@%s:%d", h.name, h.user, h.address, h.port))
 					uikit.PaneLogin(c, fmt.Sprintf("%s@%s:%d", h.user, h.address, h.port), appearance, surface)
 					if !focused {
@@ -272,24 +269,8 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 				header.Right(p.HeaderPaddingRight + (actionsWidth+t.Space.N10)*actionVisibility)
 			}
 			uikit.PaneFooter(c, appearance.FooterOpacity, surface).Children(func() {
-				badge := surface.C.Badge
-				label, tint := "已连接", tokenColor(badge.OkBg)
-				color := tokenColor(badge.OkText)
-				switch {
-				case session.state == connecting:
-					label, tint, color = "连接中", tokenColor(surface.Color.Warning.Subtle), tokenColor(surface.Color.Warning.Text)
-				case session.state != connected:
-					label, tint, color = "未连接", tokenColor(badge.NeutralBg), tokenColor(badge.NeutralText)
-				}
-				ui.Row(c).Padding(badge.PaddingY, badge.PaddingXCompact).Gap(badge.Gap).Radius(badge.Radius).Background(tint).Children(func() {
-					ui.Box(c).Size(t.Size.DotSm, t.Size.DotSm).Radius(badge.Radius).Background(color)
-					ui.Text(c, label).FontSize(badge.FontSizeCompact).TextColor(color)
-				})
-				latency := "延迟 —"
-				if session.state == connected {
-					latency = fmt.Sprintf("延迟 %d ms", h.latency)
-				}
-				ui.Text(c, latency).FontSize(status.FontSize).SingleLine()
+				uikit.ConnectionBadge(c, connectionIndicatorState(session.state), t.Size.DotSm, surface)
+				uikit.Latency(c, h.latency, session.state == connected, surface)
 				ui.Spacer(c)
 				ui.Text(c, a.paneSizeLabel(session)).FontSize(status.FontSize).SingleLine()
 			})

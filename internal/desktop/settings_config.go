@@ -221,7 +221,7 @@ func (a *app) tickPreferences(c *ui.Context) {
 		if a.settingsUI.open {
 			a.settingsUI.notice = err.Error()
 		}
-		c.Toast("保存设置失败：" + err.Error())
+		uikit.Notify(c, "保存设置失败："+err.Error())
 	}
 }
 

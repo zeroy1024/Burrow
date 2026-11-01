@@ -42,7 +42,7 @@ func (a *app) importedThemeMenu(c *ui.Context, name string) func(*ui.Menu) {
 		}
 		if menu.Item(label).Disabled(reason != "").Chosen() {
 			if err := a.deleteImportedTheme(name); err != nil {
-				c.Toast("删除配色失败：" + err.Error())
+				uikit.Notify(c, "删除配色失败："+err.Error())
 			}
 		}
 	}

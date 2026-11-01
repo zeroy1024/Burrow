@@ -7,6 +7,7 @@ import (
 	"sshdesk/internal/theme"
 
 	"github.com/egoist/mygo/ui"
+	"sshdesk/internal/uikit"
 )
 
 type terminalScrollState struct {
@@ -64,8 +65,9 @@ func fadingScrollbar(c *ui.Context, view scrollbarView, state *scrollbarState) {
 	viewHeight := bounds.H
 	trackHeight := viewHeight - view.top - view.bottom - 2*scrollbar.EndInset
 	if offset.MaxY <= 0 || trackHeight <= scrollbar.MinThumb {
-		// Initialize the fade before the first layout has measured the scroll range.
-		animateVisual(pane, "scrollbar", 0, scrollbar.FadeDuration)
+		uikit.
+			// Initialize the fade before the first layout has measured the scroll range.
+			Visual(pane, "scrollbar", 0, scrollbar.FadeDuration)
 		return
 	}
 	thumbHeight := max(scrollbar.MinThumb, trackHeight*viewHeight/(viewHeight+offset.MaxY))
@@ -107,7 +109,7 @@ func fadingScrollbar(c *ui.Context, view scrollbarView, state *scrollbarState) {
 	if nearEdge || dragging || now.Before(state.visibleUntil) {
 		target = 1
 	}
-	track.Opacity(animateVisual(pane, "scrollbar", target, scrollbar.FadeDuration))
+	track.Opacity(uikit.Visual(pane, "scrollbar", target, scrollbar.FadeDuration))
 	if now.Before(state.visibleUntil) {
 		c.After(state.visibleUntil.Sub(now))
 	}

@@ -168,14 +168,14 @@ func (a *app) closeTabDialog(c *ui.Context) {
 	if !open {
 		return
 	}
-	modal(c, &open, func() {
+	uikit.Dialog(c, &open, func() {
 		t := theme.Current()
 		ui.Column(c).Width(t.C.Dialog.GroupWidth).Gap(t.Space.N14).Children(func() {
 			ui.Text(c, "关闭活动连接？").FontSize(t.C.Dialog.TitleSize).FontWeight(t.Font.Weight.Semibold)
 			ui.Text(c, "关闭此选项卡将结束其中的会话。").FontSize(t.Font.Size.Body)
 			ui.Row(c).Justify(ui.End).Gap(t.Space.N8).Children(func() {
-				button(c, "取消").OnClick(func() { a.closeRequest = nil })
-				primaryButton(c, "关闭选项卡").OnClick(func() {
+				uikit.Button(c, "取消", uikit.ButtonProps{}).OnClick(func() { a.closeRequest = nil })
+				uikit.Button(c, "关闭选项卡", uikit.ButtonProps{Variant: uikit.ButtonPrimary}).OnClick(func() {
 					index := slices.Index(a.tabs, a.closeRequest)
 					a.closeRequest = nil
 					if index >= 0 {

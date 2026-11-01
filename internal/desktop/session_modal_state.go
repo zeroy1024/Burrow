@@ -15,6 +15,7 @@ import (
 	"sshdesk/internal/theme"
 
 	"github.com/egoist/mygo/ui"
+	"sshdesk/internal/uikit"
 )
 
 type hostDraft struct {
@@ -403,12 +404,12 @@ func (a *app) saveSessionDraft(c *ui.Context, d *hostDraft, connect bool) {
 	initializeSession(&h)
 	rollback, release, err := snapshotSessionSecrets(h, d.passwordChanged, d.passphraseChanged)
 	if err != nil {
-		c.Toast("读取原有凭据失败：" + err.Error())
+		uikit.Notify(c, "读取原有凭据失败："+err.Error())
 		return
 	}
 	defer release()
 	if err := a.storeSessionSecrets(&h, d.password, d.passwordChanged, d.passphrase, d.passphraseChanged); err != nil {
-		c.Toast("保存凭据失败：" + errors.Join(err, rollback()).Error())
+		uikit.Notify(c, "保存凭据失败："+errors.Join(err, rollback()).Error())
 		return
 	}
 	id := hostID(len(a.hosts))
@@ -438,7 +439,7 @@ func (a *app) saveSessionDraft(c *ui.Context, d *hostDraft, connect bool) {
 		}
 	})
 	if err != nil {
-		c.Toast("保存会话失败：" + errors.Join(err, rollback()).Error())
+		uikit.Notify(c, "保存会话失败："+errors.Join(err, rollback()).Error())
 		return
 	}
 	a.page().query = ""

@@ -56,15 +56,15 @@ func terminalActivity(c *ui.Context, session *remoteSession, surface *theme.Them
 	b := t.C.ActivityBadge
 	if session.hasNewOutput {
 		ui.Row(c).Shrink(0).Padding(b.PaddingY, b.PaddingRight, b.PaddingY, b.PaddingLeft).Gap(b.Gap).Radius(b.Radius).
-			Background(tokenColor(b.OutputBg)).PassThrough().Children(func() {
-			ui.Box(c).Size(b.DotSize, b.DotSize).Radius(t.Radius.Pill).Background(tokenColor(b.OutputDot))
-			ui.Text(c, "新输出").FontSize(b.FontSize).TextColor(tokenColor(b.OutputText)).SingleLine()
+			Background(uikit.Color(b.OutputBg)).PassThrough().Children(func() {
+			ui.Box(c).Size(b.DotSize, b.DotSize).Radius(t.Radius.Pill).Background(uikit.Color(b.OutputDot))
+			ui.Text(c, "新输出").FontSize(b.FontSize).TextColor(uikit.Color(b.OutputText)).SingleLine()
 		})
 	}
 	if session.hasBell {
-		tooltip(c, ui.Row(c).Shrink(0).Padding(b.PaddingY, b.PaddingRight, b.PaddingY, b.PaddingLeft).Radius(b.Radius).Label("会话响铃"), "会话响铃").
-			Background(tokenColor(b.BellBg)).PassThrough().Children(func() {
-			ui.Icon(c, bellIcon).Size(b.BellIconSize, b.BellIconSize).TextColor(tokenColor(b.BellText))
+		uikit.Tip(c, ui.Row(c).Shrink(0).Padding(b.PaddingY, b.PaddingRight, b.PaddingY, b.PaddingLeft).Radius(b.Radius).Label("会话响铃"), "会话响铃").
+			Background(uikit.Color(b.BellBg)).PassThrough().Children(func() {
+			ui.Icon(c, bellIcon).Size(b.BellIconSize, b.BellIconSize).TextColor(uikit.Color(b.BellText))
 		})
 	}
 }
@@ -82,13 +82,12 @@ func (a *app) terminalCursor(c *ui.Context, session *remoteSession, focused bool
 			0,
 			0,
 			0,
-			termtheme.CursorOutlineWidth,
-			tokenColor(surface.C.PaneFocus.CursorRingUnfocused),
+			termtheme.CursorOutlineWidth, uikit.Color(surface.C.PaneFocus.CursorRingUnfocused),
 		)
 		return
 	}
 	cursor.Children(func() {
-		mark := ui.Box(c).Absolute().Left(0).Bottom(0).Background(tokenColor(scheme.Cursor))
+		mark := ui.Box(c).Absolute().Left(0).Bottom(0).Background(uikit.Color(scheme.Cursor))
 		switch prefs.CursorShape {
 		case termtheme.CursorBar:
 			mark.Size(termtheme.CursorBarWidth, height)
@@ -96,7 +95,7 @@ func (a *app) terminalCursor(c *ui.Context, session *remoteSession, focused bool
 			mark.Size(width, termtheme.CursorUnderlineSize)
 		default:
 			mark.Size(width, height).Children(func() {
-				ui.Text(c, text).TextColor(tokenColor(scheme.CursorText)).SingleLine()
+				ui.Text(c, text).TextColor(uikit.Color(scheme.CursorText)).SingleLine()
 			})
 		}
 	})

@@ -15,10 +15,10 @@ import (
 )
 
 var (
-	sessionKeyIcon   = lineIcon(`<circle cx="8" cy="8" r="5"/><path d="m12 12 9 9m-6-6 3-3m0 6 3-3"/>`)
-	sessionEyeIcon   = lineIcon(`<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>`)
-	sessionAlertIcon = lineIcon(`<circle cx="12" cy="12" r="9"/><path d="M12 7v6m0 4h.01"/>`)
-	sessionCheckIcon = lineIcon(`<circle cx="12" cy="12" r="9"/><path d="m7 12 3 3 7-7"/>`)
+	sessionKeyIcon   = uikit.LineIcon(`<circle cx="8" cy="8" r="5"/><path d="m12 12 9 9m-6-6 3-3m0 6 3-3"/>`)
+	sessionEyeIcon   = uikit.LineIcon(`<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>`)
+	sessionAlertIcon = uikit.LineIcon(`<circle cx="12" cy="12" r="9"/><path d="M12 7v6m0 4h.01"/>`)
+	sessionCheckIcon = uikit.LineIcon(`<circle cx="12" cy="12" r="9"/><path d="m7 12 3 3 7-7"/>`)
 )
 
 func (a *app) hostDialog(c *ui.Context) {
@@ -97,12 +97,7 @@ func (a *app) hostDialog(c *ui.Context) {
 		a.sessionDraftHeader(c, d)
 		noticeHeight := float32(0)
 		if count := a.draftOpenTabs(d); count > 0 {
-			notice := ui.Row(c).Shrink(0).Margin(0, p.BodyPaddingX, t.Space.N12, p.BodyPaddingX).Padding(t.Space.N8, t.Space.N10).
-				Radius(t.Radius.Control).Background(uikit.Color(t.Color.Surface.Sunken)).Gap(t.Space.N6).Children(func() {
-				ui.Icon(c, infoIcon).Size(t.Size.IconSm, t.Size.IconSm).TextColor(uikit.Color(t.Color.Text.Secondary))
-				ui.Text(c, fmt.Sprintf("此会话已在 %d 个选项卡中打开，修改将在下次连接时生效。", count)).
-					FontSize(t.Font.Size.Small).TextColor(uikit.Color(t.Color.Text.Muted)).Grow(1).MinWidth(0)
-			})
+			notice := uikit.Banner(c, fmt.Sprintf("此会话已在 %d 个选项卡中打开，修改将在下次连接时生效。", count), infoIcon)
 			noticeHeight = notice.LayoutBounds().H + t.Space.N12
 		}
 		headerHeight := p.HeaderPaddingTop + p.IconTile + p.HeaderPaddingBottom
@@ -509,63 +504,18 @@ func (a *app) sessionDraftFooter(c *ui.Context, d *hostDraft) {
 }
 
 func (a *app) sessionTestResult(c *ui.Context, d *hostDraft) {
-	t := theme.Current()
-	p := t.C.TestResult
 	if d.testResult == nil && d.testResults == nil {
 		return
 	}
-	row := ui.Row(c).Key("test-result").MinWidth(0).Shrink(1).Gap(p.Gap).AlignItems(ui.Center).
-		Transition(ui.ElementTransition{Duration: p.Crossfade, Enter: &ui.Motion{}})
-	shown := float32(0)
-	if d.testVisible {
-		shown = 1
-	}
-	alpha := uikit.Visual(row, "result-alpha", shown, p.Crossfade)
-	row.Opacity(alpha).Hidden(alpha == 0 && !d.testVisible)
-	row.Children(func() {
-		stage := "testing"
-		if d.testResults == nil {
-			stage = "success"
-			if d.testResult.Err != nil {
-				stage = "failure"
-			}
+	props := uikit.TestResultProps{Visible: d.testVisible, SuccessIcon: sessionCheckIcon, FailureIcon: sessionAlertIcon, InfoIcon: infoIcon}
+	if d.testResults == nil {
+		props.State = uikit.TestOK
+		if d.testResult.Err != nil {
+			props.State = uikit.TestFailed
 		}
-		ui.Row(c).Key(stage).MinWidth(0).Gap(p.Gap).AlignItems(ui.Center).
-			Transition(ui.ElementTransition{Duration: p.Crossfade, Enter: &ui.Motion{}, Exit: &ui.Motion{}}).Children(func() {
-			if d.testResults != nil {
-				ui.Spinner(c).Size(p.SpinnerSize, p.SpinnerSize).Shrink(0).Label("正在连接").TextColor(uikit.Color(p.Testing))
-				ui.Text(c, "正在连接…").FontSize(p.FontSize).TextColor(uikit.Color(p.Testing)).MinWidth(0).SingleLine()
-				return
-			}
-			result := d.testResult
-			icon, color, glyph := sessionCheckIcon, p.Success, p.SuccessIcon
-			if result.Err != nil {
-				icon, color, glyph = sessionAlertIcon, p.Fail, p.FailIcon
-			}
-			ui.Icon(c, icon).Size(p.Icon, p.Icon).Shrink(0).TextColor(uikit.Color(glyph))
-			label := ui.Text(c, result.Summary).FontSize(p.FontSize).TextColor(uikit.Color(color)).MinWidth(0).SingleLine()
-			if result.Detail != "" {
-				sessionResultTooltip(c, label, result.Detail)
-			}
-			if result.Err != nil {
-				sessionResultTooltip(c, ui.Icon(c, infoIcon).Size(p.InfoSize, p.InfoSize).Shrink(0).TextColor(uikit.Color(p.Info)), result.Detail)
-			}
-		})
-	})
-}
-
-func sessionResultTooltip(c *ui.Context, anchor ui.Element, detail string) {
-	t := theme.Current()
-	lines := strings.Split(detail, "\n")
-	if len(lines) > 3 {
-		lines = append(lines[:2], lines[len(lines)-1])
+		props.Summary, props.Detail = d.testResult.Summary, d.testResult.Detail
 	}
-	text := strings.Join(lines, "\n")
-	anchor.Description(text)
-	ui.TooltipBase(c, anchor, func(panel ui.Element) {
-		uikit.StyleTooltip(panel).AttachTo(anchor, ui.AnchorTop, ui.AnchorBottom).Margin(0, 0, t.C.Tooltip.Offset, 0).
-			Children(func() { ui.Text(c, text).Font(strings.Join(t.C.Input.MonoFont, ", ")).FontSize(t.Font.Size.Footnote) })
-	})
+	uikit.TestResult(c, props)
 }
 
 func (a *app) chooseSessionDirectory(d *hostDraft) {
