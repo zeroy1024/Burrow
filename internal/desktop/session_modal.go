@@ -8,6 +8,7 @@ import (
 	"unicode/utf8"
 
 	"sshdesk/internal/theme"
+	"sshdesk/internal/uikit"
 
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
@@ -24,7 +25,7 @@ func (a *app) hostDialog(c *ui.Context) {
 	page := a.page()
 	d := &page.draft
 	if d.deleting {
-		modal(c, &page.addHostOpen, func() {
+		uikit.Dialog(c, &page.addHostOpen, func() {
 			ui.Column(c).Width(theme.Current().C.Dialog.HostWidth).Gap(theme.Current().Space.N14).Children(func() { a.deleteSiteDialogContents(c) })
 		})
 		return
@@ -53,18 +54,11 @@ func (a *app) hostDialog(c *ui.Context) {
 	}
 	t := theme.Current()
 	p := t.C.Modal
-	width, height := c.Size()
-	top := max(p.TopMin, height*p.TopRatio)
-	maxHeight := height - top - p.BottomMargin
 	d.submitted = false
-	dialog := ui.DialogBase(c, &page.addHostOpen, func(backdrop, panel ui.Element) {
-		backdrop.Column().Justify(ui.Start).AlignItems(ui.Center).Padding(top, 0, 0, 0)
-		panel.Column().Width(p.Width).MaxWidth(width - 2*p.BodyPaddingX).MaxHeight(maxHeight).
-			Padding(0).Gap(0).Radius(p.Radius).Background(tokenColor(p.Bg)).Label(a.sessionDraftTitle(d)).Disabled(d.closing || d.saving)
-		applyShadow(panel, p.Shadow)
+	dialog := uikit.Modal(c, &page.addHostOpen, uikit.ModalProps{Label: a.sessionDraftTitle(d), Disabled: d.closing || d.saving}, func(backdrop, panel ui.Element, bounds uikit.ModalBounds) {
 		alphaTarget, scaleTarget := float32(1), float32(1)
 		duration := p.Fade
-		animation := ui.Animation{Spring: tokenSpring(p.Enter)}
+		animation := ui.Animation{Spring: uikit.Spring(p.Enter)}
 		if !d.entered {
 			alphaTarget, scaleTarget = 0, p.EnterScale
 			d.entered = true
@@ -72,7 +66,7 @@ func (a *app) hostDialog(c *ui.Context) {
 		}
 		if d.closing {
 			alphaTarget, scaleTarget, duration = 0, p.ExitScale, p.Exit
-			animation = ui.Animation{Duration: p.Exit, Ease: tokenEasing(t.Motion.Easing.In)}
+			animation = ui.Animation{Duration: p.Exit, Ease: uikit.Easing(t.Motion.Easing.In)}
 			if d.closeStarted.IsZero() {
 				d.closeStarted = c.Now()
 			}
@@ -88,9 +82,9 @@ func (a *app) hostDialog(c *ui.Context) {
 			}
 			c.AnimationFrame()
 		}
-		fadeAnimation := tokenTween(duration)
+		fadeAnimation := uikit.Tween(duration)
 		if d.closing {
-			fadeAnimation.Ease = tokenEasing(t.Motion.Easing.In)
+			fadeAnimation.Ease = uikit.Easing(t.Motion.Easing.In)
 		}
 		alphaColor := panel.AnimateColor("modal-alpha", ui.Color{A: uint8(alphaTarget * 255)}, fadeAnimation)
 		alpha := float32(alphaColor.A) / 255
@@ -99,24 +93,22 @@ func (a *app) hostDialog(c *ui.Context) {
 			scale = 1
 		}
 		panel.AnimatePose(ui.Pose{Scale: scale}, ui.Animation{Duration: t.Motion.Duration.InstantNonzero}).Opacity(alpha)
-		scrim := tokenColor(p.Scrim)
-		scrim.A = uint8(float32(scrim.A) * alpha)
-		backdrop.Background(scrim)
+		uikit.StyleModalScrim(backdrop, alpha)
 		a.sessionDraftHeader(c, d)
 		noticeHeight := float32(0)
 		if count := a.draftOpenTabs(d); count > 0 {
 			notice := ui.Row(c).Shrink(0).Margin(0, p.BodyPaddingX, t.Space.N12, p.BodyPaddingX).Padding(t.Space.N8, t.Space.N10).
-				Radius(t.Radius.Control).Background(tokenColor(t.Color.Surface.Sunken)).Gap(t.Space.N6).Children(func() {
-				ui.Icon(c, infoIcon).Size(t.Size.IconSm, t.Size.IconSm).TextColor(tokenColor(t.Color.Text.Secondary))
+				Radius(t.Radius.Control).Background(uikit.Color(t.Color.Surface.Sunken)).Gap(t.Space.N6).Children(func() {
+				ui.Icon(c, infoIcon).Size(t.Size.IconSm, t.Size.IconSm).TextColor(uikit.Color(t.Color.Text.Secondary))
 				ui.Text(c, fmt.Sprintf("此会话已在 %d 个选项卡中打开，修改将在下次连接时生效。", count)).
-					FontSize(t.Font.Size.Small).TextColor(tokenColor(t.Color.Text.Muted)).Grow(1).MinWidth(0)
+					FontSize(t.Font.Size.Small).TextColor(uikit.Color(t.Color.Text.Muted)).Grow(1).MinWidth(0)
 			})
 			noticeHeight = notice.LayoutBounds().H + t.Space.N12
 		}
 		headerHeight := p.HeaderPaddingTop + p.IconTile + p.HeaderPaddingBottom
 		footerHeight := p.FooterPaddingTop + t.C.Button.Height + p.FooterPaddingBottom
 		ui.Scroll(c).Key("session-form-scroll").FillWidth().MinHeight(0).Shrink(1).
-			MaxHeight(maxHeight - headerHeight - footerHeight - noticeHeight).TrackScroll(&d.scroll).Children(func() {
+			MaxHeight(bounds.MaxHeight - headerHeight - footerHeight - noticeHeight).TrackScroll(&d.scroll).Children(func() {
 			if d.files {
 				a.sessionProtocolPicker(c, d)
 			}
@@ -126,7 +118,7 @@ func (a *app) hostDialog(c *ui.Context) {
 		})
 		a.sessionDraftFooter(c, d)
 		// Built last so that Tab reaches the close button after the footer.
-		keyedIconButton(c, "session-close", "关闭会话设置", closeIcon).Absolute().Top(p.HeaderPaddingTop).Right(p.HeaderPaddingRight).
+		uikit.IconButton(c, closeIcon, uikit.IconButtonProps{Key: "session-close", Label: "关闭会话设置"}).Absolute().Top(p.HeaderPaddingTop).Right(p.HeaderPaddingRight).
 			OnClick(func() { a.closeSessionDraft(d) })
 		if !d.closing && !d.saving {
 			if panel.OverlayShortcut(ui.Super, ui.KeyS) {
@@ -163,24 +155,24 @@ func (a *app) sessionDraftHeader(c *ui.Context, d *hostDraft) {
 	p := t.C.Modal
 	ui.Row(c).FillWidth().Shrink(0).Padding(p.HeaderPaddingTop, p.HeaderPaddingRight, p.HeaderPaddingBottom, p.HeaderPaddingLeft).
 		Gap(p.HeaderGap).AlignItems(ui.Center).Children(func() {
-		ui.Box(c).Size(p.IconTile, p.IconTile).Shrink(0).Radius(p.IconTileRadius).Background(tokenColor(t.Color.Surface.Control)).Center().Children(func() {
+		ui.Box(c).Size(p.IconTile, p.IconTile).Shrink(0).Radius(p.IconTileRadius).Background(uikit.Color(t.Color.Surface.Control)).Center().Children(func() {
 			if d.files {
 				protocol := theme.Current().C.ProtocolIcon
 				icon, fg, bg := folderLockIcon, protocol.SftpGlyph, protocol.SftpBg
 				if d.protocol == "FTP" {
 					icon, fg, bg = folderIcon, protocol.FtpGlyph, protocol.FtpBg
 				}
-				ui.Box(c).Key("protocol-header-" + d.protocol).Fill().Radius(p.IconTileRadius).Background(tokenColor(bg)).Center().
+				ui.Box(c).Key("protocol-header-" + d.protocol).Fill().Radius(p.IconTileRadius).Background(uikit.Color(bg)).Center().
 					Transition(ui.ElementTransition{Duration: p.Fade, Enter: &ui.Motion{}, Exit: &ui.Motion{}}).
-					Children(func() { ui.Icon(c, icon).Size(t.Size.Icon, t.Size.Icon).TextColor(tokenColor(fg)) })
+					Children(func() { ui.Icon(c, icon).Size(t.Size.Icon, t.Size.Icon).TextColor(uikit.Color(fg)) })
 			} else if d.editing && a.hosts[d.id].system != "" {
 				h := a.hosts[d.id]
 				style := systems[h.os]
-				ui.Box(c).Fill().Radius(p.IconTileRadius).Background(tokenColor(t.OSLogoBg(style.color))).Center().Children(func() {
-					ui.Image(c, style.icon).Size(t.C.OsLogo.GlyphSize, t.C.OsLogo.GlyphSize).TextColor(tokenColor(style.color))
+				ui.Box(c).Fill().Radius(p.IconTileRadius).Background(uikit.Color(t.OSLogoBg(style.color))).Center().Children(func() {
+					ui.Image(c, style.icon).Size(t.C.OsLogo.GlyphSize, t.C.OsLogo.GlyphSize).TextColor(uikit.Color(style.color))
 				})
 			} else {
-				ui.Icon(c, terminalIcon).Size(t.Size.Icon, t.Size.Icon).TextColor(tokenColor(t.Color.Text.Strong))
+				ui.Icon(c, terminalIcon).Size(t.Size.Icon, t.Size.Icon).TextColor(uikit.Color(t.Color.Text.Strong))
 			}
 		})
 		ui.Column(c).Grow(1).MinWidth(0).Gap(t.Space.N2).PaddingEnd(t.C.IconButton.Size).Children(func() {
@@ -192,7 +184,7 @@ func (a *app) sessionDraftHeader(c *ui.Context, d *hostDraft) {
 			if d.editing {
 				subtitle = a.hosts[d.id].name + " · " + d.protocol
 			}
-			ui.Text(c, subtitle).FontSize(p.SubtitleSize).TextColor(tokenColor(p.Subtitle)).SingleLine()
+			ui.Text(c, subtitle).FontSize(p.SubtitleSize).TextColor(uikit.Color(p.Subtitle)).SingleLine()
 		})
 	})
 }
@@ -207,24 +199,24 @@ func (a *app) sessionProtocolPicker(c *ui.Context, d *hostDraft) {
 	before := selected
 	ui.Column(c).FillWidth().Shrink(0).Padding(0, t.C.Modal.BodyPaddingX, t.Space.N8, t.C.Modal.BodyPaddingX).Children(func() {
 		segments := ui.SegmentedBase(c.Key("file-protocol"), &selected, 2)
-		segments.Track.FillWidth().Padding(t.C.Modal.ProtocolPadding).Radius(t.C.Modal.ProtocolRadius).Background(tokenColor(p.Bg)).Label("协议").Children(func() {
+		segments.Track.FillWidth().Padding(t.C.Modal.ProtocolPadding).Radius(t.C.Modal.ProtocolRadius).Background(uikit.Color(p.Bg)).Label("协议").Children(func() {
 			for index, protocol := range []string{"SFTP", "FTP"} {
 				segment := segments.Segment(index).Grow(1).MinWidth(0).Padding(t.Space.N8, p.ItemPaddingX).
 					Gap(t.Space.N8).Radius(p.ItemRadius).Label(protocol)
-				styleSegment(segment, p, index == selected)
+				uikit.StyleSegment(segment, p, index == selected)
 				segment.Children(func() {
 					icon, fg := folderLockIcon, t.C.ProtocolIcon.SftpGlyph
 					if index == 1 {
 						icon, fg = folderIcon, t.C.ProtocolIcon.FtpGlyph
 					}
-					ui.Icon(c, icon).Size(t.C.Modal.ProtocolIcon, t.C.Modal.ProtocolIcon).TextColor(tokenColor(fg)).PassThrough()
+					ui.Icon(c, icon).Size(t.C.Modal.ProtocolIcon, t.C.Modal.ProtocolIcon).TextColor(uikit.Color(fg)).PassThrough()
 					ui.Column(c).Gap(t.Space.N2).PassThrough().Children(func() {
 						ui.Text(c, protocol).FontSize(t.Font.Size.Body).FontWeight(t.Font.Weight.Semibold).PassThrough()
 						description := "基于 SSH，加密传输"
 						if index == 1 {
 							description = "经典 FTP，可选 TLS"
 						}
-						ui.Text(c, description).FontSize(t.Font.Size.Footnote).TextColor(tokenColor(t.Color.Text.Secondary)).PassThrough()
+						ui.Text(c, description).FontSize(t.Font.Size.Footnote).TextColor(uikit.Color(t.Color.Text.Secondary)).PassThrough()
 					})
 				})
 			}
@@ -238,46 +230,36 @@ func (a *app) sessionProtocolPicker(c *ui.Context, d *hostDraft) {
 }
 
 func (a *app) sessionField(c *ui.Context, d *hostDraft, key, label, description string, content func()) {
-	t := theme.Current()
-	p := t.C.FormRow
-	ui.Row(c).Key(key).FillWidth().AlignItems(ui.Start).Gap(p.LabelGap).Role(ui.RoleGroup).Label(label).Children(func() {
-		ui.Text(c, label).Width(p.LabelWidth).Shrink(0).FontSize(p.LabelSize).TextColor(tokenColor(p.Label)).
-			FixedLineHeight(p.LabelHeight).TextAlign(ui.End).OnClick(func() {
-			if h := d.handles[key]; h != nil {
-				h.Focus()
-			}
-		})
-		ui.Column(c).Grow(1).MinWidth(0).Gap(p.DescGap).Children(func() {
-			content()
-			if description != "" {
-				ui.Text(c, description).FontSize(p.DescriptionSize).TextColor(tokenColor(p.Description))
-			}
-			message := d.errors[key]
-			if key == "host" && message == "" {
-				message = d.errors["port"]
-			}
-			if message != "" {
-				ui.Row(c).FillWidth().Gap(p.ErrorGap).Margin(p.ErrorGap-p.DescGap, 0, 0, 0).AlignItems(ui.Center).Children(func() {
-					ui.Icon(c, sessionAlertIcon).Size(p.ErrorIcon, p.ErrorIcon).TextColor(tokenColor(p.Error))
-					ui.Text(c, message).Grow(1).MinWidth(0).FontSize(p.ErrorSize).TextColor(tokenColor(p.Error))
-				})
-			}
-		})
+	parts := uikit.FormRow(c, label, uikit.FormRowProps{Key: key})
+	parts.Label.OnClick(func() {
+		if h := d.handles[key]; h != nil {
+			h.Focus()
+		}
+	})
+	parts.Body.Children(func() {
+		content()
+		if description != "" {
+			uikit.FieldMessage(c, description, uikit.FieldMessageProps{})
+		}
+		message := d.errors[key]
+		if key == "host" && message == "" {
+			message = d.errors["port"]
+		}
+		if message != "" {
+			uikit.FieldMessage(c, message, uikit.FieldMessageProps{Error: true, Icon: sessionAlertIcon})
+		}
 	})
 }
 
 func (a *app) sessionInput(c *ui.Context, d *hostDraft, key, label string, value *string, mono bool) ui.Element {
-	t := theme.Current()
-	p := t.C.Input
 	if d.handles[key] == nil {
 		d.handles[key] = &ui.Handle{}
 	}
-	e := ui.TextInputBase(c.Key(key), value).Bind(d.handles[key]).Height(p.Height).FillWidth().MinWidth(0).
-		Padding(0, p.PaddingX).Radius(p.Radius).FontSize(p.FontSize).FixedLineHeight(p.LineHeight).TextColor(tokenColor(p.Text)).
-		Background(tokenColor(p.Bg)).Label(label)
-	if mono {
-		e.Font(strings.Join(p.MonoFont, ", ")).FontSize(p.MonoSize).LetterSpacing(p.MonoTracking)
-	}
+	e := uikit.Input(c.Key(key), value, uikit.InputProps{Label: label, Handle: d.handles[key], Mono: mono, DeferStyle: true}).FillWidth().MinWidth(0)
+	return a.sessionInputState(d, key, value, e)
+}
+
+func (a *app) sessionInputState(d *hostDraft, key string, value *string, e ui.Element) ui.Element {
 	if key == "name" {
 		e.AutoFocus()
 		if d.editing && !d.selectedName {
@@ -308,7 +290,7 @@ func (a *app) sessionInput(c *ui.Context, d *hostDraft, key, label string, value
 		d.errors[key] = a.draftError(d, key)
 	}
 	d.focused[key] = e.Focused()
-	styleSessionControl(e, d.errors[key])
+	uikit.StyleFormControl(e, d.errors[key])
 	if e.Submitted() {
 		d.submitted = true
 	}
@@ -323,14 +305,14 @@ func (a *app) sessionDraftFields(c *ui.Context, d *hostDraft) {
 	a.sessionField(c, d, "host", "主机", "", func() {
 		ui.Row(c).FillWidth().Gap(t.Space.N8).AlignItems(ui.Center).Children(func() {
 			a.sessionInput(c, d, "host", "主机", &d.address, true).Grow(1).Placeholder("主机名或 IP")
-			ui.Text(c, "端口").Shrink(0).FontSize(t.C.FormRow.LabelSize).TextColor(tokenColor(t.C.FormRow.Label))
+			ui.Text(c, "端口").Shrink(0).FontSize(t.C.FormRow.LabelSize).TextColor(uikit.Color(t.C.FormRow.Label))
 			a.sessionPortInput(c, d)
 		})
 	})
 	a.sessionField(c, d, "user", "用户名", "", func() {
 		if d.auth == "anonymous" {
 			anonymous := "anonymous"
-			a.sessionInput(c, d, "anonymous", "用户名", &anonymous, true).Disabled(true).Background(tokenColor(t.C.Input.DisabledBg)).TextColor(tokenColor(t.C.Input.DisabledText)).Border(t.C.Input.BorderWidth, tokenColor(t.C.Input.DisabledBorder))
+			a.sessionInput(c, d, "anonymous", "用户名", &anonymous, true).Disabled(true).Background(uikit.Color(t.C.Input.DisabledBg)).TextColor(uikit.Color(t.C.Input.DisabledText)).Border(t.C.Input.BorderWidth, uikit.Color(t.C.Input.DisabledBorder))
 		} else {
 			a.sessionInput(c, d, "user", "用户名", &d.user, true).Placeholder("root")
 		}
@@ -341,7 +323,7 @@ func (a *app) sessionDraftFields(c *ui.Context, d *hostDraft) {
 			values, labels = []string{"password", "anonymous"}, []string{"密码", "匿名"}
 		}
 		index := slices.Index(values, d.auth)
-		if sessionSegments(c.Key("auth"), &index, labels...).Changed() {
+		if uikit.Segmented(c.Key("auth"), &index, labels, uikit.SegmentedProps{Form: true}).Changed() {
 			d.auth = values[index]
 			d.changed("auth")
 		}
@@ -356,7 +338,7 @@ func (a *app) sessionDraftFields(c *ui.Context, d *hostDraft) {
 				a.sessionField(c, d, "key", "私钥", "", func() {
 					ui.Row(c).FillWidth().Gap(t.Space.N8).AlignItems(ui.Center).Children(func() {
 						a.sessionKeySelect(c, d)
-						button(c, "管理…").Height(t.Size.ControlSm).Shrink(0).OnClick(func() { d.cancelTest(); a.page().addHostOpen = false; a.openCredentialSettings() })
+						uikit.Button(c, "管理…", uikit.ButtonProps{}).Height(t.Size.ControlSm).Shrink(0).OnClick(func() { d.cancelTest(); a.page().addHostOpen = false; a.openCredentialSettings() })
 					})
 				})
 				a.sessionPasswordField(c, d, "passphrase", "口令", "", &d.passphrase, &d.showPassphrase)
@@ -369,7 +351,7 @@ func (a *app) sessionDraftFields(c *ui.Context, d *hostDraft) {
 				}
 				a.sessionField(c, d, "agent", "Agent", "", func() {
 					if d.agentResults != nil {
-						ui.Text(c, "正在检测 ssh-agent…").FontSize(t.Font.Size.Small).TextColor(tokenColor(t.Color.Text.Secondary))
+						ui.Text(c, "正在检测 ssh-agent…").FontSize(t.Font.Size.Small).TextColor(uikit.Color(t.Color.Text.Secondary))
 						return
 					}
 					color, icon, text := t.Color.Success.Text, sessionCheckIcon, fmt.Sprintf("已检测到 ssh-agent · %d 把密钥", d.agentCount)
@@ -377,8 +359,8 @@ func (a *app) sessionDraftFields(c *ui.Context, d *hostDraft) {
 						color, icon, text = t.Color.Warning.Text, sessionAlertIcon, "未检测到 ssh-agent（SSH_AUTH_SOCK）"
 					}
 					ui.Row(c).Height(t.C.Input.Height).Gap(t.Space.N6).AlignItems(ui.Center).Children(func() {
-						ui.Icon(c, icon).Size(t.Size.IconSm, t.Size.IconSm).TextColor(tokenColor(color))
-						ui.Text(c, text).FontSize(t.Font.Size.Small).TextColor(tokenColor(color))
+						ui.Icon(c, icon).Size(t.Size.IconSm, t.Size.IconSm).TextColor(uikit.Color(color))
+						ui.Text(c, text).FontSize(t.Font.Size.Small).TextColor(uikit.Color(color))
 					})
 				})
 			}
@@ -392,7 +374,7 @@ func (a *app) sessionDraftFields(c *ui.Context, d *hostDraft) {
 		}
 		options := append(a.groupNames(), "新建分组…")
 		previous := d.group
-		if sessionSelect(c, "分组", &d.group, options).Changed() {
+		if uikit.Select(c, "分组", &d.group, options).Changed() {
 			if d.group == "新建分组…" {
 				d.group = previous
 				d.creatingGroup = true
@@ -413,75 +395,31 @@ func (a *app) sessionPortInput(c *ui.Context, d *hostDraft) {
 		// TextInput keeps keyboard editing. Its unfocused text is painted by
 		// Text so automatic protocol/TLS updates can crossfade independently.
 		input.TextColor(ui.Transparent)
-		animation := tokenTween(t.C.Modal.Fade)
+		animation := uikit.Tween(t.C.Modal.Fade)
 		ui.Row(c).Absolute().Top(0).Right(0).Bottom(0).Left(0).Padding(0, p.PaddingX).AlignItems(ui.Center).PassThrough().Children(func() {
 			ui.Text(c, d.port).Role(ui.RoleNone).Font(strings.Join(p.MonoFont, ", ")).FontSize(p.MonoSize).LetterSpacing(p.MonoTracking).
-				FixedLineHeight(p.LineHeight).TextColor(tokenColor(p.Text)).SingleLine().PassThrough().ContentTransition(ui.ContentTransition{Animation: &animation})
+				FixedLineHeight(p.LineHeight).TextColor(uikit.Color(p.Text)).SingleLine().PassThrough().ContentTransition(ui.ContentTransition{Animation: &animation})
 		})
 	})
 }
 
 func (a *app) sessionPasswordField(c *ui.Context, d *hostDraft, key, label, description string, value *string, shown *bool) {
-	t := theme.Current()
 	a.sessionField(c, d, key, label, description, func() {
-		ui.Row(c).FillWidth().Children(func() {
-			input := a.sessionInput(c, d, key, label, value, true).Grow(1).PaddingEnd(t.C.Input.Height)
-			if !*shown {
-				input.Password()
-			}
-			if key == "password" && d.passwordSaved && !d.passwordChanged {
-				input.Placeholder("●●●●●●●●●●")
-			}
-			if key == "passphrase" {
-				input.Placeholder("私钥口令（无则留空）")
-			}
-			keyedIconButton(c, "show-"+key, "显示或隐藏"+label, sessionEyeIcon).Absolute().Right(0).Top(0).
-				Size(t.C.Input.Height, t.C.Input.Height).TextColor(tokenColor(t.C.Input.Icon)).OnClick(func() { *shown = !*shown })
-		})
-	})
-}
-
-func sessionSegments(c *ui.Context, selected *int, labels ...string) ui.Element {
-	t := theme.Current()
-	p := t.C.Segmented
-	parts := ui.SegmentedBase(c, selected, len(labels))
-	parts.Track.Height(t.C.Input.Height).Padding(p.Padding).Radius(p.Radius).Background(tokenColor(p.Bg)).AlignSelf(ui.Start).Children(func() {
-		for i, label := range labels {
-			segment := parts.Segment(i).Height(t.C.Input.Height-2*p.Padding).Padding(0, t.C.Modal.ButtonPaddingX).Radius(p.ItemRadius).Label(label)
-			styleSegment(segment, p, i == *selected)
-			segment.Children(func() { ui.Text(c, label).FontSize(t.Font.Size.Small).SingleLine().PassThrough() })
+		if d.handles[key] == nil {
+			d.handles[key] = &ui.Handle{}
 		}
+		parts := uikit.PasswordInput(c, value, uikit.PasswordProps{
+			Label: label, Handle: d.handles[key], Shown: *shown, EyeIcon: sessionEyeIcon, ToggleKey: "show-" + key, InputKey: key,
+		})
+		input := a.sessionInputState(d, key, value, parts.Input)
+		if key == "password" && d.passwordSaved && !d.passwordChanged {
+			input.Placeholder("●●●●●●●●●●")
+		}
+		if key == "passphrase" {
+			input.Placeholder("私钥口令（无则留空）")
+		}
+		parts.Toggle.OnClick(func() { *shown = !*shown })
 	})
-	return parts.Track
-}
-
-func sessionSelect(c *ui.Context, label string, selected *string, options []string) ui.Element {
-	t := theme.Current()
-	p := t.C.Input
-	e := ui.Select(c, selected, options).Height(p.Height).FillWidth().MinWidth(0).Padding(0, p.PaddingX).Radius(p.Radius).
-		Background(tokenColor(p.Bg)).Border(p.BorderWidth, tokenColor(p.Border)).FontSize(p.FontSize).Label(label)
-	return styleSessionControl(e, "")
-}
-
-func styleSessionControl(e ui.Element, message string) ui.Element {
-	p := theme.Current().C.Input
-	border := p.Border
-	if e.Hovered() {
-		border = p.BorderHover
-	}
-	shadow := slices.Clone(p.FocusShadow)
-	for index := range shadow {
-		shadow[index].Color.A = 0
-	}
-	if e.Focused() {
-		shadow = p.FocusShadow
-	}
-	if message != "" {
-		shadow = p.ErrorShadow
-		e.Error(message)
-	}
-	e.Border(p.BorderWidth, e.AnimateColor("border", tokenColor(border), tokenTween(p.Transition)))
-	return applyAnimatedShadow(e, "input-ring", shadow, tokenTween(p.Transition))
 }
 
 func (a *app) sessionKeySelect(c *ui.Context, d *hostDraft) {
@@ -494,30 +432,29 @@ func (a *app) sessionKeySelect(c *ui.Context, d *hostDraft) {
 	}
 	parts.Trigger.Bind(d.handles["key"])
 	parts.Trigger.Height(p.Height).Grow(1).MinWidth(0).Padding(0, p.PaddingX).Radius(p.Radius).Gap(p.Gap).
-		Background(tokenColor(p.Bg)).Label("私钥").Children(func() {
-		ui.Icon(c, sessionKeyIcon).Size(t.Size.IconSm, t.Size.IconSm).TextColor(tokenColor(p.Icon))
+		Background(uikit.Color(p.Bg)).Label("私钥").Children(func() {
+		ui.Icon(c, sessionKeyIcon).Size(t.Size.IconSm, t.Size.IconSm).TextColor(uikit.Color(p.Icon))
 		keyIndex := slices.IndexFunc(a.keys, func(k managedKey) bool { return k.ID == d.keyID })
 		if keyIndex < 0 {
-			ui.Text(c, "请选择私钥").Grow(1).FontSize(p.FontSize).TextColor(tokenColor(p.Placeholder))
+			ui.Text(c, "请选择私钥").Grow(1).FontSize(p.FontSize).TextColor(uikit.Color(p.Placeholder))
 		} else {
 			key := a.keys[keyIndex]
 			ui.Text(c, key.Name).FontSize(p.FontSize).FontWeight(t.Font.Weight.Medium).SingleLine()
-			ui.Text(c, key.Type+" · "+abbreviateFingerprint(key.Fingerprint)).Grow(1).MinWidth(0).FontSize(t.Font.Size.Footnote).TextColor(tokenColor(t.Color.Text.Secondary)).SingleLine()
+			ui.Text(c, key.Type+" · "+abbreviateFingerprint(key.Fingerprint)).Grow(1).MinWidth(0).FontSize(t.Font.Size.Footnote).TextColor(uikit.Color(t.Color.Text.Secondary)).SingleLine()
 		}
-		ui.Icon(c, chevronIcon).Size(t.Size.IconSm, t.Size.IconSm).TextColor(tokenColor(p.Icon))
+		ui.Icon(c, chevronIcon).Size(t.Size.IconSm, t.Size.IconSm).TextColor(uikit.Color(p.Icon))
 	})
-	styleSessionControl(parts.Trigger, d.errors["key"])
+	uikit.StyleFormControl(parts.Trigger, d.errors["key"])
 	parts.Popup(func(panel ui.Element) {
-		panel.Padding(t.Space.N4).Radius(t.C.Menu.Radius).Background(tokenColor(t.C.Menu.Bg))
-		applyShadow(panel, t.C.Menu.Shadow)
+		uikit.StyleSelectPopup(panel)
 		for _, key := range a.keys {
 			item := parts.Item(key.ID).Padding(t.Space.N6, t.C.Menu.ItemPaddingX).Radius(t.C.Menu.ItemRadius)
 			if item.Highlighted() {
-				item.Background(tokenColor(t.Color.State.Hover))
+				item.Background(uikit.Color(t.Color.State.Hover))
 			}
 			item.Children(func() {
 				ui.Text(c, key.Name).FontSize(t.Font.Size.Body)
-				ui.Text(c, key.Type+" · "+abbreviateFingerprint(key.Fingerprint)).FontSize(t.Font.Size.Footnote).TextColor(tokenColor(t.Color.Text.Secondary))
+				ui.Text(c, key.Type+" · "+abbreviateFingerprint(key.Fingerprint)).FontSize(t.Font.Size.Footnote).TextColor(uikit.Color(t.Color.Text.Secondary))
 			})
 		}
 		parts.Item("__import__").Padding(t.Space.N6, t.C.Menu.ItemPaddingX).Children(func() { ui.Text(c, "导入私钥…").FontSize(t.Font.Size.Body) })
@@ -549,21 +486,21 @@ func (a *app) sessionDraftFooter(c *ui.Context, d *hostDraft) {
 	t := theme.Current()
 	p := t.C.Modal
 	ui.Row(c).FillWidth().Shrink(0).Padding(p.FooterPaddingTop, p.FooterPaddingRight, p.FooterPaddingBottom, p.FooterPaddingLeft).
-		BorderWidth(t.Size.Divider, 0, 0, 0).BorderColor(tokenColor(p.Divider)).Gap(p.FooterGap).AlignItems(ui.Center).Children(func() {
+		BorderWidth(t.Size.Divider, 0, 0, 0).BorderColor(uikit.Color(p.Divider)).Gap(p.FooterGap).AlignItems(ui.Center).Children(func() {
 		disabled := strings.TrimSpace(d.address) == ""
-		test := button(c, "测试连接").Padding(0, p.ButtonPaddingX).Shrink(0).Disabled(disabled || d.testResults != nil).OnClick(func() { a.startDraftTest(c, d) })
+		test := uikit.Button(c, "测试连接", uikit.ButtonProps{}).Padding(0, p.ButtonPaddingX).Shrink(0).Disabled(disabled || d.testResults != nil).OnClick(func() { a.startDraftTest(c, d) })
 		if disabled || d.testResults != nil {
 			test.Opacity(t.Opacity.Disabled)
 		}
 		a.sessionTestResult(c, d)
 		ui.Spacer(c)
-		ui.ButtonBase(c).Height(t.C.Button.Height).Padding(0, p.ButtonPaddingX).FontSize(t.C.Button.FontSize).Label("取消").Children(func() { ui.Text(c, "取消") }).OnClick(func() { a.closeSessionDraft(d) })
+		uikit.Button(c, "取消", uikit.ButtonProps{Variant: uikit.ButtonPlain}).Padding(0, p.ButtonPaddingX).OnClick(func() { a.closeSessionDraft(d) })
 		label := "仅保存"
 		if d.editing {
 			label = "保存"
 		}
-		save := button(c, label).Padding(0, p.ButtonPaddingX).Shrink(0).Disabled(disabled).OnClick(func() { a.saveSessionDraft(c, d, false) })
-		connect := primaryButton(c, "保存并连接  ↩").Padding(0, p.ButtonPaddingX).Shrink(0).Disabled(disabled).OnClick(func() { a.saveSessionDraft(c, d, true) })
+		save := uikit.Button(c, label, uikit.ButtonProps{}).Padding(0, p.ButtonPaddingX).Shrink(0).Disabled(disabled).OnClick(func() { a.saveSessionDraft(c, d, false) })
+		connect := uikit.Button(c, "保存并连接  ↩", uikit.ButtonProps{Variant: uikit.ButtonPrimary}).Padding(0, p.ButtonPaddingX).Shrink(0).Disabled(disabled).OnClick(func() { a.saveSessionDraft(c, d, true) })
 		if disabled {
 			save.Opacity(t.Opacity.Disabled)
 			connect.Opacity(t.Opacity.Disabled)
@@ -583,7 +520,7 @@ func (a *app) sessionTestResult(c *ui.Context, d *hostDraft) {
 	if d.testVisible {
 		shown = 1
 	}
-	alpha := animateVisual(row, "result-alpha", shown, p.Crossfade)
+	alpha := uikit.Visual(row, "result-alpha", shown, p.Crossfade)
 	row.Opacity(alpha).Hidden(alpha == 0 && !d.testVisible)
 	row.Children(func() {
 		stage := "testing"
@@ -596,8 +533,8 @@ func (a *app) sessionTestResult(c *ui.Context, d *hostDraft) {
 		ui.Row(c).Key(stage).MinWidth(0).Gap(p.Gap).AlignItems(ui.Center).
 			Transition(ui.ElementTransition{Duration: p.Crossfade, Enter: &ui.Motion{}, Exit: &ui.Motion{}}).Children(func() {
 			if d.testResults != nil {
-				ui.Spinner(c).Size(p.SpinnerSize, p.SpinnerSize).Shrink(0).Label("正在连接").TextColor(tokenColor(p.Testing))
-				ui.Text(c, "正在连接…").FontSize(p.FontSize).TextColor(tokenColor(p.Testing)).MinWidth(0).SingleLine()
+				ui.Spinner(c).Size(p.SpinnerSize, p.SpinnerSize).Shrink(0).Label("正在连接").TextColor(uikit.Color(p.Testing))
+				ui.Text(c, "正在连接…").FontSize(p.FontSize).TextColor(uikit.Color(p.Testing)).MinWidth(0).SingleLine()
 				return
 			}
 			result := d.testResult
@@ -605,13 +542,13 @@ func (a *app) sessionTestResult(c *ui.Context, d *hostDraft) {
 			if result.Err != nil {
 				icon, color, glyph = sessionAlertIcon, p.Fail, p.FailIcon
 			}
-			ui.Icon(c, icon).Size(p.Icon, p.Icon).Shrink(0).TextColor(tokenColor(glyph))
-			label := ui.Text(c, result.Summary).FontSize(p.FontSize).TextColor(tokenColor(color)).MinWidth(0).SingleLine()
+			ui.Icon(c, icon).Size(p.Icon, p.Icon).Shrink(0).TextColor(uikit.Color(glyph))
+			label := ui.Text(c, result.Summary).FontSize(p.FontSize).TextColor(uikit.Color(color)).MinWidth(0).SingleLine()
 			if result.Detail != "" {
 				sessionResultTooltip(c, label, result.Detail)
 			}
 			if result.Err != nil {
-				sessionResultTooltip(c, ui.Icon(c, infoIcon).Size(p.InfoSize, p.InfoSize).Shrink(0).TextColor(tokenColor(p.Info)), result.Detail)
+				sessionResultTooltip(c, ui.Icon(c, infoIcon).Size(p.InfoSize, p.InfoSize).Shrink(0).TextColor(uikit.Color(p.Info)), result.Detail)
 			}
 		})
 	})
@@ -626,7 +563,7 @@ func sessionResultTooltip(c *ui.Context, anchor ui.Element, detail string) {
 	text := strings.Join(lines, "\n")
 	anchor.Description(text)
 	ui.TooltipBase(c, anchor, func(panel ui.Element) {
-		styleTooltip(panel).AttachTo(anchor, ui.AnchorTop, ui.AnchorBottom).Margin(0, 0, t.C.Tooltip.Offset, 0).
+		uikit.StyleTooltip(panel).AttachTo(anchor, ui.AnchorTop, ui.AnchorBottom).Margin(0, 0, t.C.Tooltip.Offset, 0).
 			Children(func() { ui.Text(c, text).Font(strings.Join(t.C.Input.MonoFont, ", ")).FontSize(t.Font.Size.Footnote) })
 	})
 }

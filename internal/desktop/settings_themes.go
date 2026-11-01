@@ -8,6 +8,7 @@ import (
 	"github.com/egoist/mygo/ui"
 	"sshdesk/internal/termtheme"
 	"sshdesk/internal/theme"
+	"sshdesk/internal/uikit"
 )
 
 func (a *app) importedThemeUse(name string) string {
@@ -73,26 +74,24 @@ func (a *app) settingsSchemeSelect(c *ui.Context, label string, value *string) b
 	p := t.C.Input
 	previous := *value
 	parts := ui.SelectBase(c.Key(label), value)
-	parts.Trigger.Width(t.C.Settings.SelectWidth).Height(p.Height).Padding(0, p.PaddingX).Gap(p.Gap).Radius(p.Radius).
-		Background(tokenColor(p.Bg)).Border(p.BorderWidth, tokenColor(p.Border)).Label(localize(c, label)).Children(func() {
+	uikit.StyleSelect(parts.Trigger, localize(c, label)).Width(t.C.Settings.SelectWidth).Gap(p.Gap).Children(func() {
 		if scheme, ok := termtheme.Lookup(*value); ok {
-			ui.Box(c).Size(t.Size.IconSm, t.Size.IconSm).Radius(t.Radius.Chip).Background(tokenColor(scheme.Background)).Border(t.Size.Hairline, tokenColor(p.Border)).PassThrough()
+			ui.Box(c).Size(t.Size.IconSm, t.Size.IconSm).Radius(t.Radius.Chip).Background(uikit.Color(scheme.Background)).Border(t.Size.Hairline, uikit.Color(p.Border)).PassThrough()
 		}
 		ui.Text(c, *value).FontSize(p.FontSize).Grow(1).MinWidth(0).SingleLine().PassThrough()
-		ui.Icon(c, chevronIcon).Size(t.Size.IconSm, t.Size.IconSm).TextColor(tokenColor(p.Icon)).PassThrough()
+		ui.Icon(c, chevronIcon).Size(t.Size.IconSm, t.Size.IconSm).TextColor(uikit.Color(p.Icon)).PassThrough()
 	})
-	styleSessionControl(parts.Trigger, "")
+	uikit.StyleFormControl(parts.Trigger, "")
 	parts.Popup(func(panel ui.Element) {
-		panel.Padding(t.Space.N4).Radius(t.Radius.Popover).Background(tokenColor(t.C.Menu.Bg)).MaxHeight(t.C.Settings.ContentMax / 2)
-		applyShadow(panel, t.C.Menu.Shadow)
+		uikit.StyleSelectPopup(panel).Radius(t.Radius.Popover).MaxHeight(t.C.Settings.ContentMax / 2)
 		for _, name := range termtheme.Names() {
 			item := parts.Item(name).Height(p.Height).Padding(0, t.C.Menu.ItemPaddingX).Gap(t.Space.N8).Radius(t.C.Menu.ItemRadius)
 			if item.Highlighted() {
-				item.Background(tokenColor(t.Color.State.Hover))
+				item.Background(uikit.Color(t.Color.State.Hover))
 			}
 			item.Children(func() {
 				scheme, _ := termtheme.Lookup(name)
-				ui.Box(c).Size(t.Size.IconSm, t.Size.IconSm).Radius(t.Radius.Chip).Background(tokenColor(scheme.Background)).PassThrough()
+				ui.Box(c).Size(t.Size.IconSm, t.Size.IconSm).Radius(t.Radius.Chip).Background(uikit.Color(scheme.Background)).PassThrough()
 				ui.Text(c, name).FontSize(p.FontSize).PassThrough()
 			})
 		}
