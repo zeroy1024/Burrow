@@ -366,6 +366,9 @@ func (a *app) removePane(tab *workspaceTab, session *remoteSession) {
 
 // Runtime endpoints are snapshots; catalog edits cannot retarget a live channel.
 func cloneHostEndpoint(endpoint host) host {
+	// Catalog values are not a live latency sample. Monitoring may replace this
+	// with a measured SSH response time after the runtime is connected.
+	endpoint.latency = -1
 	if options := endpoint.session.SSH; options != nil {
 		copy := *options
 		copy.Env = slices.Clone(options.Env)

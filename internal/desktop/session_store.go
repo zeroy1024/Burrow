@@ -108,8 +108,8 @@ type sessionCredential struct {
 func sessionCredentialKey(id string) string     { return "session/" + id + "/credential" }
 func sessionLegacyPasswordKey(id string) string { return "session/" + id + "/password" }
 
-// Both credential formats belong to the same saved profile. New writes never
-// replace the legacy raw value, so an old snapshot cannot mistake JSON for a password.
+// Both credential formats belong to the same profile. The new item never
+// overwrites raw bytes with JSON; a successful update retires the old item.
 func deleteSessionCredentials(id string) error {
 	return errors.Join(mygo.Secrets.Delete(sessionCredentialKey(id)), mygo.Secrets.Delete(sessionLegacyPasswordKey(id)))
 }
@@ -131,6 +131,9 @@ func (a *app) storeSessionSecrets(h *host, password string, changed bool, passph
 				err = mygo.Secrets.Set(sessionCredentialKey(h.session.ID), data)
 			}
 			clear(data)
+			if err == nil {
+				err = mygo.Secrets.Delete(sessionLegacyPasswordKey(h.session.ID))
+			}
 		}
 		if err != nil {
 			return fmt.Errorf("系统钥匙串：%w", err)
