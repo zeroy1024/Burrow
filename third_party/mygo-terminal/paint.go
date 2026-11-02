@@ -129,7 +129,7 @@ func (v *view) paint(p *ui.Painter, r ui.Rect) {
 	}
 	t.rmu.Lock()
 	defer t.rmu.Unlock()
-	if request := v.backdropRequest(); request != v.overscan {
+	if request := v.backdropRequest(t.term.AtBottom()); request != v.overscan {
 		if err := t.rs.SetOverscan(request); err != nil {
 			t.mu.Unlock()
 			// The ABI and uint16 request are validated; rejection indicates an

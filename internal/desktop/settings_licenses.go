@@ -6,6 +6,7 @@ import (
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/transfer"
 	"github.com/egoist/mygo/ui"
+	"sshdesk/assets"
 	"sshdesk/internal/termtheme"
 	"sshdesk/internal/theme"
 	"sshdesk/internal/uikit"
@@ -37,6 +38,14 @@ var textLicense string
 //go:embed licenses/jetbrains-mono.txt
 var jetbrainsLicense string
 
+var burrowIcon = func() *ui.Bitmap {
+	bitmap, err := ui.DecodeBitmap(assets.IconPNG)
+	if err != nil {
+		panic(err)
+	}
+	return bitmap
+}()
+
 var dependencyNotices = []struct{ name, license, text string }{
 	{"MyGo", "MIT", mygoLicense},
 	{"golang.org/x/crypto/ssh", "BSD-3-Clause", cryptoLicense},
@@ -51,19 +60,18 @@ var dependencyNotices = []struct{ name, license, text string }{
 
 func (a *app) aboutSettings(c *ui.Context) {
 	t := theme.Current()
-	if a.settingMatches("关于", "版本 SSH Desk") {
+	if a.settingMatches("关于", "版本 Burrow") {
 		ui.Column(c).FillWidth().AlignItems(ui.Center).Gap(t.Space.N8).Padding(t.Space.N16).Children(func() {
-			uikit.Icon(c, terminalIcon, uikit.IconProps{Tone: uikit.ToneAccent}).Size(t.C.Modal.IconTile*2, t.C.Modal.IconTile*2)
-			uikit.Text(c, localize(c, "SSH Desk"), uikit.TextProps{Style: uikit.TextTitle})
+			ui.Image(c, burrowIcon).Size(t.C.Modal.IconTile*2, t.C.Modal.IconTile*2)
+			uikit.Text(c, "Burrow", uikit.TextProps{Style: uikit.TextTitle})
 			ui.Row(c).Gap(t.Space.N8).AlignItems(ui.Center).Children(func() {
-				uikit.Text(c, localize(c, "0.1.0 · 原型构建"), uikit.TextProps{Tone: uikit.ToneSecondary})
+				uikit.Text(c, "0.1.0", uikit.TextProps{Tone: uikit.ToneSecondary})
 				uikit.Button(c, localize(c, "复制"), uikit.ButtonProps{}).OnClick(func() {
-					if err := mygo.Clipboard.Write(transfer.TextData("SSH Desk 0.1.0 (prototype)")); err != nil {
+					if err := mygo.Clipboard.Write(transfer.TextData("Burrow 0.1.0")); err != nil {
 						a.settingsUI.notice = err.Error()
 					}
 				})
 			})
-			uikit.Text(c, localize(c, "当前为本地原型构建，尚未配置更新与反馈服务。"), uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneTertiary})
 		})
 	}
 	fields := make([]settingField, 0, len(dependencyNotices))
