@@ -1220,7 +1220,7 @@ def main():
     shutil.copytree(repo / "build/darwin-arm64/Burrow.app", bundle)
     info_path = bundle / "Contents/Info.plist"
     info = plistlib.loads(info_path.read_bytes())
-    info["CFBundleIdentifier"] = "dev.sshdesk.integration." + str(os.getpid())
+    info["CFBundleIdentifier"] += ".integration." + str(os.getpid())
     info["CFBundleName"] = "Burrow Integration"
     info_path.write_bytes(plistlib.dumps(info))
     launch_binary = bundle / "Contents/MacOS" / info["CFBundleExecutable"]
