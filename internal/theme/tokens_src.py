@@ -388,7 +388,7 @@ COMP['pane'].update({
  'frameInterval':'motion.duration.frameInterval',
  'emptyIconSize':'size.railButton','emptyTitleSize':'size.emptyPaneTitleSize',
  'emptyTitleWeight':'font.weight.emptyPaneTitle',
- 'contentTop':'space.10','contentSide':'space.14','contentBottom':'size.terminalContentBottom',
+ 'contentTop':'space.10','contentSide':'space.8','contentBottom':'size.terminalContentBottom',
  'actionTop':'space.6','actionRight':'space.8','actionWidth':'size.controlXs',
  'actionHeight':'size.controlSm','actionGap':'space.2',
  'actionRevealPadding':'size.paneActionRevealPadding','actionRadius':'radius.control',
