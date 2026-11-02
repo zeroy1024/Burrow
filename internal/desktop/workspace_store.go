@@ -382,6 +382,15 @@ func (a *app) enforceScrollback() {
 	}
 	for _, tab := range a.tabs {
 		for _, session := range tab.root.sessions() {
+			// This pass also runs while settings/files or another tab is visible.
+			// Apply the limit in place; rendering must not own terminal lifetime.
+			if live := session.terminal; live != nil && live.scrollbackLines != limit {
+				if err := live.view.SetScrollbackLines(limit); err != nil {
+					a.terminalError = fmt.Errorf("更新终端回滚行数：%w", err)
+					return
+				}
+				live.scrollbackLines = limit
+			}
 			if len(session.output) > limit {
 				// Copy to release strings retained by the discarded backing array.
 				session.output = append([]terminalLine(nil), session.output[len(session.output)-limit:]...)

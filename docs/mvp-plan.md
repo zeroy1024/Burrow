@@ -36,17 +36,18 @@
 - [x] 凭据变更及文件/目录保存失败补偿；密钥任务独立于设置页。
 - [x] CPU、内存、磁盘、网络、进程与系统信息真实采样；失败显示不可用，不伪造数值。
 - [x] 所有关闭/退出路径保存并释放工作；页面切换保留后台工作。
+- [x] 按用户后续确认完成最小终端包扩展，回滚按物理显示行实时应用于全部SSH标签，接受页级误差且不重建终端或连接。
 
 ## 验证约束
 
 沿用现有测试、race、静态检查、Go 构建、MyGo 打包与主线协议集成 fixture；只连接受控本地临时服务器，不使用用户真实凭据或私有文件测试。不新增永久测试、组件画廊、截图基线或 CI。跳过的集成用例不能算通过；编译不能代替协议/原生界面验收。每阶段记录实际结果、剩余项和 SDK 限制；全部已授权事项完成后才结束 goal。
 
 
-## 尚存的具体差异
+## 终端差异收尾
 
-固定MyGo v0.7.3没有公开Tracking/BoldIsBright、精确行数/实时回滚上限、原生VT滚动条状态接口。原设置和预览保留，真实终端这些能力为部分实现；没有用私有接口、近似字形缩放或假ScrollState宣称完成。可见来源拖动使用真实已绘制视口；不可见来源的Snapshot不含历史视口位置。详细API与影响见mvp-status.md及更新后的uikit-coverage.md。
+2026-11-02用户允许忽略Tracking差异、删除BoldIsBright开关、滚动条仅保持风格一致，并授权最小MyGo扩展、回滚实时生效且接受页级误差。开关、搜索项及翻译文案已移除，旧配置保留；真实VT继续原生半透明胶囊、滚动/贴边显示与淡出，其他区域继续UIKit。回滚由本地固定终端包公开的`Options.ScrollbackLines`及`SetScrollbackLines(int) error`实现；`attachSSH`和快照预览创建直接传行数，`enforceScrollback`遍历全部SSH标签原地同步，不依赖当前页面渲染。未重建终端、重连SSH或重启后台传输；缩小上限会淘汰最旧合格历史页，增大不恢复已淘汰输出。可见来源拖动保留真实视口，备用Snapshot不含历史视口位置。详细API与边界见mvp-sdk-blockers.md、mvp-status.md及uikit-coverage.md。
 
-选择原生VT是为真实交互式Shell与完整控制序列，不重写VT或升级固定SDK。若要补齐这些显示能力，需要获得SDK公开扩展或允许维护相关扩展；当前不能声称原型全部显示能力已在真实终端完全等价。
+`third_party/mygo-terminal`保留固定MyGo v0.7.3终端代码、许可证和同一Ghostty构建来源，以独立本地模块接入；主MyGo版本及其他依赖不升级。扩展只绑定内核已有的行数选项并公开线程安全创建/运行时能力，不重写VT。回滚按物理显示行计数，Ghostty按页淘汰，实际保留行数可能略多或略少；严格逐行不是本轮用户确认的验收合同。本次已有检查、原生打包签名和受控功能验证通过，证据及边界见[MVP状态](mvp-status.md#本轮实时回滚验证2026-11-02)。
 
 ## 最终验证记录
 
@@ -79,7 +80,7 @@
 - 队列证据与清理记录位于 `/private/tmp/sshdesk-queue-native-x8expv1d/verification-summary.json` 和 `cleanup-results.json`；54份复制的desktop源码在验证结束与工作树一致。临时工具、服务、凭据和字节fixtures均已回收。
 - 初次隐藏帧等待和controller误读worker清单导致的失败属于临时验证器问题，保留原失败日志，修正后重跑；没有将退出66或失败命令算通过。以上是控制器功能验证，不是原界面点击或视觉验收。
 
-另行复查了公开MyGo v0.7.4源码（仅下载到任务临时依赖目录，未升级项目）：原生终端仍无Tracking/BoldIsBright及实时精确行数接口；仅升级补丁版不能补齐全部显示能力。[上游发布记录](https://github.com/egoist/mygo/releases/tag/v0.7.4)的滚动条改动也不等于把内部VT滚动状态公开给UIKit。仍保留原先明确的部分实现状态。
+扩展前曾复查公开MyGo v0.7.4源码（仅下载到任务临时依赖目录，未升级项目）：其原生终端无Tracking/BoldIsBright及实时精确行数接口；[上游发布记录](https://github.com/egoist/mygo/releases/tag/v0.7.4)的滚动条改动不等于把内部VT滚动状态公开给UIKit。该历史审计不代表当前本地扩展的能力；当前回滚已按用户接受的页级误差合同接入真实行数/运行时接口。
 
 
 补充取消语义：原型冲突框取消会终止本次选择的剩余项；现在按批次取消尚未完成任务、清同批冲突，保留Done和其他批次。追加真实hidden `-race` 单分支复验通过，实际Cancel1次、同批part清零、Done内容保留且独立8MiB任务hash一致。证据 `/private/tmp/sshdesk-queue-cancel-b5wbz7br/verification-summary.json`。最终全项目race/vet/build和原生打包已通过；取消分支修改后再做desktop检查及最终打包，不把旧包当当前产物。

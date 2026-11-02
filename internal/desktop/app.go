@@ -13,7 +13,7 @@ import (
 	"sshdesk/internal/uikit"
 
 	"github.com/egoist/mygo"
-	nativeterm "github.com/egoist/mygo/plugins/terminal"
+	nativeterm "github.com/egoist/mygo/sshdesk-terminal"
 	"github.com/egoist/mygo/ui"
 )
 

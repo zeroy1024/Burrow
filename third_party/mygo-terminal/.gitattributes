@@ -1,0 +1,2 @@
+# Recorded VT protocol bytes include meaningful CR and escape sequences.
+testdata/*.vt binary

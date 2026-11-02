@@ -11,7 +11,7 @@
 
 新增共享滚动条API及逐页面清单见[滚动条接入](scrollbars.md)。
 
-2026-11-02真实后端接入后，终端正文改用固定MyGo的原生VT View；容器、表单、导航仍沿用UIKit。本表公共组件规格不代表原生正文具有全部UIKit排版/滚动能力。字距、粗体提亮、精确回滚行数和原生滚动条列为**部分实现**，见[MVP实际差异](mvp-status.md)，不沿用原演示渲染的“完整”结论。
+2026-11-02真实后端接入后，终端正文改用固定MyGo的原生VT View；容器、表单、导航仍沿用UIKit。本表公共组件规格不代表原生正文具有全部UIKit排版/滚动能力。按用户后续决定，字距差异允许忽略、粗体提亮开关移除、滚动条只需相同风格；实时回滚使用固定终端包的最小公开扩展，按物理显示行设置并接受页级误差，见[MVP实际能力](mvp-status.md)。源码接入状态与本轮验证证据分开记录，不沿用原演示渲染结论。
 
 状态是源码合同及调用链审计结论，**不等于所有交互、像素、VoiceOver 行为都已设备实测**。已有测试/构建/静态检查与未验证项分开记录在末节。组件数量及编译结果不作为逐项规格完成的替代证据。
 
@@ -147,7 +147,7 @@
 
 ## 滚动条共享显隐
 
-滚动条统一为公共`ScrollbarState/ScrollbarProps/Scrollbars`，原演示终端、目录、状态卡机制收敛至同一个实现；真实VT正文改用SDK内部滚动条，当前无公开滚动状态适配，因此这一消费者列为部分接入；新增设置、会话表单、文件预览、文件双轴表格、传输列表、选择器与菜单的接入。顶部SSH/文件会话选项卡按最新要求始终隐藏滚动条，公共SessionTabs保留滚轮横移和新标签自动露出。逐页面/卡片列表和SDK适配差异见[滚动条清单](scrollbars.md)。不以“有原生Scroll”作为已统一显隐的证据。
+可控制区域统一使用公共`ScrollbarState/ScrollbarProps/Scrollbars`，原演示终端、目录、状态卡机制收敛至同一个实现，设置、会话表单、文件预览、双轴表格、传输列表、选择器与菜单均接入。真实VT保留SDK内部滚动条；按用户最新要求只需相同风格，不再要求公共组件或参数完全相同。顶部SSH/文件会话选项卡始终隐藏滚动条，公共SessionTabs保留滚轮横移和新标签自动露出。逐页面/卡片及已记录参数微差见[滚动条清单](scrollbars.md)，不把原生VT说成已接UIKit或已做像素验收。
 
 ## 传输完成反馈
 
@@ -270,9 +270,10 @@ SSH与文件目录的SiderRow不再注册原生ContextMenu。RowMenuOn把行右�
 | 能力 | 当前状态 | 公共API/消费者与影响 |
 |---|---|---|
 | TerminalSurface配色与容器 | 完整实现 | `TerminalSurface/ResolveTerminalColors/Pane/Header/Footer`仍接终端卡片；`sshColors(session)`给原生VT显式每会话颜色，设置预览继续原渲染 |
-| 真实终端Tracking/BoldIsBright | 部分实现 | `termtheme.Prefs`值与设置预览保留；MyGo v0.7.3 `terminal.Options/Font/SetFont`没有此公开能力，`ssh_terminal.go`不假装生效 |
-| 真实终端ScrollbackLines | 部分实现 | `terminal.Options.Scrollback`仅创建时字节预算；当前按行数×初始列数×16估算，不是精确行数，也没有live setter |
-| 真实终端共享Scrollbar | 部分实现 | 原生VT自己绘制/处理，无法把公开ScrollState交给UIKit；其他页面/卡片继续公共Scrollbars |
+| 真实终端Tracking | 明确不适用 | 2026-11-02用户允许忽略真实网格字距差异；保留原配置，不以缩放冒充支持 |
+| 真实终端BoldIsBright开关 | 明确不适用 | 用户要求删除设置入口；字体分组、搜索索引及翻译文案已移除；旧配置与旧预览读取路径保留，真实终端使用SDK默认行为 |
+| 真实终端ScrollbackLines | 完整实现（接受页级误差） | [本地终端包](../third_party/mygo-terminal/terminal.go)公开`Options.ScrollbackLines`及`Terminal.SetScrollbackLines(int) error`；[attachSSH](../internal/desktop/ssh_terminal.go)与独立拖动快照创建直接传行数，[enforceScrollback](../internal/desktop/workspace_store.go)原地同步全部已有SSH标签，包含非当前页/标签；同一terminal、连接与传输任务保留。物理显示行按页淘汰，缩小可丢弃最旧历史，增大不恢复旧输出 |
+| 真实终端共享Scrollbar | 明确不适用 | 用户改为只需风格一致；保留原生半透明胶囊、滚动/贴边显示与淡出，其他区域继续公共Scrollbars。宽度/时长存在已记录微差，不声称同组件或像素一致 |
 | 拖动真实屏幕 | 完整接入、备用路径有限制 | `Window.CapturePage`+单手势bitmap保留可见源视口；不可见来源用独立真实Snapshot，未覆盖历史视口位置能力 |
 
 本轮已有协议/race/构建验证和未执行GUI/像素验收分别记入[MVP状态](mvp-status.md)。上述差异没有按“当前没有调用”豁免，没有用函数数量或构建成功代替完成证据。

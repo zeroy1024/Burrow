@@ -14,7 +14,7 @@ import (
 	"sshdesk/internal/theme"
 	"sshdesk/internal/uikit"
 
-	nativeterm "github.com/egoist/mygo/plugins/terminal"
+	nativeterm "github.com/egoist/mygo/sshdesk-terminal"
 	"github.com/egoist/mygo/ui"
 )
 
@@ -215,7 +215,7 @@ func (a *app) nativeTerminalDragContents(c *ui.Context, session *remoteSession, 
 		colors := live.colors
 		conn := &terminalPreviewConn{done: make(chan struct{})}
 		view, err := nativeterm.New(nativeterm.Options{
-			Conn: conn, ResizeByConn: true, Font: live.font, Theme: &colors, Scrollback: live.scrollback,
+			Conn: conn, ResizeByConn: true, Font: live.font, Theme: &colors, ScrollbackLines: live.scrollbackLines,
 			Padding: nativeterm.Padding{X: -1, Y: -1}, Transparent: true,
 			NoBlink: true, NoDefaultKeybinds: true, NoClipboardWrite: true,
 			ClipboardRead: nativeterm.ClipboardDeny,

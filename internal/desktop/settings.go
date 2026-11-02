@@ -168,13 +168,13 @@ func (a *app) settingsCategoryHasMatch(index int) bool {
 	texts := []string{
 		"语言 跟随系统 简体中文 English 启动时恢复会话 关闭最后一个选项卡时 关闭有活动连接的选项卡前确认",
 		"应用主题 浅色 深色 跟随系统 强调色 预览 减少动态效果 窗口半透明 标题栏 玻璃栏",
-		"配色方案 跟随应用明暗 固定一种 浅色外观时 深色外观时 配色 终端背景 字体 字号 行高 粗体使用亮色 光标 样式 闪烁 回滚行数",
+		"配色方案 跟随应用明暗 固定一种 浅色外观时 深色外观时 配色 终端背景 字体 字号 行高 光标 样式 闪烁 回滚行数",
 		"默认本地目录 同时传输数 同名冲突",
 		"快捷键 操作 新建会话 关闭选项卡 重新打开关闭的选项卡 切换到 上一个 下一个 显示 隐藏侧栏 终端模式 文件传输模式 拆分窗格 搜索当前页面 设置",
 		"私钥 导入 生成 ssh-agent 已保存的密码 添加到 agent 密钥与凭据",
 		"关于 版本 开源许可 MyGo Catppuccin JetBrains Mono",
 	}
-	english := []string{"language system startup restore sessions close last tab active connection confirmation", "app theme light dark system accent preview reduce motion window translucency", "color scheme follow app fixed light dark terminal background font size line height bold bright cursor style blink scrollback", "default local directory concurrent transfers name conflict", "keyboard shortcuts new close reopen select tabs previous next sidebar terminal file mode split search current page settings", "private key import generate ssh-agent saved passwords add to agent credentials", "about version open source license MyGo Catppuccin JetBrains Mono"}
+	english := []string{"language system startup restore sessions close last tab active connection confirmation", "app theme light dark system accent preview reduce motion window translucency", "color scheme follow app fixed light dark terminal background font size line height cursor style blink scrollback", "default local directory concurrent transfers name conflict", "keyboard shortcuts new close reopen select tabs previous next sidebar terminal file mode split search current page settings", "private key import generate ssh-agent saved passwords add to agent credentials", "about version open source license MyGo Catppuccin JetBrains Mono"}
 	return a.settingMatches(settingsCategories[index].label, texts[index]+english[index])
 }
 
@@ -590,12 +590,6 @@ func (a *app) terminalTextSettings(c *ui.Context) {
 				a.changeTerminalSettings(func() { a.terminal.prefs.LineHeight = float32(value); a.prefs.LineHeightEdited = true })
 			}
 			uikit.Text(c, localize(c, "px"), uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneTertiary})
-		}},
-		{"粗体使用亮色", "ANSI 0–7 粗体改用 8–15 亮色（xterm 行为）", func() {
-			value := a.terminal.prefs.BoldIsBright
-			if uikit.Switch(c, &value, uikit.ToggleProps{Label: localize(c, "粗体使用亮色"), Motion: uikit.MotionOverride(a.reduceMotion(c))}).Changed() {
-				a.changeTerminalSettings(func() { a.terminal.prefs.BoldIsBright = value })
-			}
 		}},
 	})
 	a.settingsGroup(c, "光标", "", []settingField{

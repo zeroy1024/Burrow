@@ -6,11 +6,14 @@ tool github.com/egoist/mygo/cmd/mygo
 
 require (
 	github.com/egoist/mygo v0.7.3
+	github.com/egoist/mygo/sshdesk-terminal v0.0.0
 	github.com/pkg/sftp v1.13.12
 	golang.org/x/crypto v0.58.0
 	golang.org/x/sys v0.49.0
 	golang.org/x/text v0.43.0
 )
+
+replace github.com/egoist/mygo/sshdesk-terminal => ./third_party/mygo-terminal
 
 require (
 	github.com/ebitengine/purego v0.11.1 // indirect

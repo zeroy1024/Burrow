@@ -13,18 +13,18 @@ import (
 	"sshdesk/internal/uikit"
 
 	"github.com/egoist/mygo"
-	nativeterm "github.com/egoist/mygo/plugins/terminal"
+	nativeterm "github.com/egoist/mygo/sshdesk-terminal"
 	"github.com/egoist/mygo/ui"
 )
 
 type sshTerminal struct {
-	view       *nativeterm.Terminal
-	colors     nativeterm.Theme
-	font       nativeterm.Font
-	cursor     termtheme.CursorShape
-	blink      bool
-	scrollback int
-	capture    terminalCaptureFrame
+	view            *nativeterm.Terminal
+	colors          nativeterm.Theme
+	font            nativeterm.Font
+	cursor          termtheme.CursorShape
+	blink           bool
+	scrollbackLines int
+	capture         terminalCaptureFrame
 }
 
 // The emulator consumes saved history before reading any new remote output.
@@ -90,12 +90,10 @@ func (a *app) attachSSH(session *remoteSession, run *sshRuntime) {
 	}
 	prefs := a.terminal.prefs
 	blink := prefs.CursorBlink && !a.sshReduceMotion()
-	// MyGo exposes a byte budget rather than a row count. This estimates cell
-	// storage at the initial width; Unicode/style storage and reflow vary it.
-	scrollback := a.prefs.ScrollbackLines * max(80, session.columns) * 16
+	scrollbackLines := a.prefs.ScrollbackLines
 	view, err := nativeterm.New(nativeterm.Options{
 		Conn: transport, Font: a.sshFont(), Theme: a.sshColors(session),
-		Cursor: nativeterm.CursorStyle(prefs.CursorShape), NoBlink: !blink, Scrollback: scrollback,
+		Cursor: nativeterm.CursorStyle(prefs.CursorShape), NoBlink: !blink, ScrollbackLines: scrollbackLines,
 		Padding:          nativeterm.Padding{X: theme.Current().C.Pane.ContentSide, Y: -1},
 		NoClipboardWrite: true, ClipboardRead: nativeterm.ClipboardDeny,
 		OnBell: func() {
@@ -127,7 +125,8 @@ func (a *app) attachSSH(session *remoteSession, run *sshRuntime) {
 		return
 	}
 	session.terminal = &sshTerminal{
-		view: view, colors: *a.sshColors(session), font: a.sshFont(), cursor: prefs.CursorShape, blink: blink, scrollback: scrollback,
+		view: view, colors: *a.sshColors(session), font: a.sshFont(),
+		cursor: prefs.CursorShape, blink: blink, scrollbackLines: scrollbackLines,
 	}
 	session.focusPending = a.sshSessionFocused(session)
 	session.output, session.state = nil, connected
