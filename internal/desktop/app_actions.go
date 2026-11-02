@@ -71,18 +71,25 @@ func (a *app) appShortcuts(c *ui.Context) {
 	if a.settingsUI.recording != "" {
 		return
 	}
+	run := func(action func()) {
+		if !a.deferWorkspaceDragAction(action) {
+			action()
+		}
+	}
 	if a.actionPressed(c, "app.settings") {
-		a.openSettings()
+		run(a.openSettings)
 	}
 	if a.actionPressed(c, "mode.terminal") {
-		a.switchSection(sectionSSH)
+		run(func() { a.switchSection(sectionSSH) })
 	}
 	if a.actionPressed(c, "mode.files") {
-		a.switchSection(sectionFiles)
+		run(func() { a.switchSection(sectionFiles) })
 	}
 	if a.actionPressed(c, "session.new") {
-		a.closeSettings()
-		a.startHostDraft()
+		run(func() {
+			a.closeSettings()
+			a.startHostDraft()
+		})
 	}
 	count, index := len(a.tabs), a.activeTab
 	if a.section == sectionFiles {
@@ -95,7 +102,8 @@ func (a *app) appShortcuts(c *ui.Context) {
 		if a.section == sectionFiles {
 			a.activateFileTab(next)
 		} else {
-			a.activateTab(next)
+			tab := a.tabs[next]
+			run(func() { a.activateTab(slices.Index(a.tabs, tab)) })
 		}
 	}
 	for n := range 4 {
@@ -127,22 +135,24 @@ func (a *app) appShortcuts(c *ui.Context) {
 		}
 	}
 	if a.actionPressed(c, "tab.reopen") && len(a.closedTabs) > 0 {
-		closed := a.closedTabs[len(a.closedTabs)-1]
-		a.closedTabs = a.closedTabs[:len(a.closedTabs)-1]
-		a.switchSection(closed.section)
-		if closed.section == sectionFiles {
-			// Reopening this tab restores its identity and task ownership;
-			// opening the same site from the catalog still creates a new one.
-			session := closed.file
-			a.fileSessions = append(a.fileSessions, session)
-			a.activeFile = len(a.fileSessions) - 1
-			a.reconnectFileSession(session)
-		} else {
-			session := a.newShellSession(closed.host, closed.endpoint, closed.temporary, closed.connection)
-			a.nextTab++
-			a.tabs = append(a.tabs, &workspaceTab{id: a.nextTab, root: &terminalLayout{session: session}, focused: session})
-			a.activateTab(len(a.tabs) - 1)
-		}
+		run(func() {
+			closed := a.closedTabs[len(a.closedTabs)-1]
+			a.closedTabs = a.closedTabs[:len(a.closedTabs)-1]
+			a.switchSection(closed.section)
+			if closed.section == sectionFiles {
+				// Reopening this tab restores its identity and task ownership;
+				// opening the same site from the catalog still creates a new one.
+				session := closed.file
+				a.fileSessions = append(a.fileSessions, session)
+				a.activeFile = len(a.fileSessions) - 1
+				a.reconnectFileSession(session)
+			} else {
+				session := a.newShellSession(closed.host, closed.endpoint, closed.temporary, closed.connection)
+				a.nextTab++
+				a.tabs = append(a.tabs, &workspaceTab{id: a.nextTab, root: &terminalLayout{session: session}, focused: session})
+				a.activateTab(len(a.tabs) - 1)
+			}
+		})
 	}
 	if a.settingsUI.open {
 		return
@@ -152,8 +162,11 @@ func (a *app) appShortcuts(c *ui.Context) {
 	}
 	if a.section == sectionSSH && a.actionPressed(c, "pane.split") && a.currentTab() != nil {
 		tab := a.currentTab()
-		bounds := tab.focused.layoutRect
-		a.splitSession(tab.focused, tab.root.count() > 1 && bounds.H > bounds.W)
+		session := tab.focused
+		run(func() {
+			bounds := session.layoutRect
+			a.splitSession(session, tab.root.count() > 1 && bounds.H > bounds.W)
+		})
 	}
 	if count > 0 {
 		// Existing configurable bindings get first claim; these are additional
@@ -176,7 +189,9 @@ func (a *app) installAppMenu() func() {
 				a.files.conflict != nil || a.credentials.draft != nil || a.closeRequest != nil || a.closeFileRequest != nil || a.closePaneRequest != nil {
 				return
 			}
-			a.openSettings()
+			if !a.deferWorkspaceDragAction(a.openSettings) {
+				a.openSettings()
+			}
 			a.window.Invalidate()
 		},
 	}
@@ -196,6 +211,9 @@ func (a *app) installAppMenu() func() {
 
 func (a *app) requestCloseTab(index int) {
 	tab := a.tabs[index]
+	if a.deferWorkspaceDragAction(func() { a.requestCloseTab(slices.Index(a.tabs, tab)) }) {
+		return
+	}
 	if a.prefs.ConfirmCloseActive && slices.ContainsFunc(tab.root.sessions(), func(s *remoteSession) bool { return s.state == connected || s.state == connecting }) {
 		a.closeRequest, a.closeFileRequest, a.closePaneRequest = tab, nil, nil
 		return
@@ -281,6 +299,9 @@ func (a *app) afterLastTabClosed() {
 
 func (a *app) requestCloseFileTab(index int) {
 	session := a.fileSessions[index]
+	if a.deferWorkspaceDragAction(func() { a.requestCloseFileTab(slices.Index(a.fileSessions, session)) }) {
+		return
+	}
 	if a.prefs.ConfirmCloseActive && (session.state == connected || session.state == connecting) {
 		a.closeFileRequest, a.closeRequest, a.closePaneRequest = session, nil, nil
 		return

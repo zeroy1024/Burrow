@@ -536,6 +536,16 @@ func (a *app) keyUseCount(id string) int {
 	for _, task := range a.transfers.tasks {
 		fileSessions[task.session] = true
 	}
+	for _, closed := range a.closedTabs {
+		if closed.section == sectionFiles {
+			fileSessions[closed.file] = true
+			continue
+		}
+		add(closed.endpoint.session, "")
+		if closed.connection != nil {
+			groups[closed.connection] = true
+		}
+	}
 	for session := range fileSessions {
 		add(session.endpoint.session, "")
 		add(session.config, "")
@@ -545,8 +555,7 @@ func (a *app) keyUseCount(id string) int {
 	}
 	for group := range groups {
 		add(group.endpoint.session, "")
-		// A running group's jump hosts remain immutable after catalog edits.
-		// Their captured keys must survive until all consumers release the plan.
+		// Live and recoverable views keep their captured jump-host plans after edits.
 		for _, step := range group.plan.steps {
 			add(step.endpoint.session, step.key.ID)
 		}

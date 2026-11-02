@@ -108,6 +108,50 @@ func reconcileFTPNames(entries []Entry, names []string) ([]Entry, error) {
 	return entries, nil
 }
 
+func (c *ftpClient) directoryEntry(wire, name string, entries []Entry) (Entry, error) {
+	var aliases []Entry
+	for _, entry := range entries {
+		if entry.Name == name {
+			return entry, nil
+		}
+		if sameRenameSpelling(entry.Name, name) {
+			aliases = append(aliases, entry)
+		}
+	}
+	if len(aliases) == 0 {
+		return Entry{}, fs.ErrNotExist
+	}
+	// A listing's spelling does not reveal the server filesystem's comparison
+	// rules. Query this exact path before treating an equivalent name as absent.
+	code, message, err := c.command(0, "MLST %s", wire)
+	if err != nil {
+		return Entry{}, err
+	}
+	if unsupportedFTPCommand(&textproto.Error{Code: code, Msg: message}) {
+		if len(aliases) != 1 || aliases[0].Symlink {
+			return Entry{}, errors.New("FTP server cannot safely resolve this equivalent filename")
+		}
+		verb, expected := "SIZE", 213
+		if aliases[0].Directory {
+			verb, expected = "CWD", 250
+		}
+		code, message, err = c.command(0, verb+" %s", wire)
+		if err != nil {
+			return Entry{}, err
+		}
+		if code != expected {
+			return Entry{}, normalizeFTPError(&textproto.Error{Code: code, Msg: message})
+		}
+	} else if code != 250 {
+		return Entry{}, normalizeFTPError(&textproto.Error{Code: code, Msg: message})
+	}
+	if len(aliases) != 1 {
+		return Entry{}, errors.New("FTP server returned ambiguous equivalent filenames")
+	}
+	// Keep the listing's Lstat metadata; SIZE/CWD only confirmed path existence.
+	return aliases[0], nil
+}
+
 func (c *ftpClient) Chmod(ctx context.Context, name string, mode fs.FileMode) error {
 	wire, err := c.wirePath(name)
 	if err != nil {

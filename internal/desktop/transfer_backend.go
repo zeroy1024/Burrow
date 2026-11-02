@@ -161,9 +161,17 @@ func (a *app) startTransfer(task *transferTask, cleanup bool) {
 	a.sshWorkers.Go(func() {
 		var remote fileclient.Client
 		var err error
-		if cleanup && job.sourceRemote {
-			// Download staging files live locally; no authentication is needed.
-		} else {
+		var local fileclient.Client
+		if job.sourceRemote {
+			// Anchor the selected destination before authentication or a conflict
+			// can leave time for another process to replace its descendants.
+			local, err = fileclient.OpenLocalRoot(ctx, job.targetPath)
+		} else if !cleanup {
+			// Keep upload reads inside the selected source while authentication
+			// and conflict dialogs run. Remote cleanup does not need the source.
+			local, err = fileclient.OpenLocalSource(ctx, job.sourcePath)
+		}
+		if err == nil && !(cleanup && job.sourceRemote) {
 			select {
 			case result := <-run.ready:
 				remote, err = result.client, result.err
@@ -171,7 +179,6 @@ func (a *app) startTransfer(task *transferTask, cleanup bool) {
 				err = ctx.Err()
 			}
 		}
-		local := fileclient.NewLocal()
 		if err == nil {
 			err = ctx.Err()
 		}
@@ -189,7 +196,10 @@ func (a *app) startTransfer(task *transferTask, cleanup bool) {
 				close(stopProgress)
 			}
 		}
-		closeErr := local.Close()
+		var closeErr error
+		if local != nil {
+			closeErr = local.Close()
+		}
 		if remote != nil {
 			closeErr = errors.Join(closeErr, remote.Close())
 		}
@@ -440,6 +450,9 @@ func buildTransferManifestAt(ctx context.Context, client fileclient.Client, remo
 	if entry.Symlink {
 		return nil, fmt.Errorf("符号链接不会被递归跟随：%s", source)
 	}
+	if entry.ModeKnown && !entry.Directory && !entry.Mode.IsRegular() {
+		return nil, fmt.Errorf("不支持传输特殊文件：%s", source)
+	}
 	if entry.Size < 0 {
 		return nil, fmt.Errorf("文件大小无效：%s", source)
 	}
@@ -487,6 +500,9 @@ func (a *app) copyTransferNode(ctx context.Context, task *transferTask, run *tra
 	if err != nil {
 		return err
 	}
+	if fresh.ModeKnown && !fresh.Directory && !fresh.Mode.IsRegular() && !fresh.Symlink {
+		return fmt.Errorf("不支持传输特殊文件：%s", node.source)
+	}
 	if fresh.Symlink || fresh.Directory != node.entry.Directory || (!fresh.Directory && !sameTransferEntry(fresh, node.entry)) {
 		return fmt.Errorf("源文件在传输期间已改变：%s", node.source)
 	}
@@ -528,6 +544,42 @@ func (a *app) copyTransferNode(ctx context.Context, task *transferTask, run *tra
 		node.done = true
 		return nil
 	}
+	var privateWriter fileclient.PrivateStageWriter
+	if !job.sourceRemote && node.approved != nil {
+		if !node.approved.ModeKnown {
+			return fmt.Errorf("无法确认已有目标的权限，未执行覆盖：%s", node.destination)
+		}
+		if node.approved.Mode.Perm()&0044 != 0044 {
+			var supported bool
+			privateWriter, supported = target.(fileclient.PrivateStageWriter)
+			if !supported {
+				return fmt.Errorf("此连接无法在上传前安全创建私有临时文件，未执行受限权限文件的覆盖：%s", node.destination)
+			}
+		}
+	}
+	if privateWriter != nil && node.temporary != "" {
+		// Old parts may still have the server's public creation permissions.
+		// Restrict them before prefix verification or another source read.
+		output, _, err := privateWriter.OpenPrivateWrite(ctx, node.temporary, 0, false, false)
+		if errors.Is(err, fs.ErrNotExist) {
+			delete(job.temporary, node.temporary)
+			clearTransferTemporary(node, node.temporary)
+		} else {
+			if err != nil {
+				return err
+			}
+			mask := fs.ModePerm | fs.ModeSetuid | fs.ModeSetgid | fs.ModeSticky
+			for _, baseline := range []*fileclient.Entry{node.staged, node.partial} {
+				if baseline != nil {
+					baseline.Mode = baseline.Mode&^mask | 0600
+					baseline.ModeKnown = true
+				}
+			}
+			if err := output.Close(); err != nil {
+				return err
+			}
+		}
+	}
 	if node.temporary == "" {
 		var suffix [16]byte
 		if _, err := rand.Read(suffix[:]); err != nil {
@@ -544,8 +596,22 @@ func (a *app) copyTransferNode(ctx context.Context, task *transferTask, run *tra
 			}
 			return err
 		}
-		node.temporary = temporary
-		job.temporary[node.temporary] = struct{}{}
+		if privateWriter != nil {
+			output, created, err := privateWriter.OpenPrivateWrite(ctx, temporary, 0, false, true)
+			if created {
+				node.temporary = temporary
+				job.temporary[temporary] = struct{}{}
+			}
+			if err != nil {
+				return err
+			}
+			if err := output.Close(); err != nil {
+				return err
+			}
+		} else {
+			node.temporary = temporary
+			job.temporary[temporary] = struct{}{}
+		}
 	}
 	resume, err := prepareTransferResume(ctx, source, target, node)
 	if err != nil {
@@ -562,7 +628,12 @@ func (a *app) copyTransferNode(ctx context.Context, task *transferTask, run *tra
 			}
 		}
 		node.partial = nil
-		output, err := target.OpenWrite(ctx, node.temporary, offset, offset == 0)
+		var output io.WriteCloser
+		if privateWriter != nil {
+			output, _, err = privateWriter.OpenPrivateWrite(ctx, node.temporary, offset, offset == 0, false)
+		} else {
+			output, err = target.OpenWrite(ctx, node.temporary, offset, offset == 0)
+		}
 		if err != nil {
 			return errors.Join(err, input.Close())
 		}
@@ -603,7 +674,8 @@ func (a *app) copyTransferNode(ctx context.Context, task *transferTask, run *tra
 	if err != nil {
 		return err
 	}
-	if written.Symlink || written.Directory || written.Size != node.entry.Size {
+	if written.Symlink || written.Directory || written.Size != node.entry.Size ||
+		written.ModeKnown && !written.Mode.IsRegular() {
 		return fmt.Errorf("目标临时文件大小不匹配：%s", node.temporary)
 	}
 	node.staged, node.partial, node.digest = &written, &written, digest
@@ -693,7 +765,8 @@ func prepareTransferResume(
 		return resume, err
 	}
 	resume.exists = true
-	if partial.Symlink || partial.Directory || partial.Size < 0 || partial.Size > node.entry.Size {
+	if partial.Symlink || partial.Directory || partial.Size < 0 || partial.Size > node.entry.Size ||
+		partial.ModeKnown && !partial.Mode.IsRegular() {
 		return resume, fmt.Errorf("临时文件状态无效：%s", node.temporary)
 	}
 	if checkpoint := node.checkpoint; checkpoint != nil && checkpoint.Offset > partial.Size {
@@ -808,6 +881,9 @@ func preserveTransferPermissions(
 	if !current.ModeKnown {
 		return fmt.Errorf("无法确认已有目标的权限，未执行覆盖：%s", node.destination)
 	}
+	if !current.Mode.IsRegular() {
+		return fmt.Errorf("目标不是普通文件，未执行覆盖：%s", node.destination)
+	}
 	mask := fs.ModePerm | fs.ModeSetuid | fs.ModeSetgid | fs.ModeSticky
 	mode := current.Mode & mask
 	setter, ok := target.(fileclient.PermissionSetter)
@@ -902,7 +978,8 @@ func verifyCompletedTransfers(ctx context.Context, target fileclient.Client, nod
 		if err != nil {
 			return fmt.Errorf("已完成目标已改变，请重新排队：%s：%w", node.destination, err)
 		}
-		if entry.Symlink || entry.Directory != node.entry.Directory || !entry.Directory && entry.Size != node.entry.Size {
+		if entry.Symlink || entry.Directory != node.entry.Directory ||
+			!entry.Directory && (entry.Size != node.entry.Size || entry.ModeKnown && !entry.Mode.IsRegular()) {
 			return fmt.Errorf("已完成目标类型或大小已改变，请重新排队：%s", node.destination)
 		}
 	}
@@ -954,7 +1031,8 @@ func recoverTransferCommit(ctx context.Context, source, target fileclient.Client
 	if targetErr != nil {
 		return uncertain(targetErr)
 	}
-	if entry.Symlink || entry.Directory || entry.Size != node.entry.Size {
+	if entry.Symlink || entry.Directory || entry.Size != node.entry.Size ||
+		entry.ModeKnown && !entry.Mode.IsRegular() {
 		if partialExists {
 			node.committing, node.commitLegacy = false, false
 			return nil
@@ -1076,7 +1154,8 @@ func (a *app) chooseTransferDestination(ctx context.Context, task *transferTask,
 		}
 		switch choice {
 		case 1:
-			if existing.Symlink || existing.Directory != source.Directory {
+			if existing.Symlink || existing.Directory != source.Directory ||
+				!existing.Directory && existing.ModeKnown && !existing.Mode.IsRegular() {
 				return "", nil, false, fmt.Errorf("目标类型不同或为符号链接，请选择保留两者：%s", candidate)
 			}
 			return candidate, &existing, false, nil
@@ -1150,7 +1229,8 @@ func validTransferDestinationName(source, target string, directory bool) bool {
 }
 
 func sameTransferEntry(left, right fileclient.Entry) bool {
-	modeMatches := !left.ModeKnown || !right.ModeKnown || left.Mode.Perm() == right.Mode.Perm()
+	modeMatches := !left.ModeKnown || !right.ModeKnown ||
+		left.Mode.Perm() == right.Mode.Perm() && left.Mode.Type() == right.Mode.Type()
 	return left.Size == right.Size && left.Directory == right.Directory && left.Symlink == right.Symlink &&
 		left.Modified.Equal(right.Modified) && modeMatches
 }

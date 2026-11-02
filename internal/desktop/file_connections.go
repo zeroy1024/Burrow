@@ -120,7 +120,11 @@ func (a *app) openFileClient(ctx context.Context, session *fileSession, complete
 				// Kept only for this runtime and its background jobs, never persisted.
 				cached := secret
 				a.window.Update(func() {
-					if ctx.Err() == nil {
+					current := session.endpoint.session
+					// A late authentication result must not restore a cleared credential.
+					if ctx.Err() == nil && current.ID == h.session.ID && current.Auth == h.session.Auth &&
+						current.PasswordSaved == h.session.PasswordSaved && current.PasswordRevision == h.session.PasswordRevision &&
+						current.UpdatedAt.Equal(h.session.UpdatedAt) {
 						session.ftpSecret = cached
 					}
 				})
@@ -181,8 +185,10 @@ func (a *app) reconnectFileSession(session *fileSession) { a.startFileSession(se
 func (a *app) startFileSession(session *fileSession, refresh bool) {
 	a.disconnectFileSession(session)
 	if refresh {
+		previousFiles := *session.config.Files
 		endpoint, id, changed := a.latestSessionEndpoint(session.endpoint, session.temporary)
 		session.endpoint, session.config, session.host = endpoint, endpoint.session, id
+		a.refreshFileInitialDirectories(session, previousFiles)
 		if changed {
 			session.ftpSecret = ""
 		}
@@ -245,9 +251,19 @@ func (a *app) startFileSession(session *fileSession, refresh bool) {
 			case <-client.Done():
 			}
 			a.window.Update(func() {
-				if session.runtime == run && ctx.Err() == nil {
-					session.state, session.errorText, session.remote.loading = connectionFailed, "文件连接已断开", false
+				if session.runtime != run || ctx.Err() != nil {
+					return
 				}
+				publish := func() {
+					if session.runtime == run && ctx.Err() == nil {
+						session.state, session.errorText, session.remote.loading = connectionFailed, "文件连接已断开", false
+					}
+				}
+				if drag := a.files.drag; drag != nil && drag.session == session {
+					drag.publishDisconnect = publish
+					return
+				}
+				publish()
 			})
 		})
 	})
@@ -349,7 +365,7 @@ func (a *app) readFileDirectory(session *fileSession, pane *filePaneState, run *
 		if err == nil {
 			entries, err = run.client.ReadDir(run.ctx, location)
 		}
-		a.window.Update(func() {
+		publish := func() {
 			current := session.localRuntime
 			if pane.remote {
 				current = session.runtime
@@ -410,6 +426,22 @@ func (a *app) readFileDirectory(session *fileSession, pane *filePaneState, run *
 					pane.errorText = "保存目录历史：" + err.Error()
 				}
 			}
+		}
+		a.window.Update(func() {
+			current := session.localRuntime
+			if pane.remote {
+				current = session.runtime
+			}
+			if current != run || run.ctx.Err() != nil {
+				return
+			}
+			if drag := a.files.drag; drag != nil && drag.session == session && drag.remote == pane.remote {
+				// Keep the pressed row mounted until the SDK receives release.
+				// The listing guard also holds later navigation requests here.
+				drag.publishDirectory = publish
+				return
+			}
+			publish()
 		})
 	})
 }

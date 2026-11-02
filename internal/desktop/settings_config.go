@@ -299,9 +299,7 @@ func (a *app) openSettings() {
 
 func (a *app) openSettingsCategory(index int) {
 	a.openSettings()
-	a.settingsCategory = index
-	a.prefs.LastSettingsTab = settingsCategories[index].id
-	a.preferencesChanged()
+	a.selectSettingsCategory(index)
 }
 
 func (a *app) closeSettings() {
@@ -317,6 +315,7 @@ func (a *app) selectSettingsCategory(index int) {
 	if index == a.settingsCategory {
 		return
 	}
+	a.settingsUI.recording, a.settingsUI.pendingBinding, a.settingsUI.conflictAction = "", "", ""
 	a.settingsCategory = index
 	a.prefs.LastSettingsTab = settingsCategories[index].id
 	a.preferencesChanged()

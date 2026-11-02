@@ -239,7 +239,9 @@ func (a *app) completeSSHRequest(request *sshConnectionRequest) {
 	if request == nil {
 		return
 	}
-	request.release()
+	if request.release != nil {
+		request.release()
+	}
 	group := request.group
 	if group.opening == request {
 		group.opening = nil

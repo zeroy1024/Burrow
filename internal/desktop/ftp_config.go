@@ -61,6 +61,36 @@ func (a *app) restoreFileSession(session *fileSession) {
 	}
 }
 
+func (a *app) refreshFileInitialDirectories(session *fileSession, previous fileOptions) {
+	options := session.config.Files
+	reset := func(pane *filePaneState, location string) {
+		pane.path, pane.history, pane.historyIndex = location, nil, -1
+		pane.directories = map[string][]fileEntry{}
+		pane.query, pane.errorText, pane.reveal, pane.hoverFolder = "", "", "", ""
+		pane.table.Clear()
+		pane.table.List.ScrollTo(0, 0)
+		pane.scroll = ui.ScrollState{Handle: pane.scroll.Handle}
+	}
+	if options.RemoteDir != previous.RemoteDir {
+		reset(session.remote, options.RemoteDir)
+	}
+	if options.LocalDir != previous.LocalDir {
+		// Cancel an outstanding listing before the old runtime can publish its path.
+		a.closeLocalFiles(session)
+		location := options.LocalDir
+		if location == "" {
+			location = a.prefs.DefaultLocalDir
+		}
+		if location == "" {
+			location = "~"
+		}
+		reset(session.local, location)
+		if key := a.fileSiteKey(session); key != "" {
+			a.files.localPaths[key] = location
+		}
+	}
+}
+
 func (a *app) loadFilePreferences() error {
 	err := a.readFilePreferences()
 	a.filePrefs.loadErr = err

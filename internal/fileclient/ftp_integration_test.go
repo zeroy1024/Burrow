@@ -91,8 +91,9 @@ func TestFTPIntegrationDocker(t *testing.T) {
 		if !found["nested"].Directory || found["hello.txt"].Directory || found["hello.txt"].Size == 0 {
 			t.Fatal("FTP file/directory metadata was incorrect")
 		}
-		if found["hello.txt"].Owner != "" || found["hello.txt"].Permissions != "" {
-			t.Fatal("FTP metadata fabricated unsupported owner or permissions")
+		hello := found["hello.txt"]
+		if hello.Owner != "1001:1001" || hello.Permissions != "-rw-r--r--" || !hello.ModeKnown || hello.Mode.Perm() != 0644 {
+			t.Fatalf("FTP fixture owner or permissions mismatch: %+v", hello)
 		}
 		children, err := client.ReadDir(t.Context(), path.Join(root, "nested"))
 		if err != nil || len(children) == 0 {
@@ -264,12 +265,14 @@ func (f *ftpProtocolFixture) serve(pwdMode string) {
 			f.mu.Lock()
 			f.data = data
 			f.mu.Unlock()
-		case "LIST":
+		case "LIST", "NLST":
 			fmt.Fprint(connection, "150 opening data connection\r\n")
 			f.mu.Lock()
 			data := f.data.(*net.TCPConn)
 			f.mu.Unlock()
-			close(f.listEntered)
+			if verb == "LIST" {
+				close(f.listEntered)
+			}
 			if pwdMode == "blocked_list" {
 				if _, err := data.Read(make([]byte, 1)); errors.Is(err, io.EOF) {
 					close(f.dataClosed)
@@ -277,11 +280,20 @@ func (f *ftpProtocolFixture) serve(pwdMode string) {
 				data.Close()
 				return
 			}
-			fmt.Fprint(data, "-rw-r--r-- 1 user group 6 Jan 01 2026 hello.txt\r\n")
+			if verb == "LIST" {
+				fmt.Fprint(data, "-rw-r--r-- 1 user group 6 Jan 01 2026 hello.txt\r\n")
+			} else {
+				fmt.Fprint(data, "hello.txt\r\n")
+			}
 			data.CloseWrite()
 			fmt.Fprint(connection, "226 listing complete\r\n")
-			// The client must close its data socket after consuming EOF.
-			if _, err := data.Read(make([]byte, 1)); errors.Is(err, io.EOF) {
+			// Both listings must release their data sockets after consuming EOF.
+			// NLST is last, so its close confirms that the full listing finished.
+			if _, err := data.Read(make([]byte, 1)); !errors.Is(err, io.EOF) {
+				data.Close()
+				return
+			}
+			if verb == "NLST" {
 				close(f.dataClosed)
 			}
 			data.Close()

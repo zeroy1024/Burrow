@@ -48,8 +48,7 @@ func (a *app) shortcutSettings(c *ui.Context) {
 		uikit.Text(c, localize(c, "快捷键"), uikit.TextProps{Style: uikit.TextSmall}).FontWeight(t.C.Settings.GroupTitleWeight).Grow(1)
 		uikit.Button(c, localize(c, "全部恢复默认"), uikit.ButtonProps{}).OnClick(func() {
 			a.prefs.Keymap = map[string]string{}
-			a.settingsUI.recording = ""
-			a.settingsUI.conflictAction = ""
+			a.settingsUI.recording, a.settingsUI.pendingBinding, a.settingsUI.conflictAction = "", "", ""
 			a.preferencesChanged()
 		})
 	})
@@ -94,7 +93,7 @@ func (a *app) shortcutSettings(c *ui.Context) {
 						return false
 					}
 					if ev.Key == ui.KeyEscape {
-						a.settingsUI.recording = ""
+						a.settingsUI.recording, a.settingsUI.pendingBinding, a.settingsUI.conflictAction = "", "", ""
 						return true
 					}
 					if ev.Key == ui.KeyBackspace || ev.Key == ui.KeyDelete {
@@ -104,13 +103,6 @@ func (a *app) shortcutSettings(c *ui.Context) {
 					binding, ok := keyToBinding(ev.Mods, ev.Key)
 					if !ok {
 						return true
-					}
-					for _, candidate := range defaultShortcutActions {
-						if candidate.id != action.id && a.shortcutBinding(candidate.id) == binding {
-							a.settingsUI.pendingBinding = binding
-							a.settingsUI.conflictAction = candidate.id
-							return true
-						}
 					}
 					a.storeShortcut(action.id, binding)
 					return true
@@ -125,24 +117,32 @@ func (a *app) shortcutSettings(c *ui.Context) {
 				})
 			}
 		case 2:
-			uikit.Button(c, localize(c, "恢复默认"), uikit.ButtonProps{}).Label(localize(c, "恢复默认：") + localize(c, action.label)).OnClick(func() { delete(a.prefs.Keymap, action.id); a.preferencesChanged() })
+			uikit.Button(c, localize(c, "恢复默认"), uikit.ButtonProps{}).Label(localize(c, "恢复默认：") + localize(c, action.label)).OnClick(func() { a.storeShortcut(action.id, action.binding) })
 		}
 	})
 }
 
 func (a *app) storeShortcut(id, binding string) {
+	if binding != "" {
+		for _, candidate := range defaultShortcutActions {
+			if candidate.id != id && a.shortcutBinding(candidate.id) == binding {
+				a.settingsUI.recording = id
+				a.settingsUI.pendingBinding = binding
+				a.settingsUI.conflictAction = candidate.id
+				return
+			}
+		}
+	}
 	for _, action := range defaultShortcutActions {
 		if action.id == id && binding == action.binding {
 			delete(a.prefs.Keymap, id)
-			a.settingsUI.recording = ""
-			a.settingsUI.conflictAction = ""
+			a.settingsUI.recording, a.settingsUI.pendingBinding, a.settingsUI.conflictAction = "", "", ""
 			a.preferencesChanged()
 			return
 		}
 	}
 	a.prefs.Keymap[id] = binding
-	a.settingsUI.recording = ""
-	a.settingsUI.conflictAction = ""
+	a.settingsUI.recording, a.settingsUI.pendingBinding, a.settingsUI.conflictAction = "", "", ""
 	a.preferencesChanged()
 }
 

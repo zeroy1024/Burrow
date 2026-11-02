@@ -16,6 +16,7 @@ def fixture_files(container):
     subprocess.run(["docker", "exec", "-i", container, "sh"], input=b"""set -eu
 install -d -o sshdesk -g sshdesk -m 0755 /home/sshdesk/nested
 printf 'integration hello\\n' > /home/sshdesk/hello.txt
+chmod 0644 /home/sshdesk/hello.txt
 printf 'nested entry\\n' > /home/sshdesk/nested/inside.txt
 install -d -m 000 /home/sshdesk/denied
 """, check=True)

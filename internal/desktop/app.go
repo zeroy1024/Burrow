@@ -471,7 +471,17 @@ func (a *app) view(c *ui.Context) {
 	a.credentialDialogs(c)
 	a.closeTabDialog(c)
 	if a.files.drag != nil && !a.files.dragSeen {
+		drag := a.files.drag
 		a.files.drag = nil
+		if drag.publishDirectory != nil {
+			drag.publishDirectory()
+		}
+		if drag.publishDisconnect != nil {
+			drag.publishDisconnect()
+		}
+		if drag.afterCancel != nil {
+			drag.afterCancel()
+		}
 		c.AnimationFrame()
 	}
 	if a.files.notice != nil {

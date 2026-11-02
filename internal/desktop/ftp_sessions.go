@@ -39,11 +39,19 @@ func (a *app) currentFileSession() *fileSession {
 }
 
 func (a *app) activateFileTab(index int) {
+	session := a.fileSessions[index]
+	if index != a.activeFile && a.deferWorkspaceDragAction(func() { a.activateFileTab(slices.Index(a.fileSessions, session)) }) {
+		return
+	}
 	a.selectFileTab(index)
 	a.focusWorkspace()
 }
 
 func (a *app) selectFileTab(index int) {
+	session := a.fileSessions[index]
+	if index != a.activeFile && a.deferWorkspaceDragAction(func() { a.selectFileTab(slices.Index(a.fileSessions, session)) }) {
+		return
+	}
 	a.settingsUI.previousFocus = ui.Handle{}
 	a.closeSettings()
 	a.activeFile = index
@@ -236,10 +244,12 @@ func (a *app) deleteFileSite(id hostID) error {
 	for _, group := range a.runtimeSSHGroups() {
 		for _, step := range group.plan.steps {
 			if options := step.endpoint.session.SSH; options != nil && options.JumpHostID == deleted.session.ID {
-				return fmt.Errorf("运行会话仍将此条目用作跳板机，请先关闭相关会话和传输")
+				return fmt.Errorf("会话（含可恢复的关闭标签）仍将此条目用作跳板机，请先按新配置重连相关标签，或取消并清除相关传输")
 			}
 		}
 	}
+	previousWorkspace := a.savedWorkspace
+	a.savedWorkspace = a.workspaceSnapshot()
 	if err := a.commitCatalogMove(func() {
 		a.hosts = slices.Delete(a.hosts, int(id), int(id)+1)
 		for _, group := range a.groups {
@@ -251,6 +261,7 @@ func (a *app) deleteFileSite(id hostID) error {
 			}
 		}
 	}); err != nil {
+		a.savedWorkspace = previousWorkspace
 		return err
 	}
 	// Hidden page drafts still refer to the compacted host array.
@@ -268,7 +279,7 @@ func (a *app) deleteFileSite(id hostID) error {
 	}
 	for i := len(a.fileSessions) - 1; i >= 0; i-- {
 		session := a.fileSessions[i]
-		if session.host == id {
+		if !session.temporary && session.endpoint.session.ID == deleted.session.ID {
 			a.closeFileSession(i)
 		}
 	}
@@ -279,8 +290,26 @@ func (a *app) deleteFileSite(id hostID) error {
 	for _, task := range a.transfers.tasks {
 		remainingFiles[task.session] = true
 	}
+	for _, closed := range a.closedTabs {
+		if closed.section == sectionFiles {
+			remainingFiles[closed.file] = true
+		}
+	}
+	for _, tab := range a.tabs {
+		for _, session := range tab.root.sessions() {
+			if session.filePeer != nil {
+				remainingFiles[session.filePeer] = true
+			}
+		}
+	}
+	a.closedTabs = slices.DeleteFunc(a.closedTabs, func(candidate closedWorkspaceTab) bool {
+		if candidate.section == sectionFiles {
+			return !candidate.file.temporary && candidate.file.endpoint.session.ID == deleted.session.ID
+		}
+		return !candidate.temporary && candidate.endpoint.session.ID == deleted.session.ID
+	})
 	for session := range remainingFiles {
-		if session.host == id {
+		if !session.temporary && session.endpoint.session.ID == deleted.session.ID {
 			session.host, session.temporary = -1, true
 		} else if session.host > id {
 			session.host--
@@ -289,7 +318,7 @@ func (a *app) deleteFileSite(id hostID) error {
 	for i := len(a.tabs) - 1; i >= 0; i-- {
 		tab := a.tabs[i]
 		for _, session := range tab.root.sessions() {
-			if session.host == id {
+			if !session.temporary && session.endpoint.session.ID == deleted.session.ID {
 				releaseSSH(session)
 				tab.root = tab.root.remove(session)
 				if tab.focused == session && tab.root != nil {
@@ -303,9 +332,8 @@ func (a *app) deleteFileSite(id hostID) error {
 			a.closeTab(i)
 		}
 	}
-	a.closedTabs = slices.DeleteFunc(a.closedTabs, func(candidate closedWorkspaceTab) bool { return candidate.host == id })
 	for i, candidate := range a.closedTabs {
-		if candidate.host > id {
+		if candidate.section != sectionFiles && candidate.host > id {
 			a.closedTabs[i].host--
 		}
 	}

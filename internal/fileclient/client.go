@@ -32,6 +32,14 @@ type PermissionSetter interface {
 	Chmod(context.Context, string, fs.FileMode) error
 }
 
+// PrivateStageWriter restricts a staging file to 0600 before returning a writer.
+// create requests exclusive creation; otherwise the file must already exist.
+// created reports confirmed creation even when a later permission check fails,
+// so callers can track their own file without claiming an EXCL conflict's file.
+type PrivateStageWriter interface {
+	OpenPrivateWrite(ctx context.Context, name string, offset int64, truncate, create bool) (stream io.WriteCloser, created bool, err error)
+}
+
 type DirectoryResolver interface {
 	ResolveDirectory(context.Context, string) (string, error)
 }

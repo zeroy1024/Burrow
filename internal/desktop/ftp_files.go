@@ -65,9 +65,16 @@ type fileActionDialog struct {
 }
 
 type fileDrag struct {
-	session *fileSession
-	remote  bool
-	entries []fileEntry
+	afterCancel       func()
+	publishDirectory  func()
+	publishDisconnect func()
+	session           *fileSession
+	remote            bool
+	entries           []fileEntry
+}
+
+func (d *fileDrag) cancelRequested() bool {
+	return d.afterCancel != nil || d.publishDirectory != nil || d.publishDisconnect != nil
 }
 
 type fileConflict struct {

@@ -118,6 +118,58 @@ func (q *transferQueueState) sessionTasks(session *fileSession) []*transferTask 
 	return tasks
 }
 
+func (a *app) detachedTransferCount() int {
+	count := 0
+	for _, task := range a.transfers.tasks {
+		if !slices.Contains(a.fileSessions, task.view) {
+			count++
+		}
+	}
+	return count
+}
+
+func (a *app) recoverTransferTabs(c *ui.Context) {
+	recovered := map[string]*fileSession{}
+	var first *fileSession
+	for _, task := range a.transfers.tasks {
+		if slices.Contains(a.fileSessions, task.view) {
+			continue
+		}
+		snapshot := task.session
+		view := task.view
+		if view == nil {
+			view = recovered[snapshot.restoreID]
+			if view == nil {
+				view = a.snapshotTransferSession(snapshot)
+				if view.restoreID == "" {
+					view.restoreID = newSessionID()
+				}
+			}
+		}
+		if !slices.Contains(a.fileSessions, view) {
+			a.fileSessions = append(a.fileSessions, view)
+		}
+		// Keep every private endpoint snapshot, while persisting the recovered
+		// tab identity for all batches that belonged to the same original tab.
+		recovered[view.restoreID] = view
+		task.view, snapshot.restoreID = view, view.restoreID
+		if first == nil {
+			first = view
+		}
+	}
+	if first == nil {
+		return
+	}
+	a.closedTabs = slices.DeleteFunc(a.closedTabs, func(closed closedWorkspaceTab) bool {
+		return closed.section == sectionFiles && slices.Contains(a.fileSessions, closed.file)
+	})
+	a.transfers.filter, a.transfers.collapsed = 0, false
+	a.switchSection(sectionFiles)
+	a.activateFileTab(slices.Index(a.fileSessions, first))
+	a.advanceTransferConflicts()
+	a.saveFilePreferences(c)
+}
+
 func (a *app) enqueueFiles(
 	c *ui.Context,
 	session *fileSession,
@@ -308,7 +360,13 @@ func (a *app) transferHeader(c *ui.Context, session *fileSession, tasks []*trans
 		uikit.TransferHeaderTitle(c, "传输", filesIcon)
 		a.transferFilters(c, s, len(tasks))
 		ui.Spacer(c)
-		if !compact {
+		if count := a.detachedTransferCount(); count > 0 {
+			button := uikit.Button(c, fmt.Sprintf("找回任务 (%d)", count), uikit.ButtonProps{
+				Variant: uikit.ButtonPlain, Size: uikit.SizeSm,
+			}).Key("recover-transfers").Shrink(0)
+			uikit.Tip(c, button, "重新打开传输所属标签，不会自动连接或继续传输")
+			button.OnClick(func() { a.recoverTransferTabs(c) })
+		} else if !compact {
 			uikit.TransferHeaderSummary(c, "总速度 "+transferBytes(int64(s.speed))+"/s · "+transferRemaining(s.total-s.bytes, s.speed))
 		}
 		pauseIcon, pauseLabel := transferPauseIcon, "全部暂停"

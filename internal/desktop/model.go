@@ -422,6 +422,16 @@ func (a *app) runtimeSSHGroups() []*sshConnectionGroup {
 			groups[task.session.connection] = struct{}{}
 		}
 	}
+	// Reopening a closed tab restores its captured plan after catalog edits.
+	for _, closed := range a.closedTabs {
+		group := closed.connection
+		if closed.section == sectionFiles {
+			group = closed.file.connection
+		}
+		if group != nil {
+			groups[group] = struct{}{}
+		}
+	}
 	result := make([]*sshConnectionGroup, 0, len(groups))
 	for group := range groups {
 		result = append(result, group)

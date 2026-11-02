@@ -72,6 +72,18 @@ func (a *app) settingsSidebar(c *ui.Context, shown float32) {
 }
 
 func (a *app) settings(c *ui.Context) {
+	if a.settingsUI.recording != "" {
+		searching := strings.TrimSpace(a.settingsUI.query) != ""
+		visible := !searching && a.settingsCategory == 4 || searching && a.settingsCategoryHasMatch(4)
+		if visible {
+			visible = slices.ContainsFunc(defaultShortcutActions, func(action shortcutAction) bool {
+				return action.id == a.settingsUI.recording && a.settingMatches(action.label, action.group+"快捷键")
+			})
+		}
+		if !visible {
+			a.settingsUI.recording, a.settingsUI.pendingBinding, a.settingsUI.conflictAction = "", "", ""
+		}
+	}
 	t := theme.Current()
 	p := t.C.Settings
 	uikit.Card(c).Key("settings-content").Grow(1).MinWidth(0).FillHeight().Children(func() {

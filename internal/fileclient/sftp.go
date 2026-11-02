@@ -359,6 +359,148 @@ func (c *sftpClient) OpenWrite(ctx context.Context, name string, offset int64, t
 	return stream, nil
 }
 
+func (c *sftpClient) OpenPrivateWrite(
+	ctx context.Context, name string, offset int64, truncate, create bool,
+) (io.WriteCloser, bool, error) {
+	if offset < 0 || truncate && offset != 0 {
+		return nil, false, fs.ErrInvalid
+	}
+	wire, err := c.wirePath(name)
+	if err != nil {
+		return nil, false, err
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, false, err
+	}
+	select {
+	case c.readGate <- struct{}{}:
+		defer func() { <-c.readGate }()
+	case <-ctx.Done():
+		return nil, false, ctx.Err()
+	case <-c.done:
+		return nil, false, fs.ErrClosed
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, false, err
+	}
+	select {
+	case <-c.done:
+		return nil, false, fs.ErrClosed
+	default:
+	}
+	type openedStage struct {
+		file    *sftp.File
+		created bool
+		err     error
+	}
+	operation := func() (openedStage, error) {
+		flags := os.O_WRONLY
+		if create {
+			flags |= os.O_CREATE | os.O_EXCL
+		} else {
+			info, err := c.client.Lstat(wire)
+			if err != nil {
+				return openedStage{}, err
+			}
+			if !info.Mode().IsRegular() {
+				return openedStage{}, fs.ErrInvalid
+			}
+			if info.Mode().Perm()&0200 == 0 {
+				// A full part may already carry the read-only final target mode.
+				// Restore owner access without truncating it before verification.
+				if err := c.client.Chmod(wire, 0600); err != nil {
+					return openedStage{}, err
+				}
+			}
+		}
+		var file *sftp.File
+		var err error
+		if create {
+			file, err = c.client.OpenFileMode(wire, flags, 0600)
+		} else {
+			file, err = c.client.OpenFile(wire, flags)
+		}
+		if err != nil {
+			return openedStage{}, err
+		}
+		result := openedStage{file: file, created: create}
+		fail := func(err error) (openedStage, error) {
+			result.file = nil
+			return result, errors.Join(err, file.Close())
+		}
+		info, err := file.Stat()
+		if err != nil {
+			return fail(err)
+		}
+		if !info.Mode().IsRegular() {
+			return fail(fs.ErrInvalid)
+		}
+		if !create {
+			if err := file.Chmod(0600); err != nil {
+				return fail(err)
+			}
+			info, err = file.Stat()
+			if err != nil {
+				return fail(err)
+			}
+		}
+		mask := fs.ModePerm | fs.ModeSetuid | fs.ModeSetgid | fs.ModeSticky
+		if !info.Mode().IsRegular() || info.Mode()&mask != 0600 {
+			return fail(errors.New("SFTP staging file permissions could not be restricted to 0600"))
+		}
+		if truncate {
+			if err := file.Truncate(0); err != nil {
+				return fail(err)
+			}
+		}
+		if _, err := file.Seek(offset, io.SeekStart); err != nil {
+			return fail(err)
+		}
+		return result, nil
+	}
+	operationCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
+	defer cancel()
+	ready := make(chan openedStage, 1)
+	go func() {
+		opened, err := operation()
+		opened.err = err
+		ready <- opened
+	}()
+	var opened openedStage
+	received := false
+	select {
+	case opened = <-ready:
+		received = true
+		err = operationCtx.Err()
+	case <-operationCtx.Done():
+		err = operationCtx.Err()
+	case <-c.done:
+		err = ctx.Err()
+		if err == nil {
+			err = fs.ErrClosed
+		}
+	}
+	if err != nil {
+		// Creation owns a remote file even if a later Fchmod/Fstat is canceled.
+		// Settle that acknowledgement after interrupting this subsystem's I/O.
+		c.Close()
+		if !received {
+			opened = <-ready
+		}
+		if opened.file != nil {
+			opened.err = errors.Join(opened.err, opened.file.Close())
+			opened.file = nil
+		}
+	}
+	err = errors.Join(err, opened.err)
+	if err != nil {
+		return nil, opened.created, fmt.Errorf("open private SFTP staging file: %w", err)
+	}
+	stream := &sftpFileStream{owner: c, file: opened.file, ctx: ctx}
+	stream.stop = context.AfterFunc(ctx, func() { c.Close() })
+	return stream, opened.created, nil
+}
+
 func (c *sftpClient) open(ctx context.Context, name string, offset int64, flags int) (*sftpFileStream, error) {
 	if offset < 0 {
 		return nil, fs.ErrInvalid

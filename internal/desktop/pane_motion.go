@@ -25,9 +25,11 @@ func (a *app) beginWorkspaceFrame(c *ui.Context) {
 	a.dragSeen = false
 	a.dockPreview = nil
 	if d := a.drag; d != nil {
+		pressed := d.pressed
+		d.pressed = false
 		if d.phase == dragLanded {
 			a.drag = nil
-		} else if d.phase == dragReturning && c.Now().Sub(d.returnStarted) >= t.C.ReorderMotion.Cancel.Duration {
+		} else if d.phase == dragReturning && !pressed && c.Now().Sub(d.returnStarted) >= t.C.ReorderMotion.Cancel.Duration {
 			a.drag = nil
 		} else if d.kind == dragTab && d.phase == dragActive {
 			bar := a.tabScroll.Bounds(c)
@@ -130,7 +132,8 @@ func (a *app) zoomProgress(c *ui.Context, tab *workspaceTab) float32 {
 		target = 1
 	}
 	if tab.zoomStarted.IsZero() || a.reduceMotion(c) {
-		return target
+		tab.zoomMix = target
+		return tab.zoomMix
 	}
 	progress := min(1, float32(c.Now().Sub(tab.zoomStarted))/float32(t.C.Desktop.ZoomDuration))
 	curve := t.C.Desktop.MotionEasing

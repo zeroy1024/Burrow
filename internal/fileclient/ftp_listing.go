@@ -24,7 +24,7 @@ func parseFTPEntry(line string, machine bool) (Entry, bool, error) {
 			_, err := parseFTPSize(fields[1])
 			return Entry{}, err == nil, err
 		}
-		if len(fields) > 0 && strings.ContainsAny(fields[0][:1], "-dl") {
+		if len(fields) > 0 && strings.ContainsAny(fields[0][:1], "-dlpsbc") {
 			entry, err = parseUnixFTPEntry(line)
 		} else {
 			entry, err = parseDOSFTPEntry(line)
@@ -157,11 +157,34 @@ func parseUnixFTPEntry(line string) (Entry, error) {
 	if _, err := parseFTPSize(fields[1]); err != nil {
 		return Entry{}, fmt.Errorf("parse Unix FTP LIST link count: %w", err)
 	}
-	size, err := parseFTPSize(fields[4])
-	if err != nil {
-		return Entry{}, err
+	var size int64
+	dateIndex := 5
+	if mode[0] == 'b' || mode[0] == 'c' {
+		major, minor, found := strings.Cut(fields[4], ",")
+		if !found {
+			return Entry{}, errors.New("invalid Unix FTP LIST device numbers")
+		}
+		if minor == "" {
+			fields, name, ok = ftpListingFields(line, 9)
+			if !ok {
+				return Entry{}, errors.New("malformed Unix FTP LIST device entry")
+			}
+			minor, dateIndex = fields[5], 6
+		}
+		if _, err := parseFTPSize(major); err != nil {
+			return Entry{}, fmt.Errorf("parse Unix FTP LIST device major: %w", err)
+		}
+		if _, err := parseFTPSize(minor); err != nil {
+			return Entry{}, fmt.Errorf("parse Unix FTP LIST device minor: %w", err)
+		}
+	} else {
+		var err error
+		size, err = parseFTPSize(fields[4])
+		if err != nil {
+			return Entry{}, err
+		}
 	}
-	modified, err := parseUnixFTPTime(fields[5], fields[6], fields[7])
+	modified, err := parseUnixFTPTime(fields[dateIndex], fields[dateIndex+1], fields[dateIndex+2])
 	if err != nil {
 		return Entry{}, err
 	}
@@ -176,6 +199,7 @@ func parseUnixFTPEntry(line string) (Entry, error) {
 		if before, _, found := strings.Cut(entry.Name, " -> "); found {
 			entry.Name = before
 		}
+	case 'p', 's', 'b', 'c':
 	default:
 		return Entry{}, errors.New("unsupported Unix FTP LIST entry type")
 	}
@@ -310,11 +334,19 @@ func symbolicFTPMode(text string) fs.FileMode {
 	if strings.ContainsAny(text[9:10], "tT") {
 		mode |= fs.ModeSticky
 	}
-	if text[0] == 'd' {
+	switch text[0] {
+	case 'd':
 		mode |= fs.ModeDir
-	}
-	if text[0] == 'l' {
+	case 'l':
 		mode |= fs.ModeSymlink
+	case 'p':
+		mode |= fs.ModeNamedPipe
+	case 's':
+		mode |= fs.ModeSocket
+	case 'b':
+		mode |= fs.ModeDevice
+	case 'c':
+		mode |= fs.ModeDevice | fs.ModeCharDevice
 	}
 	return mode
 }

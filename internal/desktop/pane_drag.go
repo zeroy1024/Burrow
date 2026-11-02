@@ -41,6 +41,8 @@ const (
 )
 
 type paneDragState struct {
+	afterCancel        func()
+	pressed            bool
 	kind               paneDragKind
 	phase              paneDragPhase
 	session            *remoteSession
@@ -59,6 +61,25 @@ type paneDragState struct {
 
 const paneTabSlotMotion = "pane-tab-slot"
 
+// MyGo has no public value-drag cancellation API. Keep its pressed source
+// mounted until release, reject the drop, then run one requested action.
+func (a *app) deferWorkspaceDragAction(action func()) bool {
+	if d := a.drag; d != nil && d.kind != dragHost && (d.phase == dragActive || d.pressed) {
+		if d.afterCancel == nil {
+			d.afterCancel = action
+		}
+		d.phase = dragActive
+		return true
+	}
+	if d := a.files.drag; d != nil {
+		if d.afterCancel == nil {
+			d.afterCancel = action
+		}
+		return true
+	}
+	return false
+}
+
 func (a *app) paneDragHandle(c *ui.Context, source ui.Element, transfer paneTransfer) {
 	if a.activeSection() != sectionSSH {
 		return
@@ -70,6 +91,11 @@ func (a *app) paneDragHandle(c *ui.Context, source ui.Element, transfer paneTran
 	if d := a.drag; d != nil && d.phase == dragActive && transfer.fromTab &&
 		d.kind == dragTab && d.originTab == transfer.tab {
 		transfer.session = d.session
+	}
+	if d := a.drag; d != nil &&
+		(d.kind == dragTab && transfer.fromTab && d.originTab == transfer.tab ||
+			d.kind == dragPane && !transfer.fromTab && d.session == transfer.session) {
+		d.pressed = source.Pressed()
 	}
 	// MyGo v0.7.3 fixes its native threshold at 4 DIPs; it exposes no hold-delay option.
 	source.Drag(transfer).Cursor(ui.CursorDefault).FocusRing(false)
@@ -137,6 +163,9 @@ func (a *app) tabStripTarget(c *ui.Context, parts uikit.TabsResult, add ui.Eleme
 	// Keep the transition registered outside a drag as well, so yielding and
 	// returning to the original position use the same continuous spring.
 	add.Transition(ui.ElementTransition{Position: true, Animation: &animation})
+	if a.drag != nil && a.drag.afterCancel != nil {
+		return
+	}
 	source, over := ui.DragOver[paneTransfer](strip)
 	dropped, released := ui.Drop[paneTransfer](strip)
 	if released {
@@ -288,7 +317,25 @@ func (a *app) lifted(session *remoteSession) bool {
 
 func (a *app) finishWorkspaceDrag(c *ui.Context) {
 	d := a.drag
-	if d == nil || d.phase != dragActive || a.dragSeen {
+	if d == nil || d.phase != dragActive {
+		return
+	}
+	if d.afterCancel != nil {
+		if d.pressed {
+			return
+		}
+		if d.kind == dragTab {
+			active := a.currentTab()
+			a.tabs = slices.Clone(d.order)
+			a.activeTab = slices.Index(a.tabs, active)
+		}
+		a.drag = nil
+		a.clearTerminalPreviews()
+		d.afterCancel()
+		c.AnimationFrame()
+		return
+	}
+	if a.dragSeen {
 		return
 	}
 	if d.kind == dragTab {
@@ -446,6 +493,9 @@ func (a *app) paneDragPreview(c *ui.Context, session *remoteSession) {
 }
 
 func (a *app) paneDrop(c *ui.Context, pane ui.Element, target *remoteSession, catalog bool) {
+	if a.drag != nil && a.drag.afterCancel != nil {
+		return
+	}
 	t := theme.Current()
 	payload, over := ui.DragOver[any](pane)
 	value, dropped := ui.Drop[any](pane)

@@ -63,6 +63,9 @@ func (a *app) fileConnectionPage(c *ui.Context, session *fileSession) {
 }
 
 func (a *app) toggleLocalFiles(c *ui.Context) {
+	if a.deferWorkspaceDragAction(func() { a.toggleLocalFiles(c) }) {
+		return
+	}
 	a.files.localOpen = !a.files.localOpen
 	if !a.files.localOpen {
 		a.files.activeRemote = true
@@ -160,7 +163,7 @@ func (a *app) filePane(c *ui.Context, session *fileSession, pane *filePaneState,
 	t := theme.Current()
 	compact := targetWidth < t.C.FilePane.CompactWidth
 	columns := fileTableColumns(t, compact)
-	card := uikit.FilePane(c, pane.remote, map[bool]string{true: "远程文件", false: "本地文件"}[pane.remote], &pane.focus, a.files.activeRemote == pane.remote)
+	card := uikit.FilePane(c, pane, map[bool]string{true: "远程文件", false: "本地文件"}[pane.remote], &pane.focus, a.files.activeRemote == pane.remote)
 	if card.FocusWithin() {
 		a.files.activeRemote = pane.remote
 	}
@@ -401,10 +404,19 @@ func (a *app) fileRow(
 	if !pane.table.Selection.Has(entry.path) {
 		selection = []fileEntry{entry}
 	}
-	dragValue := fileDrag{session: session, remote: pane.remote, entries: selection}
-	row.Drag(dragValue)
-	if row.Dragging() {
-		a.files.drag, a.files.dragSeen = &dragValue, true
+	drag := ui.Local(row, "file-drag-source", func() fileDrag { return fileDrag{} })
+	if a.files.drag != drag && !row.Dragging() {
+		*drag = fileDrag{session: session, remote: pane.remote, entries: slices.Clone(selection)}
+	}
+	row.Drag(*drag)
+	row.HandleInput(func(event ui.InputEvent) bool {
+		if event.Kind == ui.InputPointerDown && event.Button == 0 {
+			a.files.drag = drag
+		}
+		return false
+	})
+	if row.Dragging() || a.files.drag == drag && row.Pressed() {
+		a.files.drag, a.files.dragSeen = drag, true
 	}
 	if drag := a.files.drag; drag != nil && drag.session == session && drag.remote == pane.remote &&
 		slices.ContainsFunc(drag.entries, func(source fileEntry) bool { return source.path == entry.path }) {
@@ -483,10 +495,16 @@ func (a *app) filePaneKeys(c *ui.Context, card ui.Element, session *fileSession,
 		target.focus.Focus()
 	}
 	if card.Shortcut(ui.Super, ui.KeyLeft) {
-		a.fileHistory(c, session, pane, -1)
+		back := func() { a.fileHistory(c, session, pane, -1) }
+		if !a.deferWorkspaceDragAction(back) {
+			back()
+		}
 	}
 	if card.Shortcut(ui.Super, ui.KeyRight) {
-		a.fileHistory(c, session, pane, 1)
+		forward := func() { a.fileHistory(c, session, pane, 1) }
+		if !a.deferWorkspaceDragAction(forward) {
+			forward()
+		}
 	}
 }
 
@@ -537,6 +555,9 @@ func (a *app) fileDropTarget(
 	directory string,
 	decorate bool,
 ) string {
+	if a.files.drag != nil && a.files.drag.cancelRequested() {
+		return ""
+	}
 	t := theme.Current()
 	drag, over := ui.DragOver[fileDrag](element)
 	external := pane.remote && element.FileDragOver()

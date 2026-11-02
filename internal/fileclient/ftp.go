@@ -59,6 +59,15 @@ type ftpClient struct {
 	home       string
 }
 
+type ftpRedactedError struct {
+	cause   error
+	message string
+}
+
+func (e *ftpRedactedError) Error() string { return e.message }
+
+func (e *ftpRedactedError) Unwrap() error { return e.cause }
+
 func DialFTP(ctx context.Context, cfg FTPConfig) (Client, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -211,6 +220,15 @@ func DialFTP(ctx context.Context, cfg FTPConfig) (Client, error) {
 		}
 		return nil
 	})
+	if err != nil && cfg.Password != "" {
+		message := err.Error()
+		redacted := strings.ReplaceAll(message, cfg.Password, "[redacted]")
+		if redacted != message {
+			// Preserve protocol classification without publishing an echoed
+			// password to callers that display or persist the error message.
+			err = &ftpRedactedError{cause: err, message: redacted}
+		}
+	}
 	cfg.Password = ""
 	if err != nil {
 		c.Close()
@@ -566,26 +584,24 @@ func (c *ftpClient) Stat(ctx context.Context, name string) (Entry, error) {
 		if err != nil {
 			return err
 		}
-		for _, candidate := range entries {
-			if candidate.Name == decoded {
-				entry = candidate
-				if !entry.ModeKnown && !entry.Directory && !entry.Symlink {
-					listed, listErr := c.readListing(opCtx, "LIST", "-a "+wire, false)
-					if listErr != nil {
-						if unsupportedFTPCommand(listErr) {
-							return nil
-						}
-						return listErr
-					}
-					if len(listed) == 1 && !listed[0].Directory && !listed[0].Symlink && listed[0].Size == entry.Size {
-						entry.Mode, entry.ModeKnown = listed[0].Mode, listed[0].ModeKnown
-						entry.Permissions, entry.Owner = listed[0].Permissions, listed[0].Owner
-					}
+		entry, err = c.directoryEntry(wire, decoded, entries)
+		if err != nil {
+			return err
+		}
+		if !entry.ModeKnown && !entry.Directory && !entry.Symlink {
+			listed, listErr := c.readListing(opCtx, "LIST", "-a "+wire, false)
+			if listErr != nil {
+				if unsupportedFTPCommand(listErr) {
+					return nil
 				}
-				return nil
+				return listErr
+			}
+			if len(listed) == 1 && !listed[0].Directory && !listed[0].Symlink && listed[0].Size == entry.Size {
+				entry.Mode, entry.ModeKnown = listed[0].Mode, listed[0].ModeKnown
+				entry.Permissions, entry.Owner = listed[0].Permissions, listed[0].Owner
 			}
 		}
-		return fs.ErrNotExist
+		return nil
 	})
 	if err != nil {
 		return Entry{}, fmt.Errorf("stat FTP entry: %w", err)
@@ -633,12 +649,15 @@ func (c *ftpClient) Rename(ctx context.Context, oldName, newName string, options
 	// replacing an already visible target, but cannot exclude another client
 	// creating it between LIST and RNTO.
 	if len(options) > 0 && options[0].NoReplace {
-		if _, err := c.Stat(ctx, newName); err == nil {
-			return fs.ErrExist
+		caseOnly := oldWire != newWire && path.Dir(oldWire) == path.Dir(newWire) && sameRenameSpelling(path.Base(oldName), path.Base(newName))
+		if existing, err := c.Stat(ctx, newName); err == nil {
+			if !caseOnly || existing.Name != path.Base(oldName) {
+				return fs.ErrExist
+			}
 		} else if !errors.Is(err, fs.ErrNotExist) {
 			return err
 		}
-		if oldWire != newWire && path.Dir(oldWire) == path.Dir(newWire) && sameRenameSpelling(path.Base(oldName), path.Base(newName)) {
+		if caseOnly {
 			temporary := path.Join(path.Dir(oldWire), ".sshdesk-rename-"+rand.Text())
 			decoded, err := c.codec.decode(temporary)
 			if err != nil {

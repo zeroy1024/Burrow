@@ -19,6 +19,7 @@ type localClient struct {
 	mu       sync.Mutex
 	closed   bool
 	files    map[*localFile]struct{}
+	root     *os.Root
 	done     chan struct{}
 	closeErr error
 }
@@ -35,12 +36,68 @@ type localFile struct {
 
 // NewLocal opens the user's filesystem without confining it to a fixed root.
 func NewLocal() Client {
+	return newLocalClient()
+}
+
+func newLocalClient() *localClient {
 	return &localClient{files: map[*localFile]struct{}{}, done: make(chan struct{})}
+}
+
+// OpenLocalRoot keeps the selected directory open for an entire transfer.
+// Absolute client paths are resolved relative to this descriptor, so replacing
+// a descendant directory cannot redirect a later operation outside that tree.
+func OpenLocalRoot(ctx context.Context, directory string) (Client, error) {
+	c := newLocalClient()
+	name, err := c.path(ctx, directory)
+	if err != nil {
+		return nil, err
+	}
+	c.root, err = os.OpenRoot(name)
+	if err != nil {
+		return nil, err
+	}
+	return c, nil
+}
+
+// OpenLocalSource anchors a directory upload at that directory, or a single
+// file at its parent. A source link is never promoted into a transfer root.
+func OpenLocalSource(ctx context.Context, source string) (Client, error) {
+	c := newLocalClient()
+	name, err := c.path(ctx, source)
+	if err != nil {
+		return nil, err
+	}
+	info, err := os.Lstat(name)
+	if err != nil {
+		return nil, err
+	}
+	if !info.IsDir() && !info.Mode().IsRegular() {
+		return nil, &fs.PathError{Op: "open transfer source", Path: name, Err: fs.ErrInvalid}
+	}
+	directory, leaf := name, "."
+	if !info.IsDir() {
+		directory, leaf = filepath.Dir(name), filepath.Base(name)
+	}
+	c.root, err = os.OpenRoot(directory)
+	if err != nil {
+		return nil, err
+	}
+	opened, err := c.root.Lstat(leaf)
+	if err == nil && !os.SameFile(info, opened) {
+		err = &fs.PathError{Op: "open transfer source", Path: name, Err: fs.ErrInvalid}
+	}
+	if err != nil {
+		return nil, errors.Join(err, c.root.Close())
+	}
+	return c, nil
 }
 
 func (c *localClient) InitialPath(ctx context.Context) (string, error) {
 	if err := c.check(ctx); err != nil {
 		return "", err
+	}
+	if c.root != nil {
+		return c.root.Name(), nil
 	}
 	return os.UserHomeDir()
 }
@@ -50,7 +107,17 @@ func (c *localClient) ReadDir(ctx context.Context, name string) ([]Entry, error)
 	if err != nil {
 		return nil, err
 	}
-	entries, err := os.ReadDir(name)
+	var entries []os.DirEntry
+	if c.root == nil {
+		entries, err = os.ReadDir(name)
+	} else {
+		directory, openErr := c.root.Open(name)
+		if openErr != nil {
+			return nil, openErr
+		}
+		entries, err = directory.ReadDir(-1)
+		err = errors.Join(err, directory.Close())
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -73,11 +140,20 @@ func (c *localClient) Stat(ctx context.Context, name string) (Entry, error) {
 	if err != nil {
 		return Entry{}, err
 	}
-	info, err := os.Lstat(name)
+	var info fs.FileInfo
+	if c.root == nil {
+		info, err = os.Lstat(name)
+	} else {
+		info, err = c.root.Lstat(name)
+	}
 	if err != nil {
 		return Entry{}, err
 	}
-	return localEntry(info), nil
+	entry := localEntry(info)
+	if c.root != nil && name == "." {
+		entry.Name = filepath.Base(c.root.Name())
+	}
+	return entry, nil
 }
 
 func (c *localClient) OpenRead(ctx context.Context, name string, offset int64) (io.ReadCloser, error) {
@@ -113,7 +189,7 @@ func (c *localClient) open(ctx context.Context, name string, offset int64, flags
 	if err != nil {
 		return nil, err
 	}
-	parent, err := os.OpenRoot(filepath.Dir(name))
+	parent, err := c.openParent(name)
 	if err != nil {
 		return nil, err
 	}
@@ -178,6 +254,9 @@ func (c *localClient) Mkdir(ctx context.Context, name string) error {
 	if err != nil {
 		return err
 	}
+	if c.root != nil {
+		return c.root.Mkdir(name, 0755)
+	}
 	return os.Mkdir(name, 0755)
 }
 
@@ -190,12 +269,12 @@ func (c *localClient) Rename(ctx context.Context, oldName, newName string, optio
 	if err != nil {
 		return err
 	}
-	fromRoot, err := os.OpenRoot(filepath.Dir(oldName))
+	fromRoot, err := c.openParent(oldName)
 	if err != nil {
 		return err
 	}
 	defer fromRoot.Close()
-	toRoot, err := os.OpenRoot(filepath.Dir(newName))
+	toRoot, err := c.openParent(newName)
 	if err != nil {
 		return err
 	}
@@ -241,6 +320,13 @@ func (c *localClient) ResolveDirectory(ctx context.Context, name string) (string
 	if err != nil {
 		return "", err
 	}
+	if c.root != nil {
+		directory, err := c.root.OpenRoot(name)
+		if err != nil {
+			return "", err
+		}
+		return directory.Name(), errors.Join(directory.Close(), c.check(ctx))
+	}
 	resolved, err := filepath.EvalSymlinks(name)
 	if err != nil {
 		return "", err
@@ -260,7 +346,7 @@ func (c *localClient) Chmod(ctx context.Context, name string, mode fs.FileMode) 
 	if err != nil {
 		return err
 	}
-	parent, err := os.OpenRoot(filepath.Dir(name))
+	parent, err := c.openParent(name)
 	if err != nil {
 		return err
 	}
@@ -298,7 +384,7 @@ func (c *localClient) RemoveTree(ctx context.Context, name string) error {
 	if filepath.Dir(name) == name {
 		return &fs.PathError{Op: "remove tree", Path: name, Err: fs.ErrInvalid}
 	}
-	parent, err := os.OpenRoot(filepath.Dir(name))
+	parent, err := c.openParent(name)
 	if err != nil {
 		return err
 	}
@@ -311,7 +397,13 @@ func (c *localClient) Remove(ctx context.Context, name string, directory bool) e
 	if err != nil {
 		return err
 	}
-	info, err := os.Lstat(name)
+	parent, err := c.openParent(name)
+	if err != nil {
+		return err
+	}
+	defer parent.Close()
+	base := filepath.Base(name)
+	info, err := parent.Lstat(base)
 	if err != nil {
 		return err
 	}
@@ -321,7 +413,7 @@ func (c *localClient) Remove(ctx context.Context, name string, directory bool) e
 	if !directory && info.IsDir() {
 		return &fs.PathError{Op: "remove", Path: name, Err: syscall.EISDIR}
 	}
-	return os.Remove(name)
+	return parent.Remove(base)
 }
 
 func (c *localClient) Done() <-chan struct{} { return c.done }
@@ -342,6 +434,9 @@ func (c *localClient) Close() error {
 	var err error
 	for _, file := range files {
 		err = errors.Join(err, file.Close())
+	}
+	if c.root != nil {
+		err = errors.Join(err, c.root.Close())
 	}
 	c.closeErr = err
 	close(c.done)
@@ -377,7 +472,22 @@ func (c *localClient) path(ctx context.Context, name string) (string, error) {
 	if !filepath.IsAbs(name) {
 		return "", &fs.PathError{Op: "path", Path: name, Err: fs.ErrInvalid}
 	}
-	return filepath.Clean(name), nil
+	name = filepath.Clean(name)
+	if c.root != nil {
+		relative, err := filepath.Rel(c.root.Name(), name)
+		if err != nil || !filepath.IsLocal(relative) {
+			return "", &fs.PathError{Op: "path", Path: name, Err: fs.ErrInvalid}
+		}
+		return relative, nil
+	}
+	return name, nil
+}
+
+func (c *localClient) openParent(name string) (*os.Root, error) {
+	if c.root != nil {
+		return c.root.OpenRoot(filepath.Dir(name))
+	}
+	return os.OpenRoot(filepath.Dir(name))
 }
 
 func localEntry(info fs.FileInfo) Entry {
