@@ -66,7 +66,7 @@ func (a *app) settingsSidebar(c *ui.Context, shown float32) {
 		ui.Row(c).FillWidth().BorderWidth(t.Size.Divider, 0, 0, 0).BorderColor(uikit.Color(t.Color.Border.Subtle)).
 			Padding(t.Space.N10, t.Space.N16).Gap(t.Space.N8).AlignItems(ui.Center).Children(func() {
 			uikit.Icon(c, infoIcon, uikit.IconProps{Tone: uikit.ToneTertiary})
-			uikit.Text(c, "Burrow 0.1.0", uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneTertiary})
+			uikit.Text(c, "Burrow 0.1.1", uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneTertiary})
 		})
 	})
 }

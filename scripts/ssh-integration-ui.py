@@ -298,7 +298,7 @@ func dockerIntegrationMenu(items []*mygo.MenuItem) []*mygo.MenuItem {
 func init() {
     root, err := dockerIntegrationConfigDir()
     if err != nil { panic(err) }
-    mygo.App.SetPath(mygo.PathUserData, filepath.Join(root, "SSH Desk"))
+    mygo.App.SetPath(mygo.PathUserData, filepath.Join(root, "Burrow"))
     mygo.App.SetPath(mygo.PathCache, filepath.Join(root, "cache"))
     mygo.App.SetPath(mygo.PathLogs, filepath.Join(root, "logs"))
     if err := os.Setenv("MYGO_LOCALE", "zh-Hans"); err != nil { panic(err) }
@@ -320,7 +320,7 @@ def prepare(repo, task_dir, address):
     overlay_dir = task_dir / "native-overlay"
     overlay_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
     config_root = Path(tempfile.mkdtemp(prefix="native-config-", dir=task_dir))
-    config_dir = config_root / "SSH Desk"
+    config_dir = config_root / "Burrow"
     config_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
     local_dir = task_dir / "ui-files"
     local_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -348,12 +348,6 @@ def prepare(repo, task_dir, address):
             raise RuntimeError("integration overlay source no longer matches; isolation was not applied")
         return content.replace(before, after, 1)
 
-    for relative in ["internal/desktop/catalog_config.go", "internal/desktop/terminal_config.go"]:
-        original = repo / relative
-        content = replace_once(original.read_text(), "os.UserConfigDir()", "dockerIntegrationConfigDir()")
-        replacement = overlay_dir / original.name
-        replacement.write_text(content)
-        mapping[str(original)] = str(replacement)
     original = repo / "internal/desktop/app.go"
     replacement = overlay_dir / "app.go"
     replacement.write_text(replace_once(original.read_text(),
@@ -986,7 +980,7 @@ class Driver:
         initial = self.snapshot()
         if initial["CatalogVersion"] != 1 or len(initial["SSHProfiles"]) != 4 or len(initial["FileProfiles"]) != 4:
             raise RuntimeError("legacy fixture did not migrate to independent SSH and file sessions")
-        backup = json.loads((self.config_root / "SSH Desk/catalog.json.v1.bak").read_text())
+        backup = json.loads((self.config_root / "Burrow/catalog.json.v1.bak").read_text())
         if len(backup.get("hosts", [])) != 4 or backup.get("version", 0) != 0:
             raise RuntimeError("legacy catalog backup was not preserved")
         print("PASS native UI: legacy catalog migration to sessions v1")
@@ -995,7 +989,7 @@ class Driver:
         self.wait("first host trust", lambda: self.node("信任并连接", "button"))
         self.click("取消")
         self.state(3)
-        if (self.config_root / "SSH Desk/known_hosts").exists():
+        if (self.config_root / "Burrow/known_hosts").exists():
             raise RuntimeError("rejected host key was persisted")
         self.close_tab()
         print("PASS native UI: first host-key rejection")

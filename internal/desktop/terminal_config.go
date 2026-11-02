@@ -55,13 +55,13 @@ func (a *app) loadTerminalSettings() error {
 		mode: termtheme.FollowAppTheme(), prefs: termtheme.DefaultPrefs(),
 		followLight: termtheme.DefaultLight, followDark: termtheme.DefaultDark,
 	}
-	directory, err := os.UserConfigDir()
+	directory, err := mygo.App.Path(mygo.PathUserData)
 	if err != nil {
 		a.terminal.loadErr = fmt.Errorf("locate terminal configuration directory: %w", err)
 		a.applyTerminalSettings()
 		return a.terminal.loadErr
 	}
-	a.terminal.path = filepath.Join(directory, "SSH Desk", "terminal.json")
+	a.terminal.path = filepath.Join(directory, "terminal.json")
 	importErr := a.loadTerminalThemes()
 	a.terminal.loadErr = a.readTerminalSettings()
 	a.applyTerminalSettings()
