@@ -237,8 +237,8 @@ func (a *app) nativeTerminalDragContents(c *ui.Context, session *remoteSession, 
 	ui.Box(c).Size(width, height).Clip().PassThrough().Children(func() {
 		ui.Box(c).Absolute().Left(0).Top(0).Size(sourceWidth, sourceHeight).
 			Scale(scale, scale).TransformOrigin(0, 0).Clip().PassThrough().Children(func() {
-			ui.Box(c).Absolute().Left(t.C.Pane.ContentSide).Top(t.Space.N4).
-				Width(sourceWidth - 2*t.C.Pane.ContentSide).Height(max(1, sourceHeight-2*t.Space.N4)).Clip().PassThrough().Children(func() {
+			ui.Box(c).Absolute().Left(t.C.Pane.ContentSide).Top(t.C.Pane.ContentSide).
+				Width(sourceWidth - 2*t.C.Pane.ContentSide).Height(max(1, sourceHeight-2*t.C.Pane.ContentSide)).Clip().PassThrough().Children(func() {
 				if preview.err != nil {
 					uikit.Text(c, "无法显示终端快照："+preview.err.Error(), uikit.TextProps{Style: uikit.TextSmall}).PassThrough()
 					return
@@ -260,8 +260,8 @@ func (a *app) capturedTerminalDragContents(c *ui.Context, bitmap *ui.Bitmap, vie
 		ui.Box(c).Absolute().Left(0).Top(0).Size(sourceWidth, sourceHeight).
 			Scale(scale, scale).TransformOrigin(0, 0).Clip().PassThrough().Children(func() {
 			contentWidth := sourceWidth - 2*t.C.Pane.ContentSide
-			ui.Box(c).Absolute().Left(t.C.Pane.ContentSide).Top(t.Space.N4).
-				Size(contentWidth, max(1, sourceHeight-2*t.Space.N4)).Clip().PassThrough().Children(func() {
+			ui.Box(c).Absolute().Left(t.C.Pane.ContentSide).Top(t.C.Pane.ContentSide).
+				Size(contentWidth, max(1, sourceHeight-2*t.C.Pane.ContentSide)).Clip().PassThrough().Children(func() {
 				pixelsWide, pixelsHigh := bitmap.Size()
 				ui.Image(c, bitmap).Size(contentWidth, contentWidth*float32(pixelsHigh)/float32(pixelsWide)).PassThrough()
 			})

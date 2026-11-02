@@ -164,6 +164,9 @@ func (a *app) appShortcuts(c *ui.Context) {
 	if count > 0 && a.actionPressed(c, "tab.close") {
 		if a.section == sectionFiles {
 			a.requestCloseFileTab(a.activeFile)
+		} else if tab := a.currentTab(); tab.root.count() > 1 {
+			session := tab.focused
+			run(func() { a.requestClosePane(tab, session) })
 		} else {
 			a.requestCloseTab(a.activeTab)
 		}

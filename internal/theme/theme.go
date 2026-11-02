@@ -1411,7 +1411,7 @@ type PaneTokens struct {
 	EmptyTitleSize      float32       // ← size.emptyPaneTitleSize
 	EmptyTitleWeight    int           // ← font.weight.emptyPaneTitle
 	ContentTop          float32       // ← space.10
-	ContentSide         float32       // ← space.14
+	ContentSide         float32       // ← space.8
 	ContentBottom       float32       // ← size.terminalContentBottom
 	ActionTop           float32       // ← space.6
 	ActionRight         float32       // ← space.8
@@ -1653,7 +1653,7 @@ type FileListTokens struct {
 	RowHeight        float32     // ← size.listRow
 	RowRadius        float32     // ← radius.controlSm
 	RowPaddingX      float32     // ← space.8
-	RowGap           float32     // ← space.12
+	RowGap           float32     // ← space.2
 	FontSize         float32     // ← font.size.body
 	Zebra            color.NRGBA // ← color.surface.zebra
 	BgSelected       color.NRGBA // ← color.state.selectedAccent
@@ -3820,7 +3820,7 @@ func buildComponents(s *Semantic) Components {
 			EmptyTitleSize:      s.Size.EmptyPaneTitleSize,
 			EmptyTitleWeight:    s.Font.Weight.EmptyPaneTitle,
 			ContentTop:          s.Space.N10,
-			ContentSide:         s.Space.N14,
+			ContentSide:         s.Space.N8,
 			ContentBottom:       s.Size.TerminalContentBottom,
 			ActionTop:           s.Space.N6,
 			ActionRight:         s.Space.N8,
@@ -4040,7 +4040,7 @@ func buildComponents(s *Semantic) Components {
 			RowHeight:        s.Size.ListRow,
 			RowRadius:        s.Radius.ControlSm,
 			RowPaddingX:      s.Space.N8,
-			RowGap:           s.Space.N12,
+			RowGap:           s.Space.N2,
 			FontSize:         s.Font.Size.Body,
 			Zebra:            s.Color.Surface.Zebra,
 			BgSelected:       s.Color.State.SelectedAccent,

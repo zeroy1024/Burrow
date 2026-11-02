@@ -38,6 +38,7 @@ func paintTableBackdrop(c *ui.Context, parts TableParts, scroll *ui.ScrollState,
 		Draw(func(p *ui.Painter, frame ui.Rect) {
 			t := theme.Current()
 			height := t.C.ListRow.Height
+			stride := height + t.C.FileList.RowGap
 			width := max(frame.W-2*t.C.FilePane.ContentPadding, sumColumnWidths(parts.Widths)+
 				2*t.C.FileList.RowPaddingX+float32(max(0, len(parts.Columns)-1))*t.C.FileList.ColumnGap)
 			origin := frame.Y + props.HeaderHeight - scroll.Y
@@ -48,12 +49,12 @@ func paintTableBackdrop(c *ui.Context, parts TableParts, scroll *ui.ScrollState,
 				if band.H <= 0 {
 					continue
 				}
-				first := max(0, int(math.Floor(float64((band.Y-origin)/height))))
-				last := min(props.Count, int(math.Ceil(float64((band.Y+band.H-origin)/height))))
+				first := max(0, int(math.Floor(float64((band.Y-origin)/stride))))
+				last := min(props.Count, int(math.Ceil(float64((band.Y+band.H-origin)/stride))))
 				p.Clip(band, 0, func() {
 					for index := first; index < last; index++ {
 						row := ui.Rect{X: frame.X + t.C.FilePane.ContentPadding - scroll.X,
-							Y: origin + float32(index)*height, W: width, H: height}
+							Y: origin + float32(index)*stride, W: width, H: height}
 						selected := parts.State.Selection.Has(props.Key(index))
 						background, ink := ui.Transparent, Color(t.Color.Text.Primary)
 						if props.Zebra && index%2 != 0 {
