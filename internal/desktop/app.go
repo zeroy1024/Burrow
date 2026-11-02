@@ -189,14 +189,6 @@ func (a *app) clearWorkspaceGestures() {
 
 // Run starts the native desktop application and its main window.
 func Run() error {
-	// Preserve the existing data directory, including integration overrides,
-	// before changing the display name used by MyGo's default paths.
-	mygo.App.SetName("SSH Desk")
-	dataDirectory, err := mygo.App.Path(mygo.PathUserData)
-	if err != nil {
-		return fmt.Errorf("locate application data directory: %w", err)
-	}
-	mygo.App.SetPath(mygo.PathUserData, dataDirectory)
 	mygo.App.SetName("Burrow")
 	mygo.App.SetLanguages("zh-Hans", "en")
 	if err := nativeterm.Load(); err != nil {

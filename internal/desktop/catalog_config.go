@@ -133,11 +133,7 @@ func (a *app) readCatalog() error {
 		return fmt.Errorf("locate catalog configuration directory: %w", err)
 	}
 	a.catalogConfig.path = filepath.Join(directory, "sessions.json")
-	legacy, err := os.UserConfigDir()
-	if err != nil {
-		return err
-	}
-	a.catalogConfig.legacyPath = filepath.Join(legacy, "SSH Desk", "catalog.json")
+	a.catalogConfig.legacyPath = filepath.Join(directory, "catalog.json")
 	return a.readCatalogFile()
 }
 

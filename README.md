@@ -16,8 +16,8 @@ mise run build
 
 ```text
 build/darwin-arm64/Burrow.app
-build/darwin-arm64/burrow-0.1.0-arm64.zip
-build/darwin-arm64/burrow-0.1.0-arm64.dmg
+build/darwin-arm64/burrow-0.1.1-arm64.zip
+build/darwin-arm64/burrow-0.1.1-arm64.dmg
 ```
 
 DMG 固定使用 `assets/dmg/background.tiff` 中的 Burrow 浅色背景，包含 1x/2x 多分辨率图像以适配 Retina。窗口为 660×400，应用与 Applications 快捷方式分别位于 `(170, 180)` 和 `(490, 180)`，支持拖拽安装；背景不会随安装者的系统外观切换。仅需生成 `.app` 时，仍可使用 `mise exec -- go tool mygo build -skip-dmg`。
@@ -39,11 +39,11 @@ SSH、文件传输和设置按平级互斥方式渲染。切页保留连接、�
 
 ## 存储与边界
 
-Burrow 的应用标识及原生包标识为 `dev.burrow.app`，沿用原 SSH Desk 的数据目录，继续读取原有会话、设置和传输队列，无需搬移用户数据。钥匙串凭据按新应用标识隔离，原 `dev.sshdesk.app` 命名空间中的已保存密码和私钥口令需要重新录入。Go 模块名 `sshdesk` 与本地终端扩展模块路径保留。
+Burrow 的应用标识及原生包标识为 `dev.burrow.app`。会话、设置、终端配置、导入主题、托管私钥、主机信任记录及传输队列统一保存在 MyGo 的应用用户数据目录，macOS 默认为 `~/Library/Application Support/Burrow/`；不再读取或自动迁移旧 `SSH Desk` 目录，旧目录中的文件不会被删除。缓存和日志分别使用 `~/Library/Caches/Burrow/` 和 `~/Library/Logs/Burrow/`。钥匙串凭据按应用标识隔离，原 `dev.sshdesk.app` 命名空间中的已保存密码和私钥口令需要重新录入。Go 模块名 `sshdesk` 与本地终端扩展模块路径保留。
 
 全新安装默认不创建分组或主机；SSH 与文件传输目录均为空，无分组时新建会话可同时填写并创建首个分组。终端默认使用 JetBrains Mono 13px、19px 行高，回滚上限为 4000 行。已有配置中的字号、行高、回滚上限及目录继续沿用保存值。
 
-目录保存到 MyGo 应用用户数据目录的 `sessions.json`，偏好使用既有 `prefs.json`、`files.json`、`terminal.json` 和主题目录。主线旧版 `catalog.json` v0/v2 在新目录不存在时迁移，保留源文件和备份；外部私钥复制到应用托管目录，原件不移动。无内嵌公钥的传统加密 PEM 会在应用窗口就绪后请求口令解锁迁移，完整校验后才发布新目录；取消或失败保留源数据，并通过原错误提示重试。该导入口令不写钥匙串。密钥、密码和私钥口令不写入 JSON；密码存系统钥匙串并绑定配置版本，旧任务不会误取同 UUID 新密码。
+目录保存到 MyGo 应用用户数据目录的 `sessions.json`，偏好使用既有 `prefs.json`、`files.json`、`terminal.json` 和主题目录。当前数据目录内的 `catalog.json` v0/v2 仅在 `sessions.json` 不存在时迁移，保留源文件和备份；外部私钥复制到应用托管目录，原件不移动。无内嵌公钥的传统加密 PEM 会在应用窗口就绪后请求口令解锁迁移，完整校验后才发布新目录；取消或失败保留源数据，并通过原错误提示重试。该导入口令不写钥匙串。密钥、密码和私钥口令不写入 JSON；密码存系统钥匙串并绑定配置版本，旧任务不会误取同 UUID 新密码。
 
 正常退出恢复使用 `transfers.json`。这不是逐笔崩溃日志：强制结束进程、系统断电期间新建的部分文件不保证已被记录。递归传输拒绝符号链接；删除使用 Lstat，不跟随链接。
 
