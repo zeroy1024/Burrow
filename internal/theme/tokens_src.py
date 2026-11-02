@@ -300,7 +300,7 @@ COMP={
    'text':'color.text.muted','bgOn':'color.surface.raised','textOn':'color.text.primary','shadowOn':'shadow.segment'},
  'breadcrumb':{'height':'size.controlMd','radius':'radius.controlSm','bg':'color.surface.field','bgOnGlass':'color.fill.quieter','paddingX':'space.8','gap':'space.3','text':'color.text.muted','current':'color.text.primary','separator':'color.text.placeholder'},
  'fileList':{'headerHeight':'size.listRow','headerText':'color.text.secondary','headerSize':'font.size.footnote','headerBorder':'color.border.divider',
-   'rowHeight':'size.listRow','rowRadius':'radius.controlSm','rowPaddingX':'space.8','rowGap':'space.12','fontSize':'font.size.body','zebra':'color.surface.zebra',
+   'rowHeight':'size.listRow','rowRadius':'radius.controlSm','rowPaddingX':'space.8','rowGap':'space.2','fontSize':'font.size.body','zebra':'color.surface.zebra',
    'bgSelected':'color.state.selectedAccent','textSelected':'color.text.accentStrong','meta':'color.text.secondary','fileIcon':'color.icon.subtle','folderIcon':'color.icon.folder','folderFill':'color.icon.folderFill',
    'paneHeaderHeight':'size.fileHeader'},
  'progress':{'height':'size.progress','radius':'radius.bar','track':'color.border.subtle','fill':'color.accent.default','fillNeutral':'color.fill.strong','fillPaused':'color.status.paused','fillDone':'color.success.default'},

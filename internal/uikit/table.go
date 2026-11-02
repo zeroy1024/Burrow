@@ -148,7 +148,8 @@ func DataTable(
 	parts.Frame.Children(func() {
 		parts.Root = ui.List(c.Key("rows"), &state.List, props.Count).
 			Absolute().Top(props.HeaderHeight).Bottom(props.FooterHeight).Left(0).Right(0).
-			Focusable().FocusRing(false).TrackScroll(scroll).Label(props.Label+"数据行").Padding(0, t.C.FilePane.ContentPadding)
+			Focusable().FocusRing(false).TrackScroll(scroll).Label(props.Label+"数据行").
+			Padding(0, t.C.FilePane.ContentPadding).Gap(t.C.FileList.RowGap)
 		parts.Root.RowWidth(sumColumnWidths(parts.Widths) + 2*t.C.FileList.RowPaddingX + float32(max(0, len(columns)-1))*t.C.FileList.ColumnGap)
 		parts.Root.Rows(func(native ui.ListRow) {
 			index := native.Index
@@ -399,7 +400,8 @@ func (state *TableState) tableKeys(list ui.Element, props TableProps) {
 		}
 		list.SetChanged()
 	}
-	page := max(1, int(list.Bounds().H/theme.Current().C.FileList.RowHeight))
+	fileList := theme.Current().C.FileList
+	page := max(1, int(list.Bounds().H/(fileList.RowHeight+fileList.RowGap)))
 	for _, mods := range []ui.Modifiers{0, ui.Shift} {
 		to := -1
 		if list.Shortcut(mods, ui.KeyDown) {

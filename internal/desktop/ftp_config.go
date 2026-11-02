@@ -37,6 +37,7 @@ func (a *app) fileSiteKey(session *fileSession) string {
 }
 
 func (a *app) restoreFileSession(session *fileSession) {
+	// New tabs use configured directories; workspace restoration reapplies saved paths separately.
 	local := a.prefs.DefaultLocalDir
 	if options := session.config.Files; options != nil {
 		if options.LocalDir != "" {
@@ -49,12 +50,6 @@ func (a *app) restoreFileSession(session *fileSession) {
 		}
 	}
 	if local != "" {
-		session.local.path = local
-		session.local.history = []string{local}
-		session.local.historyIndex = 0
-	}
-	if key := a.fileSiteKey(session); key != "" && a.files.localPaths[key] != "" {
-		local := a.files.localPaths[key]
 		session.local.path = local
 		session.local.history = []string{local}
 		session.local.historyIndex = 0

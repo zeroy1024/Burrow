@@ -1651,7 +1651,7 @@ type FileListTokens struct {
 	RowHeight        float32     // ← size.listRow
 	RowRadius        float32     // ← radius.controlSm
 	RowPaddingX      float32     // ← space.8
-	RowGap           float32     // ← space.12
+	RowGap           float32     // ← space.2
 	FontSize         float32     // ← font.size.body
 	Zebra            color.NRGBA // ← color.surface.zebra
 	BgSelected       color.NRGBA // ← color.state.selectedAccent
@@ -4036,7 +4036,7 @@ func buildComponents(s *Semantic) Components {
 			RowHeight:        s.Size.ListRow,
 			RowRadius:        s.Radius.ControlSm,
 			RowPaddingX:      s.Space.N8,
-			RowGap:           s.Space.N12,
+			RowGap:           s.Space.N2,
 			FontSize:         s.Font.Size.Body,
 			Zebra:            s.Color.Surface.Zebra,
 			BgSelected:       s.Color.State.SelectedAccent,

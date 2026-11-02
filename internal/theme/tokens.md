@@ -1478,7 +1478,7 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `fileList.rowHeight` | `{size.listRow}` | 30px |  |
 | `fileList.rowRadius` | `{radius.controlSm}` | 6px |  |
 | `fileList.rowPaddingX` | `{space.8}` | 8px |  |
-| `fileList.rowGap` | `{space.12}` | 12px |  |
+| `fileList.rowGap` | `{space.2}` | 2px |  |
 | `fileList.fontSize` | `{font.size.body}` | 12.5px | tab、按钮、列表 |
 | `fileList.zebra` | `{color.surface.zebra}` | #fafafb | 列表斑马纹 |
 | `fileList.bgSelected` | `{color.state.selectedAccent}` | #e8f2fe | 文件列表选中行 |

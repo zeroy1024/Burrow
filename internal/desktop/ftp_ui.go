@@ -422,12 +422,7 @@ func (a *app) fileRow(
 		slices.ContainsFunc(drag.entries, func(source fileEntry) bool { return source.path == entry.path }) {
 		row.Opacity(t.C.DragLift.SourceOpacity)
 	}
-	row.ContextMenu(func(m *ui.Menu) {
-		if !pane.table.Selection.Has(entry.path) {
-			pane.table.Select(entry.path)
-		}
-		uikit.NativeMenu(m, a.filePaneMenu(c, session, pane))
-	})
+	uikit.ContextMenuOn(tableRow.Context, row, a.filePaneMenu(c, session, pane))
 	row.Children(func() {
 		kind, values := fileTableRowData(entry)
 		uikit.FileIcon(c, kind, entry.name, uikit.FileIconProps{Selected: tableRow.Selected, Focused: tableRow.Focused})
@@ -476,7 +471,10 @@ func (a *app) filePaneMenu(c *ui.Context, session *fileSession, pane *filePaneSt
 	}
 	if !pane.remote {
 		entries = append(entries, uikit.MenuEntry{ID: "local-divider", Separator: true},
-			uikit.MenuEntry{ID: "local-reveal", Label: "在文件管理器中显示", Icon: uikit.IconFolder, OnChoose: func() { mygo.Shell.ShowItemInFolder(pane.path) }})
+			uikit.MenuEntry{
+				ID: "local-reveal", Label: "在文件管理器中显示", Icon: uikit.IconFolder,
+				Disabled: len(selection) != 1, OnChoose: func() { mygo.Shell.ShowItemInFolder(selection[0].path) },
+			})
 	}
 	entries = append(entries, uikit.MenuEntry{ID: "danger-divider", Separator: true},
 		uikit.MenuEntry{ID: "delete", Label: "删除所选项目", Icon: uikit.IconTrash, Danger: true, Disabled: len(selection) == 0 || !writable, OnChoose: func() {
