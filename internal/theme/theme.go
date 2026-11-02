@@ -361,7 +361,9 @@ type PaletteTokensLetterSpacing struct {
 
 // PaletteTokensBlur groups tokens.
 type PaletteTokensBlur struct {
+	N1   float32
 	N1_5 float32
+	N3   float32
 	N4   float32
 	N5   float32
 	N6   float32
@@ -2847,7 +2849,9 @@ var Palette = PaletteTokens{
 		Pos0_3: 0.3,
 	},
 	Blur: PaletteTokensBlur{
+		N1:   1,
 		N1_5: 1.5,
+		N3:   3,
 		N4:   4,
 		N5:   5,
 		N6:   6,
@@ -3368,9 +3372,9 @@ func lightSemantic() Semantic {
 		},
 		Glass: Glass{
 			Fade: GlassFade{
-				Blur1:       Palette.Blur.N1_5,
-				Blur2:       Palette.Blur.N4,
-				Blur3:       Palette.Blur.N9,
+				Blur1:       Palette.Blur.N1,
+				Blur2:       Palette.Blur.N3,
+				Blur3:       Palette.Blur.N5,
 				Mask1Solid:  Palette.Ratio.N0_45,
 				Mask1End:    Palette.Ratio.N1,
 				Mask2Solid:  Palette.Ratio.N0_4,
@@ -3387,7 +3391,7 @@ func lightSemantic() Semantic {
 				Saturate: Palette.Ratio.N1_5,
 			},
 			Bar: GlassBar{
-				Blur:     Palette.Blur.N5,
+				Blur:     Palette.Blur.N3,
 				Saturate: Palette.Ratio.N1_8,
 			},
 			PaneActionBlur: 4,

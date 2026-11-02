@@ -225,6 +225,7 @@ func (a *app) startTransfer(task *transferTask, cleanup bool) {
 // this private snapshot and the original shared transport group independently.
 func (a *app) snapshotTransferSession(view *fileSession) *fileSession {
 	snapshot := a.newFileSession(view.host, view.endpoint, view.temporary, view.connection)
+	snapshot.restoreID = view.restoreID
 	snapshot.ftpSecret = view.ftpSecret
 	snapshot.local.path, snapshot.remote.path = view.local.path, view.remote.path
 	snapshot.local.history, snapshot.remote.history = slices.Clone(view.local.history), slices.Clone(view.remote.history)
@@ -1273,6 +1274,10 @@ func (a *app) askTransferConflict(ctx context.Context, task *transferTask, targe
 
 func (a *app) advanceTransferConflicts() {
 	q := &a.transfers
+	session := a.activeTransferSession()
+	if a.files.conflict != nil && (session == nil || a.files.conflict.task.view != session) {
+		a.files.conflict = nil
+	}
 	q.conflicts = slices.DeleteFunc(q.conflicts, func(conflict *fileConflict) bool {
 		if conflict.ctx.Err() != nil {
 			if a.files.conflict == conflict {
@@ -1292,8 +1297,13 @@ func (a *app) advanceTransferConflicts() {
 		}
 		return false
 	})
-	if a.files.dialog == nil && a.files.conflict == nil && len(q.conflicts) > 0 {
-		a.files.conflict = q.conflicts[0]
+	if session != nil && a.files.dialog == nil && a.files.conflict == nil {
+		for _, conflict := range q.conflicts {
+			if conflict.task.view == session {
+				a.files.conflict = conflict
+				break
+			}
+		}
 	}
 }
 

@@ -14,7 +14,8 @@ func TitleBar(c *ui.Context) ui.Element {
 func TitleBarLeading(c *ui.Context, workspaceWidth float32) ui.Element {
 	t := theme.Current()
 	bar := c.TitleBar()
-	return ui.Row(c).Width(max(workspaceWidth, bar.Left+t.C.Titlebar.Height)).Shrink(0).
+	// The title row contributes its own gap before the tab strip.
+	return ui.Row(c).Width(max(workspaceWidth-t.Space.N6, bar.Left+t.C.Titlebar.Height)).Shrink(0).
 		PaddingStart(bar.Left + t.C.Titlebar.LeftGap).DragWindow()
 }
 

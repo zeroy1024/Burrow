@@ -23,8 +23,9 @@ const (
 )
 
 type transferTask struct {
-	id                     int
-	session                *fileSession
+	id      int
+	session *fileSession
+	// view is the owning tab; destination reveal never transfers ownership.
 	view                   *fileSession
 	entry                  fileEntry
 	sourceRemote           bool
@@ -74,8 +75,12 @@ var (
 )
 
 func (q *transferQueueState) summary() transferSummary {
+	return summarizeTransfers(q.tasks)
+}
+
+func summarizeTransfers(tasks []*transferTask) transferSummary {
 	s := transferSummary{}
-	for _, task := range q.tasks {
+	for _, task := range tasks {
 		s.bytes += task.transferred
 		s.total += task.total
 		switch task.state {
@@ -91,6 +96,26 @@ func (q *transferQueueState) summary() transferSummary {
 		}
 	}
 	return s
+}
+
+func (a *app) activeTransferSession() *fileSession {
+	if a.activeSection() != sectionFiles {
+		return nil
+	}
+	return a.currentFileSession()
+}
+
+func (q *transferQueueState) sessionTasks(session *fileSession) []*transferTask {
+	tasks := []*transferTask{}
+	if session == nil {
+		return tasks
+	}
+	for _, task := range q.tasks {
+		if task.view == session {
+			tasks = append(tasks, task)
+		}
+	}
+	return tasks
 }
 
 func (a *app) enqueueFiles(
@@ -135,8 +160,9 @@ func (a *app) enqueueFiles(
 
 func (a *app) tickTransfers(c *ui.Context) {
 	a.advanceTransferConflicts()
+	session := a.activeTransferSession()
 	for _, task := range a.transfers.tasks {
-		if task.failureNotice {
+		if task.failureNotice && session != nil && task.view == session {
 			task.failureNotice = false
 			a.transferFailureNotice(c, task)
 		}
@@ -175,8 +201,14 @@ func transferRemaining(bytes int64, speed float64) string {
 func (a *app) transferDock(c *ui.Context, maxHeight float32) {
 	t, q := theme.Current(), &a.transfers
 	p := t.C.TransferDock
-	dock := uikit.TransferDock(c)
-	rows := a.filteredTransfers()
+	session := a.activeTransferSession()
+	tasks := q.sessionTasks(session)
+	dock := uikit.TransferDock(c).Key(session)
+	rows := a.filteredTransfers(tasks)
+	scroll := &q.dockScroll
+	if session != nil {
+		scroll = &session.transferScroll
+	}
 	rowsTarget := float32(1)
 	if q.collapsed {
 		rowsTarget = 0
@@ -196,12 +228,12 @@ func (a *app) transferDock(c *ui.Context, maxHeight float32) {
 	dock.Margin(t.C.FTPSplit.Gutter, 0, 0, 0).Children(func() {
 		card := uikit.TransferDockCard(c)
 		card.Children(func() {
-			a.transferHeader(c)
-			scroller := ui.Scroll(c).Grow(1).MinHeight(0).TrackScroll(&q.dockScroll).Children(func() {
+			a.transferHeader(c, session, tasks)
+			scroller := ui.Scroll(c).Grow(1).MinHeight(0).TrackScroll(scroll).Children(func() {
 				ui.Column(c).FillWidth().Children(func() {
 					if len(rows) == 0 {
 						message := "此分类暂无传输"
-						if len(q.tasks) == 0 {
+						if len(tasks) == 0 {
 							message = "暂无传输任务"
 						}
 						uikit.TransferDockEmpty(c, message)
@@ -211,7 +243,7 @@ func (a *app) transferDock(c *ui.Context, maxHeight float32) {
 					}
 				})
 			})
-			uikit.Scrollbars(c, card, scroller, &q.dockScroll, uikit.ScrollbarProps{Label: "传输任务滚动条"})
+			uikit.Scrollbars(c, card, scroller, scroll, uikit.ScrollbarProps{Label: "传输任务滚动条"})
 		})
 		if q.collapsed || !dock.Settled("rows") {
 			return
@@ -252,10 +284,10 @@ func (a *app) transferDock(c *ui.Context, maxHeight float32) {
 	})
 }
 
-func (a *app) filteredTransfers() []*transferTask {
+func (a *app) filteredTransfers(tasks []*transferTask) []*transferTask {
 	q := &a.transfers
 	rows := []*transferTask{}
-	for _, task := range q.tasks {
+	for _, task := range tasks {
 		if q.filter == 1 && (task.state == transferDone || task.state == transferFailed) {
 			continue
 		}
@@ -267,26 +299,28 @@ func (a *app) filteredTransfers() []*transferTask {
 	return rows
 }
 
-func (a *app) transferHeader(c *ui.Context) {
+func (a *app) transferHeader(c *ui.Context, session *fileSession, tasks []*transferTask) {
 	t, q := theme.Current(), &a.transfers
-	s := q.summary()
+	s := summarizeTransfers(tasks)
 	header := uikit.TransferHeader(c)
 	compact := header.Bounds().W < t.C.TransferDock.CompactBreakpoint
 	header.Children(func() {
 		uikit.TransferHeaderTitle(c, "传输", filesIcon)
-		a.transferFilters(c, s)
+		a.transferFilters(c, s, len(tasks))
 		ui.Spacer(c)
 		if !compact {
-			uikit.TransferHeaderSummary(c, "总速度 "+transferBytes(int64(q.displaySpeed))+"/s · "+transferRemaining(s.total-s.bytes, s.speed))
+			uikit.TransferHeaderSummary(c, "总速度 "+transferBytes(int64(s.speed))+"/s · "+transferRemaining(s.total-s.bytes, s.speed))
 		}
 		pauseIcon, pauseLabel := transferPauseIcon, "全部暂停"
 		if s.running+s.queued == 0 && s.paused > 0 {
 			pauseIcon, pauseLabel = transferPlayIcon, "全部继续"
 		}
 		uikit.TransferAction(c, "pause-all", pauseLabel, pauseIcon, s.running+s.queued+s.paused == 0).
-			OnClick(func() { a.pauseAllTransfers(c) })
+			OnClick(func() { a.pauseAllTransfers(c, session) })
 		uikit.TransferAction(c, "clear-done", "清除已完成", transferTrashIcon, s.done == 0).OnClick(func() {
-			q.tasks = slices.DeleteFunc(q.tasks, func(task *transferTask) bool { return task.state == transferDone })
+			q.tasks = slices.DeleteFunc(q.tasks, func(task *transferTask) bool {
+				return session != nil && task.view == session && task.state == transferDone
+			})
 		})
 		label := "折叠传输列表"
 		if q.collapsed {
@@ -305,9 +339,9 @@ func (a *app) transferHeader(c *ui.Context) {
 	})
 }
 
-func (a *app) transferFilters(c *ui.Context, summary transferSummary) {
+func (a *app) transferFilters(c *ui.Context, summary transferSummary, total int) {
 	q := &a.transfers
-	total, active, done := len(q.tasks), summary.running+summary.queued+summary.paused, summary.done
+	active, done := summary.running+summary.queued+summary.paused, summary.done
 	items := []uikit.SegItem{{Label: "全部", Count: &total}, {Label: "进行中", Count: &active}, {Label: "已完成", Count: &done}}
 	if uikit.TransferFilters(c, "传输分类", &q.filter, items).Changed() {
 		a.saveFilePreferences(c)
@@ -367,11 +401,11 @@ func (a *app) transferFailureNotice(c *ui.Context, task *transferTask) {
 	})
 }
 
-func (a *app) pauseAllTransfers(c *ui.Context) {
-	q := &a.transfers
-	s := q.summary()
+func (a *app) pauseAllTransfers(c *ui.Context, session *fileSession) {
+	tasks := a.transfers.sessionTasks(session)
+	s := summarizeTransfers(tasks)
 	resume := s.running+s.queued == 0 && s.paused > 0
-	for _, task := range q.tasks {
+	for _, task := range tasks {
 		if resume && task.state == transferPaused {
 			a.resumeTransfer(task)
 		} else if !resume && (task.state == transferRunning || task.state == transferQueued) {

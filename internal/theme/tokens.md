@@ -7,7 +7,7 @@
 
 | 层 | 数量 | 说明 |
 |---|---|---|
-| palette（primitives） | 280 | 原始色值与刻度，其中 50 个为推导值（derived） |
+| palette（primitives） | 282 | 原始色值与刻度，其中 50 个为推导值（derived） |
 | semantic（每个主题一份） | 466 | Light = 当前设计；Dark 覆盖其中 110 个（全部 derived） |
 | component | 1045 | 只引用 semantic；换主题时自动跟随 |
 
@@ -392,7 +392,9 @@ siderItem.nameColor             ← component，只能引用 semantic
 ### palette.blur
 | token | 值 | 备注 |
 |---|---|---|
+| `palette.blur.1` | 1px |  |
 | `palette.blur.1_5` | 1.5px |  |
+| `palette.blur.3` | 3px |  |
 | `palette.blur.4` | 4px |  |
 | `palette.blur.5` | 5px |  |
 | `palette.blur.6` | 6px |  |
@@ -890,9 +892,9 @@ siderItem.nameColor             ← component，只能引用 semantic
 ### glass
 | token | Light | Dark（derived） | 用途 |
 |---|---|---|---|
-| `glass.fade.blur1` | 1.5px | ＝ |  |
-| `glass.fade.blur2` | 4px | ＝ |  |
-| `glass.fade.blur3` | 9px | ＝ |  |
+| `glass.fade.blur1` | 1px | ＝ |  |
+| `glass.fade.blur2` | 3px | ＝ |  |
+| `glass.fade.blur3` | 5px | ＝ |  |
 | `glass.fade.mask1Solid` | 0.45 | ＝ | 层 1 实心到 45%，100% 透明 |
 | `glass.fade.mask1End` | 1 | ＝ |  |
 | `glass.fade.mask2Solid` | 0.4 | ＝ |  |
@@ -905,7 +907,7 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `glass.fade.tintEnd` | 0 | ＝ |  |
 | `glass.float.blur` | 16px | ＝ |  |
 | `glass.float.saturate` | 1.5 | ＝ |  |
-| `glass.bar.blur` | 5px | ＝ |  |
+| `glass.bar.blur` | 3px | ＝ |  |
 | `glass.bar.saturate` | 1.8 | ＝ |  |
 | `glass.paneActionBlur` | 4px | ＝ |  |
 | `glass.paneRevealBlur` | 8px | ＝ |  |
@@ -1298,9 +1300,9 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `fadeBar.tint` | `{color.surface.terminal}` | #fbfbfc | 终端卡片容器底色（仅容器，不含终端文字配色） |
 | `fadeBar.extent` | `{size.fadeExtent}` | 24px | 玻璃栏向内容延伸的渐隐长度 |
 | `fadeBar.extentPane` | `{size.fadeExtentPane}` | 22px | 分屏窗格内的渐隐长度 |
-| `fadeBar.blur1` | `{glass.fade.blur1}` | 1.5px |  |
-| `fadeBar.blur2` | `{glass.fade.blur2}` | 4px |  |
-| `fadeBar.blur3` | `{glass.fade.blur3}` | 9px |  |
+| `fadeBar.blur1` | `{glass.fade.blur1}` | 1px |  |
+| `fadeBar.blur2` | `{glass.fade.blur2}` | 3px |  |
+| `fadeBar.blur3` | `{glass.fade.blur3}` | 5px |  |
 | `fadeBar.mask1Solid` | `{glass.fade.mask1Solid}` | 0.45 | 层 1 实心到 45%，100% 透明 |
 | `fadeBar.mask1End` | `{glass.fade.mask1End}` | 1 |  |
 | `fadeBar.mask2Solid` | `{glass.fade.mask2Solid}` | 0.4 |  |

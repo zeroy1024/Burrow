@@ -223,12 +223,6 @@ func (a *app) revealTransferredFile(c *ui.Context, task *transferTask) {
 	view := task.view
 	if !sameTransferView(view, task.session) || !slices.Contains(a.fileSessions, view) {
 		view = nil
-		for _, candidate := range a.fileSessions {
-			if sameTransferView(candidate, task.session) {
-				view = candidate
-				break
-			}
-		}
 	}
 	index := slices.Index(a.fileSessions, view)
 	if view == nil {
@@ -241,7 +235,7 @@ func (a *app) revealTransferredFile(c *ui.Context, task *transferTask) {
 		a.fileSessions = append(a.fileSessions, view)
 		index = len(a.fileSessions) - 1
 	}
-	task.view = view
+	// A separate destination browser does not acquire this task's ownership.
 	a.switchSection(sectionFiles)
 	a.activeFile = index
 	if view.state != connected && view.state != connecting {

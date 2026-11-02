@@ -71,7 +71,7 @@
 | L3.9 | Menu | 完整实现 | [MenuEntry](../internal/uikit/menu.go#L10) / [MenuOn](../internal/uikit/menu.go#L81) / [MenuButton](../internal/uikit/menu.go#L76) / [RowMenu](../internal/uikit/menu.go#L60) / [RowMenuOn](../internal/uikit/menu.go#L66) / [ContextMenuOn](../internal/uikit/menu.go#L72) / [NativeMenu](../internal/uikit/menu.go#L27) | 共享模型和renderer；Popover图标/Kbd/勾选/禁用/危险项/子菜单/键盘；RowMenuOn双入口共享状态；ContextMenuOn只响应右键/ShiftF10，不覆盖行的左键、导航、角色及展开状态 | SSH目录条目右键和更多共用“连接主机/编辑主机/复制地址/删除主机”，文件目录对应“连接站点/编辑站点/复制地址/删除站点”；分组菜单使用“添加主机（或添加站点）/新建分组/修改组名/删除分组”四字文案；侧栏添加菜单复用对应添加/新建动作；标题栏/凭据/文件更多及其他原生菜单适配 |
 | L3.10 | ToastViewport / Toast | 完整实现 | [Toast](../internal/uikit/toast.go#L20) / [ToastProps](../internal/uikit/toast.go#L10) / [ToastViewport](../internal/uikit/toast.go#L52) / [Notify](../internal/uikit/toast.go#L41) | 类型、标题、详情、操作/关闭、快捷键；复用SDK队列/超时/悬停暂停/announce | 根视图一次viewport；即时及延迟错误使用ToneDanger+标题/详情，忙碌和不可写警告分类，普通提示保留Notify及去重ID |
 | L3.11 | EmptyState | 完整实现 | [EmptyState](../internal/uikit/empty.go#L49) / [EmptyProps](../internal/uikit/empty.go#L17) / [EmptyMessage](../internal/uikit/empty.go#L37) | 图标tile、标题/详情/错误、操作与紧凑空态 | 无工作区、连接态、设置搜索、目录搜索EmptyCatalogSearch、空目录与传输空态 |
-| L3.12 | ScrollFade | 完整实现 | [ScrollFade](../internal/uikit/scrollfade.go#L18) / [Edge](../internal/uikit/types.go#L44) / [ScrollFadeProps](../internal/uikit/scrollfade.go#L9) | 上下边、默认渐隐、玻璃多层mask/实体回退、Uniform整段玻璃背景、可布局Root | 真实/旧文本终端均接玻璃栏；真实终端以本地插件ViewportBackdrop提供实际相邻历史行；文件表格以TableProps.Backdrop提供实际栏下条目，工具栏和列头共用Uniform玻璃背景；SidePanel及设置保留渐隐 |
+| L3.12 | ScrollFade | 完整实现 | [ScrollFade](../internal/uikit/scrollfade.go#L18) / [Edge](../internal/uikit/types.go#L44) / [ScrollFadeProps](../internal/uikit/scrollfade.go#L9) | 上下边、默认渐隐、玻璃多层mask/实体回退、Uniform整段玻璃背景、可布局Root | 真实/旧文本终端上下栏与文件页头（工具栏及列头）/页脚统一1/3/5px多层渐进模糊，着色按92%→78%→0向内容区逐渐透明；真实终端以本地插件ViewportBackdrop提供实际相邻历史行，文件表格以TableProps.Backdrop提供实际栏下条目；SidePanel及设置保留渐隐 |
 | L4.1 | Rail | 完整实现 | [Rail](../internal/uikit/rail.go#L8) / [RailButtonProps](../internal/uikit/rail.go#L16) | 纵向TabList、方向键移焦、Enter激活、底部设置入口 | 三页导航，原switchSection负责真正切页 |
 | L4.2 | RailButton | 完整实现 | [RailButton](../internal/uikit/rail.go#L25) | 页面选中/悬停/按下/焦点、提示、稳定Handle | SSH、文件、设置按钮；重复点击仅进入 |
 | L4.3 | Sider | 完整实现 | [Sider](../internal/uikit/sider.go#L22) / [SiderProps](../internal/uikit/sider.go#L9) / [SiderResult](../internal/uikit/sider.go#L17) / [SiderHeader](../internal/uikit/sider.go#L81) / [SiderHeaderProps](../internal/uikit/sider.go#L71) | Title/Add/Search/List/Footer完整结构与UI结果；Header.HideAdd保留统一高度而不构建按钮 | SSH与文件独立目录；设置复用SiderHeader.HideAdd与SearchField，统一标题/搜索位置，不持有连接/持久化 |
@@ -79,20 +79,20 @@
 | L4.5 | SiderRow | 完整实现 | [SiderRow](../internal/uikit/sider.go#L263) / [SiderRowProps](../internal/uikit/sider.go#L235) / [SiderRowResult.Present](../internal/uikit/sider.go#L280) | Logo/HostLabel、双击/Enter、更多/ShiftF10、Drag/Drop；原生Focused驱动独立active底色，失焦清除；无外部Selected/Active/连接State字段 | SSH/文件目录共用；先track再Present，稳定源身份和单击仅聚焦；不读取活动会话 |
 | L4.6 | SessionTabs | 完整实现 | [SessionTabs](../internal/uikit/tabs.go#L290) / [SessionTabsProps](../internal/uikit/tabs.go#L277) / [TabsResult](../internal/uikit/tabs.go#L267) | 完整viewport/scroll/row、标准items/reorder事件、自定义driver slots与公共输入；隐藏滚动条、共用滚轮横移；新增标签后一次定位尾部加号，保留原生横向wheel/触控板 | SSH/File标题栏均直接接入；BuildTabs返回原加号按钮；原docking controller、父级、滚动状态及源身份保留 |
 | L4.7 | SessionTab | 完整实现 | [SessionTab](../internal/uikit/tabs.go#L55) / [SessionTabInput](../internal/uikit/tabs.go#L217) / [SessionTabWidth](../internal/uikit/tabs.go#L108) / [SessionTabPreview](../internal/uikit/tabs.go#L123) | 单会话四种连接状态；组合四宫格+Count；实际测宽与无交互完整预览，共用标签内容；方向/Home/End/中键、焦点、新建/选中露出 | 两页真实标签；SSH组合及标签ghost用同一四宫格；面板→标签Morph接真实预览；键盘与工作区焦点契约保留 |
-| L4.8 | PathBar | 完整实现 | [PathBar](../internal/uikit/pathbar.go#L35) / [PathBarProps](../internal/uikit/pathbar.go#L14) / [PathBarParts](../internal/uikit/pathbar.go#L26) | 实测宽度折叠；普通段与“…”菜单统一返回Chosen/Target/Index | 本地/远程路径由单一结果入口导航；保留Items，不再由页面另绑OnClick |
+| L4.8 | PathBar | 完整实现 | [PathBar](../internal/uikit/pathbar.go#L35) / [PathBarProps](../internal/uikit/pathbar.go#L14) / [PathBarParts](../internal/uikit/pathbar.go#L26) | 实测宽度折叠；普通段与“…”菜单统一返回Chosen/Target/Index | 本地/远程路径由单一结果入口导航；本地绝对目录拼接保留根斜杠，普通段和折叠菜单均使用同一绝对Target，避免相对应用工作目录解析；保留Items，不再由页面另绑OnClick |
 | L4.9 | HistoryButtons | 完整实现 | [HistoryButtons](../internal/uikit/filepane.go#L101) / [HistoryButtonProps](../internal/uikit/filepane.go#L97) | 前进/后退、禁用、Kbd提示与UI事件；页面保留已确认键位 | 文件历史，实际⌘←/⌘→保持 |
 | L4.10 | PaneLabel | 完整实现 | [PaneLabel](../internal/uikit/filepane.go#L75) | 本地/远程、聚焦/失焦与单窗格样式 | 文件工具栏 |
 | L4.11 | CountTabs | 完整实现 | [CountTabs](../internal/uikit/titlebar.go#L45) | 小号Segmented与真实Count；完整图标/计数数据项；横向标题行显式AlignSelf(Center) | 传输全部/进行中/完成分类，与标题及工具按钮垂直居中 |
 | L4.12 | NavItem | 完整实现 | [SettingsNavItem](../internal/uikit/settings.go#L153) / [SettingsNavItemProps](../internal/uikit/settings.go#L146) | 图标、标签、选中/悬停；FocusVisible+ControlFocus，关闭SDK默认环，应用保留分类选择 | 设置分类导航 |
 | L5.1 | DataTable | 完整实现 | [DataTable](../internal/uikit/table.go#L82) / [TableState](../internal/uikit/table.go#L31) / [TableRow](../internal/uikit/table.go#L67) / [TableProps](../internal/uikit/table.go#L44) / [TableResult](../internal/uikit/table.go#L75) | 真实List.Rows虚拟化；唯一path选择、排序、resize、对齐、完整键盘/屏外Reveal、拖动源保活、公开表格语义及两轴共享滚动条 | 文件列表；关联限制见下表，已获用户接受 |
-| L5.2 | SortHeader | 完整实现 | [SortHeader](../internal/uikit/sortheader.go#L25) / [Column](../internal/uikit/table.go#L21) / [SortHeaderProps](../internal/uikit/sortheader.go#L10) | sticky表头、ScrollWith、单/多排序、resize/键盘调宽、对齐及列名/排序描述；Translucent清除自身HeaderBg，复用整段页头的唯一玻璃背景，停用时保留实体底色；调整后方列时固定前方弹性列，边界竖线与拖动命中区居中对齐 | 本地/远程DataTable内置表头，5/3列随原布局适配；实际行Backdrop和Underlay同时启用时接通玻璃态，不被原实色底遮挡，也不随下方渐隐退到零模糊；仅非Fixed列绘制共享Divider，悬停/拖动/键盘焦点高亮 |
+| L5.2 | SortHeader | 完整实现 | [SortHeader](../internal/uikit/sortheader.go#L25) / [Column](../internal/uikit/table.go#L21) / [SortHeaderProps](../internal/uikit/sortheader.go#L10) | sticky表头、ScrollWith、单/多排序、resize/键盘调宽、对齐及列名/排序描述；Translucent清除自身HeaderBg，复用整段页头的共享渐进玻璃背景，停用时保留实体底色；调整后方列时固定前方弹性列，边界竖线与拖动命中区居中对齐 | 本地/远程DataTable内置表头，5/3列随原布局适配；实际行Backdrop和Underlay同时启用时接通玻璃态，不被原实色底遮挡，按用户最新要求随共享玻璃层渐隐；仅非Fixed列绘制共享Divider，悬停/拖动/键盘焦点高亮 |
 | L5.3 | ListRow | 完整实现 | [ListRow](../internal/uikit/listrow.go#L19) / [ListRowProps](../internal/uikit/listrow.go#L9) | Leading/Title/Meta、选中/焦点/斑马/hover、行语义；选中meta不覆盖行色 | DataTable行；通用Leading/Title/Meta变体完整提供，未把多行凭据卡强缩成30px |
 | L5.4 | KeyValue | 完整实现 | [KeyValue](../internal/uikit/keyvalue.go#L15) / [KV](../internal/uikit/keyvalue.go#L10) | 多行、Mono/Dim、专用行高/颜色/字体 | 监控系统信息、进程与预览元数据；监控实际消费`/proc`原始记录、默认路由接口差分及PID＋启动时间Top，单项不可用为—，见[后端覆盖](monitoring.md) |
 | L5.5 | Meter | 完整实现 | [Meter](../internal/uikit/meter.go#L10) / [MeterProps](../internal/uikit/meter.go#L8) | lo/hi、Label/Value、RoleMeter/Range；正常黑、70%警告、90%危险 | CPU/内存/磁盘 |
 | L5.6 | Progress | 完整实现 | [Progress](../internal/uikit/progress.go#L29) / [ProgressProps](../internal/uikit/progress.go#L10) | Running/Paused/Done/Error、Thin、确定/不定、减少动态静态条纹 | 传输五态与设置50%预览；不定变体完整提供 |
 | L5.7 | Sparkline | 完整实现 | [Sparkline](../internal/uikit/sparkline.go#L14) / [SparklineProps](../internal/uikit/sparkline.go#L8) | 数值序列、Height/Tone、专用线宽/填充/主题色 | CPU曲线 |
 | L5.8 | Stat | 完整实现 | [Stat](../internal/uikit/stat.go#L8) / [MeterStat](../internal/uikit/stat.go#L22) | 标题/右侧值、图形body及说明slots | 监控分组；CPU/内存为`/proc`值，磁盘容量为独立SFTP `StatFilesystem`结果；失败保留各卡片—及原布局，见[后端覆盖](monitoring.md) |
-| L5.9 | TransferRow | 完整实现 | [TransferRow](../internal/uikit/transfer.go#L174) / [Transfer](../internal/uikit/transfer.go#L159) / [TransferRowResult](../internal/uikit/transfer.go#L169) | 展示快照、图标/名称/保文件名路径/进度/状态/操作；只运行速度Accent | 传输队列；暂停/继续/重试/定位/取消由原队列执行 |
+| L5.9 | TransferRow | 完整实现 | [TransferRow](../internal/uikit/transfer.go#L174) / [Transfer](../internal/uikit/transfer.go#L159) / [TransferRowResult](../internal/uikit/transfer.go#L169) | 展示快照、图标/名称/保文件名路径/进度/状态/操作；只运行速度Accent | 具体文件标签的传输队列；离线恢复仍显示归属任务，列表/统计/批量操作/冲突与失败反馈按当前标签隔离，暂停/继续/重试/定位/取消由原后台队列执行 |
 | L6.1 | OsLogo | 完整实现 | [OsLogo](../internal/uikit/domain.go#L22) / [RegisterOS](../internal/uikit/domain.go#L20) / [OSAsset](../internal/uikit/domain.go#L12) | 名称/尺寸、品牌背景、未知Linux，资源无状态色 | SSH目录与预览 |
 | L6.2 | ProtocolIcon | 完整实现 | [ProtocolIcon](../internal/uikit/domain.go#L47) / [Protocol](../internal/uikit/domain.go#L39) | SSH/SFTP/FTP、尺寸与专用配色 | 文件站点目录、会话协议 |
 | L6.3 | HostLabel | 完整实现 | [HostLabel](../internal/uikit/domain.go#L155) / [HostLabelProps](../internal/uikit/domain.go#L150) / [MiddleText](../internal/uikit/table.go#L278) / [MiddlePath](../internal/uikit/domain.go#L236) / [MiddleLabel](../internal/uikit/domain.go#L203) / [MiddleLabelProps](../internal/uikit/domain.go#L189) | Inline/Stacked/Dim；MiddleLabel实际测宽、Prefix预留、MiddlePath保留文件名及完整AX原文；目录profile保留行高 | 目录、宿主标签、传输路径、凭据文件与SSH_AUTH_SOCK路径 |
@@ -163,6 +163,16 @@
 
 ChipInput的水平padding改用同一个Input.PaddingX，垂直padding、chip尺寸、换行/删除/提交逻辑保留；空态占位、编辑文字及首个标签边缘与普通Input内容区对齐。环境变量VALUE里的逗号仍按PreserveCommas保留，不改变配置或保存流程。
 
+## 传输任务与会话归属
+
+业务层通过`fileSession.restoreID`、`storedFileTab.ID`（工作区v2）与`storedTransferSession.ViewID`（队列v4）保存具体标签身份；`activeTransferSession/sessionTasks`只向公共TransferDock/TransferHeader/CountTabs/TransferRow提供当前标签的数据，包括离线标签。没有标签时保留空传输栏；新建同站点标签获得新身份，不按地址或profile合并历史。每个标签保留独立的传输滚动句柄，列表根Key也跟随标签；全局并发调度、独立client及后台worker生命周期保持原实现。重新打开刚关闭的标签复用原对象；定位到其他浏览器不修改任务归属。
+
+RestoreSessions关闭时不绑定旧任务；开启时仅按恢复标签ID绑定，恢复不自动连接/继续。缺标签身份的旧v1/v2/v3记录无法可靠区分同站点的多个标签，保留未完成检查点，不猜测归属。已完成记录仅为可恢复原标签持久化。具体恢复和旧数据边界见[文件传输](file-transfer.md)。UIKit继续不持有业务归属、网络或持久化。
+
+标题栏对齐由公共TitleBarLeading扣除标题行自身6px gap，SSH/文件调用都传入与正文一致的rail＋（侧栏宽＋8px gutter）×显示进度；保留原生交通灯最小空间、标签滚动、拖动和加号定位。
+
+本轮已有项目`go test -race ./...`、`go vet ./...`、`go build ./...`和格式/差异检查通过，MyGo darwin/arm64应用打包通过。未新增测试，未操作用户真实配置或服务器；跨标签交互、实际进程重启与设备UI尚未实测，不以已有测试通过冒充新增路径的运行验收。
+
 ## 传输分类垂直对齐
 
 修正后已有测试、Go构建、go vet、格式/差异检查及MyGo应用打包通过；未做设备UI验收。
@@ -230,7 +240,7 @@ SSH与文件目录的SiderRow不再注册原生ContextMenu。RowMenuOn把行右�
 - `desktop`继续持有独立SSH/文件目录、三页激活、连接对象、输出/滚动、目录历史、传输队列、配置写入及独立密钥任务；UIKit不做网络、文件、持久化或钥匙串操作。
 - Settings关闭的临时状态清理和稳定Handle仍由原应用流程负责。组件新增状态只包含reveal、菜单开关、焦点/鼠标、确认、测量和控件编辑等UI状态。
 - 虚拟列表使用真实公开 `ui.List(...).Rows(func(ui.ListRow))`。TableState持有唯一path选择/cursor/anchor，不维护旧name map镜像；内层Drag先接收鼠标，因此不谎称原生List selector负责了该选择。源行获得焦点后由SDK额外保活，结束恢复list焦点；Reveal在构建前按路径定位索引。
-- 表头和内容使用同一列宽模型；实际body viewport从HeaderHeight到FooterHeight，避免屏外定位被sticky头覆盖。Rows→真实条目Backdrop→Underlay→Header→外层toolbar/footer的绘制顺序保留玻璃效果且不遮表头。文件页工具栏和列头共用覆盖完整HeaderHeight的ScrollFadeProps.Uniform背景，只模糊和着色一次；列头在半透明有效时自身完全透明，避免实色或重复着色造成白色条带，也不在列头底部退到零模糊。Material与着色均先于工具栏、列名和排序/拖动控件绘制，ScrollWith只横移内容。TableBackdropRow只供显示数据，PaintFileIcon与FileIcon共用图标/颜色，单元格共用字体、宽度、对齐和中间省略；装饰层按paint时的实际滚动偏移绘制，不创建第二组交互/读屏行。
+- 表头和内容使用同一列宽模型；实际body viewport从HeaderHeight到FooterHeight，避免屏外定位被sticky头覆盖。Rows→真实条目Backdrop→Underlay→Header→外层toolbar/footer的绘制顺序保留玻璃效果且不遮表头。文件页工具栏和列头共用覆盖完整HeaderHeight的ScrollFade多层渐进背景，与SSH上下栏、文件页脚统一1/3/5px和92%→78%→0着色；列头在半透明有效时自身完全透明，避免实色或重复叠加独立列头底色造成白色条带。Material与着色均先于工具栏、列名和排序/拖动控件绘制，ScrollWith只横移内容。TableBackdropRow只供显示数据，PaintFileIcon与FileIcon共用图标/颜色，单元格共用字体、宽度、对齐和中间省略；装饰层按paint时的实际滚动偏移绘制，不创建第二组交互/读屏行。
 - 窗口创建启用固定MyGo公开的VibrancyTitlebar，syncWindowMaterial只在设置/系统降低透明度改变时切换原生材质；Root仅在开关有效且c.Vibrancy可用时透明，三页各自的标题栏叠加Window.Bg及Titlebar.TintOpacity（92%）着色，停用透明时回到实体底色，正文仍用原不透明背景。不改变窗口、会话或后台传输的生命周期。终端仍保留原正文矩形和上下4px留白，ViewportBackdrop只读同一RenderState的overscan，不移动真实视口；背景层在自身绘制空间计算网格原点，不再复用另一离屏纹理内的View坐标，上下栏分别以自身外侧圆角裁剪子绘制，避免GPU内层矩形裁剪抹掉卡片圆角。
 - 默认名称列最小宽160，现有窄文件窗格显式传原布局约束；Header公共36/40/46齐全，现有Sider仍显式保留原外框高度。布局参数覆盖不删除公共规格。
 - 原DataTable应用框架、左右文件窗格、分屏比例和拖动控制器继续复用。用户批准移除页头状态点会让标题前移；其他规范化外观包括内描边、状态色/阈值、数字对齐、Kbd和中间省略，不声称像素无差异。
@@ -241,7 +251,7 @@ SSH与文件目录的SiderRow不再注册原生ContextMenu。RowMenuOn把行右�
 
 2026-11-02截图反馈后的渲染修正：上述检查没有覆盖到实际GPU下的标题栏颜色、嵌套圆角裁剪和非焦点离屏坐标，不能证明上轮视觉正确。本次新增标题栏着色语义令牌及组件映射Titlebar.TintOpacity，重新生成theme.go/tokens.json/tokens.md；保留原生材质，在三页各自标题栏叠加92%主题窗口底色。ViewportBackdropOptions增加Radius，顶部/底部各自用外侧圆角的容器裁剪子绘制，移除会覆盖卡片圆角的矩形Painter.Clip；在自身子树的绘制矩形中计算网格原点，移除跨离屏纹理复用的painted坐标。原终端View的父级、位置、尺寸、4px留白、滚动和PTY尺寸控制未改。项目及终端插件已有全套race测试、go vet和Go构建通过；未新增测试或执行设备GUI验收，实际渲染仍待复测。
 
-2026-11-02文件列头玻璃态收口：上版单独给列头增加模糊及着色，与工具栏下的渐隐着色叠加，未解决截图中的实色观感；先前已有检查不作为视觉通过证据。最终SortHeader.Translucent只清除自身背景，工具栏和列头共同使用完整HeaderHeight范围的ScrollFadeProps.Uniform（已有Glass.Bar.Blur、FadeBar.TintMid令牌），整段页头只保留一层模糊和一次着色。关闭半透明或系统降低透明度后仍为原实体底色，页脚和SSH渐隐保持原路径。本地/远程、3/5列共用；列头尺寸、ScrollWith、排序/列宽处理、虚拟行及业务句柄保留。本轮项目已有race测试、go vet和Go构建、格式及差异检查通过；设备UI仍待复测，不以静态检查替代实际显示验收。
+2026-11-02文件列头玻璃态收口：上版单独给列头增加模糊及着色，与工具栏下的渐隐着色叠加，未解决截图中的实色观感；先前已有检查不作为视觉通过证据。最终SortHeader.Translucent只清除自身背景，工具栏和列头共同使用完整HeaderHeight范围的ScrollFadeProps.Uniform（已有Glass.Bar.Blur、FadeBar.TintMid令牌），整段页头只保留一层模糊和一次着色。当时关闭半透明或系统降低透明度后回到实体底色；随后两页上下栏曾统一为Uniform；用户最新要求已恢复为1/3/5px多层渐进模糊，着色向内容区逐渐透明。本地/远程、3/5列共用；列头尺寸、ScrollWith、排序/列宽处理、虚拟行及业务句柄保留。本轮项目已有race测试、go vet和Go构建、格式及差异检查通过；设备UI仍待复测，不以静态检查替代实际显示验收。
 
 2026-11-02组合标签、会话拆离及形态/排序动画完成后，已有`go test ./...`、`go build ./...`、`go vet ./...`、修改Go文件的`gofmt`与`git diff --check`均通过；依赖和已有测试文件未改。按固定MyGo v0.7.3公开接口及源码复核了pointer-held预览、真实会话指针复用、快速drop、pendingDock提交顺序、后台/活动组焦点、关闭动画保护、原生副本抑制、底部滚动哨兵、让位范围回收和真实标签交接。两次独立静态复核发现的坐标夹取/布局宽度/哨兵问题已按最终手持语义修正；没有把编译或静态复核当作视觉验收。未新增测试、组件画廊、截图基线或CI；未启动/重连真实服务器、未进行设备UI验收。
 

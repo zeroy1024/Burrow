@@ -331,6 +331,7 @@ func (a *app) terminalScrollEdge(c *ui.Context, barHeight float32, bottom bool, 
 		edge = uikit.EdgeBottom
 	}
 	uikit.ScrollFade(c, edge, uikit.ScrollFadeProps{
-		Height: barHeight, Background: background, MaskTint: uikit.Color(theme.Current().C.FadeBar.Tint), Translucent: a.translucencyEnabled(c),
+		Height: barHeight, Background: background,
+		Translucent: a.translucencyEnabled(c),
 	})
 }

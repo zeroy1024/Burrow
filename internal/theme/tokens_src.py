@@ -47,7 +47,7 @@ PALETTE={
  'fontFamily':{'system':F(['-apple-system','SF Pro Text','PingFang SC','Inter','Noto Sans CJK SC','system-ui','sans-serif']),
    'mono':F(['JetBrains Mono','Menlo','monospace'],'仅用于主机名/路径等 UI 文本，不用于终端内容')},
  'letterSpacing':{'neg0_2':D(-0.2),'zero':D(0),'pos0_3':D(0.3)},
- 'blur':{str(v).replace('.','_'):D(v) for v in [1.5,4,5,6,9,16]},
+ 'blur':{str(v).replace('.','_'):D(v) for v in [1,1.5,3,4,5,6,9,16]},
  'ratio':{k:N(v) for k,v in [('0',0),('0_09',.09),('0_15',.15),('0_18',.18),('0_3',.3),('0_35',.35),('0_4',.4),('0_45',.45),('0_5',.5),('0_55',.55),('0_6',.6),('0_7',.7),('0_78',.78),('0_8',.8),('0_92',.92),('1',1),('1_03',1.03),('1_5',1.5),('1_8',1.8)]},
  'duration':{str(v):MS(v) for v in [0,120,150,160,180,220,300,320,500,600]},
  'speed':{'autoScroll':N(900,'px/s')},
@@ -175,12 +175,12 @@ SEM={
    'dotOnline':SH([L(0,0,0,3,P('greenA.a14'))]),'dotConnecting':SH([L(0,0,0,3,P('amberA.a18'))]),
  },
  'glass':{
-   'fade':{'blur1':D(P('blur.1_5')),'blur2':D(P('blur.4')),'blur3':D(P('blur.9')),
+   'fade':{'blur1':D(P('blur.1')),'blur2':D(P('blur.3')),'blur3':D(P('blur.5')),
      'mask1Solid':N(P('ratio.0_45'),'层 1 实心到 45%，100% 透明'),'mask1End':N(P('ratio.1')),
      'mask2Solid':N(P('ratio.0_4')),'mask2End':N(P('ratio.0_78')),'mask3Solid':N(P('ratio.0_3')),'mask3End':N(P('ratio.0_6')),
      'tintStart':N(P('ratio.0_92'),'着色渐变起点 alpha（取所在卡片底色）'),'tintMid':N(P('ratio.0_78')),'tintMidStop':N(P('ratio.0_45')),'tintEnd':N(P('ratio.0'))},
    'float':{'blur':D(P('blur.16')),'saturate':N(P('ratio.1_5'))},
-   'bar':{'blur':D(P('blur.5')),'saturate':N(P('ratio.1_8'))},
+   'bar':{'blur':D(P('blur.3')),'saturate':N(P('ratio.1_8'))},
  },
  'opacity':{
    'titlebarTint':N(P('ratio.0_92'),'原生标题栏材质上的窗口底色着色强度',True),

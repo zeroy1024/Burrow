@@ -13,7 +13,7 @@ import (
 func (a *app) titleBar(c *ui.Context, shown float32) {
 	t := theme.Current()
 	uikit.TitleBar(c).Children(func() {
-		uikit.TitleBarLeading(c, t.C.Rail.Width+a.page().sidebarWidth*shown).Children(func() {
+		uikit.TitleBarLeading(c, t.C.Rail.Width+(a.page().sidebarWidth+t.C.Window.Gutter)*shown).Children(func() {
 			label := "收起会话栏"
 			if a.page().sidebarCollapsed {
 				label = "展开会话栏"

@@ -349,7 +349,9 @@ func (a *app) fileBreadcrumbs(c *ui.Context, session *fileSession, pane *filePan
 		segments = append(segments, uikit.PathSegment{Label: session.endpoint.name, Target: "/"})
 	}
 	current := ""
-	if pane.remote {
+	// Preserve the local root: relative breadcrumb targets would otherwise
+	// resolve against the application's working directory instead of pane.path.
+	if pane.remote || path.IsAbs(pane.path) {
 		current = "/"
 	}
 	for _, part := range parts {
@@ -619,6 +621,8 @@ func (a *app) fileScrollEdge(c *ui.Context, height float32, bottom bool) {
 	if bottom {
 		edge = uikit.EdgeBottom
 	}
-	uikit.ScrollFade(c, edge, uikit.ScrollFadeProps{Height: height, Background: background,
-		MaskTint: background, Translucent: a.translucencyEnabled(c), Uniform: !bottom})
+	uikit.ScrollFade(c, edge, uikit.ScrollFadeProps{
+		Height: height, Background: background,
+		Translucent: a.translucencyEnabled(c),
+	})
 }

@@ -12,21 +12,23 @@ import (
 )
 
 type fileSession struct {
-	endpoint     host
-	temporary    bool
-	connection   *sshConnectionGroup
-	runtime      *fileRuntime
-	localRuntime *fileRuntime
-	sshPeer      *remoteSession
-	ftpSecret    string
-	config       sessionConfig
-	id           int
-	host         hostID
-	state        connectionState
-	errorText    string
-	connectedAt  time.Time
-	local        *filePaneState
-	remote       *filePaneState
+	endpoint       host
+	temporary      bool
+	connection     *sshConnectionGroup
+	runtime        *fileRuntime
+	localRuntime   *fileRuntime
+	sshPeer        *remoteSession
+	ftpSecret      string
+	config         sessionConfig
+	id             int
+	restoreID      string
+	transferScroll ui.ScrollState
+	host           hostID
+	state          connectionState
+	errorText      string
+	connectedAt    time.Time
+	local          *filePaneState
+	remote         *filePaneState
 }
 
 func (a *app) currentFileSession() *fileSession {
@@ -70,7 +72,7 @@ func (a *app) newFileSession(id hostID, endpoint host, temporary bool, connectio
 		connection = a.newSSHGroup(endpoint)
 	}
 	session := &fileSession{
-		id: a.nextFileSession, host: id, endpoint: endpoint, config: endpoint.session,
+		id: a.nextFileSession, restoreID: newSessionID(), host: id, endpoint: endpoint, config: endpoint.session,
 		temporary: temporary, connection: connection,
 		local: newFilePane(false), remote: newFilePane(true),
 	}
@@ -109,7 +111,7 @@ func (a *app) closeFileSession(index int) {
 func (a *app) fileTitleBar(c *ui.Context, shown float32) {
 	t := theme.Current()
 	uikit.TitleBar(c).PaddingEnd(t.C.Window.Gutter).Children(func() {
-		uikit.TitleBarLeading(c, t.C.Rail.Width+a.page().sidebarWidth*shown).Children(func() {
+		uikit.TitleBarLeading(c, t.C.Rail.Width+(a.page().sidebarWidth+t.C.Window.Gutter)*shown).Children(func() {
 			label := "收起站点栏"
 			if a.page().sidebarCollapsed {
 				label = "展开站点栏"

@@ -46,6 +46,7 @@ type storedWorkspaceSession struct {
 }
 
 type storedFileTab struct {
+	ID         string                 `json:"id,omitempty"`
 	Session    storedWorkspaceSession `json:"session"`
 	LocalPath  string                 `json:"localPath"`
 	RemotePath string                 `json:"remotePath"`
@@ -53,7 +54,7 @@ type storedFileTab struct {
 
 func (a *app) workspaceSnapshot() *storedWorkspace {
 	result := &storedWorkspace{
-		Version: 1, Tabs: []storedWorkspaceTab{}, FileTabs: []storedFileTab{},
+		Version: 2, Tabs: []storedWorkspaceTab{}, FileTabs: []storedFileTab{},
 		Section: a.section, ActiveSSH: a.activeTab, ActiveFile: a.activeFile,
 	}
 	groups := map[*sshConnectionGroup]int{}
@@ -78,6 +79,7 @@ func (a *app) workspaceSnapshot() *storedWorkspace {
 	}
 	for _, session := range a.fileSessions {
 		result.FileTabs = append(result.FileTabs, storedFileTab{
+			ID:        session.restoreID,
 			Session:   snapshotWorkspaceSession(session.endpoint, session.config, session.temporary, connectionID(session.connection)),
 			LocalPath: session.local.path, RemotePath: session.remote.path,
 		})
@@ -116,7 +118,7 @@ func (a *app) restoreWorkspace() {
 	if !a.prefs.RestoreSessions || saved == nil {
 		return
 	}
-	if saved.Version == 1 {
+	if saved.Version >= 1 {
 		a.restoreWorkspaceTabs(saved)
 		return
 	}
@@ -201,6 +203,9 @@ func (a *app) restoreWorkspaceTabs(saved *storedWorkspace) {
 	for _, stored := range saved.FileTabs {
 		id, endpoint, temporary, group := restore(stored.Session)
 		session := a.newFileSession(id, endpoint, temporary, group)
+		if stored.ID != "" {
+			session.restoreID = stored.ID
+		}
 		if stored.LocalPath != "" {
 			session.local.path, session.local.history = stored.LocalPath, []string{stored.LocalPath}
 			session.local.historyIndex = 0
@@ -219,14 +224,14 @@ func validateStoredWorkspace(saved *storedWorkspace, hosts []host, keys []manage
 	if saved == nil {
 		return nil
 	}
-	if saved.Version != 0 && saved.Version != 1 {
+	if saved.Version != 0 && saved.Version != 1 && saved.Version != 2 {
 		return errors.New("unsupported workspace version")
 	}
 	if saved.Section != sectionSSH && saved.Section != sectionFiles {
 		return errors.New("invalid workspace section")
 	}
 	sshCount, fileCount := len(saved.SSH), len(saved.Files)
-	if saved.Version == 1 {
+	if saved.Version >= 1 {
 		sshCount, fileCount = len(saved.Tabs), len(saved.FileTabs)
 	}
 	if saved.ActiveSSH < 0 || saved.ActiveSSH >= max(1, sshCount) || saved.ActiveFile < 0 || saved.ActiveFile >= max(1, fileCount) {
@@ -325,7 +330,17 @@ func validateStoredWorkspace(saved *storedWorkspace, hosts []host, keys []manage
 			return errors.New("invalid workspace focus or pane count")
 		}
 	}
+	fileIDs := map[string]bool{}
 	for _, file := range saved.FileTabs {
+		if saved.Version >= 2 && file.ID == "" {
+			return errors.New("missing file workspace identity")
+		}
+		if file.ID != "" {
+			if strings.TrimSpace(file.ID) != file.ID || fileIDs[file.ID] {
+				return errors.New("invalid or duplicate file workspace identity")
+			}
+			fileIDs[file.ID] = true
+		}
 		if err := validateConnection(file.Session); err != nil {
 			return err
 		}

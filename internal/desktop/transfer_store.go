@@ -35,6 +35,7 @@ type storedTransferBatch struct {
 
 type storedTransferSession struct {
 	ID         int                    `json:"id"`
+	ViewID     string                 `json:"viewId,omitempty"`
 	Session    storedWorkspaceSession `json:"session"`
 	LocalPath  string                 `json:"localPath"`
 	RemotePath string                 `json:"remotePath"`
@@ -167,7 +168,7 @@ func (a *app) finishTransferQuitIfReady() {
 }
 
 func (a *app) transferSnapshot() *storedTransferQueue {
-	result := &storedTransferQueue{Version: 3, NextID: a.transfers.nextID, NextBatchID: a.transfers.nextBatchID,
+	result := &storedTransferQueue{Version: 4, NextID: a.transfers.nextID, NextBatchID: a.transfers.nextBatchID,
 		Sessions: []storedTransferSession{}, Connections: []storedTransferConnection{}, Tasks: []storedTransferTask{}}
 	groups := map[*sshConnectionGroup]int{}
 	groupID := func(group *sshConnectionGroup) int {
@@ -190,13 +191,19 @@ func (a *app) transferSnapshot() *storedTransferQueue {
 	sessions := map[*fileSession]int{}
 	batches := map[*transferBatch]bool{}
 	for _, task := range a.transfers.tasks {
+		// Completed rows belong to a restorable tab, not a global history.
+		// Keep unfinished checkpoints even when their browser was closed.
+		if task.state == transferDone && (!a.prefs.RestoreSessions || !slices.Contains(a.fileSessions, task.view)) {
+			continue
+		}
 		sessionID := sessions[task.session]
 		if sessionID == 0 {
 			sessionID = len(sessions) + 1
 			sessions[task.session] = sessionID
 			session := task.session
 			result.Sessions = append(result.Sessions, storedTransferSession{
-				ID: sessionID, Session: snapshotWorkspaceSession(session.endpoint, session.config, session.temporary, groupID(session.connection)),
+				ID: sessionID, ViewID: session.restoreID,
+				Session:   snapshotWorkspaceSession(session.endpoint, session.config, session.temporary, groupID(session.connection)),
 				LocalPath: session.local.path, RemotePath: session.remote.path,
 			})
 		}
@@ -301,11 +308,24 @@ func (a *app) restoreTransfers() (err error) {
 		}
 		groups[stored.ID] = group
 	}
+	views := map[string]*fileSession{}
+	if a.prefs.RestoreSessions {
+		for _, session := range a.fileSessions {
+			views[session.restoreID] = session
+		}
+	}
 	sessions := map[int]*fileSession{}
+	owners := map[int]*fileSession{}
 	for _, stored := range saved.Sessions {
 		endpoint := transferStoredHost(stored.Session.Endpoint)
 		profile := hostID(slices.IndexFunc(a.hosts, func(h host) bool { return h.session.ID == stored.Session.ProfileID }))
 		session := a.newFileSession(profile, endpoint, stored.Session.Temporary || profile < 0, groups[stored.Session.Connection])
+		// Legacy journals lack a tab identity. Preserve their checkpoints
+		// without guessing an owner from a host/profile or a matching address.
+		session.restoreID = stored.ViewID
+		if stored.ViewID != "" {
+			owners[stored.ID] = views[stored.ViewID]
+		}
 		session.local.path, session.remote.path = stored.LocalPath, stored.RemotePath
 		if stored.LocalPath != "" {
 			session.local.history, session.local.historyIndex = []string{stored.LocalPath}, 0
@@ -334,7 +354,7 @@ func (a *app) restoreTransfers() (err error) {
 		if state != transferDone && state != transferFailed {
 			state = transferPaused
 		}
-		q.tasks = append(q.tasks, &transferTask{id: stored.ID, session: sessions[stored.Session],
+		q.tasks = append(q.tasks, &transferTask{id: stored.ID, session: sessions[stored.Session], view: owners[stored.Session],
 			entry: fileEntry{name: entry.Name, path: stored.SourcePath, size: entry.Size, dir: entry.Directory,
 				symlink: entry.Symlink, modified: entry.Modified, owner: entry.Owner, permissions: entry.Permissions},
 			sourceRemote: stored.SourceRemote, sourcePath: stored.SourcePath, targetPath: stored.TargetPath,
@@ -413,13 +433,17 @@ func sameTransferEndpoint(left, right storedSession) bool {
 // per task and had no commit acknowledgement state. Preserve those boundaries;
 // a pending old part must be reconciled before it can be uploaded again.
 func migrateTransferQueue(saved *storedTransferQueue) error {
+	if saved.Version == 4 {
+		return nil
+	}
 	if saved.Version == 3 {
+		saved.Version = 4
 		return nil
 	}
 	if saved.Version == 2 {
 		// Existing parts keep their names and bytes. Their first resume compares
 		// source and target prefixes once before establishing a v3 checkpoint.
-		saved.Version = 3
+		saved.Version = 4
 		return nil
 	}
 	if saved.Version != 1 {
@@ -463,12 +487,12 @@ func migrateTransferQueue(saved *storedTransferQueue) error {
 		task.Batch, task.Policy = task.Session, decisions[task.Session]
 		markPending(task.Root)
 	}
-	saved.Version = 3
+	saved.Version = 4
 	return nil
 }
 
 func validateTransferQueue(saved *storedTransferQueue) error {
-	if saved.Version != 3 || saved.NextID < 0 || saved.NextBatchID < 0 {
+	if saved.Version != 4 || saved.NextID < 0 || saved.NextBatchID < 0 {
 		return errors.New("传输记录版本或计数无效")
 	}
 	batches := map[int]storedTransferBatch{}
@@ -511,6 +535,9 @@ func validateTransferQueue(saved *storedTransferQueue) error {
 		}
 		if err := validateTransferEndpoint(session.Session.Endpoint, true); err != nil {
 			return err
+		}
+		if strings.TrimSpace(session.ViewID) != session.ViewID {
+			return errors.New("传输所属文件会话标识无效")
 		}
 		if strings.ContainsRune(session.LocalPath+session.RemotePath, '\x00') {
 			return errors.New("传输浏览路径无效")

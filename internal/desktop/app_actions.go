@@ -12,6 +12,7 @@ import (
 )
 
 type closedWorkspaceTab struct {
+	file       *fileSession
 	endpoint   host
 	temporary  bool
 	connection *sshConnectionGroup
@@ -130,7 +131,9 @@ func (a *app) appShortcuts(c *ui.Context) {
 		a.closedTabs = a.closedTabs[:len(a.closedTabs)-1]
 		a.switchSection(closed.section)
 		if closed.section == sectionFiles {
-			session := a.newFileSession(closed.host, closed.endpoint, closed.temporary, closed.connection)
+			// Reopening this tab restores its identity and task ownership;
+			// opening the same site from the catalog still creates a new one.
+			session := closed.file
 			a.fileSessions = append(a.fileSessions, session)
 			a.activeFile = len(a.fileSessions) - 1
 			a.reconnectFileSession(session)
@@ -249,7 +252,7 @@ func (a *app) closeTabDialog(c *ui.Context) {
 			}
 		} else if fileRequest != nil {
 			if index := slices.Index(a.fileSessions, fileRequest); index >= 0 {
-				a.closedTabs = append(a.closedTabs, closedWorkspaceTab{host: fileRequest.host, section: sectionFiles, endpoint: cloneHostEndpoint(fileRequest.endpoint), temporary: fileRequest.temporary, connection: fileRequest.connection})
+				a.closedTabs = append(a.closedTabs, closedWorkspaceTab{file: fileRequest, section: sectionFiles})
 				a.closeFileSession(index)
 				a.afterLastTabClosed()
 			}
@@ -282,7 +285,7 @@ func (a *app) requestCloseFileTab(index int) {
 		a.closeFileRequest, a.closeRequest, a.closePaneRequest = session, nil, nil
 		return
 	}
-	a.closedTabs = append(a.closedTabs, closedWorkspaceTab{host: session.host, section: sectionFiles, endpoint: cloneHostEndpoint(session.endpoint), temporary: session.temporary, connection: session.connection})
+	a.closedTabs = append(a.closedTabs, closedWorkspaceTab{file: session, section: sectionFiles})
 	a.closeFileSession(index)
 	a.afterLastTabClosed()
 }
