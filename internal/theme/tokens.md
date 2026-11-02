@@ -8,8 +8,8 @@
 | 层 | 数量 | 说明 |
 |---|---|---|
 | palette（primitives） | 282 | 原始色值与刻度，其中 50 个为推导值（derived） |
-| semantic（每个主题一份） | 466 | Light = 当前设计；Dark 覆盖其中 110 个（全部 derived） |
-| component | 1045 | 只引用 semantic；换主题时自动跟随 |
+| semantic（每个主题一份） | 467 | Light = 当前设计；Dark 覆盖其中 110 个（全部 derived） |
+| component | 1046 | 只引用 semantic；换主题时自动跟随 |
 
 ## 1. 三层结构与引用规则
 
@@ -915,7 +915,8 @@ siderItem.nameColor             ← component，只能引用 semantic
 ### opacity
 | token | Light | Dark（derived） | 用途 |
 |---|---|---|---|
-| `opacity.titlebarTint` | 0.92 | ＝ | **derived** 原生标题栏材质上的窗口底色着色强度 |
+| `opacity.windowTint` | 0.18 | ＝ | **derived** macOS 原生窗口材质上的统一底色着色强度 |
+| `opacity.titlebarTint` | 0.92 | ＝ | **derived** 其他平台原生标题栏材质上的窗口底色着色强度 |
 | `opacity.paneUnfocusedContent` | 0.5 | 0.45 |  |
 | `opacity.paneUnfocusedSaturate` | 0.35 | ＝ |  |
 | `opacity.paneUnfocusedStatus` | 0.55 | ＝ |  |
@@ -997,6 +998,7 @@ siderItem.nameColor             ← component，只能引用 semantic
 | token | 引用 | Light 值 | 说明 |
 |---|---|---|---|
 | `window.bg` | `{color.bg.window}` | #e7e7e8 | 窗口底色（标题栏、rail、卡片间缝隙） |
+| `window.tintOpacity` | `{opacity.windowTint}` | 0.18 | macOS 原生窗口材质上的统一底色着色强度 |
 | `window.radius` | `{radius.window}` | 12px |  |
 | `window.shadow` | `{shadow.window}` | 0px 0px 0px 0.5px rgba(0,0,0,0.18), 0px 24px 60px 0px rgba(0,0,0,0.18), 0px 4px 14px 0px rgba(0,0,0,0.08) |  |
 | `window.bodyPaddingRight` | `{space.8}` | 8px |  |
@@ -1007,7 +1009,7 @@ siderItem.nameColor             ← component，只能引用 semantic
 | token | 引用 | Light 值 | 说明 |
 |---|---|---|---|
 | `titlebar.height` | `{size.titlebar}` | 44px |  |
-| `titlebar.tintOpacity` | `{opacity.titlebarTint}` | 0.92 | 原生标题栏材质上的窗口底色着色强度 |
+| `titlebar.tintOpacity` | `{opacity.titlebarTint}` | 0.92 | 其他平台原生标题栏材质上的窗口底色着色强度 |
 | `titlebar.leftWidth` | `{size.titleLeft}` | 296px | 标题栏左区（交通灯 + 侧栏开关），与 rail+sider 对齐 |
 | `titlebar.leftPaddingX` | `{space.16}` | 16px |  |
 | `titlebar.leftGap` | `{space.8}` | 8px |  |

@@ -2,6 +2,7 @@ package desktop
 
 import (
 	"fmt"
+	"runtime"
 	"slices"
 
 	"github.com/egoist/mygo"
@@ -33,13 +34,20 @@ func (a *app) translucencyEnabled(c *ui.Context) bool {
 	return a.prefs.Translucency && !a.reduceTransparency
 }
 
+func windowVibrancy() mygo.Vibrancy {
+	if runtime.GOOS == "darwin" {
+		return mygo.VibrancyUnderWindow
+	}
+	return mygo.VibrancyTitlebar
+}
+
 func (a *app) syncWindowMaterial() {
 	if a.window == nil {
 		return
 	}
 	material := mygo.VibrancyNone
 	if a.prefs.Translucency && !a.reduceTransparency {
-		material = mygo.VibrancyTitlebar
+		material = windowVibrancy()
 	}
 	if material != a.windowMaterial {
 		a.windowMaterial = material

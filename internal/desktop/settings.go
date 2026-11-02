@@ -179,14 +179,14 @@ func (a *app) settingMatches(label, description string) bool {
 func (a *app) settingsCategoryHasMatch(index int) bool {
 	texts := []string{
 		"语言 跟随系统 简体中文 English 启动时恢复会话 关闭最后一个选项卡时 关闭活动连接前确认",
-		"应用主题 浅色 深色 跟随系统 强调色 预览 减少动态效果 窗口半透明 标题栏 玻璃栏",
+		"应用主题 浅色 深色 跟随系统 强调色 预览 减少动态效果 窗口半透明 全局背景 毛玻璃 标题栏 玻璃栏 macOS",
 		"配色方案 跟随应用明暗 固定一种 浅色外观时 深色外观时 配色 终端背景 字体 字号 行高 光标 样式 闪烁 回滚行数",
 		"默认本地目录 同时传输数 同名冲突",
 		"快捷键 操作 新建会话 关闭选项卡 重新打开关闭的选项卡 切换到 上一个 下一个 显示 隐藏侧栏 终端模式 文件传输模式 拆分窗格 搜索当前页面 设置",
 		"私钥 导入 生成 ssh-agent 已保存的密码 添加到 agent 密钥与凭据",
 		"关于 版本 开源许可 MyGo Catppuccin JetBrains Mono",
 	}
-	english := []string{"language system startup restore sessions close last tab active connection confirmation", "app theme light dark system accent preview reduce motion window translucency", "color scheme follow app fixed light dark terminal background font size line height cursor style blink scrollback", "default local directory concurrent transfers name conflict", "keyboard shortcuts new close reopen select tabs previous next sidebar terminal file mode split search current page settings", "private key import generate ssh-agent saved passwords add to agent credentials", "about version open source license MyGo Catppuccin JetBrains Mono"}
+	english := []string{"language system startup restore sessions close last tab active connection confirmation", "app theme light dark system accent preview reduce motion window translucency global background blur macOS", "color scheme follow app fixed light dark terminal background font size line height cursor style blink scrollback", "default local directory concurrent transfers name conflict", "keyboard shortcuts new close reopen select tabs previous next sidebar terminal file mode split search current page settings", "private key import generate ssh-agent saved passwords add to agent credentials", "about version open source license MyGo Catppuccin JetBrains Mono"}
 	return a.settingMatches(settingsCategories[index].label, texts[index]+english[index])
 }
 
@@ -343,7 +343,7 @@ func (a *app) appearanceSettings(c *ui.Context) {
 			values := []string{"system", "on", "off"}
 			settingsSegment(c, "reduce-motion", "减少动态效果", []string{"跟随系统", "始终开启", "关闭"}, slices.Index(values, a.prefs.ReduceMotion), func(index int) { a.prefs.ReduceMotion = values[index]; a.preferencesChanged() })
 		}},
-		{"窗口半透明", "标题栏、玻璃栏的模糊；系统「降低透明度」开启时自动关闭", func() {
+		{"窗口半透明", "macOS 全局毛玻璃及栏内模糊；系统「降低透明度」开启时自动关闭", func() {
 			value := a.prefs.Translucency
 			locked := a.reduceTransparency
 			if locked {

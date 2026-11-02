@@ -1059,7 +1059,8 @@ type Glass struct {
 
 // Opacities groups tokens.
 type Opacities struct {
-	TitlebarTint              float32 // 原生标题栏材质上的窗口底色着色强度 [derived]
+	WindowTint                float32 // macOS 原生窗口材质上的统一底色着色强度 [derived]
+	TitlebarTint              float32 // 其他平台原生标题栏材质上的窗口底色着色强度 [derived]
 	PaneUnfocusedContent      float32
 	PaneUnfocusedSaturate     float32
 	PaneUnfocusedStatus       float32
@@ -1170,6 +1171,7 @@ type Semantic struct {
 // WindowTokens groups tokens.
 type WindowTokens struct {
 	Bg                color.NRGBA // ← color.bg.window
+	TintOpacity       float32     // ← opacity.windowTint
 	Radius            float32     // ← radius.window
 	Shadow            Shadow      // ← shadow.window
 	BodyPaddingRight  float32     // ← space.8
@@ -3398,6 +3400,7 @@ func lightSemantic() Semantic {
 			PaneRevealBlur: Palette.Blur.N8,
 		},
 		Opacity: Opacities{
+			WindowTint:                Palette.Ratio.N0_18,
 			TitlebarTint:              Palette.Ratio.N0_92,
 			PaneUnfocusedContent:      Palette.Ratio.N0_5,
 			PaneUnfocusedSaturate:     Palette.Ratio.N0_35,
@@ -3599,6 +3602,7 @@ func buildComponents(s *Semantic) Components {
 	return Components{
 		Window: WindowTokens{
 			Bg:                s.Color.Bg.Window,
+			TintOpacity:       s.Opacity.WindowTint,
 			Radius:            s.Radius.Window,
 			Shadow:            s.Shadow.Window,
 			BodyPaddingRight:  s.Space.N8,

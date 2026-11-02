@@ -241,7 +241,7 @@ SSH与文件目录的SiderRow不再注册原生ContextMenu。RowMenuOn把行右�
 - Settings关闭的临时状态清理和稳定Handle仍由原应用流程负责。组件新增状态只包含reveal、菜单开关、焦点/鼠标、确认、测量和控件编辑等UI状态。
 - 虚拟列表使用真实公开 `ui.List(...).Rows(func(ui.ListRow))`。TableState持有唯一path选择/cursor/anchor，不维护旧name map镜像；内层Drag先接收鼠标，因此不谎称原生List selector负责了该选择。源行获得焦点后由SDK额外保活，结束恢复list焦点；Reveal在构建前按路径定位索引。
 - 表头和内容使用同一列宽模型；实际body viewport从HeaderHeight到FooterHeight，避免屏外定位被sticky头覆盖。Rows→真实条目Backdrop→Underlay→Header→外层toolbar/footer的绘制顺序保留玻璃效果且不遮表头。文件页工具栏和列头共用覆盖完整HeaderHeight的ScrollFade多层渐进背景，与SSH上下栏、文件页脚统一1/3/5px和92%→78%→0着色；列头在半透明有效时自身完全透明，避免实色或重复叠加独立列头底色造成白色条带。Material与着色均先于工具栏、列名和排序/拖动控件绘制，ScrollWith只横移内容。TableBackdropRow只供显示数据，PaintFileIcon与FileIcon共用图标/颜色，单元格共用字体、宽度、对齐和中间省略；装饰层按paint时的实际滚动偏移绘制，不创建第二组交互/读屏行。
-- 窗口创建启用固定MyGo公开的VibrancyTitlebar，syncWindowMaterial只在设置/系统降低透明度改变时切换原生材质；Root仅在开关有效且c.Vibrancy可用时透明，三页各自的标题栏叠加Window.Bg及Titlebar.TintOpacity（92%）着色，停用透明时回到实体底色，正文仍用原不透明背景。不改变窗口、会话或后台传输的生命周期。终端仍保留原正文矩形和上下4px留白，ViewportBackdrop只读同一RenderState的overscan，不移动真实视口；背景层在自身绘制空间计算网格原点，不再复用另一离屏纹理内的View坐标，上下栏分别以自身外侧圆角裁剪子绘制，避免GPU内层矩形裁剪抹掉卡片圆角。
+- macOS窗口创建启用固定MyGo公开的VibrancyUnderWindow（NSVisualEffectView后方混合），syncWindowMaterial只在设置/系统降低透明度改变时切换原生材质；开关有效且c.Vibrancy可用时，Root统一叠加Window.Bg及Window.TintOpacity（18%）着色，三页header与content不再各自铺底，导航和卡片间隙共同透出同一层全局毛玻璃；停用透明时由Root恢复统一实体底色。卡片、终端背景及其栏内渐进模糊保留，其他平台沿用标题栏材质和不透明正文。不改变窗口、会话或后台传输的生命周期。终端仍保留原正文矩形和上下4px留白，ViewportBackdrop只读同一RenderState的overscan，不移动真实视口；背景层在自身绘制空间计算网格原点，不再复用另一离屏纹理内的View坐标，上下栏分别以自身外侧圆角裁剪子绘制，避免GPU内层矩形裁剪抹掉卡片圆角。
 - 默认名称列最小宽160，现有窄文件窗格显式传原布局约束；Header公共36/40/46齐全，现有Sider仍显式保留原外框高度。布局参数覆盖不删除公共规格。
 - 原DataTable应用框架、左右文件窗格、分屏比例和拖动控制器继续复用。用户批准移除页头状态点会让标题前移；其他规范化外观包括内描边、状态色/阈值、数字对齐、Kbd和中间省略，不声称像素无差异。
 

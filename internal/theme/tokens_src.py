@@ -183,7 +183,8 @@ SEM={
    'bar':{'blur':D(P('blur.3')),'saturate':N(P('ratio.1_8'))},
  },
  'opacity':{
-   'titlebarTint':N(P('ratio.0_92'),'原生标题栏材质上的窗口底色着色强度',True),
+   'windowTint':N(P('ratio.0_18'),'macOS 原生窗口材质上的统一底色着色强度',True),
+   'titlebarTint':N(P('ratio.0_92'),'其他平台原生标题栏材质上的窗口底色着色强度',True),
    'paneUnfocusedContent':N(P('ratio.0_5')),'paneUnfocusedSaturate':N(P('ratio.0_35')),'paneUnfocusedStatus':N(P('ratio.0_55')),
    'paneHoverContent':N(P('ratio.0_78')),'paneHoverSaturate':N(P('ratio.0_7')),'dragSource':N(P('ratio.0_4'),'拖走后源行（折叠时）'),'liftStackBack':N(P('ratio.0_8')),
  },
@@ -238,7 +239,7 @@ R=lambda p:'{'+p+'}'
 def ref(p,t=None):  # type inferred later
     return R(p)
 COMP={
- 'window':{'bg':'color.bg.window','radius':'radius.window','shadow':'shadow.window','bodyPaddingRight':'space.8','bodyPaddingBottom':'space.8','gutter':'space.8'},
+ 'window':{'bg':'color.bg.window','tintOpacity':'opacity.windowTint','radius':'radius.window','shadow':'shadow.window','bodyPaddingRight':'space.8','bodyPaddingBottom':'space.8','gutter':'space.8'},
  'titlebar':{'height':'size.titlebar','tintOpacity':'opacity.titlebarTint','leftWidth':'size.titleLeft','leftPaddingX':'space.16','leftGap':'space.8',
    'trafficSize':'size.trafficLight','trafficClose':'color.traffic.close','trafficMinimize':'color.traffic.minimize','trafficZoom':'color.traffic.zoom','trafficEdge':'color.traffic.edge',
    'toggleIcon':'color.text.muted','tabsGap':'space.2','actionsGap':'space.3','actionsPaddingRight':'space.10'},

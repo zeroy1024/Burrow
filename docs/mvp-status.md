@@ -15,7 +15,7 @@
 | 传输队列 | 完整接入，按标签隔离 | 真实recursive manifest、字节/速度、全局并发调度、pause/resume/cancel/retry、独有part提交；列表、统计、批量操作及冲突/失败提示按具体文件标签隔离，离线标签仍显示自己的任务，无标签时为空；独立任务端点和client继续保留 |
 | 正常退出恢复 | 按会话开关绑定，附旧记录边界 | 收敛worker后保存v4队列和v2工作区的标签身份；仅RestoreSessions开启且原标签恢复时绑定任务，离线显示、不自动连接/继续；新标签不继承站点历史。兼容旧格式，缺标签身份的旧检查点保留但不猜测归属；已完成记录仅随可恢复标签保存。格式/路径校验、读取失败保护、保存错误可见 |
 | SSH延迟 | 完整接入 | `Connection.ProbeLatency`复用现有transport测SSH应用层往返时间；`updateSSHLatency`独立于监控，当前可见Shell按连接组共享，首次可见连接立即采样、每5秒刷新，3秒超时或10秒过期显示未知 |
-| 窗口及栏半透明 | 已修正渲染回归，GUI待复测 | `syncWindowMaterial`即时切换原生VibrancyTitlebar，系统降低透明度强制停用；三页标题栏用92%主题Window.Bg着色，保留原灰色外观；真实终端ViewportBackdrop读取固定Ghostty的实际overscan行，使用自身绘制坐标及上下栏外侧圆角裁剪，修正焦点/非焦点不同离屏绘制路径的错位与直角底板；文件TableProps.Backdrop绘制实际条目，SSH上下栏和文件页头/页脚统一ScrollFade多层渐进模式（1/3/5px模糊，92%→78%→0各自背景着色），文件工具栏和列头共用唯一背景，SortHeader.Translucent清除自身底色，关闭半透明时恢复实体背景；原视口、4px留白及输入/拖动身份保留 |
+| 窗口及栏半透明 | 已修正渲染回归，GUI待复测 | `syncWindowMaterial`即时切换原生材质，系统降低透明度强制停用；macOS使用VibrancyUnderWindow，由Root统一叠加18%主题Window.Bg着色，三页header/content、导航和卡片间隙共用连续毛玻璃背景；其他平台保留原标题栏效果；卡片和终端背景保留；真实终端ViewportBackdrop读取固定Ghostty的实际overscan行，使用自身绘制坐标及上下栏外侧圆角裁剪，修正焦点/非焦点不同离屏绘制路径的错位与直角底板；文件TableProps.Backdrop绘制实际条目，SSH上下栏和文件页头/页脚统一ScrollFade多层渐进模式（1/3/5px模糊，92%→78%→0各自背景着色），文件工具栏和列头共用唯一背景，SortHeader.Translucent清除自身底色，关闭半透明时恢复实体背景；原视口、4px留白及输入/拖动身份保留 |
 | Linux监控 | 完整接入，附能力边界 | 主体`/proc`、`os-release`及可选SFTP `statvfs`；默认路由单接口、PID＋启动时间差分Top、单指标失败隔离；同transport切Shell保留基线，隐藏取消自有采集通道。实际API、预算及未实测边界见[监控覆盖清单](monitoring.md) |
 | 真实终端字体/颜色/光标 | 当前验收范围完整接入 | 每会话scheme、字体/字号/行高、背景、光标通过公开API接入；终端字距遗留参数已移除，粗体提亮设置入口已删除 |
 | 实时回滚行数 | 完整实现（接受页级误差） | 本地终端包公开`Options.ScrollbackLines` / `SetScrollbackLines(int) error`；创建时按物理显示行设置，`enforceScrollback`遍历全部SSH标签原地同步，含后台标签与非SSH页面；缩小淘汰最旧历史页，增大不恢复旧输出 |

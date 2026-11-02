@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"runtime"
 	"slices"
 	"sync"
 	"time"
@@ -260,6 +261,7 @@ func Run() error {
 	openWindow := func() {
 		a.syncAppearance()
 		t := theme.Current()
+		material := windowVibrancy()
 		a.window = mygo.NewWindow(mygo.WindowOptions{
 			Title:                "Burrow",
 			Width:                int(t.C.Desktop.WindowWidth),
@@ -270,10 +272,10 @@ func Run() error {
 			TrafficLightPosition: &mygo.Point{X: int(t.C.Desktop.TrafficLightX), Y: int(t.C.Desktop.TrafficLightY)},
 			BackgroundColor:      "#00000000",
 			Transparent:          true,
-			Vibrancy:             mygo.VibrancyTitlebar,
+			Vibrancy:             material,
 			Content:              ui.View(a.view),
 		})
-		a.windowMaterial = mygo.VibrancyTitlebar
+		a.windowMaterial = material
 		a.syncWindowMaterial()
 		a.startCatalogMigration()
 		a.window.OnClose(func(e *mygo.CloseEvent) {
@@ -383,12 +385,17 @@ func (a *app) view(c *ui.Context) {
 	t := theme.Current()
 	a.theme = uikit.Install(c)
 	background := uikit.Color(t.C.Window.Bg)
-	headerBackground := background
+	headerBackground, contentBackground := ui.Transparent, ui.Transparent
 	if a.translucencyEnabled(c) && c.Vibrancy() {
-		// Keep the title bar in the window's palette while allowing the
-		// native material to show through its tint.
-		headerBackground = background.Alpha(t.C.Titlebar.TintOpacity)
-		background = ui.Transparent
+		if runtime.GOOS == "darwin" {
+			// Tint the native material once across the whole window, so the
+			// header and content share a continuous background.
+			background = background.Alpha(t.C.Window.TintOpacity)
+		} else {
+			headerBackground = background.Alpha(t.C.Titlebar.TintOpacity)
+			contentBackground = background
+			background = ui.Transparent
+		}
 	}
 	c.Root().Background(background).Disabled(a.transfers.quitting)
 	root := ui.Column(c).Fill()
@@ -431,7 +438,7 @@ func (a *app) view(c *ui.Context) {
 				uikit.TitleBar(c).FillWidth()
 			}
 		})
-		ui.Row(c).Grow(1).MinHeight(0).AlignItems(ui.Stretch).Background(uikit.Color(t.C.Window.Bg)).Children(func() {
+		ui.Row(c).Grow(1).MinHeight(0).AlignItems(ui.Stretch).Background(contentBackground).Children(func() {
 			a.navigation(c)
 			ui.Box(c).Key(active).Grow(1).MinWidth(0).FillHeight().Children(func() {
 				switch active {
