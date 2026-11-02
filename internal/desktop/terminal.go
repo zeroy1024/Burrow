@@ -279,7 +279,7 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 				if focused {
 					splitShortcut = shortcutDisplay(a.shortcutBinding("pane.split"))
 				}
-				split := uikit.PaneIconButton(c, "分栏 "+h.name, sidebarIcon, surface, uikit.PaneIconButtonProps{
+				split := uikit.PaneIconButton(c, "分栏 "+h.name, splitIcon, surface, uikit.PaneIconButtonProps{
 					Shortcut: splitShortcut,
 					Disabled: count >= maxTerminalPanes || session.closing || !canSplit(session.layoutRect, dropRight) && !canSplit(session.layoutRect, dropBottom),
 				}).Absolute().Top(0).Left(0).Size(p.ActionWidth, p.ActionHeight)

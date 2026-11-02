@@ -12,6 +12,10 @@ var (
   <rect x="3" y="4.5" width="18" height="15" rx="3"/>
   <path d="M9 4.5v15"/>
 `)
+	splitIcon = uikit.LineIcon(`
+  <rect x="3" y="4.5" width="18" height="15" rx="3"/>
+  <path d="M12 4.5v15"/>
+`)
 	terminalIcon = uikit.LineIcon(`
   <rect x="3" y="4.5" width="18" height="15" rx="3"/>
   <path d="m7 9 3 3-3 3m6 0h4"/>
