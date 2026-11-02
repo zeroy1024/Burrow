@@ -215,6 +215,12 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 					LetterSpacing(prefs.Tracking).TextColor(uikit.Color(colors.Foreground)).SelectionColor(uikit.Color(colors.Selection)).
 					Opacity(appearance.Opacity).Cache().
 					OnClick(func() { a.focusSession(tab, session) })
+				if session.focusPending {
+					if a.sshSessionFocused(session) {
+						output.Focus()
+					}
+					session.focusPending = false
+				}
 				if appearance.Saturation != 1 {
 					output.Effect(terminalSaturation.Effect(shader.Options{
 						Uniforms: map[string]any{"Saturation": appearance.Saturation},

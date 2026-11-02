@@ -31,13 +31,15 @@ import (
     "strconv"
 
     "github.com/egoist/mygo"
+    "github.com/egoist/mygo/ui"
 )
 
 var dockerIntegrationApp *app
+var dockerIntegrationContext *ui.Context
 
 type dockerProfileInfo struct {
     ID, Port int
-    Name, User, Address, Auth, Protocol string
+    Name, User, Address, Auth, Protocol, UUID string
 }
 
 type dockerGroupInfo struct {
@@ -47,21 +49,24 @@ type dockerGroupInfo struct {
     Collapsed bool
 }
 
-func dockerIntegrationGroups(catalog *catalogData) []dockerGroupInfo {
-    groups := make([]dockerGroupInfo, 0, len(catalog.groups))
-    for _, g := range catalog.groups {
-        groups = append(groups, dockerGroupInfo{ID:g.id, Name:g.name, Hosts:g.hosts, Collapsed:g.collapsed})
+func dockerIntegrationGroups(a *app, scope section) []dockerGroupInfo {
+    groups := []dockerGroupInfo{}
+    for _, g := range a.groups {
+        if g.scope == scope {
+            groups = append(groups, dockerGroupInfo{ID:g.id, Name:g.name, Hosts:g.hosts, Collapsed:g.collapsed})
+        }
     }
     return groups
 }
 
-func dockerIntegrationProfiles(catalog *catalogData) []dockerProfileInfo {
-    profiles := make([]dockerProfileInfo, 0, len(catalog.hosts))
-    for id, h := range catalog.hosts {
+func dockerIntegrationProfiles(a *app, scope section) []dockerProfileInfo {
+    profiles := []dockerProfileInfo{}
+    for id, h := range a.hosts {
+        files := h.protocol == "sftp" || h.protocol == "ftp"
+        if files != (scope == sectionFiles) { continue }
         profiles = append(profiles, dockerProfileInfo{ID:int(id), Port:h.port,
-            Name:h.name, User:h.user, Address:h.address, Auth:h.auth, Protocol:h.protocol})
+            Name:h.name, User:h.user, Address:h.address, Auth:h.session.Auth, Protocol:h.protocol, UUID:h.session.ID})
     }
-    sort.Slice(profiles, func(i,j int) bool { return profiles[i].ID < profiles[j].ID })
     return profiles
 }
 
@@ -69,6 +74,45 @@ func dockerIntegrationConfigDir() (string, error) {
     path := os.Getenv("SSHDESK_INTEGRATION_CONFIG")
     if !filepath.IsAbs(path) { return "", errors.New("isolated integration configuration is required") }
     return path, nil
+}
+
+type dockerBounds struct {
+    X float32 `json:"x"`
+    Y float32 `json:"y"`
+    Width float32 `json:"width"`
+    Height float32 `json:"height"`
+}
+
+type dockerFileEntry struct {
+    Name, Path, Permissions, Owner string
+    Directory, Symlink bool
+    Size int64
+}
+
+type dockerFilePane struct {
+    Path, Error string
+    Loading, Remote bool
+    HistoryIndex int
+    History, Selection []string
+    Entries []dockerFileEntry
+    Bounds dockerBounds
+}
+
+func dockerIntegrationPane(p *filePaneState) dockerFilePane {
+    result := dockerFilePane{Path:p.path, Error:p.errorText, Loading:p.loading, Remote:p.remote,
+        HistoryIndex:p.historyIndex, History:append([]string{}, p.history...),
+        Selection:[]string{}, Entries:[]dockerFileEntry{}}
+    for selected := range p.table.Selection.All() { result.Selection = append(result.Selection, selected) }
+    sort.Strings(result.Selection)
+    for _, e := range p.directories[p.path] {
+        result.Entries = append(result.Entries, dockerFileEntry{Name:e.name, Path:e.path, Directory:e.dir,
+            Symlink:e.symlink, Size:e.size, Permissions:e.permissions, Owner:e.owner})
+    }
+    if c := dockerIntegrationContext; c != nil {
+        bounds := p.focus.Bounds(c)
+        result.Bounds = dockerBounds{bounds.X, bounds.Y, bounds.W, bounds.H}
+    }
+    return result
 }
 
 func dockerIntegrationSnapshot() {
@@ -80,24 +124,43 @@ func dockerIntegrationSnapshot() {
         Focused, Closing, ShellReturned, RunCanceled, OwnerPresent, OwnerDone bool
         Name, Address, Text string
     }
-    type fileEntryInfo struct { Name string; Directory bool; Size int64 }
     type fileSessionInfo struct {
         ID, Host, State, Connection, Generation int
-        Selected, Temporary, Loading bool
-        Name, Protocol, Path, Error string
-        Entries []fileEntryInfo
+        Selected, Temporary, Loading, LocalLoading bool
+        Name, Protocol, Path, Error, RestoreID, LocalPath, LocalError string
+        Entries, LocalEntries []dockerFileEntry
+        RemoteSelection, LocalSelection []string
+        RemoteBounds, LocalBounds dockerBounds
+        Local, Remote dockerFilePane
+    }
+    type transferInfo struct {
+        ID, ViewID, SessionID, State, BatchID, TemporaryCount int
+        RestoreID, ViewRestoreID, Name, SourcePath, TargetPath, Error, ErrorText string
+        SourceRemote, RunPresent, CleanupPending, RemoveRequested bool
+        Transferred, Total, RunTransferred, RunTotal int64
+        Speed float64
     }
     out := struct {
         Sessions []sessionInfo
         FileSessions []fileSessionInfo
+        TransferTasks []transferInfo
         SSHProfiles, FileProfiles []dockerProfileInfo
         SSHGroups, FileGroups []dockerGroupInfo
-        Prompts, Tabs, FileTabs, Section, CatalogVersion, Transfers int
-        LocalOpen bool
+        Prompts, Tabs, FileTabs, Section, ActiveSection, CatalogVersion, Transfers, ClosedTabs int
+        DraggedFileSession, PaneDragKind, PaneDragPhase int
+        LocalOpen, ActiveRemote, DragActive, FileDragActive, PaneDragActive, SettingsOpen bool
+        FileDragPendingDirectory, FileDragPendingDisconnect, FileDragCancelRequested bool
+        FileDragEntryPaths []string
+        SettingsRecording, CatalogError, Locale string
     }{Prompts: len(a.sshPrompts), Tabs: len(a.tabs), FileTabs:len(a.fileSessions), Section:int(a.section),
-      Transfers:len(a.transfers.tasks), LocalOpen:a.files.localOpen,
-      SSHProfiles:dockerIntegrationProfiles(&a.sshCatalog), FileProfiles:dockerIntegrationProfiles(&a.fileCatalog),
-      SSHGroups:dockerIntegrationGroups(&a.sshCatalog), FileGroups:dockerIntegrationGroups(&a.fileCatalog)}
+      ActiveSection:int(a.activeSection()), Transfers:len(a.transfers.tasks), LocalOpen:a.files.localOpen,
+      ActiveRemote:a.files.activeRemote, ClosedTabs:len(a.closedTabs), SettingsOpen:a.settingsUI.open,
+      Locale:mygo.App.Locale(),
+      SettingsRecording:a.settingsUI.recording, Sessions:[]sessionInfo{}, FileSessions:[]fileSessionInfo{},
+      TransferTasks:[]transferInfo{}, FileDragEntryPaths:[]string{},
+      SSHProfiles:dockerIntegrationProfiles(a, sectionSSH), FileProfiles:dockerIntegrationProfiles(a, sectionFiles),
+      SSHGroups:dockerIntegrationGroups(a, sectionSSH), FileGroups:dockerIntegrationGroups(a, sectionFiles)}
+    if err := a.catalogConfig.loadErr; err != nil { out.CatalogError = err.Error() }
     configData, err := os.ReadFile(a.catalogConfig.path)
     if err != nil { panic(err) }
     var saved struct { Version int `json:"version"` }
@@ -106,22 +169,28 @@ func dockerIntegrationSnapshot() {
     for _, tab := range a.tabs {
         for _, s := range tab.root.sessions() {
             item := sessionInfo{ID:s.id, Host:int(s.host), State:int(s.state),
-                Connection:s.connection.id, Generation:s.connection.generation, Columns:s.columns, Rows:s.rows,
+                Columns:s.columns, Rows:s.rows,
                 Focused:tab == a.currentTab() && tab.focused == s, Closing:s.closing,
                 Name:s.endpoint.name, Address:s.endpoint.address}
-            item.QueueLength, item.OpeningSession = len(s.connection.queue), -1
+            item.OpeningSession = -1
+            if s.connection != nil {
+                item.Connection, item.Generation = s.connection.id, s.connection.generation
+                item.QueueLength = len(s.connection.queue)
+            }
             if s.ssh != nil {
                 item.ShellReturned = s.ssh.conn != nil
                 item.RunCanceled = s.ssh.ctx.Err() != nil
             }
-            if owner := s.connection.connection; owner != nil {
-                item.OwnerPresent = true
-                select { case <-owner.Done(): item.OwnerDone = true; default: }
-            }
-            if opening := s.connection.opening; opening != nil {
-                for _, otherTab := range a.tabs {
-                    for _, other := range otherTab.root.sessions() {
-                        if other.ssh != nil && other.ssh.request == opening { item.OpeningSession = other.id }
+            if s.connection != nil {
+                if owner := s.connection.connection; owner != nil {
+                    item.OwnerPresent = true
+                    select { case <-owner.Done(): item.OwnerDone = true; default: }
+                }
+                if opening := s.connection.opening; opening != nil {
+                    for _, otherTab := range a.tabs {
+                        for _, other := range otherTab.root.sessions() {
+                            if other.ssh != nil && other.ssh.request == opening { item.OpeningSession = other.id }
+                        }
                     }
                 }
             }
@@ -135,25 +204,53 @@ func dockerIntegrationSnapshot() {
         }
     }
     for i, s := range a.fileSessions {
+        local, remote := dockerIntegrationPane(s.local), dockerIntegrationPane(s.remote)
         item := fileSessionInfo{ID:s.id, Host:int(s.host), State:int(s.state), Selected:i==a.activeFile,
             Temporary:s.temporary, Loading:s.remote.loading, Name:s.endpoint.name, Protocol:s.endpoint.protocol,
-            Path:s.remote.path, Error:s.remote.errorText}
+            Path:s.remote.path, Error:s.remote.errorText, RestoreID:s.restoreID,
+            Local:local, Remote:remote, LocalPath:local.Path, LocalLoading:local.Loading, LocalError:local.Error,
+            LocalEntries:local.Entries, Entries:remote.Entries,
+            RemoteSelection:remote.Selection, LocalSelection:local.Selection,
+            RemoteBounds:remote.Bounds, LocalBounds:local.Bounds}
         if s.errorText != "" { item.Error = s.errorText }
         if s.connection != nil { item.Connection, item.Generation = s.connection.id, s.connection.generation }
-        for _, e := range s.remote.directories[s.remote.path] {
-            item.Entries = append(item.Entries, fileEntryInfo{Name:e.name, Directory:e.dir, Size:e.size})
-        }
         out.FileSessions = append(out.FileSessions, item)
+    }
+    for _, task := range a.transfers.tasks {
+        item := transferInfo{ID:task.id, SessionID:task.session.id, RestoreID:task.session.restoreID,
+            Name:task.entry.name, State:int(task.state), SourcePath:task.sourcePath,
+            TargetPath:task.targetPath, Error:task.errorText, ErrorText:task.errorText, SourceRemote:task.sourceRemote,
+            RunPresent:task.run != nil, CleanupPending:task.cleanupPending, RemoveRequested:task.removeRequested,
+            Transferred:task.transferred, Total:task.total, Speed:task.speed, TemporaryCount:-1}
+        if task.view != nil { item.ViewID, item.ViewRestoreID = task.view.id, task.view.restoreID }
+        if task.job != nil {
+            item.BatchID = task.job.batch.id
+            // A running worker exclusively owns the manifest and staging map.
+            if task.run == nil { item.TemporaryCount = len(task.job.temporary) }
+        }
+        if task.run != nil { item.RunTransferred, item.RunTotal = task.run.bytes.Load(), task.run.total.Load() }
+        out.TransferTasks = append(out.TransferTasks, item)
+    }
+    if drag := a.files.drag; drag != nil {
+        out.DragActive, out.FileDragActive, out.DraggedFileSession = true, true, drag.session.id
+        out.FileDragPendingDirectory = drag.publishDirectory != nil
+        out.FileDragPendingDisconnect = drag.publishDisconnect != nil
+        out.FileDragCancelRequested = drag.cancelRequested()
+        for _, entry := range drag.entries { out.FileDragEntryPaths = append(out.FileDragEntryPaths, entry.path) }
+    }
+    if drag := a.drag; drag != nil {
+        out.DragActive, out.PaneDragActive = true, true
+        out.PaneDragKind, out.PaneDragPhase = int(drag.kind), int(drag.phase)
     }
     data, err := json.Marshal(out)
     if err != nil { panic(err) }
     if err := os.WriteFile(filepath.Join(os.Getenv("SSHDESK_TEST_DIR"), "native-observation.json"), data, 0600); err != nil { panic(err) }
 }
 
-func init() {
-    if err := os.WriteFile(filepath.Join(os.Getenv("SSHDESK_INTEGRATION_CONFIG"), "app.pid"), []byte(strconv.Itoa(os.Getpid())), 0600); err != nil { panic(err) }
-    mygo.App.WhenReady(func() {
-        mygo.App.SetMenu(mygo.NewMenu([]*mygo.MenuItem{{Label:"Integration", Submenu:[]*mygo.MenuItem{
+// These existing model actions exercise controller integration only. Snapshot
+// is read-only; native end-to-end cases drive the actual UI instead.
+func dockerIntegrationMenu(items []*mygo.MenuItem) []*mygo.MenuItem {
+    return append(items, &mygo.MenuItem{Label:"Integration", Submenu:[]*mygo.MenuItem{
             {Label:"Snapshot", Click:func(*mygo.MenuItem,*mygo.Window){ dockerIntegrationSnapshot() }},
             {Label:"Focus window", Click:func(*mygo.MenuItem,*mygo.Window){
                 if a:=dockerIntegrationApp; a!=nil { a.window.Show(); mygo.App.Focus(); a.window.Focus() }
@@ -179,18 +276,33 @@ func init() {
                 if a:=dockerIntegrationApp; a!=nil { a.startHostDraft(); a.window.Invalidate() }
             }},
             {Label:"Edit catalog fixture", Click:func(*mygo.MenuItem,*mygo.Window){
-                if a:=dockerIntegrationApp; a!=nil { a.startEditHostDraft(0); a.window.Invalidate() }
+                if a:=dockerIntegrationApp; a!=nil {
+                    for _, group := range a.catalogGroups() { if len(group.hosts)>0 { a.startEditHostDraft(group.hosts[0]); break } }
+                    a.window.Invalidate()
+                }
             }},
             {Label:"Delete catalog fixture", Click:func(*mygo.MenuItem,*mygo.Window){
                 if a:=dockerIntegrationApp; a!=nil {
-                    a.page().draft = hostDraft{id:0, deleting:true, files:a.section==sectionFiles}
-                    a.page().addHostOpen = true
+                    for _, group := range a.catalogGroups() { if len(group.hosts)>0 {
+                        a.page().draft = hostDraft{id:group.hosts[0], deleting:true, files:a.section==sectionFiles}
+                        a.page().addHostOpen = true
+                        break
+                    } }
                     a.window.Invalidate()
                 }
             }},
             {Label:"Quit", Click:func(*mygo.MenuItem,*mygo.Window){ mygo.App.Quit() }},
-        }}}))
-    })
+    }})
+}
+
+func init() {
+    root, err := dockerIntegrationConfigDir()
+    if err != nil { panic(err) }
+    mygo.App.SetPath(mygo.PathUserData, filepath.Join(root, "SSH Desk"))
+    mygo.App.SetPath(mygo.PathCache, filepath.Join(root, "cache"))
+    mygo.App.SetPath(mygo.PathLogs, filepath.Join(root, "logs"))
+    if err := os.Setenv("MYGO_LOCALE", "zh-Hans"); err != nil { panic(err) }
+    if err := os.WriteFile(filepath.Join(root, "app.pid"), []byte(strconv.Itoa(os.Getpid())), 0600); err != nil { panic(err) }
 }
 '''
 
@@ -210,6 +322,12 @@ def prepare(repo, task_dir, address):
     config_root = Path(tempfile.mkdtemp(prefix="native-config-", dir=task_dir))
     config_dir = config_root / "SSH Desk"
     config_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+    local_dir = task_dir / "ui-files"
+    local_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+    for name in ("cache", "logs"):
+        (config_root / name).mkdir(mode=0o700)
+    # Exercise the real v0 -> current sessions.json migration. These source
+    # records contain only disposable fixture paths, never stored passwords.
     hosts = []
     for i, (name, auth, key) in enumerate([
         ("Docker Password", "password", ""),
@@ -222,31 +340,164 @@ def prepare(repo, task_dir, address):
     (config_dir / "catalog.json").write_text(json.dumps(dict(
         groups=[dict(id=0, name="Docker integration", order=0, collapsed=False)], hosts=hosts)))
     os.chmod(config_dir / "catalog.json", 0o600)
+    (config_dir / "prefs.json").write_text(json.dumps(dict(version=1, defaultLocalDir=str(local_dir))))
+    os.chmod(config_dir / "prefs.json", 0o600)
     mapping = {}
     def replace_once(content, before, after):
         if content.count(before) != 1:
             raise RuntimeError("integration overlay source no longer matches; isolation was not applied")
         return content.replace(before, after, 1)
 
-    for relative in ["internal/desktop/catalog_config.go", "internal/desktop/terminal_config.go", "internal/desktop/ssh_sessions.go"]:
+    for relative in ["internal/desktop/catalog_config.go", "internal/desktop/terminal_config.go"]:
         original = repo / relative
         content = replace_once(original.read_text(), "os.UserConfigDir()", "dockerIntegrationConfigDir()")
-        if relative.endswith("ssh_sessions.go"):
-            # This source uses os only for UserConfigDir; the overlay's helper replaces it.
-            content = content.replace('\n\t"os"', "")
         replacement = overlay_dir / original.name
         replacement.write_text(content)
         mapping[str(original)] = str(replacement)
     original = repo / "internal/desktop/app.go"
     replacement = overlay_dir / "app.go"
     replacement.write_text(replace_once(original.read_text(),
-        "func (a *app) view(c *ui.Context) {", "func (a *app) view(c *ui.Context) {\n dockerIntegrationApp = a"))
+        "func (a *app) view(c *ui.Context) {",
+        "func (a *app) view(c *ui.Context) {\n dockerIntegrationApp = a\n dockerIntegrationContext = c"))
     mapping[str(original)] = str(replacement)
-    original = repo / "internal/desktop/terminal.go"
-    replacement = overlay_dir / "terminal.go"
+    original = repo / "internal/desktop/ssh_terminal.go"
+    replacement = overlay_dir / "ssh_terminal.go"
     replacement.write_text(replace_once(original.read_text(),
-        'Label(h.name + " SSH 终端").Opacity(opacity)',
-        'Label(fmt.Sprintf("%s SSH 终端 #%d", h.name, session.id)).Opacity(opacity)'))
+        'Label(session.endpoint.name + " SSH 终端")',
+        'Label(fmt.Sprintf("%s SSH 终端 #%d", session.endpoint.name, session.id))'))
+    mapping[str(original)] = str(replacement)
+    original = repo / "internal/desktop/app_actions.go"
+    content = replace_once(original.read_text(), "menu := mygo.NewMenu([]*mygo.MenuItem{",
+                           "menu := mygo.NewMenu(dockerIntegrationMenu([]*mygo.MenuItem{")
+    content = replace_once(content, "\n\t})\n\tmygo.App.SetMenu(menu)", "\n\t}))\n\tmygo.App.SetMenu(menu)")
+    replacement = overlay_dir / "app_actions.go"
+    replacement.write_text(content)
+    mapping[str(original)] = str(replacement)
+
+    module = json.loads(subprocess.check_output(["go", "list", "-m", "-json", "github.com/egoist/mygo"],
+                                               cwd=repo, text=True))
+    if module.get("Version") != "v0.7.3":
+        raise RuntimeError("native integration isolation must be reviewed for the pinned MyGo version")
+    # Go disallows overlays beneath GOMODCACHE. Copy the pinned SDK unchanged
+    # into this run, then overlay its two isolation seams through a local modfile.
+    mygo_dir = Path(tempfile.mkdtemp(prefix="mygo-sdk-", dir=overlay_dir))
+    shutil.copytree(Path(module["Dir"]), mygo_dir, dirs_exist_ok=True)
+    modfile = (repo / "go.mod").read_text()
+    for module_name, relative in (("github.com/egoist/mygo/sshdesk-terminal", "third_party/mygo-terminal"),
+                                  ("github.com/pkg/sftp", "third_party/pkg-sftp")):
+        modfile = replace_once(modfile, "replace " + module_name + " => ./" + relative,
+                               "replace " + module_name + " => " + json.dumps(str(repo / relative)))
+    modfile += "\nreplace github.com/egoist/mygo => " + json.dumps(str(mygo_dir)) + "\n"
+    (overlay_dir / "integration.mod").write_text(modfile)
+    shutil.copyfile(repo / "go.sum", overlay_dir / "integration.sum")
+    # The fixed automation plugin formats keys on its socket goroutine. Pointer
+    # keys must expose identity, not race with layout or reveal pane contents.
+    original = mygo_dir / "plugins/automation/protocol.go"
+    content = replace_once(original.read_text(), '\n\t"strconv"', '\n\t"reflect"\n\t"strconv"')
+    content = replace_once(content, '\treturn fmt.Sprint(k)', '''\tvalue := reflect.ValueOf(k)
+    if value.Kind() == reflect.Pointer {
+        return fmt.Sprintf("%T@%x", k, value.Pointer())
+    }
+    return fmt.Sprint(k)''')
+    replacement = overlay_dir / "automation-protocol.go"
+    replacement.write_text(content)
+    mapping[str(original)] = str(replacement)
+    original = mygo_dir / "paths.go"
+    content = original.read_text()
+    if content.count("os.UserConfigDir()") != 4:
+        raise RuntimeError("MyGo configuration paths changed; isolation was not applied")
+    content = content.replace("os.UserConfigDir()", "dockerIntegrationUserConfigDir()")
+    content += '''
+func dockerIntegrationUserConfigDir() (string, error) {
+    root := os.Getenv("SSHDESK_INTEGRATION_CONFIG")
+    if !filepath.IsAbs(root) { return "", fmt.Errorf("isolated integration configuration is required") }
+    return root, nil
+}
+'''
+    replacement = overlay_dir / "mygo-paths.go"
+    replacement.write_text(content)
+    mapping[str(original)] = str(replacement)
+
+    # Native Keychain integration is deliberately excluded. Keep the public
+    # MyGo Secrets API and validation, replacing only its Darwin provider with
+    # a file store confined to this run so restart scenarios retain credentials.
+    original = mygo_dir / "internal/darwin/secrets.go"
+    replacement = overlay_dir / "mygo-secrets-darwin.go"
+    replacement.write_text(r'''//go:build darwin
+
+package darwin
+
+import (
+    "encoding/json"
+    "errors"
+    "fmt"
+    "os"
+    "path/filepath"
+    "sync"
+
+    "github.com/egoist/mygo/internal/platform"
+)
+
+type secrets struct{}
+var integrationSecretsMu sync.Mutex
+
+func integrationSecrets() (string, map[string][]byte, error) {
+    root := os.Getenv("SSHDESK_INTEGRATION_CONFIG")
+    if !filepath.IsAbs(root) { return "", nil, fmt.Errorf("isolated integration credential directory is required") }
+    name := filepath.Join(root, "integration-secrets.json")
+    values := map[string][]byte{}
+    data, err := os.ReadFile(name)
+    if errors.Is(err, os.ErrNotExist) { return name, values, nil }
+    if err != nil { return "", nil, err }
+    if err := json.Unmarshal(data, &values); err != nil { return "", nil, err }
+    if values == nil { return "", nil, errors.New("integration credential store is null") }
+    return name, values, nil
+}
+
+func writeIntegrationSecrets(name string, values map[string][]byte) (result error) {
+    data, err := json.Marshal(values)
+    if err != nil { return err }
+    defer clear(data)
+    file, err := os.CreateTemp(filepath.Dir(name), ".integration-secrets-*")
+    if err != nil { return err }
+    defer func() {
+        if err := os.Remove(file.Name()); err != nil && !errors.Is(err, os.ErrNotExist) { result = errors.Join(result, err) }
+    }()
+    _, writeErr := file.Write(data)
+    if err := errors.Join(writeErr, file.Sync(), file.Close()); err != nil { return err }
+    return os.Rename(file.Name(), name)
+}
+
+func (secrets) SetSecret(service, account string, secret []byte) error {
+    integrationSecretsMu.Lock()
+    defer integrationSecretsMu.Unlock()
+    name, values, err := integrationSecrets()
+    if err != nil { return err }
+    values[service+"\x00"+account] = append([]byte{}, secret...)
+    return writeIntegrationSecrets(name, values)
+}
+
+func (secrets) Secret(service, account string) ([]byte, error) {
+    integrationSecretsMu.Lock()
+    defer integrationSecretsMu.Unlock()
+    _, values, err := integrationSecrets()
+    if err != nil { return nil, err }
+    value, exists := values[service+"\x00"+account]
+    if !exists { return nil, platform.ErrSecretNotFound }
+    return append([]byte{}, value...), nil
+}
+
+func (secrets) DeleteSecret(service, account string) error {
+    integrationSecretsMu.Lock()
+    defer integrationSecretsMu.Unlock()
+    name, values, err := integrationSecrets()
+    if err != nil { return err }
+    key := service+"\x00"+account
+    if _, exists := values[key]; !exists { return nil }
+    delete(values, key)
+    return writeIntegrationSecrets(name, values)
+}
+''')
     mapping[str(original)] = str(replacement)
     original = repo / "main.go"
     replacement = overlay_dir / "main.go"
@@ -324,7 +575,10 @@ class Driver:
 
     def node(self, label, role=None):
         for node in self.nodes():
-            if node.get("label") == label and (role is None or node.get("role") == role):
+            matches = node.get("label") == label
+            if role == "listItem":
+                matches = matches or node.get("label", "").startswith(label + "，")
+            if matches and (role is None or node.get("role") == role):
                 return node
         return None
 
@@ -365,6 +619,11 @@ class Driver:
     def menu(self, name):
         self.call("menu", dict(path=["Integration", name]))
 
+    def quit(self):
+        locale = self.snapshot()["Locale"]
+        label = "退出SSH Desk" if locale == "zh-Hans" else "Quit SSH Desk"
+        self.call("menu", dict(path=["SSH Desk", label]))
+
     def snapshot(self):
         self.menu("Snapshot")
         return json.loads((self.task_dir / "native-observation.json").read_text())
@@ -377,7 +636,7 @@ class Driver:
 
     def state(self, state, count=1):
         def check():
-            if self.snapshot()["Section"] != 0 or self.node("打开文件会话", "button") is None:
+            if self.snapshot()["Section"] != 0:
                 return None
             sessions = self.sessions()
             return sessions if len(sessions) == count and all(s["State"] == state for s in sessions) else None
@@ -391,7 +650,7 @@ class Driver:
             sessions = state.get("Sessions") or []
             if any(s["State"] == 3 for s in sessions):
                 raise RuntimeError("a shared SSH shell failed to open")
-            if state["Section"] != 0 or self.node("打开文件会话", "button") is None:
+            if state["Section"] != 0:
                 return None
             return sessions if len(sessions) == count and all(s["State"] == 1 for s in sessions) else None
         return self.wait("shared SSH shells without authentication", check)
@@ -412,8 +671,8 @@ class Driver:
         self.call("act", dict(id=node["id"], action="setValue", text=value))
 
     def page(self, label, section):
-        self.click(label)
-        self.wait("selected page", lambda: self.snapshot()["Section"] == section)
+        self.key(("Cmd+Alt+1", "Cmd+Alt+2")[section])
+        self.wait("selected page " + label, lambda: self.snapshot()["Section"] == section)
 
     def profiles(self, section):
         return self.snapshot()["SSHProfiles" if section == 0 else "FileProfiles"]
@@ -435,7 +694,7 @@ class Driver:
             if state["Section"] != 1 or self.node("远程文件") is None:
                 return None
             tab = self.node(selected["Name"], "tab")
-            if tab is None or "checked" not in tab.get("states", []):
+            if tab is None or "selected" not in tab.get("states", []):
                 return None
             names = {e["Name"] for e in selected["Entries"] or []}
             return selected if expected is None or set(expected).issubset(names) else None
@@ -453,7 +712,7 @@ class Driver:
 
     def open_directory(self, name):
         try:
-            item = self.wait("remote directory " + name, lambda: self.node(name, "listItem"))
+            item = self.wait("remote directory " + name, lambda: self.node(name, "listItem") or self.node(name, "row"))
         except RuntimeError:
             state = self.snapshot()
             file = self.file()
@@ -472,12 +731,16 @@ class Driver:
     def close_file_tab(self, name):
         self.window_focused()
         self.call("idle", dict(timeout=5000))
-        self.wait("file workspace before close", lambda: self.snapshot()["Section"] == 1 and self.node("打开 SSH 会话", "button") is not None)
+        self.wait("file workspace before close", lambda: self.snapshot()["Section"] == 1)
         tab = self.wait("file tab", lambda: self.node(name, "tab"))
         bounds = tab["bounds"]
         before = self.snapshot()["FileTabs"]
         self.input(dict(type="click", x=bounds["x"] + bounds["width"] - 16,
                         y=bounds["y"] + bounds["height"] / 2))
+        self.wait("file close confirmation or removal", lambda: self.snapshot()["FileTabs"] == before - 1
+                  or self.node("关闭选项卡", "button"))
+        if self.node("关闭选项卡", "button"):
+            self.click("关闭选项卡")
         try:
             self.wait("closed file tab", lambda: self.snapshot()["FileTabs"] == before - 1)
         except RuntimeError:
@@ -487,32 +750,32 @@ class Driver:
             raise
 
     def select_protocol(self, protocol):
-        trigger = self.wait("protocol selector", lambda: next((n for n in self.nodes()
-                            if n.get("value") == "SFTP" and "press" in n.get("actions", [])), None))
-        self.call("act", dict(id=trigger["id"], action="focus"))
-        self.key("Down")
-        self.key("End" if protocol == "FTP" else "Home")
-        self.key("Enter")
+        trigger = self.wait("protocol selector " + protocol, lambda: next((n for n in self.nodes()
+                            if n.get("label") == protocol and "press" in n.get("actions", [])), None))
+        self.call("act", dict(id=trigger["id"], action="press"))
 
     def create_file_site(self, name, protocol, address):
         self.page("SFTP / FTP", 1)
         self.menu("Create catalog record")
         self.select_protocol(protocol)
         host, port = address.rsplit(":", 1)
-        for label, value in (("名称", name), ("主机地址", host.strip("[]")), ("用户名", "sshdesk"), ("端口", port)):
+        for label, value in (("名称", name), ("主机", host.strip("[]")), ("用户名", "sshdesk"), ("端口", port)):
             self.fill(label, value)
-        self.click("添加")
+        self.click("仅保存")
         self.wait("saved file site", lambda: any(p["Name"] == name and p["Protocol"] == protocol.lower() for p in self.profiles(1)))
 
-    def read_only_file_controls(self):
-        for label in ("上传文件暂未开放", "新建文件夹暂未开放", "本地面板暂未开放"):
-            node = self.wait("read-only control " + label, lambda: self.node(label))
-            if "disabled" not in node.get("states", []):
-                raise RuntimeError("a write or local-file control is available during read-only browsing")
+    def writable_file_controls(self):
+        for label in ("上传文件", "新建文件夹"):
+            node = self.wait("file operation control " + label, lambda: self.node(label))
+            if "disabled" in node.get("states", []):
+                raise RuntimeError("a writable fixture directory disabled " + label)
+        before = self.snapshot()
         self.key("Cmd+Shift+L")
-        state = self.snapshot()
-        if state["LocalOpen"] or state["Transfers"]:
-            raise RuntimeError("read-only file browsing opened local files or generated a transfer task")
+        self.wait("local panel shortcut", lambda: self.snapshot()["LocalOpen"] != before["LocalOpen"])
+        self.key("Cmd+Shift+L")
+        self.wait("local panel restored", lambda: self.snapshot()["LocalOpen"] == before["LocalOpen"])
+        if self.snapshot()["Transfers"] != before["Transfers"]:
+            raise RuntimeError("toggling the local panel unexpectedly created a transfer task")
 
     def browse_directories(self):
         initial = self.files_ready({"hello.txt", "你好.txt", "nested", "denied"})
@@ -535,126 +798,12 @@ class Driver:
             raise RuntimeError("directory permission error is missing from the actual UI")
         self.click("刷新")
         self.files_ready({"hello.txt", "nested"})
-        self.read_only_file_controls()
+        self.writable_file_controls()
         return initial["Path"]
 
     def run_file_protocols(self):
-        password = (self.task_dir / "password").read_text().strip()
-        ftp_fixture = json.loads((self.task_dir / "ftp-server.json").read_text())
-        if (not ftp_fixture["container"].startswith("sshdesk-ftp-integration-")
-                or ftp_fixture["address"].rsplit(":", 1)[0] not in ("127.0.0.1", "localhost", "[::1]")):
-            raise RuntimeError("FTP fixture metadata must identify the disposable local server")
-        self.ftp_container = ftp_fixture["container"]
-        saved_files = self.catalog_state(1)
-        saved_ssh = self.catalog_state(0)
-
-        self.open_host("Docker Password")
-        self.secret("输入 SSH 密码", password)
-        self.click("信任并连接")
-        source = self.state(1)[0]
-        self.shell_ready()
-        transport_before = self.server_connections()
-        self.click("打开文件会话")
-        files = self.files_ready({"hello.txt", "你好.txt", "nested", "denied"}, no_auth=True)
-        if (not files["Temporary"] or files["Connection"] != source["Connection"]
-                or self.server_connections() != transport_before or self.catalog_state(1) != saved_files):
-            raise RuntimeError("SSH to SFTP did not reuse the source connection without changing saved sites")
-        linked_file = files["ID"]
-        self.browse_directories()
-        self.click("打开 SSH 会话")
-        self.wait("original SSH view", lambda: self.snapshot()["Section"] == 0 and (self.focused() or {}).get("ID") == source["ID"])
-        self.click("打开文件会话")
-        files = self.files_ready({"hello.txt", "nested"}, no_auth=True)
-        if files["ID"] != linked_file or self.snapshot()["FileTabs"] != 1:
-            raise RuntimeError("repeated SSH/SFTP shortcuts created duplicate target views")
-        self.click("打开 SSH 会话")
-        self.close_tab()
-        self.page("SFTP / FTP", 1)
-        self.click("刷新")
-        self.files_ready({"hello.txt", "nested"}, no_auth=True)
-        if self.server_connections() != transport_before:
-            raise RuntimeError("closing every SSH pane disconnected or reauthenticated the surviving SFTP view")
-        self.click("打开 SSH 会话")
-        reopened = self.shared_shells(1)[0]
-        if reopened["ID"] == source["ID"] or reopened["Connection"] != source["Connection"]:
-            raise RuntimeError("SFTP did not open a fresh shell on its existing connection")
-        self.shell_ready()
-        self.command("printf '\\n%s\\n' SSHDESK_SFTP_SURVIVOR")
-        self.output("\nSSHDESK_SFTP_SURVIVOR\n")
-        self.click("打开文件会话")
-        self.close_file_tab("Docker Password")
-        self.page("SSH", 0)
-        self.focus_terminal()
-        self.command("printf '\\n%s\\n' SSHDESK_SHELL_SURVIVOR")
-        self.output("\nSSHDESK_SHELL_SURVIVOR\n")
-        self.close_tab()
-        self.wait("last shared consumer released", lambda: self.server_connections()[1] == 0)
-        print("PASS native files: SSH/SFTP shortcuts, one transport, independent close and read-only navigation")
-
-        self.create_file_site("Docker Saved SFTP", "SFTP", os.environ["SSHDESK_TEST_ADDRESS"])
-        if self.catalog_state(0) != saved_ssh:
-            raise RuntimeError("saving an SFTP site added or changed SSH records")
-        self.open_host("Docker Saved SFTP")
-        standalone = self.files_ready({"hello.txt", "nested"}, no_auth=True)
-        if standalone["Temporary"]:
-            raise RuntimeError("a saved SFTP site opened as a temporary site")
-        standalone_before = self.server_connections()
-        self.click("打开 SSH 会话")
-        shell = self.shared_shells(1)[0]
-        if shell["Connection"] != standalone["Connection"] or self.catalog_state(0) != saved_ssh:
-            raise RuntimeError("standalone SFTP to SSH created a new connection or saved host")
-        self.shell_ready()
-        self.command("printf '\\n%s\\n' SSHDESK_STANDALONE_SFTP")
-        self.output("\nSSHDESK_STANDALONE_SFTP\n")
-        if self.server_connections() != standalone_before:
-            raise RuntimeError("opening SSH from a saved SFTP site repeated authentication")
-        self.close_tab("Docker Saved SFTP")
-        self.page("SFTP / FTP", 1)
-        self.click("刷新")
-        self.files_ready({"hello.txt", "nested"}, no_auth=True)
-        self.close_file_tab("Docker Saved SFTP")
-        self.wait("standalone SFTP released", lambda: self.server_connections()[1] == 0)
-        print("PASS native files: independently saved SFTP site and temporary SSH view")
-
-        self.page("SSH", 0)
-        self.open_host("Docker Password")
-        self.secret("输入 SSH 密码", password)
-        target = self.state(1)[0]
-        self.shell_ready()
-        ssh_before_ftp = self.server_connections()
-        self.create_file_site("Docker FTP", "FTP", ftp_fixture["address"])
-        if self.catalog_state(0) != saved_ssh:
-            raise RuntimeError("saving an FTP site changed the SSH catalog")
-        self.open_host("Docker FTP")
-        self.secret("输入 FTP 密码", password + "-invalid")
-        self.wait("wrong FTP password failure", lambda: (self.file() or {}).get("State") == 3)
-        self.close_file_tab("Docker FTP")
-        self.open_host("Docker FTP")
-        self.secret("输入 FTP 密码", password)
-        ftp = self.files_ready({"hello.txt", "你好.txt", "nested", "denied"})
-        if ftp["Protocol"] != "ftp" or ftp["Connection"] != 0:
-            raise RuntimeError("ordinary FTP was incorrectly attached to an SSH connection")
-        self.browse_directories()
-        self.click("打开 SSH 会话")
-        profile = next(p for p in self.profiles(0) if p["Name"] == "Docker Password")
-        choice = profile["Name"] + " · " + profile["User"] + "@" + profile["Address"] + ":" + str(profile["Port"])
-        self.click(choice)
-        self.wait("existing FTP-linked SSH view", lambda: self.snapshot()["Section"] == 0 and (self.focused() or {}).get("ID") == target["ID"])
-        if self.snapshot()["Prompts"] or self.server_connections() != ssh_before_ftp:
-            raise RuntimeError("FTP shortcut did not reuse the selected existing SSH view")
-        self.click("打开文件会话")
-        returned = self.files_ready({"hello.txt", "nested"})
-        if returned["ID"] != ftp["ID"] or returned["Protocol"] != "ftp":
-            raise RuntimeError("SSH shortcut did not return to its existing linked FTP view")
-        self.page("SSH", 0)
-        self.close_tab()
-        self.page("SFTP / FTP", 1)
-        self.click("刷新")
-        self.files_ready({"hello.txt", "nested"})
-        if self.server_connections()[1] != 0 or self.established_connections(self.ftp_container, 21) != 1:
-            raise RuntimeError("FTP and SSH connection lifetimes were not independent")
-        print("PASS native files: FTP login, permission errors, read-only browsing and explicit SSH target reuse")
-        self.menu("Quit")
+        from ssh_e2e_scenarios import run_file_browsing
+        run_file_browsing(self)
 
     def run_concurrent_split(self):
         password = (self.task_dir / "password").read_text().strip()
@@ -696,19 +845,24 @@ class Driver:
 
     def catalog_state(self, section):
         state = self.snapshot()
-        return (state["SSHProfiles"], state["SSHGroups"]) if section == 0 else (state["FileProfiles"], state["FileGroups"])
+        profiles = state["SSHProfiles" if section == 0 else "FileProfiles"]
+        identities = {profile["ID"]: profile["UUID"] for profile in state["SSHProfiles"] + state["FileProfiles"]}
+        groups = state["SSHGroups" if section == 0 else "FileGroups"]
+        # Array indices compact after deletion; persistent UUIDs define identity.
+        return ([{key: value for key, value in profile.items() if key != "ID"} for profile in profiles],
+                [dict(group, Hosts=[identities[index] for index in group["Hosts"] or []]) for group in groups])
 
     def add_catalog_record(self, name):
         self.menu("Create catalog record")
         host, port = os.environ["SSHDESK_TEST_ADDRESS"].rsplit(":", 1)
-        for label, value in (("名称", name), ("主机地址", host.strip("[]")), ("用户名", "sshdesk"), ("端口", port)):
+        for label, value in (("名称", name), ("主机", host.strip("[]")), ("用户名", "sshdesk"), ("端口", port)):
             self.fill(label, value)
-        self.click("添加")
+        self.click("仅保存")
 
     def delete_catalog_fixture(self):
         self.menu("Delete catalog fixture")
         def button():
-            return next((n for n in self.nodes() if n.get("role") == "button" and n.get("label") in ("删除主机", "删除站点")), None)
+            return next((n for n in self.nodes() if n.get("role") == "button" and n.get("label") == "删除"), None)
         target = self.wait("catalog delete confirmation", button)
         self.call("act", dict(id=target["id"], action="press"))
 
@@ -727,7 +881,7 @@ class Driver:
             raise RuntimeError("adding an SSH host changed the file catalog")
         self.menu("Edit catalog fixture")
         self.fill("名称", "Docker SSH Renamed")
-        self.fill("主机地址", "127.0.0.2")
+        self.fill("主机", "127.0.0.2")
         self.click("保存")
         self.wait("saved SSH edit", lambda: next(p for p in self.profiles(0) if p["ID"] == 0)["Name"] == "Docker SSH Renamed")
         if self.catalog_state(1) != before_file_catalog:
@@ -736,14 +890,10 @@ class Driver:
         if any(s["Name"] != original["Name"] or s["Address"] != original["Address"] for s in self.sessions()):
             raise RuntimeError("editing a catalog record changed an already connected session identity")
         self.delete_catalog_fixture()
-        self.wait("deleted SSH record", lambda: all(p["ID"] != 0 for p in self.profiles(0)))
-        self.state(1)
+        self.wait("deleted SSH record", lambda: all(p["UUID"] != original["UUID"] for p in self.profiles(0)))
+        self.wait("deleted site's sessions closed", lambda: not self.sessions())
         if self.catalog_state(1) != before_file_catalog:
             raise RuntimeError("deleting an SSH host changed the file catalog")
-        self.focus_terminal()
-        self.command("printf '\\n%s\\n' SSHDESK_AFTER_CATALOG_DELETE")
-        self.output("\nSSHDESK_AFTER_CATALOG_DELETE\n")
-        self.close_tab()
 
         self.page("SFTP / FTP", 1)
         if self.snapshot()["FileTabs"]:
@@ -751,12 +901,13 @@ class Driver:
         stable_ssh = self.catalog_state(0)
         self.add_catalog_record("Docker File Only")
         self.wait("saved file-only record", lambda: len(self.profiles(1)) == len(before_files) + 1)
+        file_uuid = before_files[0]["UUID"]
         self.menu("Edit catalog fixture")
         self.fill("名称", "Docker File Renamed")
         self.click("保存")
-        self.wait("saved file edit", lambda: next(p for p in self.profiles(1) if p["ID"] == 0)["Name"] == "Docker File Renamed")
+        self.wait("saved file edit", lambda: next(p for p in self.profiles(1) if p["UUID"] == file_uuid)["Name"] == "Docker File Renamed")
         self.delete_catalog_fixture()
-        self.wait("deleted file record", lambda: all(p["ID"] != 0 for p in self.profiles(1)))
+        self.wait("deleted file record", lambda: all(p["UUID"] != file_uuid for p in self.profiles(1)))
         if self.catalog_state(0) != stable_ssh:
             raise RuntimeError("file catalog operations changed the SSH catalog")
         self.page("SSH", 0)
@@ -782,13 +933,14 @@ class Driver:
         self.call("act", dict(id=node["id"], action="setValue", text=value))
         self.click("连接")
 
-    def focus_terminal(self, host="Docker Password"):
-        target = self.focused()
+    def focus_terminal(self, host="Docker Password", session_id=None):
+        target = self.focused() if session_id is None else next(s for s in self.sessions() if s["ID"] == session_id)
         expected = host + " SSH 终端 #" + str(target["ID"]) if target else ""
         candidates = [n for n in self.nodes() if n.get("label") == expected and "focus" in n.get("actions", [])]
         if not candidates:
             raise RuntimeError("terminal focus target missing")
         self.call("act", dict(id=candidates[-1]["id"], action="focus"))
+        self.wait("terminal focus identity", lambda: (self.focused() or {}).get("ID") == target["ID"])
 
     def command(self, command):
         self.text(command)
@@ -806,12 +958,17 @@ class Driver:
         # and a 16 DIP icon, as the current tab tokens specify.
         self.window_focused()
         self.call("idle", dict(timeout=5000))
-        self.wait("SSH workspace before close", lambda: self.node("打开文件会话", "button") is not None)
+        self.wait("SSH workspace before close", lambda: self.snapshot()["Section"] == 0)
         tab = self.wait("active tab", lambda: self.node(host, "tab"))
         bounds = tab["bounds"]
+        before = self.snapshot()["Tabs"]
         self.input(dict(type="click", x=bounds["x"] + bounds["width"] - 16,
                         y=bounds["y"] + bounds["height"] / 2))
-        self.wait("closed tab", lambda: not self.sessions())
+        self.wait("SSH close confirmation or removal", lambda: self.snapshot()["Tabs"] == before - 1
+                  or self.node("关闭选项卡", "button"))
+        if self.node("关闭选项卡", "button"):
+            self.click("关闭选项卡")
+        self.wait("closed tab", lambda: self.snapshot()["Tabs"] == before - 1)
 
     def check_grid(self):
         def settled():
@@ -827,12 +984,12 @@ class Driver:
         password = (self.task_dir / "password").read_text().strip()
         passphrase = (self.task_dir / "key_passphrase").read_text().strip()
         initial = self.snapshot()
-        if initial["CatalogVersion"] != 2 or len(initial["SSHProfiles"]) != 4 or len(initial["FileProfiles"]) != 4:
-            raise RuntimeError("legacy fixture catalog did not migrate to two independent v2 catalogs")
+        if initial["CatalogVersion"] != 1 or len(initial["SSHProfiles"]) != 4 or len(initial["FileProfiles"]) != 4:
+            raise RuntimeError("legacy fixture did not migrate to independent SSH and file sessions")
         backup = json.loads((self.config_root / "SSH Desk/catalog.json.v1.bak").read_text())
         if len(backup.get("hosts", [])) != 4 or backup.get("version", 0) != 0:
             raise RuntimeError("legacy catalog backup was not preserved")
-        print("PASS native UI: legacy catalog migration")
+        print("PASS native UI: legacy catalog migration to sessions v1")
         self.open_host("Docker Password")
         self.secret("输入 SSH 密码", password)
         self.wait("first host trust", lambda: self.node("信任并连接", "button"))
@@ -897,14 +1054,14 @@ class Driver:
                 or [s["ID"] for s in default_sessions if "\n" + default_marker + "\n" in s["Text"]] != [new_id]):
             raise RuntimeError("new split did not own the default keyboard focus")
         print("PASS native UI: new split owns default keyboard focus")
-        self.key("Cmd+2")
+        self.focus_terminal(session_id=new_id)
         self.call("idle", dict(timeout=5000))
         self.command("printf '\\n__NEW_VAR__%s__END__\\n' \"${SSHDESK_UI_VARIABLE-unset}\"")
         self.output("\n__NEW_VAR__unset__END__\n")
-        self.key("Cmd+1")
+        self.focus_terminal(session_id=min(s["ID"] for s in split_sessions))
         self.command("printf '\\n__OLD_VAR__%s__END__\\n' \"${SSHDESK_UI_VARIABLE-unset}\"")
         self.output("\n__OLD_VAR__alpha__END__\n")
-        self.key("Cmd+2")
+        self.focus_terminal(session_id=new_id)
         split_grid = self.check_grid()
         if original_grid == split_grid:
             raise RuntimeError("split did not change the terminal grid")
@@ -916,6 +1073,7 @@ class Driver:
             raise RuntimeError("close pane button missing")
         button = max(buttons, key=lambda n: n["bounds"]["x"])
         self.call("act", dict(id=button["id"], action="press"))
+        self.click("关闭窗格")
         self.shared_shells(1)
         if self.server_connections() != connections_before_split:
             raise RuntimeError("closing one pane changed the surviving shared transport")
@@ -947,7 +1105,8 @@ class Driver:
 
         for host, value in [("Docker Plain Key", ""), ("Docker Encrypted Key", passphrase)]:
             self.open_host(host)
-            self.secret("私钥口令（未加密可留空）", value)
+            if value:
+                self.secret("输入私钥口令", value)
             self.state(1)
             self.focus_terminal(host)
             self.command("printf '\\n%s\\n' SSHDESK_KEY_OK")
@@ -964,52 +1123,22 @@ class Driver:
         self.menu("Quit")
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--prepare-only", action="store_true")
-    modes = parser.add_mutually_exclusive_group()
-    modes.add_argument("--file-protocols", action="store_true", help="run only the SFTP/FTP native UI checks")
-    modes.add_argument("--concurrent-split", action="store_true", help="run only simultaneous shared-shell requests")
-    args = parser.parse_args()
-    repo = Path(__file__).resolve().parents[1]
-    task_dir = Path(os.environ["SSHDESK_TEST_DIR"]).resolve()
-    if not args.prepare_only:
-        ensure_unlocked()
-    overlay, config_root = prepare(repo, task_dir, os.environ["SSHDESK_TEST_ADDRESS"])
-    if args.prepare_only:
-        print(overlay)
-        return
-    binary = task_dir / "sshdesk-native-integration"
-    env = dict(os.environ, SSHDESK_INTEGRATION_CONFIG=str(config_root), MYGO_AUTOMATION=str(task_dir / "native.sock"))
-    env.setdefault("GOCACHE", "/private/tmp/sshdesk-go-cache")
-    subprocess.run(["go", "build", "-race", "-overlay", str(overlay), "-o", str(binary), "."], cwd=repo, env=env, check=True)
-    # AppKit needs a proper bundle to register/focus a native window reliably.
-    # Reuse only the packaging resources; the executable is the overlay build.
-    bundle = task_dir / ("SSH Desk Integration " + str(os.getpid()) + ".app")
-    shutil.copytree(repo / "build/darwin-arm64/SSH Desk.app", bundle)
-    info_path = bundle / "Contents/Info.plist"
-    info = plistlib.loads(info_path.read_bytes())
-    info["CFBundleIdentifier"] = "dev.sshdesk.integration." + str(os.getpid())
-    info["CFBundleName"] = "SSH Desk Integration"
-    info_path.write_bytes(plistlib.dumps(info))
-    launch_binary = bundle / "Contents/MacOS" / info["CFBundleExecutable"]
-    shutil.copy2(binary, launch_binary)
-    subprocess.run(["codesign", "--force", "--deep", "--sign", "-", str(bundle)],
-                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
-    with isolated_agent(task_dir) as agent_socket, (task_dir / "native-app.log").open("w") as log:
-        env["SSH_AUTH_SOCK"] = agent_socket
-        launch = ["/usr/bin/open", "-n", "-W", "-a", str(bundle), "--stdout", str(task_dir / "native-app.log"),
-                  "--stderr", str(task_dir / "native-app.log")]
-        for key in ("SSHDESK_INTEGRATION_CONFIG", "MYGO_AUTOMATION", "SSHDESK_TEST_DIR", "SSH_AUTH_SOCK"):
-            launch += ["--env", key + "=" + env[key]]
+@contextmanager
+def native_window(repo, bundle, env, config_root, run_dir, phase):
+    log_path = run_dir / ("native-app-" + str(phase) + ".log")
+    status_path = config_root / "app-exit-status"
+    status_path.write_text("pending")
+    launch = ["/usr/bin/open", "-n", "-W", "-a", str(bundle), "--stdout", str(log_path), "--stderr", str(log_path)]
+    for key in ("SSHDESK_INTEGRATION_CONFIG", "MYGO_AUTOMATION", "SSHDESK_TEST_DIR", "SSH_AUTH_SOCK"):
+        launch += ["--env", key + "=" + env[key]]
+    with log_path.open("w") as log:
         app = subprocess.Popen(launch, cwd=repo, env=env, stdout=log, stderr=log)
-        print("Native test bundle: " + str(bundle), flush=True)
         try:
             end = time.monotonic() + 30
             connection = None
             while time.monotonic() < end:
                 if app.poll() is not None:
-                    raise RuntimeError("native integration application exited before connecting")
+                    raise RuntimeError("native integration application exited before connecting; log: " + str(log_path))
                 try:
                     connection = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
                     connection.settimeout(20)
@@ -1020,36 +1149,34 @@ def main():
                     connection = None
                     time.sleep(0.05)
             if connection is None:
-                raise RuntimeError("native automation socket did not start")
+                raise RuntimeError("native automation socket did not start; log: " + str(log_path))
             with connection:
-                driver = Driver(connection, task_dir, config_root)
-                driver.wait("native window", lambda: driver.call("windows").get("windows"))
-                driver.wait("native view", lambda: driver.node("Docker Password", "listItem"))
-                driver.menu("Focus window")
-                def focused_window():
-                    if any(w.get("focused") for w in driver.call("windows").get("windows", [])):
-                        return True
+                driver = Driver(connection, Path(env["SSHDESK_TEST_DIR"]), config_root)
+                try:
+                    driver.wait("native window", lambda: driver.call("windows").get("windows"))
+                    driver.wait("native view", lambda: driver.node("Docker Password", "listItem"))
                     driver.menu("Focus window")
-                    return False
-                driver.wait("focused native window", focused_window, timeout=60)
-                if args.file_protocols:
-                    driver.run_file_protocols()
-                elif args.concurrent_split:
-                    driver.run_concurrent_split()
-                else:
-                    driver.run()
-            if app.wait(timeout=10) != 0:
-                raise RuntimeError("native integration application returned an error")
-            if (config_root / "app-exit-status").read_text() != "ok":
-                raise RuntimeError("native application did not complete cleanly")
-            native_log = (task_dir / "native-app.log").read_text()
-            if "WARNING: DATA RACE" in native_log:
-                raise RuntimeError("Go race detector reported a native integration race")
-            driver.wait("SSH transports released after application exit", lambda: driver.server_connections()[1] == 0, timeout=5)
-            if args.file_protocols:
-                driver.wait("FTP transport released after application exit",
-                            lambda: driver.established_connections(driver.ftp_container, 21) == 0, timeout=5)
-            print("PASS native UI: last consumer and application exit release the transport")
+                    driver.wait("focused native window", lambda: any(w.get("focused") for w in driver.call("windows").get("windows", [])))
+                    yield driver
+                except Exception:
+                    # Preserve labels and read-only state, never text-field values.
+                    try:
+                        diagnosis = dict(state=driver.snapshot(), nodes=[
+                            {key: node[key] for key in ("id", "parent", "role", "label", "states", "bounds") if key in node}
+                            for node in driver.nodes()])
+                        path = run_dir / ("failure-" + str(phase) + ".json")
+                        path.write_text(json.dumps(diagnosis, indent=2))
+                        os.chmod(path, 0o600)
+                        print("Native failure state: " + str(path), flush=True)
+                    except Exception as diagnostic_error:
+                        print("Native failure state unavailable: " + type(diagnostic_error).__name__, file=sys.stderr)
+                    raise
+                finally:
+                    driver.reader.close()
+            if app.wait(timeout=15) != 0 or status_path.read_text() != "ok":
+                raise RuntimeError("native application did not complete cleanly; log: " + str(log_path))
+            if "WARNING: DATA RACE" in log_path.read_text():
+                raise RuntimeError("Go race detector reported a native integration race; log: " + str(log_path))
         finally:
             if app.poll() is None:
                 pid_path = config_root / "app.pid"
@@ -1062,7 +1189,81 @@ def main():
                     app.wait(timeout=5)
                 except subprocess.TimeoutExpired:
                     app.terminate()
-                    app.wait()
+                    app.wait(timeout=5)
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--prepare-only", action="store_true")
+    modes = parser.add_mutually_exclusive_group()
+    modes.add_argument("--file-protocols", action="store_true", help="run only the SFTP/FTP native UI checks")
+    modes.add_argument("--concurrent-split", action="store_true", help="run only simultaneous shared-shell requests")
+    modes.add_argument("--core-e2e", action="store_true", help="run real UI transfers, drag lifecycle and restart recovery")
+    args = parser.parse_args()
+    repo = Path(__file__).resolve().parents[1]
+    task_dir = Path(os.environ["SSHDESK_TEST_DIR"]).resolve()
+    if not args.prepare_only:
+        ensure_unlocked()
+    overlay, config_root = prepare(repo, task_dir, os.environ["SSHDESK_TEST_ADDRESS"])
+    if args.prepare_only:
+        print(overlay)
+        return
+    run_dir = Path(tempfile.mkdtemp(prefix="native-run-", dir=task_dir))
+    binary = run_dir / "sshdesk-native-integration"
+    env = dict(os.environ, SSHDESK_INTEGRATION_CONFIG=str(config_root), MYGO_AUTOMATION=str(run_dir / "native.sock"))
+    env.setdefault("GOCACHE", "/private/tmp/sshdesk-go-cache")
+    subprocess.run(["go", "build", "-race", "-modfile", str(overlay.parent / "integration.mod"),
+                    "-overlay", str(overlay), "-o", str(binary), "."], cwd=repo, env=env, check=True)
+    # AppKit needs a proper bundle to register/focus a native window reliably.
+    # Reuse only the packaging resources; the executable is the overlay build.
+    bundle = run_dir / "SSH Desk Integration.app"
+    shutil.copytree(repo / "build/darwin-arm64/SSH Desk.app", bundle)
+    info_path = bundle / "Contents/Info.plist"
+    info = plistlib.loads(info_path.read_bytes())
+    info["CFBundleIdentifier"] = "dev.sshdesk.integration." + str(os.getpid())
+    info["CFBundleName"] = "SSH Desk Integration"
+    info_path.write_bytes(plistlib.dumps(info))
+    launch_binary = bundle / "Contents/MacOS" / info["CFBundleExecutable"]
+    shutil.copy2(binary, launch_binary)
+    subprocess.run(["codesign", "--force", "--deep", "--sign", "-", str(bundle)],
+                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+    mode = "core-e2e" if args.core_e2e else "file-protocols" if args.file_protocols else "concurrent-split" if args.concurrent_split else "terminal"
+    report = dict(mode=mode, status="failed", phases=[], configuration=str(config_root), bundle=str(bundle))
+    print("Native test bundle: " + str(bundle), flush=True)
+    try:
+        with isolated_agent(task_dir) as agent_socket:
+            env["SSH_AUTH_SOCK"] = agent_socket
+            recovery = None
+            for phase in range(1, 3 if args.core_e2e else 2):
+                with native_window(repo, bundle, env, config_root, run_dir, phase) as driver:
+                    if args.core_e2e:
+                        from ssh_e2e_scenarios import run_core, run_core_recovered
+                        if phase == 1:
+                            recovery = run_core(driver)
+                        else:
+                            run_core_recovered(driver, recovery)
+                    elif args.file_protocols:
+                        driver.run_file_protocols()
+                    elif args.concurrent_split:
+                        driver.run_concurrent_split()
+                    else:
+                        driver.run()
+                driver.wait("SSH transports released after application exit", lambda: driver.server_connections()[1] == 0, timeout=5)
+                if args.file_protocols or args.core_e2e:
+                    ftp_fixture = json.loads((task_dir / "ftp-server.json").read_text())
+                    driver.wait("FTP transport released after application exit",
+                                lambda: driver.established_connections(ftp_fixture["container"], 21) == 0, timeout=5)
+                report["phases"].append(dict(phase=phase, status="passed", clean_exit=True, race_free=True, transports_released=True))
+                print("PASS native UI: phase " + str(phase) + " exits cleanly and releases all transports", flush=True)
+        report["status"] = "passed"
+    except Exception as error:
+        report["error"] = type(error).__name__ + ": " + str(error)
+        raise
+    finally:
+        result_path = run_dir / "result.json"
+        result_path.write_text(json.dumps(report, indent=2) + "\n")
+        os.chmod(result_path, 0o600)
+        print("Native test report: " + str(result_path), flush=True)
 
 
 if __name__ == "__main__":

@@ -180,6 +180,8 @@ func appendSessionLines(session *remoteSession, lines ...terminalLine) {
 
 func (a *app) focusSession(tab *workspaceTab, session *remoteSession) {
 	tab.focused = session
+	// The target may still be waiting for its terminal view to be created.
+	session.focusPending = true
 	session.focus.Focus()
 	session.markViewed()
 }
