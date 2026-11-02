@@ -1409,7 +1409,7 @@ type PaneTokens struct {
 	EmptyTitleSize      float32       // ← size.emptyPaneTitleSize
 	EmptyTitleWeight    int           // ← font.weight.emptyPaneTitle
 	ContentTop          float32       // ← space.10
-	ContentSide         float32       // ← space.14
+	ContentSide         float32       // ← space.8
 	ContentBottom       float32       // ← size.terminalContentBottom
 	ActionTop           float32       // ← space.6
 	ActionRight         float32       // ← space.8
@@ -3816,7 +3816,7 @@ func buildComponents(s *Semantic) Components {
 			EmptyTitleSize:      s.Size.EmptyPaneTitleSize,
 			EmptyTitleWeight:    s.Font.Weight.EmptyPaneTitle,
 			ContentTop:          s.Space.N10,
-			ContentSide:         s.Space.N14,
+			ContentSide:         s.Space.N8,
 			ContentBottom:       s.Size.TerminalContentBottom,
 			ActionTop:           s.Space.N6,
 			ActionRight:         s.Space.N8,

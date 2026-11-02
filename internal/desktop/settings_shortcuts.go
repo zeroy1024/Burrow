@@ -14,7 +14,7 @@ type shortcutAction struct{ id, label, group, binding string }
 
 var defaultShortcutActions = []shortcutAction{
 	{"session.new", "新建会话", "会话", "Cmd+N"},
-	{"tab.close", "关闭选项卡", "会话", "Cmd+W"},
+	{"tab.close", "关闭分屏或选项卡", "会话", "Cmd+W"},
 	{"tab.reopen", "重新打开关闭的选项卡", "会话", "Cmd+Shift+T"},
 	{"tab.select.1", "切换到第 1 个分屏或选项卡", "会话", "Cmd+1"},
 	{"tab.select.2", "切换到第 2 个分屏或选项卡", "会话", "Cmd+2"},

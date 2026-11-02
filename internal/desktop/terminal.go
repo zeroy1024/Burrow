@@ -141,7 +141,7 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 	h := session.endpoint
 	count := tab.root.count()
 	multiple := count > 1
-	contentGap := t.Space.N4
+	contentGap := p.ContentSide
 	topPadding := contentGap
 	bottomPadding := status.HeightPane + contentGap
 	if multiple {
@@ -225,6 +225,12 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 					}))
 				}
 				output.Children(func() {
+					hasOutput := len(session.transcript) > 0 || len(session.output) > 0
+					if session.state == disconnected && !hasOutput {
+						ui.Text(c, localize(c, "会话已恢复，尚未连接。")).
+							TextColor(uikit.Color(colors.Foreground)).FixedLineHeight(prefs.LineHeight)
+						return
+					}
 					a.terminalLines(c, session, focused)
 				})
 				terminalScrollbar(c, card, output, scroll, terminalBackground)
@@ -275,9 +281,10 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 				if !multiple {
 					uikit.PaneActionBackdrop(c, actionsWidth, a.glassRadius(c, p.ActionBlur), background, surface)
 				}
-				splitShortcut := ""
+				splitShortcut, closeShortcut := "", ""
 				if focused {
 					splitShortcut = shortcutDisplay(a.shortcutBinding("pane.split"))
+					closeShortcut = shortcutDisplay(a.shortcutBinding("tab.close"))
 				}
 				split := uikit.PaneIconButton(c, "分栏 "+h.name, splitIcon, surface, uikit.PaneIconButtonProps{
 					Shortcut: splitShortcut,
@@ -298,7 +305,9 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 					expand.OnClick(func() {
 						a.togglePaneZoom(tab, session)
 					})
-					close := uikit.PaneIconButton(c, "关闭窗格 "+h.name, closeIcon, surface).Absolute().Top(0).Left(2*(p.ActionWidth+p.ActionGap)).Size(p.ActionWidth, p.ActionHeight)
+					close := uikit.PaneIconButton(c, "关闭窗格 "+h.name, closeIcon, surface, uikit.PaneIconButtonProps{
+						Shortcut: closeShortcut,
+					}).Absolute().Top(0).Left(2*(p.ActionWidth+p.ActionGap)).Size(p.ActionWidth, p.ActionHeight)
 					keyboardFocus = keyboardFocus || close.FocusVisible()
 					close.OnClick(func() { a.requestClosePane(tab, session) })
 				}

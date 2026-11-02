@@ -18,7 +18,8 @@ func localizeTag(tag, text string) string {
 }
 
 var settingsEnglish = map[string]string{
-	"编辑会话…": "Edit session…", "断开当前会话": "Disconnect session", "取消连接": "Cancel connection",
+	"会话已恢复，尚未连接。": "Session restored. Not connected yet.",
+	"编辑会话…":       "Edit session…", "断开当前会话": "Disconnect session", "取消连接": "Cancel connection",
 	"连接当前会话": "Connect session", "断开文件会话": "Disconnect file session", "重新连接": "Reconnect",
 	"拆分会话":      "Ungroup sessions",
 	"添加":        "Add",
@@ -49,8 +50,9 @@ var settingsEnglish = map[string]string{
 	"删除「%s」分组，连接配置、已打开的会话和传输任务会保留。":                   "Delete group “%s”. Connection profiles, open sessions and transfers will be retained.",
 	"删除「%s」分组后，组内 %d 个条目将移至「%s」。连接配置、已打开的会话和传输任务会保留。": "Delete group “%s” and move its %d items to “%s”. Connection profiles, open sessions and transfers will be retained.",
 
-	"搜索当前页面": "Search current page",
-	"选项卡":    "Tabs", "上一个选项卡": "Previous tab", "下一个选项卡": "Next tab",
+	"搜索当前页面":   "Search current page",
+	"关闭分屏或选项卡": "Close pane or tab",
+	"选项卡":      "Tabs", "上一个选项卡": "Previous tab", "下一个选项卡": "Next tab",
 	"SSH 多分屏时优先切换分屏；单窗格及文件传输页切换选项卡。Ctrl+Tab / Ctrl+Shift+Tab 始终切换选项卡。": "With multiple SSH panes, switch panes; with one pane or in file transfer, switch tabs. " +
 		"Ctrl+Tab / Ctrl+Shift+Tab always switch tabs.",
 	"设置…": "Settings…",
