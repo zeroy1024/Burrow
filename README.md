@@ -7,10 +7,20 @@
 ```sh
 mise install
 mise exec -- go run .
-mise exec -- go tool mygo build -skip-dmg
+mise run build
 ```
 
-真实原生终端要求 macOS 13 或更新系统。首次运行或构建由固定 MyGo 插件获取其原生 Ghostty VT 库。应用不预填演示服务器，不在启动或恢复工作区时自动连接。macOS 构建产物位于 `build/darwin-arm64/SSH Desk.app`。
+真实原生终端要求 macOS 13 或更新系统。首次运行或构建由固定 MyGo 插件获取其原生 Ghostty VT 库。应用不预填演示服务器，不在启动或恢复工作区时自动连接。
+
+在 macOS 上执行 `mise run build`，一次生成裸 `.app`、ZIP 和 DMG 三种产物；ZIP 保留应用包结构及 macOS 资源信息。MyGo 构建应用，固定版本的 `dmgbuild` 生成自定义 DMG；`mise install` 安装 Go 和 uv，uv 在首次构建时准备兼容的 Python（3.10+）和脚本依赖。名称、版本和输出目录读取 `mygo.json`，架构使用当前 Go 工具链的 `GOARCH`。按当前配置，Apple Silicon 构建产物为：
+
+```text
+build/darwin-arm64/SSH Desk.app
+build/darwin-arm64/ssh-desk-0.1.0-arm64.zip
+build/darwin-arm64/ssh-desk-0.1.0-arm64.dmg
+```
+
+DMG 固定使用 `assets/dmg/background.tiff` 中的 Burrow 浅色背景，包含 1x/2x 多分辨率图像以适配 Retina。窗口为 660×400，应用与 Applications 快捷方式分别位于 `(170, 180)` 和 `(490, 180)`，支持拖拽安装；背景不会随安装者的系统外观切换。仅需生成 `.app` 时，仍可使用 `mise exec -- go tool mygo build -skip-dmg`。
 
 ## 已接通的功能
 
