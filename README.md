@@ -1,4 +1,4 @@
-# SSH Desk
+# Burrow
 
 使用 Go 1.27.3 / MyGo v0.7.3 构建的原生 SSH、SFTP、FTP/FTPS 桌面应用。当前分支保留 UIKit 原型的三页布局、独立目录和拖拽交互，接入真实连接、终端、文件操作、传输队列与 Linux 监控。
 
@@ -10,7 +10,7 @@ mise exec -- go run .
 mise exec -- go tool mygo build -skip-dmg
 ```
 
-真实原生终端要求 macOS 13 或更新系统。首次运行或构建由固定 MyGo 插件获取其原生 Ghostty VT 库。应用不预填演示服务器，不在启动或恢复工作区时自动连接。macOS 构建产物位于 `build/darwin-arm64/SSH Desk.app`。
+真实原生终端要求 macOS 13 或更新系统。首次运行或构建由固定 MyGo 插件获取其原生 Ghostty VT 库。应用不预填演示服务器，不在启动或恢复工作区时自动连接。macOS 构建产物位于 `build/darwin-arm64/Burrow.app`。
 
 ## 已接通的功能
 
@@ -28,6 +28,8 @@ mise exec -- go tool mygo build -skip-dmg
 SSH、文件传输和设置按平级互斥方式渲染。切页保留连接、输出、终端滚动、目录历史和后台任务；设置关闭仅清理临时 UI 状态，配置、稳定句柄及密钥任务保留。普通关闭窗口隐藏同一个原生窗口，后台任务继续；Dock 激活重新显示。退出应用才收敛任务并释放 transport。
 
 ## 存储与边界
+
+Burrow 沿用原 SSH Desk 的数据目录和应用标识 `dev.sshdesk.app`，继续读取原有会话、设置、传输队列和钥匙串凭据。Go 模块名 `sshdesk` 与本地终端扩展模块路径保留；本次改名无需搬移用户数据。
 
 目录保存到 MyGo 应用用户数据目录的 `sessions.json`，偏好使用既有 `prefs.json`、`files.json`、`terminal.json` 和主题目录。主线旧版 `catalog.json` v0/v2 在新目录不存在时迁移，保留源文件和备份；外部私钥复制到应用托管目录，原件不移动。无内嵌公钥的传统加密 PEM 会在应用窗口就绪后请求口令解锁迁移，完整校验后才发布新目录；取消或失败保留源数据，并通过原错误提示重试。该导入口令不写钥匙串。密钥、密码和私钥口令不写入 JSON；密码存系统钥匙串并绑定配置版本，旧任务不会误取同 UUID 新密码。
 

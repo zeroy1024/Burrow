@@ -69,8 +69,17 @@ func RowMenuOn(c *ui.Context, row, trigger ui.Element, entries []MenuEntry) bool
 
 // ContextMenuOn uses the shared popup at the context gesture without taking
 // over the row's primary click, keyboard navigation, role or expanded state.
-func ContextMenuOn(c *ui.Context, row ui.Element, entries []MenuEntry) bool {
-	return menuOn(c, row, row, entries, true)
+// Targets share the popup with children that own pointer input, such as a
+// tab's drag handle and close button.
+func ContextMenuOn(c *ui.Context, row ui.Element, entries []MenuEntry, targets ...ui.Element) bool {
+	return menuOn(
+		c,
+		row,
+		row,
+		entries,
+		true,
+		targets...,
+	)
 }
 
 func MenuButton[T IconSource](c *ui.Context, icon T, label string, entries []MenuEntry) ui.Element {
@@ -88,7 +97,13 @@ type menuState struct {
 	Point         ui.Point
 }
 
-func menuOn(c *ui.Context, trigger, row ui.Element, entries []MenuEntry, contextOnly bool) bool {
+func menuOn(
+	c *ui.Context,
+	trigger, row ui.Element,
+	entries []MenuEntry,
+	contextOnly bool,
+	targets ...ui.Element,
+) bool {
 	state := ui.Local(trigger, "uikit.menu.state", func() menuState { return menuState{} })
 	open := &state.Open
 	wasOpen := *open
@@ -100,6 +115,11 @@ func menuOn(c *ui.Context, trigger, row ui.Element, entries []MenuEntry, context
 		context, keyboard := false, false
 		if row.ID() != 0 {
 			context = row.RightClicked() || trigger.RightClicked()
+			for _, target := range targets {
+				if target.RightClicked() {
+					context = true
+				}
+			}
 			keyboard = row.Shortcut(ui.Shift, ui.KeyF10)
 		}
 		if context || keyboard {

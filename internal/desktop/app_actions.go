@@ -76,21 +76,6 @@ func (a *app) appShortcuts(c *ui.Context) {
 			action()
 		}
 	}
-	if a.actionPressed(c, "app.settings") {
-		run(a.openSettings)
-	}
-	if a.actionPressed(c, "mode.terminal") {
-		run(func() { a.switchSection(sectionSSH) })
-	}
-	if a.actionPressed(c, "mode.files") {
-		run(func() { a.switchSection(sectionFiles) })
-	}
-	if a.actionPressed(c, "session.new") {
-		run(func() {
-			a.closeSettings()
-			a.startHostDraft()
-		})
-	}
 	count, index := len(a.tabs), a.activeTab
 	if a.section == sectionFiles {
 		count, index = len(a.fileSessions), a.activeFile
@@ -106,33 +91,78 @@ func (a *app) appShortcuts(c *ui.Context) {
 			run(func() { a.activateTab(slices.Index(a.tabs, tab)) })
 		}
 	}
-	for n := range 4 {
-		if a.actionPressed(c, fmt.Sprintf("tab.select.%d", n+1)) {
-			selectTab(n)
+	// These keys always navigate tabs, even when the current tab is split.
+	if !a.settingsUI.open && count > 0 {
+		if c.Shortcut(ui.Ctrl|ui.Shift, ui.KeyTab) {
+			a.cycleTab(-1)
+			return
+		}
+		if c.Shortcut(ui.Ctrl, ui.KeyTab) {
+			a.cycleTab(1)
+			return
 		}
 	}
-	if count > 0 {
-		if a.actionPressed(c, "tab.prev") {
-			selectTab((index + count - 1) % count)
+	if a.actionPressed(c, "app.settings") {
+		run(a.openSettings)
+	}
+	if a.actionPressed(c, "mode.terminal") {
+		run(func() { a.switchSection(sectionSSH) })
+	}
+	if a.actionPressed(c, "mode.files") {
+		run(func() { a.switchSection(sectionFiles) })
+	}
+	if a.actionPressed(c, "session.new") {
+		run(func() {
+			a.closeSettings()
+			a.startHostDraft()
+		})
+	}
+	if a.settingsUI.open {
+		if a.actionPressed(c, "host.search") {
+			a.settingsUI.search.Focus()
 		}
-		if a.actionPressed(c, "tab.next") {
-			selectTab((index + 1) % count)
-		}
-		if a.actionPressed(c, "tab.close") {
-			if a.section == sectionFiles {
-				a.requestCloseFileTab(a.activeFile)
-			} else {
-				a.requestCloseTab(a.activeTab)
+		return
+	}
+	selectTarget := selectTab
+	targetCount, targetIndex := count, index
+	if a.section == sectionSSH {
+		if tab := a.currentTab(); tab != nil && tab.root.count() > 1 {
+			sessions := tab.root.sessions()
+			targetCount, targetIndex = len(sessions), slices.Index(sessions, tab.focused)
+			selectTarget = func(next int) {
+				if next < 0 || next >= len(sessions) {
+					return
+				}
+				run(func() { a.focusSession(tab, sessions[next]) })
 			}
 		}
 	}
-	if a.actionPressed(c, "host.search") {
-		if a.settingsUI.open {
-			a.settingsUI.search.Focus()
-		} else {
-			a.page().sidebarCollapsed = false
-			a.page().search.Focus()
+	for n := range 4 {
+		if a.actionPressed(c, fmt.Sprintf("tab.select.%d", n+1)) {
+			selectTarget(n)
+			return
 		}
+	}
+	if targetCount > 0 {
+		if a.actionPressed(c, "tab.prev") {
+			selectTarget((targetIndex + targetCount - 1) % targetCount)
+			return
+		}
+		if a.actionPressed(c, "tab.next") {
+			selectTarget((targetIndex + 1) % targetCount)
+			return
+		}
+	}
+	if count > 0 && a.actionPressed(c, "tab.close") {
+		if a.section == sectionFiles {
+			a.requestCloseFileTab(a.activeFile)
+		} else {
+			a.requestCloseTab(a.activeTab)
+		}
+	}
+	if a.actionPressed(c, "host.search") {
+		a.page().sidebarCollapsed = false
+		a.page().search.Focus()
 	}
 	if a.actionPressed(c, "tab.reopen") && len(a.closedTabs) > 0 {
 		run(func() {
@@ -154,9 +184,6 @@ func (a *app) appShortcuts(c *ui.Context) {
 			}
 		})
 	}
-	if a.settingsUI.open {
-		return
-	}
 	if a.actionPressed(c, "sidebar.toggle") {
 		a.page().sidebarCollapsed = !a.page().sidebarCollapsed
 	}
@@ -168,15 +195,25 @@ func (a *app) appShortcuts(c *ui.Context) {
 			a.splitSession(session, tab.root.count() > 1 && bounds.H > bounds.W)
 		})
 	}
-	if count > 0 {
-		// Existing configurable bindings get first claim; these are additional
-		// tab-navigation keys, scoped out by the SDK while a modal is active.
-		if c.Shortcut(ui.Ctrl|ui.Shift, ui.KeyTab) {
-			selectTab((index + count - 1) % count)
-		}
-		if c.Shortcut(ui.Ctrl, ui.KeyTab) {
-			selectTab((index + 1) % count)
-		}
+}
+
+func (a *app) cycleTab(direction int) {
+	count, index := len(a.tabs), a.activeTab
+	if a.section == sectionFiles {
+		count, index = len(a.fileSessions), a.activeFile
+	}
+	if count == 0 {
+		return
+	}
+	next := (index + direction + count) % count
+	if a.section == sectionFiles {
+		a.activateFileTab(next)
+		return
+	}
+	tab := a.tabs[next]
+	action := func() { a.activateTab(slices.Index(a.tabs, tab)) }
+	if !a.deferWorkspaceDragAction(action) {
+		action()
 	}
 }
 
@@ -195,17 +232,50 @@ func (a *app) installAppMenu() func() {
 			a.window.Invalidate()
 		},
 	}
+	cycle := func(direction int) func(*mygo.MenuItem, *mygo.Window) {
+		return func(*mygo.MenuItem, *mygo.Window) {
+			// AppKit handles Control-Tab before the native view's keyDown.
+			// Menu accelerators need their own guard for the UI's modal scope.
+			switch {
+			case a.settingsUI.open, a.settingsUI.recording != "", a.transfers.quitting:
+				return
+			case a.page().addHostOpen, a.page().groupDialogOpen:
+				return
+			case a.files.dialog != nil, a.files.conflict != nil, a.fileSSHLink != nil:
+				return
+			case a.credentials.draft != nil, len(a.sshPrompts) > 0:
+				return
+			case a.closeRequest != nil, a.closeFileRequest != nil, a.closePaneRequest != nil:
+				return
+			}
+			a.cycleTab(direction)
+			a.window.Invalidate()
+		}
+	}
+	previous := &mygo.MenuItem{
+		Label: localizeTag(mygo.App.Locale(), "上一个选项卡"), Accelerator: "Ctrl+Shift+Tab", Click: cycle(-1),
+	}
+	next := &mygo.MenuItem{
+		Label: localizeTag(mygo.App.Locale(), "下一个选项卡"), Accelerator: "Ctrl+Tab", Click: cycle(1),
+	}
+	tabs := &mygo.MenuItem{
+		Label: localizeTag(mygo.App.Locale(), "选项卡"), Submenu: []*mygo.MenuItem{previous, next},
+	}
 	menu := mygo.NewMenu([]*mygo.MenuItem{
-		{Label: "SSH Desk", Submenu: []*mygo.MenuItem{
+		{Label: "Burrow", Submenu: []*mygo.MenuItem{
 			settings,
 			{Type: mygo.MenuItemSeparator}, {Role: mygo.RoleQuit},
 		}},
 		{Role: mygo.RoleEditMenu},
+		tabs,
 		{Role: mygo.RoleWindowMenu},
 	})
 	mygo.App.SetMenu(menu)
 	return mygo.App.OnLocaleChanged(func(locale string) {
 		settings.SetLabel(localizeTag(locale, "设置…"))
+		tabs.SetLabel(localizeTag(locale, "选项卡"))
+		previous.SetLabel(localizeTag(locale, "上一个选项卡"))
+		next.SetLabel(localizeTag(locale, "下一个选项卡"))
 	})
 }
 

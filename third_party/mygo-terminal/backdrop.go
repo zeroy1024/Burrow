@@ -68,7 +68,7 @@ type viewportBackdropRow struct {
 	line rowCache
 }
 
-func (v *view) backdropRequest() vt.Overscan {
+func (v *view) backdropRequest(atBottom bool) vt.Overscan {
 	rows := func(height float32) uint16 {
 		if height <= 0 {
 			return 0
@@ -77,7 +77,13 @@ func (v *view) backdropRequest() vt.Overscan {
 		count := math.Ceil(float64((height+v.backdrop.Gap)*v.scale)/float64(v.cellH)) + 1
 		return uint16(min(count, 65535))
 	}
-	return vt.Overscan{Above: rows(v.backdrop.Top), Below: rows(v.backdrop.Bottom)}
+	request := vt.Overscan{Above: rows(v.backdrop.Top), Below: rows(v.backdrop.Bottom)}
+	// Clear-screen sequences can preserve history; show it above the grid
+	// only while the user is scrolled back, not above the live screen.
+	if atBottom {
+		request.Above = 0
+	}
+	return request
 }
 
 func (v *view) paintBackdrop(p *ui.Painter, band ui.Rect, origin ui.Point) {

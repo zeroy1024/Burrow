@@ -99,31 +99,38 @@ func (a *app) tabButton(c *ui.Context, list ui.Element, index int, tab *workspac
 		pendingAction = func() { a.requestCloseTab(slices.Index(a.tabs, tab)) }
 	}
 	button.OnClick(func() { a.activateTab(slices.Index(a.tabs, tab)) })
-	button.ContextMenu(func(m *ui.Menu) {
-		current := tab.focused
-		if tab.root.count() > 1 {
-			if m.Item(localize(c, "拆分会话")).Disabled(a.drag != nil || !tab.canSeparateSessions()).Chosen() {
+	menu := []uikit.MenuEntry{}
+	if tab.root.count() > 1 {
+		menu = append(menu, uikit.MenuEntry{
+			ID: "ungroup", Label: localize(c, "拆分会话"), Icon: uikit.IconGrid,
+			Disabled: a.drag != nil || !tab.canSeparateSessions(), OnChoose: func() {
 				pendingAction = func() { a.ungroupTab(tab) }
+			},
+		})
+	} else {
+		menu = append(menu, uikit.MenuEntry{
+			ID: "edit", Label: localize(c, "编辑会话…"), Icon: uikit.IconEdit,
+			Disabled: session.temporary || session.host < 0, OnChoose: func() { a.startEditHostDraft(session.host) },
+		}, uikit.MenuEntry{ID: "after-edit", Separator: true})
+		if session.state == connected || session.state == connecting {
+			label, icon := "断开当前会话", uikit.IconPause
+			if session.state == connecting {
+				label, icon = "取消连接", uikit.IconClose
 			}
-		} else if m.Item("编辑会话…").Disabled(current.temporary || current.host < 0).Chosen() {
-			a.startEditHostDraft(current.host)
+			menu = append(menu, uikit.MenuEntry{
+				ID: "disconnect", Label: localize(c, label), Icon: icon,
+				OnChoose: func() { disconnectSession(session) },
+			})
+		} else {
+			menu = append(menu, uikit.MenuEntry{
+				ID: "connect", Label: localize(c, "连接当前会话"), Icon: uikit.IconTerminal,
+				OnChoose: func() { a.connectSession(session) },
+			})
 		}
-		m.Separator()
-		if current.state == connected || current.state == connecting {
-			label := "断开当前会话"
-			if current.state == connecting {
-				label = "取消连接"
-			}
-			if m.Item(label).Chosen() {
-				disconnectSession(current)
-			}
-		} else if m.Item("连接当前会话").Chosen() {
-			a.connectSession(current)
-		}
-		m.Separator()
-		if m.Item("关闭选项卡").Chosen() {
-			pendingAction = func() { a.requestCloseTab(slices.Index(a.tabs, tab)) }
-		}
+	}
+	menu = append(menu, uikit.MenuEntry{ID: "before-close", Separator: true}, uikit.MenuEntry{
+		ID: "close", Label: localize(c, "关闭选项卡"), Icon: uikit.IconClose, Danger: true,
+		OnChoose: func() { pendingAction = func() { a.requestCloseTab(slices.Index(a.tabs, tab)) } },
 	})
 	button.Children(func() {
 		props.State = connectionIndicatorState(session.state)
@@ -131,6 +138,13 @@ func (a *app) tabButton(c *ui.Context, list ui.Element, index int, tab *workspac
 		parts.Close.OnClick(func() { a.requestCloseTab(slices.Index(a.tabs, tab)) })
 		parts.DragHandle.OnClick(func() { a.activateTab(slices.Index(a.tabs, tab)) })
 		a.paneDragHandle(c, parts.DragHandle, paneTransfer{tab: tab, session: tab.focused, fromTab: true})
+		uikit.ContextMenuOn(
+			c,
+			button,
+			menu,
+			parts.DragHandle,
+			parts.Close,
+		)
 	})
 	if d := a.drag; d != nil && d.kind == dragTab && d.originTab == tab && d.phase != dragLanded {
 		button.Opacity(0)

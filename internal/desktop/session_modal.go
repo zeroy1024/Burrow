@@ -422,8 +422,18 @@ func (a *app) sessionPasswordField(c *ui.Context, d *hostDraft, key, label, desc
 			Label: label, Handle: d.handles[key], Mono: true, DeferStyle: true,
 		})
 		input := a.sessionInputState(d, key, value, parts.Input)
-		if key == "password" && d.passwordSaved && !d.passwordChanged {
-			input.Placeholder("●●●●●●●●●●")
+		savedPassword := key == "password" && d.passwordSaved && !d.passwordChanged
+		if savedPassword && !input.Composing() {
+			p := theme.Current().C.Input
+			// Native placeholders use muted text; paint the saved marker in the input's style.
+			parts.Root.Children(func() {
+				ui.Row(c).Key("saved-password-mask").Absolute().Top(0).Right(p.Height).Bottom(0).
+					Left(p.PaddingX + p.BorderWidth).AlignItems(ui.Center).PassThrough().Children(func() {
+					ui.Text(c, "••••••••••").Role(ui.RoleNone).Font(strings.Join(p.MonoFont, ", ")).
+						FontSize(p.MonoSize).LetterSpacing(p.MonoTracking).FixedLineHeight(p.LineHeight).
+						TextColor(uikit.Color(p.Text)).SingleLine().PassThrough()
+				})
+			})
 		}
 		if key == "passphrase" {
 			input.Placeholder("私钥口令（无则留空）")

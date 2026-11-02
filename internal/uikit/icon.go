@@ -7,15 +7,16 @@ import (
 )
 
 type IconButtonProps struct {
-	Label    string
-	Key      any
-	Size     Size
-	Variant  IconVariant
-	On       *bool
-	IconOn   *ui.SVG
-	Shortcut string
-	Disabled bool
-	Surface  *theme.Theme
+	Label          string
+	Key            any
+	Size           Size
+	Variant        IconVariant
+	On             *bool
+	IconOn         *ui.SVG
+	Shortcut       string
+	Disabled       bool
+	Surface        *theme.Theme
+	IconTransition *ui.ContentTransition
 }
 
 type IconVariant uint8
@@ -93,7 +94,10 @@ func IconButton[T IconSource](c *ui.Context, icon T, props IconButtonProps) ui.E
 		if props.On != nil && *props.On && props.IconOn != nil {
 			image = props.IconOn
 		}
-		ui.Icon(c, image).Size(glyph, glyph).PassThrough()
+		imageElement := ui.Icon(c, image).Size(glyph, glyph).PassThrough()
+		if props.IconTransition != nil {
+			imageElement.ContentTransition(*props.IconTransition)
+		}
 	})
 	return StyleDisabled(button, props.Disabled)
 }
