@@ -86,7 +86,7 @@ func (a *app) loadAppPreferences() error {
 		AppTheme: "system", Accent: "#0a84ff", ReduceMotion: "system", Translucency: true,
 		TermMode: a.terminal.mode.String(), TermFollowLight: a.terminal.followLight,
 		TermFollowDark: a.terminal.followDark, TermBackground: a.terminal.prefs.Background.String(),
-		Term: a.terminal.prefs, ScrollbackLines: 10000, DefaultLocalDir: "~", TransferParallel: 3,
+		Term: a.terminal.prefs, ScrollbackLines: 4000, DefaultLocalDir: "~", TransferParallel: 3,
 		ConflictPolicy: "ask", Keymap: map[string]string{},
 		LastSettingsTab: "terminal", ModalAdvancedOpen: map[string]bool{},
 	}
@@ -181,7 +181,6 @@ func (a *app) validateAppPreferences() error {
 	cfg.FontFamily = p.Term.FontFamily
 	cfg.FontSize = p.Term.FontSize
 	cfg.LineHeight = p.Term.LineHeight
-	cfg.Tracking = p.Term.Tracking
 	cfg.CursorShape = p.Term.CursorShape
 	if err := cfg.validate(); err != nil {
 		return err

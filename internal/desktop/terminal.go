@@ -121,11 +121,9 @@ func (a *app) terminals(c *ui.Context, size ui.Point) {
 func (a *app) terminalCellWidth() float32 {
 	prefs := a.terminal.prefs
 	font := ui.Font{Family: strings.Join(prefs.FontFamily, ", "), Size: prefs.FontSize}
-	if a.cellWidth == 0 || a.cellFont != font || a.cellTracking != prefs.Tracking {
+	if a.cellWidth == 0 || a.cellFont != font {
 		a.cellFont = font
-		a.cellTracking = prefs.Tracking
 		a.cellWidth, _ = ui.ShapeText("M", font, 0).Size()
-		a.cellWidth += prefs.Tracking
 	}
 	return a.cellWidth
 }
@@ -212,7 +210,7 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 					bottomPadding,
 					p.ContentSide,
 				).Font(strings.Join(prefs.FontFamily, ", ")).FontSize(prefs.FontSize).
-					LetterSpacing(prefs.Tracking).TextColor(uikit.Color(colors.Foreground)).SelectionColor(uikit.Color(colors.Selection)).
+					TextColor(uikit.Color(colors.Foreground)).SelectionColor(uikit.Color(colors.Selection)).
 					Opacity(appearance.Opacity).Cache().
 					OnClick(func() { a.focusSession(tab, session) })
 				if session.focusPending {
@@ -252,7 +250,8 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 					}
 					content.Children(func() {
 						number := slices.Index(tab.root.sessions(), session) + 1
-						uikit.PaneBadge(c, number, focused, surface)
+						binding := a.shortcutBinding(fmt.Sprintf("tab.select.%d", number))
+						uikit.PaneShortcut(c, shortcutDisplay(binding), focused, surface).Hidden(binding == "")
 						uikit.Tip(c, uikit.PaneTitle(c, h.name, appearance, surface), fmt.Sprintf("%s · %s@%s:%d", h.name, h.user, h.address, h.port))
 						uikit.PaneLogin(c, fmt.Sprintf("%s@%s:%d", h.user, h.address, h.port), appearance, surface)
 						if !focused {
@@ -280,14 +279,21 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 				if focused {
 					splitShortcut = shortcutDisplay(a.shortcutBinding("pane.split"))
 				}
-				split := uikit.PaneIconButton(c, "分栏 "+h.name, sidebarIcon, surface, uikit.PaneIconButtonProps{
+				split := uikit.PaneIconButton(c, "分栏 "+h.name, splitIcon, surface, uikit.PaneIconButtonProps{
 					Shortcut: splitShortcut,
 					Disabled: count >= maxTerminalPanes || session.closing || !canSplit(session.layoutRect, dropRight) && !canSplit(session.layoutRect, dropBottom),
 				}).Absolute().Top(0).Left(0).Size(p.ActionWidth, p.ActionHeight)
 				keyboardFocus = split.FocusVisible()
 				split.OnClick(func() { a.splitSession(session, stacked) })
 				if multiple {
-					expand := uikit.PaneIconButton(c, "放大或恢复 "+h.name, expandIcon, surface).Absolute().Top(0).Left(p.ActionWidth+p.ActionGap).Size(p.ActionWidth, p.ActionHeight)
+					icon, label := expandIcon, "放大窗格 "
+					if tab.maximized {
+						icon, label = restoreIcon, "恢复窗格 "
+					}
+					animation := uikit.Anim(c, t.C.IconButton.Transition, uikit.MotionOverride(a.reduceMotion(c)))
+					expand := uikit.PaneIconButton(c.Key("pane-zoom"), label+h.name, icon, surface, uikit.PaneIconButtonProps{
+						IconTransition: &ui.ContentTransition{Animation: &animation},
+					}).Absolute().Top(0).Left(p.ActionWidth+p.ActionGap).Size(p.ActionWidth, p.ActionHeight)
 					keyboardFocus = keyboardFocus || expand.FocusVisible()
 					expand.OnClick(func() {
 						a.togglePaneZoom(tab, session)

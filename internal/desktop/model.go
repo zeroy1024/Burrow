@@ -86,9 +86,6 @@ type remoteSession struct {
 	layoutRect                  ui.Rect
 	contentWidth, contentHeight float32
 	columns, rows               int
-	enter                       dropZone
-	entering                    bool
-	enterStarted                time.Time
 	closing                     bool
 	closeStarted                time.Time
 	revealing                   bool
@@ -333,8 +330,8 @@ func (a *app) splitSession(session *remoteSession, stacked bool) {
 	child := a.newShellSession(session.host, session.endpoint, session.temporary, session.connection)
 	node := tab.root.find(session)
 	node.insert(child, zone)
-	child.enter, child.entering = zone, true
-	a.markPaneLayout(tab, theme.Current().C.Desktop.PaneEnterDuration)
+	startPaneReveal(child)
+	a.markPaneLayout(tab, theme.Current().C.PaneReveal.Duration)
 	a.focusSession(tab, child)
 	a.setPaneZoom(tab, false)
 }

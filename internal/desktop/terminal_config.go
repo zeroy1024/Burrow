@@ -36,7 +36,6 @@ type terminalConfig struct {
 	FontFamily  []string              `json:"font_family"`
 	FontSize    float32               `json:"font_size"`
 	LineHeight  float32               `json:"line_height"`
-	Tracking    float32               `json:"tracking"`
 	CursorShape termtheme.CursorShape `json:"cursor_shape"`
 	CursorBlink bool                  `json:"cursor_blink"`
 	BoldBright  bool                  `json:"bold_is_bright"`
@@ -46,7 +45,7 @@ func (s terminalSettingsState) config() terminalConfig {
 	return terminalConfig{
 		Mode: s.mode.String(), FollowLight: s.followLight, FollowDark: s.followDark,
 		Background: s.prefs.Background.String(), FontFamily: s.prefs.FontFamily,
-		FontSize: s.prefs.FontSize, LineHeight: s.prefs.LineHeight, Tracking: s.prefs.Tracking,
+		FontSize: s.prefs.FontSize, LineHeight: s.prefs.LineHeight,
 		CursorShape: s.prefs.CursorShape, CursorBlink: s.prefs.CursorBlink, BoldBright: s.prefs.BoldIsBright,
 	}
 }
@@ -114,7 +113,7 @@ func (a *app) readTerminalSettings() error {
 	a.terminal.followLight, a.terminal.followDark = config.FollowLight, config.FollowDark
 	a.terminal.prefs = termtheme.Prefs{
 		FontFamily: config.FontFamily, FontSize: config.FontSize, LineHeight: config.LineHeight,
-		Tracking: config.Tracking, CursorShape: config.CursorShape, CursorBlink: config.CursorBlink,
+		CursorShape: config.CursorShape, CursorBlink: config.CursorBlink,
 		Background: termtheme.ParseBackgroundSource(config.Background), BoldIsBright: config.BoldBright,
 	}
 	return nil
@@ -135,17 +134,8 @@ func (config terminalConfig) validate() error {
 	if config.LineHeight < 6 || config.LineHeight > 80 {
 		return errors.New("line_height must be between 6 and 80")
 	}
-	if config.Tracking < -4 || config.Tracking > 8 {
-		return errors.New("tracking must be between -4 and 8")
-	}
 	if config.CursorShape < termtheme.CursorBlock || config.CursorShape > termtheme.CursorUnderline {
 		return errors.New("unknown cursor_shape")
-	}
-	width, _ := ui.ShapeText("M", ui.Font{
-		Family: strings.Join(config.FontFamily, ", "), Size: config.FontSize,
-	}, 0).Size()
-	if width+config.Tracking <= 0 {
-		return errors.New("tracking must leave a positive character width for the selected font")
 	}
 	return nil
 }

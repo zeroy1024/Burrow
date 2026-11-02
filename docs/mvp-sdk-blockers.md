@@ -6,7 +6,7 @@
 
 | 能力 | 当前消费者 | 实际API与影响 | 当前验收状态 |
 |---|---|---|---|
-| Tracking / 字距 | `internal/desktop/ssh_terminal.go:sshFont`；`terminal_config.go` 保留原配置 | SDK未公开网格字距；真实终端不采用原型−0.1px。未用缩放字形替代 | 明确不适用：用户允许忽略此差异，不再阻塞 |
+| 终端字距 | 配置结构、校验及旧文本渲染调用均已移除 | SDK未公开网格字距；旧 JSON 字段按未知字段忽略，新保存配置不再包含字距。未用缩放字形替代 | 已按用户要求移除遗留参数 |
 | BoldIsBright / 粗体提亮开关 | `settings.go`字体分组及搜索索引已移除入口，`localize.go`移除对应文案 | 真实终端继续SDK默认粗体行为；旧配置字段及旧预览读取路径保留，避免改写既有配置契约 | 明确不适用：用户要求删除开关，不再扩展真实终端映射能力 |
 | 实时ScrollbackLines | `ssh_terminal.go:attachSSH`、`terminal_preview.go:nativeTerminalDragContents`创建时直接传行数；`workspace_store.go:enforceScrollback`原地同步全部已有SSH标签 | `third_party/mygo-terminal`公开`Options.ScrollbackLines`、`Terminal.SetScrollbackLines(int) error`，真实绑定内核行数选项；物理显示行计数、按页淘汰，非严格逐行 | 完整实现：按用户接受的页级误差合同，修改设置同步后台标签，保留同一终端与连接，不操作后台传输任务 |
 | 真实终端滚动条风格 | `ssh_terminal.go:sshTerminalView`使用原生VT滚动条，其他区域使用`uikit.Scrollbars` | 两者均为半透明胶囊、无轨道底色、滚动或贴边显示并淡出；原生4/8px、停留1000ms/淡出300ms，UIKit6px、700ms/180ms | 当前风格范围已有实现；用户不再要求同一组件或参数完全相同，未做像素验收 |

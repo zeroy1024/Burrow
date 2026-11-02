@@ -254,7 +254,6 @@ func terminalSpans(line terminalLine, scheme *termtheme.Scheme, prefs termtheme.
 		fg, bg := terminalSpanColors(run, scheme, prefs)
 		span := ui.Span{
 			Text: run.Text, Color: fg, Underline: run.Underline || run.Link != "",
-			LetterSpacing: prefs.Tracking,
 		}
 		if run.Background.kind != terminalDefault || run.Reverse {
 			span.Background = bg

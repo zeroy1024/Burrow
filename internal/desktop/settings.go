@@ -28,7 +28,7 @@ var settingsCategories = [...]settingsCategory{
 	{"files", "文件传输", "目录、传输与同名文件", filesIcon},
 	{"shortcuts", "快捷键", "点击快捷键进行录制", textCursorIcon},
 	{"keys", "密钥与凭据", "私钥、ssh-agent 与已保存的密码", lockIcon},
-	{"about", "关于", "SSH Desk 与开源许可", infoIcon},
+	{"about", "关于", "Burrow 与开源许可", infoIcon},
 }
 
 type settingField struct {
@@ -66,7 +66,7 @@ func (a *app) settingsSidebar(c *ui.Context, shown float32) {
 		ui.Row(c).FillWidth().BorderWidth(t.Size.Divider, 0, 0, 0).BorderColor(uikit.Color(t.Color.Border.Subtle)).
 			Padding(t.Space.N10, t.Space.N16).Gap(t.Space.N8).AlignItems(ui.Center).Children(func() {
 			uikit.Icon(c, infoIcon, uikit.IconProps{Tone: uikit.ToneTertiary})
-			uikit.Text(c, localize(c, "SSH Desk 0.1.0 · 原型"), uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneTertiary})
+			uikit.Text(c, "Burrow 0.1.0", uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneTertiary})
 		})
 	})
 }
@@ -589,7 +589,10 @@ func (a *app) terminalTextSettings(c *ui.Context) {
 				a.changeTerminalSettings(func() {
 					a.terminal.prefs.FontSize = float32(value)
 					if !a.prefs.LineHeightEdited {
-						a.terminal.prefs.LineHeight = float32(math.Round(value * 19 / 12.5))
+						defaults := termtheme.DefaultPrefs()
+						a.terminal.prefs.LineHeight = float32(math.Round(
+							value * float64(defaults.LineHeight) / float64(defaults.FontSize),
+						))
 					}
 					a.terminal.prefs.LineHeight = max(a.terminal.prefs.LineHeight, float32(math.Ceil(value*1.2)))
 				})

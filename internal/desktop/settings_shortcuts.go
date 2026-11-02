@@ -16,12 +16,12 @@ var defaultShortcutActions = []shortcutAction{
 	{"session.new", "新建会话", "会话", "Cmd+N"},
 	{"tab.close", "关闭选项卡", "会话", "Cmd+W"},
 	{"tab.reopen", "重新打开关闭的选项卡", "会话", "Cmd+Shift+T"},
-	{"tab.select.1", "切换到第 1 个选项卡", "会话", "Cmd+1"},
-	{"tab.select.2", "切换到第 2 个选项卡", "会话", "Cmd+2"},
-	{"tab.select.3", "切换到第 3 个选项卡", "会话", "Cmd+3"},
-	{"tab.select.4", "切换到第 4 个选项卡", "会话", "Cmd+4"},
-	{"tab.prev", "上一个选项卡", "会话", "Cmd+["},
-	{"tab.next", "下一个选项卡", "会话", "Cmd+]"},
+	{"tab.select.1", "切换到第 1 个分屏或选项卡", "会话", "Cmd+1"},
+	{"tab.select.2", "切换到第 2 个分屏或选项卡", "会话", "Cmd+2"},
+	{"tab.select.3", "切换到第 3 个分屏或选项卡", "会话", "Cmd+3"},
+	{"tab.select.4", "切换到第 4 个分屏或选项卡", "会话", "Cmd+4"},
+	{"tab.prev", "上一个分屏或选项卡", "会话", "Cmd+["},
+	{"tab.next", "下一个分屏或选项卡", "会话", "Cmd+]"},
 	{"sidebar.toggle", "显示/隐藏侧栏", "视图", "Cmd+\\"},
 	{"mode.terminal", "终端模式", "视图", "Cmd+Alt+1"},
 	{"mode.files", "文件传输模式", "视图", "Cmd+Alt+2"},
@@ -52,6 +52,10 @@ func (a *app) shortcutSettings(c *ui.Context) {
 			a.preferencesChanged()
 		})
 	})
+	uikit.FieldMessage(c,
+		localize(c, "SSH 多分屏时优先切换分屏；单窗格及文件传输页切换选项卡。Ctrl+Tab / Ctrl+Shift+Tab 始终切换选项卡。"),
+		uikit.FieldMessageProps{},
+	)
 	actions := make([]shortcutAction, 0, len(defaultShortcutActions))
 	for _, action := range defaultShortcutActions {
 		if a.settingMatches(action.label, action.group+"快捷键") {

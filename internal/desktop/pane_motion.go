@@ -167,34 +167,6 @@ func (a *app) paneMotion(c *ui.Context, pane ui.Element, tab *workspaceTab, sess
 	} else if !session.revealing && a.reduceMotion(c) && !tab.zoomStarted.IsZero() {
 		alpha *= min(1, float32(c.Now().Sub(tab.zoomStarted))/float32(t.C.Desktop.ZoomDuration))
 	}
-	if session.entering {
-		if session.enterStarted.IsZero() {
-			session.enterStarted = c.Now()
-		}
-		progress := min(1, float32(c.Now().Sub(session.enterStarted))/float32(t.C.Desktop.PaneEnterDuration))
-		curve := t.C.Desktop.MotionEasing
-		progress = ui.CubicBezier(curve[0], curve[1], curve[2], curve[3])(progress)
-		alpha *= progress
-		if !a.reduceMotion(c) {
-			x, y := float32(0), float32(0)
-			switch session.enter {
-			case dropLeft:
-				x = -t.C.Desktop.PaneEnterOffset
-			case dropRight:
-				x = t.C.Desktop.PaneEnterOffset
-			case dropTop:
-				y = -t.C.Desktop.PaneEnterOffset
-			case dropBottom:
-				y = t.C.Desktop.PaneEnterOffset
-			}
-			pane.Translate(x*(1-progress), y*(1-progress))
-		}
-		if progress >= 1 {
-			session.entering = false
-		} else {
-			c.AnimationFrame()
-		}
-	}
 	if session.closing {
 		progress := min(1, float32(c.Now().Sub(session.closeStarted))/float32(t.C.Desktop.PaneCloseDuration))
 		alpha *= 1 - progress
@@ -211,7 +183,6 @@ func (a *app) paneMotion(c *ui.Context, pane ui.Element, tab *workspaceTab, sess
 
 func startPaneReveal(session *remoteSession) {
 	session.revealing, session.revealStarted = true, time.Time{}
-	session.entering = false
 }
 
 func paneReveal(c *ui.Context, card ui.Element, session *remoteSession) {

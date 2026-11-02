@@ -1,8 +1,6 @@
 package desktop
 
 import (
-	"slices"
-
 	"sshdesk/internal/termtheme"
 	"sshdesk/internal/theme"
 	"sshdesk/internal/uikit"
@@ -20,32 +18,6 @@ func ColorEffect(pos vec2, color vec4) vec4 {
 	return vec4(mix(vec3(luminance), color.rgb, Saturation), color.a)
 }
 `)
-
-func (a *app) paneShortcuts(c *ui.Context) {
-	tab := a.currentTab()
-	if tab == nil || tab.root.count() == 1 {
-		return
-	}
-	sessions := tab.root.sessions()
-	keys := [...]ui.Key{ui.Key1, ui.Key2, ui.Key3, ui.Key4}
-	for index, session := range sessions {
-		if c.Shortcut(ui.Super, keys[index]) {
-			a.focusSession(tab, session)
-			return
-		}
-	}
-	var direction int
-	if c.Shortcut(ui.Super, ui.KeyBracketLeft) {
-		direction = -1
-	}
-	if c.Shortcut(ui.Super, ui.KeyBracketRight) {
-		direction = 1
-	}
-	if direction != 0 {
-		index := (slices.Index(sessions, tab.focused) + direction + len(sessions)) % len(sessions)
-		a.focusSession(tab, sessions[index])
-	}
-}
 
 func terminalActivity(c *ui.Context, session *remoteSession, surface *theme.Theme) {
 	if session.hasNewOutput {

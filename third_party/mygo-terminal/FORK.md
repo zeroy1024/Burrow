@@ -1,4 +1,4 @@
-# SSH Desk terminal extension
+# Burrow terminal extension
 
 This directory is the terminal plugin from `github.com/egoist/mygo v0.7.3`,
 copied from its published Go module. The original MIT license is retained in
@@ -82,6 +82,9 @@ checksums and Ghostty revision remain unchanged.
 Extra rows carry the original cell styles, graphemes and drawn box characters;
 their signed viewport coordinates align them with the live grid. Content that
 does not exist (before history starts or after the bottom) is never invented.
+Top overscan is enabled only while scrolled back. Following the live screen
+leaves the header blank, including after clear-screen sequences that preserve
+scrollback; scrolling back still exposes that retained history.
 Zero bar heights remove the overscan request. Closing a terminal drops the edge
 cache along with its normal frame. The application applies its shared glass
 material above this drawing and respects its translucency/accessibility switch.

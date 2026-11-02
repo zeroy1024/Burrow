@@ -621,8 +621,8 @@ class Driver:
 
     def quit(self):
         locale = self.snapshot()["Locale"]
-        label = "退出SSH Desk" if locale == "zh-Hans" else "Quit SSH Desk"
-        self.call("menu", dict(path=["SSH Desk", label]))
+        label = "退出Burrow" if locale == "zh-Hans" else "Quit Burrow"
+        self.call("menu", dict(path=["Burrow", label]))
 
     def snapshot(self):
         self.menu("Snapshot")
@@ -1216,12 +1216,12 @@ def main():
                     "-overlay", str(overlay), "-o", str(binary), "."], cwd=repo, env=env, check=True)
     # AppKit needs a proper bundle to register/focus a native window reliably.
     # Reuse only the packaging resources; the executable is the overlay build.
-    bundle = run_dir / "SSH Desk Integration.app"
-    shutil.copytree(repo / "build/darwin-arm64/SSH Desk.app", bundle)
+    bundle = run_dir / "Burrow Integration.app"
+    shutil.copytree(repo / "build/darwin-arm64/Burrow.app", bundle)
     info_path = bundle / "Contents/Info.plist"
     info = plistlib.loads(info_path.read_bytes())
     info["CFBundleIdentifier"] = "dev.sshdesk.integration." + str(os.getpid())
-    info["CFBundleName"] = "SSH Desk Integration"
+    info["CFBundleName"] = "Burrow Integration"
     info_path.write_bytes(plistlib.dumps(info))
     launch_binary = bundle / "Contents/MacOS" / info["CFBundleExecutable"]
     shutil.copy2(binary, launch_binary)

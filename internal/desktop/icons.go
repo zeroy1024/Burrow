@@ -12,6 +12,10 @@ var (
   <rect x="3" y="4.5" width="18" height="15" rx="3"/>
   <path d="M9 4.5v15"/>
 `)
+	splitIcon = uikit.LineIcon(`
+  <rect x="3" y="4.5" width="18" height="15" rx="3"/>
+  <path d="M12 4.5v15"/>
+`)
 	terminalIcon = uikit.LineIcon(`
   <rect x="3" y="4.5" width="18" height="15" rx="3"/>
   <path d="m7 9 3 3-3 3m6 0h4"/>
@@ -59,11 +63,12 @@ var (
 <rect x="3" y="14" width="7" height="7" rx="1"/>
 <rect x="14" y="14" width="7" height="7" rx="1"/>
 `)
-	expandIcon = uikit.LineIcon(`<path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7"/>`)
-	bellIcon   = uikit.LineIcon(`<path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/>`)
-	lockIcon   = uikit.LineIcon(`<rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V6a4 4 0 0 1 8 0v4"/>`)
-	codeIcon   = uikit.LineIcon(`<path d="M8 3H6v7l-2 2 2 2v7h2M16 3h2v7l2 2-2 2v7h-2"/>`)
-	ubuntuIcon = uikit.BrandIcon(`
+	expandIcon  = uikit.LineIcon(`<path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7"/>`)
+	restoreIcon = uikit.LineIcon(`<path d="M14 4v6h6M10 20v-6H4M20 4l-6 6M4 20l6-6"/>`)
+	bellIcon    = uikit.LineIcon(`<path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/>`)
+	lockIcon    = uikit.LineIcon(`<rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V6a4 4 0 0 1 8 0v4"/>`)
+	codeIcon    = uikit.LineIcon(`<path d="M8 3H6v7l-2 2 2 2v7h2M16 3h2v7l2 2-2 2v7h-2"/>`)
+	ubuntuIcon  = uikit.BrandIcon(`
 <circle cx="12" cy="12" r="6.2" stroke-width="3"/>
 <circle cx="20" cy="12" r="2.8" fill="currentColor" stroke="none"/>
 <circle cx="8" cy="5" r="2.8" fill="currentColor" stroke="none"/>

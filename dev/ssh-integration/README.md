@@ -56,7 +56,7 @@ python3 -B -u scripts/ssh-integration-ui.py --file-protocols
 python3 -B -u scripts/ssh-integration-ui.py --core-e2e
 ```
 
-脚本通过 Go overlay 启用固定 MyGo 版本的 automation 插件，只在临时构建中将应用配置路径指向独立目录；不修改 `HOME`、正式构建或现有 SSH Desk 配置。固定 SDK 复制到测试临时目录后通过独立 modfile 引用，不修改全局模块缓存或项目依赖。用户数据、旧配置迁移路径、本地默认目录、缓存和日志均隔离。测试专用凭据 provider 以 `0600` 文件保存临时秘密，保留应用的凭据调用与版本校验；这些测试不覆盖 macOS 钥匙串集成。
+脚本通过 Go overlay 启用固定 MyGo 版本的 automation 插件，只在临时构建中将应用配置路径指向独立目录；不修改 `HOME`、正式构建或现有 Burrow 配置。固定 SDK 复制到测试临时目录后通过独立 modfile 引用，不修改全局模块缓存或项目依赖。用户数据、旧配置迁移路径、本地默认目录、缓存和日志均隔离。测试专用凭据 provider 以 `0600` 文件保存临时秘密，保留应用的凭据调用与版本校验；这些测试不覆盖 macOS 钥匙串集成。
 
 它启动真实 macOS 窗口，以本地 Unix socket 发送点击、键盘和菜单操作，并从实际 Ghostty 实例读取文字与网格。Snapshot 只读观测应用状态；不拍截图或进行视觉验收。
 

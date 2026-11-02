@@ -90,7 +90,6 @@ type app struct {
 	pointer            ui.Point
 	cellWidth          float32
 	cellFont           ui.Font
-	cellTracking       float32
 	terminal           terminalSettingsState
 	terminalError      error
 	drag               *paneDragState
@@ -189,7 +188,15 @@ func (a *app) clearWorkspaceGestures() {
 
 // Run starts the native desktop application and its main window.
 func Run() error {
+	// Preserve the existing data directory, including integration overrides,
+	// before changing the display name used by MyGo's default paths.
 	mygo.App.SetName("SSH Desk")
+	dataDirectory, err := mygo.App.Path(mygo.PathUserData)
+	if err != nil {
+		return fmt.Errorf("locate application data directory: %w", err)
+	}
+	mygo.App.SetPath(mygo.PathUserData, dataDirectory)
+	mygo.App.SetName("Burrow")
 	mygo.App.SetLanguages("zh-Hans", "en")
 	if err := nativeterm.Load(); err != nil {
 		return fmt.Errorf("加载原生终端：%w", err)
@@ -254,7 +261,7 @@ func Run() error {
 		a.syncAppearance()
 		t := theme.Current()
 		a.window = mygo.NewWindow(mygo.WindowOptions{
-			Title:                "SSH Desk",
+			Title:                "Burrow",
 			Width:                int(t.C.Desktop.WindowWidth),
 			Height:               int(t.C.Desktop.WindowHeight),
 			MinWidth:             int(t.C.Desktop.WindowMinWidth),

@@ -289,7 +289,7 @@ SSH与文件目录的SiderRow不再注册原生ContextMenu。RowMenuOn把行右�
 | 能力 | 当前状态 | 公共API/消费者与影响 |
 |---|---|---|
 | TerminalSurface配色与容器 | 完整实现 | `TerminalSurface/ResolveTerminalColors/Pane/Header/Footer`仍接终端卡片；`sshColors(session)`给原生VT显式每会话颜色，设置预览继续原渲染 |
-| 真实终端Tracking | 明确不适用 | 2026-11-02用户允许忽略真实网格字距差异；保留原配置，不以缩放冒充支持 |
+| 真实终端字距 | 已移除遗留参数 | 配置字段、校验及旧文本渲染调用已删除；旧 JSON 字段忽略，不以缩放冒充支持 |
 | 真实终端BoldIsBright开关 | 明确不适用 | 用户要求删除设置入口；字体分组、搜索索引及翻译文案已移除；旧配置与旧预览读取路径保留，真实终端使用SDK默认行为 |
 | 真实终端ScrollbackLines | 完整实现（接受页级误差） | [本地终端包](../third_party/mygo-terminal/terminal.go)公开`Options.ScrollbackLines`及`Terminal.SetScrollbackLines(int) error`；[attachSSH](../internal/desktop/ssh_terminal.go)与独立拖动快照创建直接传行数，[enforceScrollback](../internal/desktop/workspace_store.go)原地同步全部已有SSH标签，包含非当前页/标签；同一terminal、连接与传输任务保留。物理显示行按页淘汰，缩小可丢弃最旧历史，增大不恢复旧输出 |
 | 真实终端共享Scrollbar | 明确不适用 | 用户改为只需风格一致；保留原生半透明胶囊、滚动/贴边显示与淡出，其他区域继续公共Scrollbars。宽度/时长存在已记录微差，不声称同组件或像素一致 |

@@ -238,8 +238,9 @@ func PaneActionBackdrop(c *ui.Context, width, blurRadius float32, background ui.
 }
 
 type PaneIconButtonProps struct {
-	Shortcut string
-	Disabled bool
+	Shortcut       string
+	Disabled       bool
+	IconTransition *ui.ContentTransition
 }
 
 func PaneIconButton(c *ui.Context, label string, icon *ui.SVG, surface *theme.Theme, options ...PaneIconButtonProps) ui.Element {
@@ -247,7 +248,10 @@ func PaneIconButton(c *ui.Context, label string, icon *ui.SVG, surface *theme.Th
 	if len(options) != 0 {
 		props = options[0]
 	}
-	return IconButton(c, icon, IconButtonProps{Label: label, Surface: surface, Shortcut: props.Shortcut, Disabled: props.Disabled})
+	return IconButton(c, icon, IconButtonProps{
+		Label: label, Surface: surface, Shortcut: props.Shortcut, Disabled: props.Disabled,
+		IconTransition: props.IconTransition,
+	})
 }
 
 func StylePaneActions(actions ui.Element, target float32, surface *theme.Theme) float32 {

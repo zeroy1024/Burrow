@@ -186,27 +186,36 @@ func (a *app) fileTabButton(c *ui.Context, list ui.Element, index int, session *
 		a.activateFileTab(slices.Index(a.fileSessions, session))
 	})
 	closing := input.Close
-	button.ContextMenu(func(m *ui.Menu) {
-		if m.Item("编辑会话…").Disabled(session.temporary || session.host < 0).Chosen() {
-			a.startEditHostDraft(session.host)
-		}
-		m.Separator()
-		if session.state == connected || session.state == connecting {
-			if m.Item("断开文件会话").Chosen() {
-				a.disconnectFileSession(session)
-			}
-		} else if m.Item("重新连接").Chosen() {
-			a.reconnectFileSession(session)
-		}
-		m.Separator()
-		if m.Item("关闭选项卡").Chosen() {
-			closing = true
-		}
+	menu := []uikit.MenuEntry{
+		{ID: "edit", Label: localize(c, "编辑会话…"), Icon: uikit.IconEdit,
+			Disabled: session.temporary || session.host < 0, OnChoose: func() { a.startEditHostDraft(session.host) }},
+		{ID: "after-edit", Separator: true},
+	}
+	if session.state == connected || session.state == connecting {
+		menu = append(menu, uikit.MenuEntry{
+			ID: "disconnect", Label: localize(c, "断开文件会话"), Icon: uikit.IconPause,
+			OnChoose: func() { a.disconnectFileSession(session) },
+		})
+	} else {
+		menu = append(menu, uikit.MenuEntry{
+			ID: "reconnect", Label: localize(c, "重新连接"), Icon: uikit.IconRetry,
+			OnChoose: func() { a.reconnectFileSession(session) },
+		})
+	}
+	menu = append(menu, uikit.MenuEntry{ID: "before-close", Separator: true}, uikit.MenuEntry{
+		ID: "close", Label: localize(c, "关闭选项卡"), Icon: uikit.IconClose, Danger: true,
+		OnChoose: func() { closing = true },
 	})
 	button.Children(func() {
 		props.State = connectionIndicatorState(session.state)
 		parts := uikit.SessionTabContents(c, button, props)
 		parts.Close.OnClick(func() { a.requestCloseFileTab(slices.Index(a.fileSessions, session)) })
+		uikit.ContextMenuOn(
+			c,
+			button,
+			menu,
+			parts.Close,
+		)
 	})
 	return closing
 }
