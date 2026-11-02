@@ -44,6 +44,8 @@ type pageState struct {
 	draft             hostDraft
 	groupDialogOpen   bool
 	groupDraft        string
+	groupDelete       *hostGroup
+	groupRename       *hostGroup
 	catalogScroll     ui.ScrollState
 	catalogScrollbar  scrollbarState
 	catalogItems      map[catalogKey]*catalogItemMotion
@@ -63,6 +65,7 @@ type app struct {
 	cancel                 context.CancelFunc
 	sshWorkers             sync.WaitGroup
 	nextConnection         int
+	nextCatalogGroupID     int
 	sshPrompts             []*sshPrompt
 	fileSSHLink            *fileSession
 
@@ -81,6 +84,7 @@ type app struct {
 	tabPress           ui.Point
 	statusVisible      bool
 	window             *mygo.Window
+	windowMaterial     mygo.Vibrancy
 	minimumWindow      [2]int
 	workArea           ui.Handle
 	pointer            ui.Point
@@ -116,6 +120,7 @@ type app struct {
 	closedTabs         []closedWorkspaceTab
 	closeRequest       *workspaceTab
 	closeFileRequest   *fileSession
+	closePaneRequest   *paneCloseRequest
 	savedWorkspace     *storedWorkspace
 	reduceTransparency bool
 }
@@ -227,9 +232,6 @@ func Run() error {
 	stopTokens := theme.OnChange(func(t *theme.Theme) {
 		updateTerminalSurfaceAccent(t)
 		if a.window != nil {
-			if err := a.window.SetBackgroundColor(windowColor(t.C.Window.Bg)); err != nil {
-				panic(err)
-			}
 			a.window.Invalidate()
 		}
 	})
@@ -259,9 +261,13 @@ func Run() error {
 			MinHeight:            int(t.C.Desktop.WindowMinHeight),
 			TitleBarStyle:        mygo.TitleBarHidden,
 			TrafficLightPosition: &mygo.Point{X: int(t.C.Desktop.TrafficLightX), Y: int(t.C.Desktop.TrafficLightY)},
-			BackgroundColor:      windowColor(t.C.Window.Bg),
+			BackgroundColor:      "#00000000",
+			Transparent:          true,
+			Vibrancy:             mygo.VibrancyTitlebar,
 			Content:              ui.View(a.view),
 		})
+		a.windowMaterial = mygo.VibrancyTitlebar
+		a.syncWindowMaterial()
 		a.startCatalogMigration()
 		a.window.OnClose(func(e *mygo.CloseEvent) {
 			if a.quitPending {
@@ -369,7 +375,15 @@ func Run() error {
 func (a *app) view(c *ui.Context) {
 	t := theme.Current()
 	a.theme = uikit.Install(c)
-	c.Root().Background(uikit.Color(t.C.Window.Bg)).Disabled(a.transfers.quitting)
+	background := uikit.Color(t.C.Window.Bg)
+	headerBackground := background
+	if a.translucencyEnabled(c) && c.Vibrancy() {
+		// Keep the title bar in the window's palette while allowing the
+		// native material to show through its tint.
+		headerBackground = background.Alpha(t.C.Titlebar.TintOpacity)
+		background = ui.Transparent
+	}
+	c.Root().Background(background).Disabled(a.transfers.quitting)
 	root := ui.Column(c).Fill()
 	x, y, _ := root.PointerPosition()
 	a.pointer = ui.Point{X: x, Y: y}
@@ -391,6 +405,7 @@ func (a *app) view(c *ui.Context) {
 	a.files.dragSeen = false
 	a.enforceScrollback()
 	a.tickTransfers(c)
+	a.updateSSHLatency(c)
 	a.updateMonitor(c)
 	a.tickPreferences(c)
 	target := float32(1)
@@ -399,7 +414,7 @@ func (a *app) view(c *ui.Context) {
 	}
 	shown := root.AnimateTo(sidebarMotionKey(a.section), target, a.positionAnimation(uikit.Tween(t.C.Desktop.SidebarDuration)))
 	root.Children(func() {
-		ui.Column(c).Key(pageHeaderKey(active)).FillWidth().Shrink(0).Children(func() {
+		ui.Column(c).Key(pageHeaderKey(active)).FillWidth().Shrink(0).Background(headerBackground).Children(func() {
 			switch active {
 			case sectionSSH:
 				a.titleBar(c, shown)
@@ -409,7 +424,7 @@ func (a *app) view(c *ui.Context) {
 				uikit.TitleBar(c).FillWidth()
 			}
 		})
-		ui.Row(c).Grow(1).MinHeight(0).AlignItems(ui.Stretch).Children(func() {
+		ui.Row(c).Grow(1).MinHeight(0).AlignItems(ui.Stretch).Background(uikit.Color(t.C.Window.Bg)).Children(func() {
 			a.navigation(c)
 			ui.Box(c).Key(active).Grow(1).MinWidth(0).FillHeight().Children(func() {
 				switch active {

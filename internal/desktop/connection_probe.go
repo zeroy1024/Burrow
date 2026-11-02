@@ -39,7 +39,13 @@ func (a *app) prepareConnectionTest(h host, password, passphrase string, passphr
 		plan, planErr = a.captureSSHPlan(h)
 	}
 	return func(parent context.Context) connectionTestResult {
-		ctx, cancel := context.WithTimeout(parent, theme.Current().Motion.Duration.Test)
+		timeout := theme.Current().Motion.Duration.Test
+		if h.protocol != "ftp" {
+			// Interactive authentication must not inherit the prototype's ten
+			// second UI budget while the user is answering server challenges.
+			timeout = 2 * time.Minute
+		}
+		ctx, cancel := context.WithTimeout(parent, timeout)
 		defer cancel()
 		result := connectionTestResult{startedAt: time.Now()}
 		err := planErr

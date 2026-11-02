@@ -28,6 +28,7 @@ type sshConnectionGroup struct {
 	waiters    map[*sshConnectionRequest]struct{}
 	queue      []*sshConnectionRequest
 	opening    *sshConnectionRequest
+	latency    sshLatencyState
 }
 
 type sshConnectionRequest struct {

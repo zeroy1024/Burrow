@@ -38,11 +38,13 @@ func (a *app) serverStatus(c *ui.Context) {
 		if a.monitor.session == session {
 			if a.monitor.metrics != nil {
 				metrics, history = *a.monitor.metrics, a.monitor.history
-				notice = "每 2 秒采样 · 进程 CPU 为累计均值"
+				if stats := a.monitor.diskStats; stats != nil && a.monitor.diskIdentity == metrics.root.identity {
+					metrics.diskTotal, metrics.diskUsed = stats.Total, stats.Total-stats.Free
+					percent := float64(metrics.diskUsed) / float64(metrics.diskTotal) * 100
+					metrics.disk = &percent
+				}
 			}
-			if a.monitor.errorText != "" {
-				notice = "监控不可用：" + a.monitor.errorText
-			}
+			notice = monitorNotice(&a.monitor)
 		}
 		ui.Column(c).Gap(t.C.Stats.SectionGap).Children(func() {
 			uikit.Text(c, h.name+" · 跟随焦点", uikit.TextProps{Style: uikit.TextCaption, Tone: uikit.ToneSecondary}).FontSize(t.Font.Size.Caption2).
@@ -92,13 +94,15 @@ func (a *app) serverStatus(c *ui.Context) {
 			uikit.Divider(c)
 			ui.Column(c).Gap(t.Space.N12).Children(func() {
 				processes := "—"
-				if metrics.processes > 0 {
+				if metrics.hasProcesses {
 					processes = fmt.Sprint(metrics.processes)
 				}
 				uikit.KeyValue(c, []uikit.KV{{Key: "主机名", Value: monitorText(metrics.hostname)}, {Key: "系统", Value: monitorText(metrics.system)},
-					{Key: "内核", Value: monitorText(metrics.kernel), Dim: true}, {Key: "运行时间", Value: monitorUptime(metrics.uptime)}, {Key: "进程", Value: processes}})
+					{Key: "内核", Value: monitorText(metrics.kernel)}, {Key: "运行时间", Value: monitorUptime(metrics.uptime)}, {Key: "进程", Value: processes}})
 			})
-			uikit.Text(c, notice, uikit.TextProps{Style: uikit.TextCaption, Tone: uikit.ToneSecondary})
+			if notice != "" {
+				uikit.Text(c, notice, uikit.TextProps{Style: uikit.TextCaption, Tone: uikit.ToneSecondary})
+			}
 			ui.Box(c).Height(t.Space.N8)
 		})
 	})

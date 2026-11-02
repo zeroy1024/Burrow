@@ -19,6 +19,7 @@ type sshPrompt struct {
 	secret               string
 	open                 bool
 	responded            bool
+	echo                 bool
 	answer               chan sshAnswer
 }
 
@@ -74,7 +75,11 @@ func (a *app) sshDialogs(c *ui.Context) {
 			uikit.Text(c, "首次连接此服务器。请与服务器管理员核对主机密钥指纹后再信任。", uikit.TextProps{Style: uikit.TextSmall})
 			ui.Text(c, fmt.Sprintf("%s\n%s", p.keyType, p.fingerprint)).FontSize(t.Font.Size.Small).Selectable()
 		} else {
-			uikit.PasswordInput(c, &p.secret, uikit.InputProps{Label: p.title, Mono: true}).Input.FillWidth().AutoFocus()
+			if p.echo {
+				uikit.Input(c, &p.secret, uikit.InputProps{Label: p.title, Mono: true}).FillWidth().AutoFocus()
+			} else {
+				uikit.PasswordInput(c, &p.secret, uikit.InputProps{Label: p.title, Mono: true}).Input.FillWidth().AutoFocus()
+			}
 			detail := p.detail
 			if detail == "" {
 				detail = "仅用于本次连接，不保存到配置。"

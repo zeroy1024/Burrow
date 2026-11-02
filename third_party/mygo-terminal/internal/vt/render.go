@@ -32,12 +32,27 @@ const (
 	rowDataCells     = 3
 	rowDataSelection = 4
 	rowDataCellsRaw  = 5
+	rowDataViewportY = 6
 	rowDataID        = 7
 
 	cellDataStyle        = 2
 	cellDataGraphemesLen = 3
 	cellDataGraphemesBuf = 4
 )
+
+type Overscan struct{ Above, Below uint16 }
+
+// SetOverscan requests actual neighbouring rows without moving the viewport.
+func (r *RenderState) SetOverscan(request Overscan) error {
+	return result(call(fnRenderStateSet, r.h, 1, uintptr(unsafe.Pointer(&request))))
+}
+
+// RowViewportY is negative above the viewport and at least Size.rows below it.
+func (r *RenderState) RowViewportY() int {
+	var y int32
+	r.rowGet(rowDataViewportY, unsafe.Pointer(&y))
+	return int(y)
+}
 
 // NewRenderState makes an empty render state.
 func NewRenderState() (*RenderState, error) {

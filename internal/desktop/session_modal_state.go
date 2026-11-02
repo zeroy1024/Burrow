@@ -12,8 +12,6 @@ import (
 	"time"
 	"unicode"
 
-	"sshdesk/internal/theme"
-
 	"github.com/egoist/mygo/ui"
 	"sshdesk/internal/uikit"
 )
@@ -391,7 +389,7 @@ func (a *app) startDraftTest(c *ui.Context, d *hostDraft) {
 	}
 	h := a.draftHost(d)
 	password := d.password
-	if d.passwordSaved && !d.passwordChanged {
+	if d.auth == "password" && d.passwordSaved && !d.passwordChanged {
 		var err error
 		password, err = a.sessionPassword(h)
 		if err != nil {
@@ -400,7 +398,7 @@ func (a *app) startDraftTest(c *ui.Context, d *hostDraft) {
 			return
 		}
 	}
-	ctx, cancel := context.WithTimeout(a.ctx, theme.Current().Motion.Duration.Test)
+	ctx, cancel := context.WithCancel(a.ctx)
 	results := make(chan connectionTestResult, 1)
 	d.testCancel, d.testResults, d.testResult, d.testVisible = cancel, results, nil, true
 	c.Announce("正在连接…")

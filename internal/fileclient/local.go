@@ -2,6 +2,8 @@ package fileclient
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -111,17 +113,42 @@ func (c *localClient) open(ctx context.Context, name string, offset int64, flags
 	if err != nil {
 		return nil, err
 	}
-	// Reject devices and pipes before opening; transfers operate on regular files.
-	info, err := os.Stat(name)
+	parent, err := os.OpenRoot(filepath.Dir(name))
+	if err != nil {
+		return nil, err
+	}
+	defer parent.Close()
+	base := filepath.Base(name)
+	info, err := parent.Lstat(base)
 	if err == nil && !info.Mode().IsRegular() {
 		return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrInvalid}
 	}
 	if err != nil && !(flags&os.O_CREATE != 0 && errors.Is(err, fs.ErrNotExist)) {
 		return nil, err
 	}
-	file, err := os.OpenFile(name, flags, 0644)
+	truncate := flags&os.O_TRUNC != 0
+	flags &^= os.O_TRUNC
+	if info == nil {
+		flags |= os.O_EXCL
+	} else {
+		flags &^= os.O_CREATE
+	}
+	file, err := openLocalLeaf(parent, base, flags, 0600)
 	if err != nil {
 		return nil, err
+	}
+	opened, err := file.Stat()
+	if err == nil && (!opened.Mode().IsRegular() || info != nil && !os.SameFile(info, opened)) {
+		err = &fs.PathError{Op: "open", Path: name, Err: fs.ErrInvalid}
+	}
+	if err == nil {
+		err = c.check(ctx)
+	}
+	if err == nil && truncate {
+		err = file.Truncate(0)
+	}
+	if err != nil {
+		return nil, errors.Join(err, file.Close())
 	}
 	if _, err := file.Seek(offset, io.SeekStart); err != nil {
 		return nil, errors.Join(err, file.Close())
@@ -163,13 +190,120 @@ func (c *localClient) Rename(ctx context.Context, oldName, newName string, optio
 	if err != nil {
 		return err
 	}
-	if len(options) > 0 && options[0].NoReplace {
-		if err := renameLocalNoReplace(oldName, newName); err != nil {
-			return &os.LinkError{Op: "rename", Old: oldName, New: newName, Err: err}
-		}
-		return nil
+	fromRoot, err := os.OpenRoot(filepath.Dir(oldName))
+	if err != nil {
+		return err
 	}
-	return os.Rename(oldName, newName)
+	defer fromRoot.Close()
+	toRoot, err := os.OpenRoot(filepath.Dir(newName))
+	if err != nil {
+		return err
+	}
+	defer toRoot.Close()
+	from, to := filepath.Base(oldName), filepath.Base(newName)
+	noReplace := len(options) > 0 && options[0].NoReplace
+	err = renameLocalAt(fromRoot, from, toRoot, to, noReplace)
+	if !noReplace || !errors.Is(err, fs.ErrExist) || from == to || !sameRenameSpelling(from, to) {
+		return err
+	}
+	oldInfo, oldErr := fromRoot.Lstat(from)
+	newInfo, newErr := toRoot.Lstat(to)
+	if oldErr != nil || newErr != nil || !os.SameFile(oldInfo, newInfo) {
+		return err
+	}
+	name, err := localRenameTemporary()
+	if err != nil {
+		return err
+	}
+	if err := renameLocalAt(fromRoot, from, fromRoot, name, true); err != nil {
+		return err
+	}
+	if err := renameLocalAt(fromRoot, name, toRoot, to, true); err != nil {
+		rollback := renameLocalAt(fromRoot, name, fromRoot, from, true)
+		if rollback != nil {
+			return fmt.Errorf("rename failed; original remains at %s: %w", filepath.Join(filepath.Dir(oldName), name), errors.Join(err, rollback))
+		}
+		return err
+	}
+	return nil
+}
+
+func localRenameTemporary() (string, error) {
+	var random [16]byte
+	if _, err := rand.Read(random[:]); err != nil {
+		return "", err
+	}
+	return ".sshdesk-rename-" + hex.EncodeToString(random[:]), nil
+}
+
+func (c *localClient) ResolveDirectory(ctx context.Context, name string) (string, error) {
+	name, err := c.path(ctx, name)
+	if err != nil {
+		return "", err
+	}
+	resolved, err := filepath.EvalSymlinks(name)
+	if err != nil {
+		return "", err
+	}
+	info, err := os.Stat(resolved)
+	if err != nil {
+		return "", err
+	}
+	if !info.IsDir() {
+		return "", errors.Join(ErrNotDirectory, &fs.PathError{Op: "resolve directory", Path: name, Err: syscall.ENOTDIR})
+	}
+	return resolved, c.check(ctx)
+}
+
+func (c *localClient) Chmod(ctx context.Context, name string, mode fs.FileMode) error {
+	name, err := c.path(ctx, name)
+	if err != nil {
+		return err
+	}
+	parent, err := os.OpenRoot(filepath.Dir(name))
+	if err != nil {
+		return err
+	}
+	defer parent.Close()
+	base := filepath.Base(name)
+	info, err := parent.Lstat(base)
+	if err != nil {
+		return err
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		return &fs.PathError{Op: "chmod", Path: name, Err: fs.ErrInvalid}
+	}
+	file, err := openLocalLeaf(parent, base, os.O_RDONLY, 0)
+	if err != nil {
+		return err
+	}
+	opened, err := file.Stat()
+	if err == nil && !os.SameFile(info, opened) {
+		err = &fs.PathError{Op: "chmod", Path: name, Err: fs.ErrInvalid}
+	}
+	if err == nil {
+		err = c.check(ctx)
+	}
+	if err == nil {
+		err = file.Chmod(mode)
+	}
+	return errors.Join(err, file.Close())
+}
+
+func (c *localClient) RemoveTree(ctx context.Context, name string) error {
+	name, err := c.path(ctx, name)
+	if err != nil {
+		return err
+	}
+	if filepath.Dir(name) == name {
+		return &fs.PathError{Op: "remove tree", Path: name, Err: fs.ErrInvalid}
+	}
+	parent, err := os.OpenRoot(filepath.Dir(name))
+	if err != nil {
+		return err
+	}
+	defer parent.Close()
+	return removeLocalTree(ctx, c, parent, filepath.Base(name))
 }
 
 func (c *localClient) Remove(ctx context.Context, name string, directory bool) error {
@@ -251,6 +385,7 @@ func localEntry(info fs.FileInfo) Entry {
 		Name: info.Name(), Size: info.Size(), Directory: info.IsDir(),
 		Symlink: info.Mode()&os.ModeSymlink != 0, Modified: info.ModTime(),
 		Permissions: info.Mode().String(),
+		Mode:        info.Mode(), ModeKnown: true,
 	}
 	if stat, ok := info.Sys().(*syscall.Stat_t); ok {
 		entry.Owner = fmt.Sprintf("%d:%d", stat.Uid, stat.Gid)

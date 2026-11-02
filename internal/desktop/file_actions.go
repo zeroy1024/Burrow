@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/fs"
 	"path"
 	"slices"
 	"strings"
@@ -31,7 +30,7 @@ func (a *app) applyFileAction(c *ui.Context, dialog *fileActionDialog) bool {
 		dialog.errorText = "文件会话未连接"
 		return false
 	}
-	name, directory, kind := strings.TrimSpace(dialog.name), pane.path, dialog.kind
+	name, directory, kind := dialog.name, pane.path, dialog.kind
 	selected := slices.Clone(pane.selection())
 	if dialog.original != "" {
 		selected = nil
@@ -58,12 +57,7 @@ func (a *app) applyFileAction(c *ui.Context, dialog *fileActionDialog) bool {
 		case "rename":
 			reveal = path.Join(directory, name)
 			if selected[0].path != reveal {
-				_, err = client.Stat(ctx, reveal)
-				if err == nil {
-					err = fs.ErrExist
-				} else if errors.Is(err, fs.ErrNotExist) {
-					err = client.Rename(ctx, selected[0].path, reveal, fileclient.RenameOptions{NoReplace: true})
-				}
+				err = client.Rename(ctx, selected[0].path, reveal, fileclient.RenameOptions{NoReplace: true})
 			}
 		case "delete":
 			if len(selected) == 0 {
@@ -105,6 +99,9 @@ func (a *app) applyFileAction(c *ui.Context, dialog *fileActionDialog) bool {
 // Lstat is repeated at every level: links are unlinked, never traversed.
 // A malicious server cannot turn a recursive deletion into a parent traversal.
 func removeFileTree(ctx context.Context, client fileclient.Client, location string, depth int) error {
+	if remover, ok := client.(fileclient.TreeRemover); ok {
+		return remover.RemoveTree(ctx, location)
+	}
 	if depth > 256 {
 		return errors.New("目录层级过深，已停止删除")
 	}

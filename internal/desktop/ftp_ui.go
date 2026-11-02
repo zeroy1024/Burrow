@@ -174,11 +174,24 @@ func (a *app) filePane(c *ui.Context, session *fileSession, pane *filePaneState,
 	var folderTarget string
 	card.Children(func() {
 		entries := pane.entries()
+		var backdrop func(int) uikit.TableBackdropRow
+		if a.translucencyEnabled(c) {
+			backdrop = func(index int) uikit.TableBackdropRow {
+				entry := entries[index]
+				kind, values := fileTableRowData(entry)
+				return uikit.TableBackdropRow{Values: values, Leading: func(p *ui.Painter, rect ui.Rect) {
+					uikit.PaintFileIcon(p, rect, kind, entry.name, uikit.FileIconProps{
+						Selected: pane.table.Selection.Has(entry.path), Focused: a.files.activeRemote == pane.remote,
+					})
+				}}
+			}
+		}
 		table := uikit.DataTable(c.Key("file-scroll"), &pane.table, &pane.scroll, columns, uikit.TableProps{
 			Count: len(entries), HeaderHeight: headHeight, FooterHeight: footerHeight,
 			Width: targetWidth, Focused: a.files.activeRemote == pane.remote, Zebra: true, Label: map[bool]string{true: "远程文件", false: "本地文件"}[pane.remote],
 			Key: func(index int) string { return entries[index].path }, RowLabel: func(index int) string { return entries[index].name }, Reveal: pane.reveal,
 			Underlay: func() { a.fileScrollEdge(c, headHeight, false); a.fileScrollEdge(c, footerHeight, true) },
+			Backdrop: backdrop,
 		}, func(row uikit.TableRow, table uikit.TableParts) {
 			if target := a.fileRow(c, session, pane, entries[row.Index], row, table); target != "" {
 				folderTarget = target
@@ -200,6 +213,8 @@ func (a *app) filePane(c *ui.Context, session *fileSession, pane *filePaneState,
 			entry := entries[table.Open]
 			if entry.dir {
 				a.navigateFiles(c, session, pane, entry.path)
+			} else if entry.symlink {
+				a.queueFileDirectory(session, pane, fileNavigation{path: entry.path, historyIndex: -1, link: &entry})
 			} else {
 				a.files.dialog = &fileActionDialog{session: session, pane: pane, kind: "preview", preview: entry}
 			}
@@ -400,21 +415,24 @@ func (a *app) fileRow(
 		uikit.NativeMenu(m, a.filePaneMenu(c, session, pane))
 	})
 	row.Children(func() {
-		kind := uikit.FileRegular
-		if entry.dir {
-			kind = uikit.FileDirectory
-		}
+		kind, values := fileTableRowData(entry)
 		uikit.FileIcon(c, kind, entry.name, uikit.FileIconProps{Selected: tableRow.Selected, Focused: tableRow.Focused})
-		sizeText := "—"
-		if !entry.dir {
-			sizeText = transferBytes(entry.size)
-		}
-		table.Cells(c, []string{entry.name, sizeText, entry.modified.Format("01月02日 15:04"), entry.permissions, entry.owner})
+		table.Cells(c, values)
 	})
 	if entry.dir {
 		return a.fileDropTarget(c, row, session, pane, entry.path, true)
 	}
 	return ""
+}
+
+func fileTableRowData(entry fileEntry) (uikit.FileKind, []string) {
+	kind, size := uikit.FileRegular, "—"
+	if entry.dir {
+		kind = uikit.FileDirectory
+	} else {
+		size = transferBytes(entry.size)
+	}
+	return kind, []string{entry.name, size, entry.modified.Format("01月02日 15:04"), entry.permissions, entry.owner}
 }
 
 func (a *app) filePaneMenu(c *ui.Context, session *fileSession, pane *filePaneState) []uikit.MenuEntry {
@@ -602,5 +620,5 @@ func (a *app) fileScrollEdge(c *ui.Context, height float32, bottom bool) {
 		edge = uikit.EdgeBottom
 	}
 	uikit.ScrollFade(c, edge, uikit.ScrollFadeProps{Height: height, Background: background,
-		MaskTint: background, Translucent: a.translucencyEnabled(c)})
+		MaskTint: background, Translucent: a.translucencyEnabled(c), Uniform: !bottom})
 }

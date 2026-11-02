@@ -3,7 +3,6 @@ package uikit
 import (
 	"fmt"
 	"slices"
-	"strings"
 
 	"sshdesk/internal/theme"
 
@@ -53,6 +52,7 @@ type TableProps struct {
 	Menu                       func(*ui.Menu, int)
 	DropTarget                 func(int) bool
 	Underlay                   func()
+	Backdrop                   func(int) TableBackdropRow
 }
 
 type TableParts struct {
@@ -200,12 +200,16 @@ func DataTable(
 				Left(t.C.FilePane.ContentPadding).Right(t.C.FilePane.ContentPadding).Clip().PassThrough().Children(empty)
 		}
 		if props.Underlay != nil {
+			if props.Backdrop != nil {
+				paintTableBackdrop(c, parts, scroll, props)
+			}
 			props.Underlay()
 		}
 		ui.Box(c).Key("header").Absolute().Top(props.HeaderHeight - t.C.FileList.HeaderHeight).Left(0).Right(0).
 			Height(t.C.FileList.HeaderHeight).ClipX().Children(func() {
 			SortHeader(c, SortHeaderProps{Columns: columns, State: state, Width: width,
-				Scroller: parts.Root, Chevron: IconSVG(IconChevronDown)})
+				Scroller: parts.Root, Chevron: IconSVG(IconChevronDown),
+				Translucent: props.Underlay != nil && props.Backdrop != nil})
 		})
 		Scrollbars(c, parts.Frame, parts.Root, scroll, ScrollbarProps{
 			Label: props.Label + "滚动条", Horizontal: true, Vertical: true,
@@ -304,11 +308,8 @@ func (parts TableParts) Cells(c *ui.Context, values []string) {
 	t := theme.Current()
 	for index, column := range parts.Columns {
 		width := max(0, parts.Widths[index]-column.LeadingWidth)
-		value := values[index]
-		if column.MiddleEllipsis {
-			value = MiddleText(value, width, ui.Font{Family: strings.Join(t.Font.Family.Ui, ", "), Size: t.C.FileList.FontSize})
-		}
-		cell := ui.Text(c, value).Width(width).Shrink(0).FontSize(t.C.FileList.FontSize).SingleLine().Role(ui.RoleCell).
+		value, font := tableCellContent(column, values[index], width)
+		cell := ui.Text(c, value).Width(width).Shrink(0).Font(font.Family).FontSize(font.Size).FontFeatures(font.Features).SingleLine().Role(ui.RoleCell).
 			Label(column.Title + "：" + values[index]).Value(values[index])
 		if column.RowHeader {
 			cell.Description("行标题 · " + column.Title)
@@ -328,9 +329,6 @@ func (parts TableParts) Cells(c *ui.Context, values []string) {
 				}
 			}
 			cell.TextColor(Color(ink))
-		}
-		if column.TextStyle == ColumnMonoMetadata {
-			cell.Font(strings.Join(t.Font.Family.Mono, ", ")).FontSize(t.Font.Size.Caption)
 		}
 	}
 }

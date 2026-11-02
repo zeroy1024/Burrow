@@ -2,6 +2,8 @@
 
 以 `7decb9c` 为 UI 基线，合入本地 main `45d14ed`；仓库无远端，因此没有远端拉取或推送。原布局、三页互斥、独立目录及拖放模型保留，正文与事件接入真实后端。
 
+`73159b6`后审查发现的14项问题与本轮实际API、生产消费者及新验证分列于[整改清单](mvp-remediation.md)。14项修复及已有检查已完成，第14项先受控复现再修；SSH/SFTP/FTP loopback、传输控制器与本地文件验证独立记录。真实OS特殊位跳过、原Docker集成未重跑和GUI未验收的边界如实保留，不沿用历史“完整接入”冒充所有设备已实测。
+
 | 能力 | 状态 | 实际实现与消费者 |
 |---|---|---|
 | SSH真实终端 | 完整接入 | `sshclient` + `ssh_sessions.go/ssh_terminal.go`；终端窗格使用固定 MyGo Ghostty VT View，支持真实输入输出/PTY/resize/控制序列/IME |
@@ -11,8 +13,10 @@
 | 目录与文件CRUD | 完整接入 | `fileclient` local/SFTP/FTP API；浏览、历史、工具栏、文件操作Modal读取真实结果 |
 | FTP配置 | 完整接入 | TLS none/explicit/implicit、passive/active、7种编码；正式连接及测试共用client |
 | 传输队列 | 完整接入 | 真实recursive manifest、字节/速度、并发、冲突、pause/resume/cancel/retry、独有part提交；独立任务端点和client |
-| 正常退出恢复 | 完整接入 | 收敛worker后保存队列/清单/part；重启离线；格式/路径校验、读取失败保护、保存错误可见 |
-| Linux监控 | 完整接入 | 现有全部指标卡片读取真实采样；CPU/net差分；失败/缺工具显示不可用；隐藏即停采样而不关闭SSH |
+| 正常退出恢复 | 完整接入 | 收敛worker后保存v3队列/清单/part及确认偏移摘要；兼容v1/v2，重启离线；格式/路径校验、读取失败保护、保存错误可见 |
+| SSH延迟 | 完整接入 | `Connection.ProbeLatency`复用现有transport测SSH应用层往返时间；`updateSSHLatency`独立于监控，当前可见Shell按连接组共享，首次可见连接立即采样、每5秒刷新，3秒超时或10秒过期显示未知 |
+| 窗口及栏半透明 | 已修正渲染回归，GUI待复测 | `syncWindowMaterial`即时切换原生VibrancyTitlebar，系统降低透明度强制停用；三页标题栏用92%主题Window.Bg着色，保留原灰色外观；真实终端ViewportBackdrop读取固定Ghostty的实际overscan行，使用自身绘制坐标及上下栏外侧圆角裁剪，修正焦点/非焦点不同离屏绘制路径的错位与直角底板；文件TableProps.Backdrop绘制实际条目，ScrollFadeProps.Uniform为工具栏和列头绘制唯一的均匀模糊/主题着色背景，SortHeader.Translucent清除自身底色，页脚保留渐隐，关闭半透明时恢复实体背景；原视口、4px留白及输入/拖动身份保留 |
+| Linux监控 | 完整接入，附能力边界 | 主体`/proc`、`os-release`及可选SFTP `statvfs`；默认路由单接口、PID＋启动时间差分Top、单指标失败隔离；同transport切Shell保留基线，隐藏取消自有采集通道。实际API、预算及未实测边界见[监控覆盖清单](monitoring.md) |
 | 真实终端字体/颜色/光标 | 当前验收范围完整接入 | 每会话scheme、字体/字号/行高、背景、光标通过公开API接入；用户允许忽略Tracking差异，粗体提亮设置入口已删除 |
 | 实时回滚行数 | 完整实现（接受页级误差） | 本地终端包公开`Options.ScrollbackLines` / `SetScrollbackLines(int) error`；创建时按物理显示行设置，`enforceScrollback`遍历全部SSH标签原地同步，含后台标签与非SSH页面；缩小淘汰最旧历史页，增大不恢复旧输出 |
 | 真实终端滚动条风格 | 当前风格范围已有实现 | 原生VT与UIKit均为半透明胶囊、滚动/贴边显示与淡出；按用户要求保留原生实现，不再要求组件或参数完全相同，未做像素验收 |
@@ -63,3 +67,11 @@
 
 
 终端四项差异已按用户后续决定收口：忽略字距差异、删除粗体开关、原生滚动条保持相同风格；实时回滚通过最小终端包扩展实现并接受页级误差。具体API、页面消费者与裁剪边界见[终端SDK差异](mvp-sdk-blockers.md)。
+
+## 独立 SSH 延迟采样（2026-11-02）
+
+`Connection.ProbeLatency(ctx)`计时现有加密连接上的轻量全局请求，成功或不支持回复均有效；与自动KeepAlive共用一个在途请求，调用方超时只结束等待。未回复的底层请求随transport关闭收敛，不额外持有连接lease，不改变最后一个Shell或文件消费者释放transport的规则。KeepAlive原有间隔/超时断线策略保留；关闭自动KeepAlive时，可见终端仍会发送显示延迟所需的探测。
+
+`updateSSHLatency`只调度SSH页面当前可见窗格，隐藏窗口/切到文件或设置/非当前Tab不新增探测；放大窗格时只采样当前窗格所属连接组。首次可见就绪立即采样，后续5秒一次；同组Shell共享结果，移动/拆分不重建样本所属组。3秒超时、迟到超过3秒或10秒过期显示`—`，重新建立transport清除旧样本。监控命令不再写入页脚延迟，监控指标本轮未改。
+
+已有`go test -race ./...`、`go vet ./...`、`go build ./...`通过，MyGo darwin/arm64应用重新打包并签名。未新增测试；现有用例不含新增延迟调度的专门断言，尚未进行真实服务器或GUI交互验收。此后监控改造已按用户接受的`os-release`/SFTP `statvfs`两项例外接入，状态与新验证分列于[监控覆盖清单](monitoring.md)。

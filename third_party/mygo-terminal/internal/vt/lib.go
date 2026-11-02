@@ -29,7 +29,7 @@ var (
 	fnTerminalVTWrite, fnTerminalCompress, fnTerminalCompressionActivity uintptr
 
 	fnRenderStateNew, fnRenderStateFree, fnRenderStateBeginUpdate, fnRenderStateEndUpdate, fnRenderStateClean,
-	fnRenderStateGet, fnRowIteratorNew, fnRowIteratorFree, fnRowIteratorNext, fnRowGet,
+	fnRenderStateGet, fnRenderStateSet, fnRowIteratorNew, fnRowIteratorFree, fnRowIteratorNext, fnRowGet,
 	fnRowCellsNew, fnRowCellsFree, fnRowCellsSelect, fnRowCellsGet uintptr
 
 	fnKeyEncoderNew, fnKeyEncoderFree, fnKeyEncoderSetopt, fnKeyEncoderSetoptFromTerminal, fnKeyEncoderEncode,
@@ -87,6 +87,7 @@ var symbols = []struct {
 	{"ghostty_render_state_end_update", &fnRenderStateEndUpdate},
 	{"ghostty_render_state_clean", &fnRenderStateClean},
 	{"ghostty_render_state_get", &fnRenderStateGet},
+	{"ghostty_render_state_set", &fnRenderStateSet},
 	{"ghostty_render_state_row_iterator_new", &fnRowIteratorNew},
 	{"ghostty_render_state_row_iterator_free", &fnRowIteratorFree},
 	{"ghostty_render_state_row_iterator_next", &fnRowIteratorNext},
@@ -335,6 +336,8 @@ var enums = []struct {
 	{"GhosttyTerminalData", "MOUSE_SHAPE", dataMouseShape},
 	{"GhosttyRowData", "WRAP", rowDataWrap},
 	{"GhosttyRenderStateRowData", "RAW", rowDataRaw},
+	{"GhosttyRenderStateRowData", "VIEWPORT_Y", rowDataViewportY},
+	{"GhosttyRenderStateOption", "OVERSCAN", 1},
 	{"GhosttyKittyGraphicsPlacementData", "Z", placementZ},
 	{"GhosttyKittyGraphicsImageData", "GENERATION", imageGeneration},
 	{"GhosttyKittyImageFormat", "GRAY", int64(ImageGray)},

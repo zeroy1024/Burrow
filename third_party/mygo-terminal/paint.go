@@ -1,6 +1,7 @@
 package terminal
 
 import (
+	"fmt"
 	"math"
 	"slices"
 	"time"
@@ -115,6 +116,7 @@ func (v *view) paint(p *ui.Painter, r ui.Rect) {
 	bg := v.theme.Background
 	t.mu.Lock()
 	if t.term == nil {
+		v.edgeRows = v.edgeRows[:0]
 		t.mu.Unlock()
 		if !t.opts.Transparent {
 			p.Fill(r, bg, 0)
@@ -127,6 +129,15 @@ func (v *view) paint(p *ui.Painter, r ui.Rect) {
 	}
 	t.rmu.Lock()
 	defer t.rmu.Unlock()
+	if request := v.backdropRequest(); request != v.overscan {
+		if err := t.rs.SetOverscan(request); err != nil {
+			t.mu.Unlock()
+			// The ABI and uint16 request are validated; rejection indicates an
+			// internal renderer contract error, not a recoverable I/O failure.
+			panic(fmt.Errorf("terminal: configure render overscan: %w", err))
+		}
+		v.overscan = request
+	}
 	// A synchronized update shows when it ends, or after a second.
 	if t.held && time.Since(t.heldSince) > time.Second {
 		t.term.SetMode(vt.ModeSyncOutput, false)
@@ -136,7 +147,9 @@ func (v *view) paint(p *ui.Painter, r ui.Rect) {
 	if !held {
 		t.rs.BeginUpdate(t.term)
 	}
-	v.scrollbar = t.term.Scrollbar()
+	scrollbar := t.term.Scrollbar()
+	viewportMoved := scrollbar.Offset != v.scrollbar.Offset
+	v.scrollbar = scrollbar
 	contrast := t.opts.MinimumContrast
 	tc, tr := t.term.Size()
 	v.matches, v.matchBuf = t.viewportMatches(v.matches, v.matchBuf, tc, tr)
@@ -149,15 +162,29 @@ func (v *view) paint(p *ui.Painter, r ui.Rect) {
 		rs.EndUpdate()
 	}
 	colors := rs.Colors()
-	full := rs.Dirty() == vt.Full || colors != v.colors || contrast != v.contrast
+	full := rs.Dirty() == vt.Full || viewportMoved || colors != v.colors || contrast != v.contrast
 	v.colors, v.contrast, v.cursor = colors, contrast, rs.Cursor()
 	cols, rows := rs.Size()
 	if len(v.lines) != rows {
 		v.lines = append(v.lines[:0], make([]rowCache, rows)...)
 		full = true
 	}
+	v.edgeRows = v.edgeRows[:0]
 	rs.Rows()
-	for y := 0; y < rows && rs.NextRow(); y++ {
+	for rs.NextRow() {
+		y := rs.RowViewportY()
+		if y < 0 || y >= rows {
+			index := len(v.edgeRows)
+			if index < cap(v.edgeRows) {
+				v.edgeRows = v.edgeRows[:index+1]
+			} else {
+				v.edgeRows = append(v.edgeRows, viewportBackdropRow{})
+			}
+			row := &v.edgeRows[index]
+			row.y = y
+			v.buildRow(&row.line, rs, cols)
+			continue
+		}
 		line := &v.lines[y]
 		if full || !line.ok || rs.RowDirty() {
 			v.buildRow(line, rs, cols)

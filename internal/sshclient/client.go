@@ -29,11 +29,15 @@ type Config struct {
 	KeyPath    string
 	Passphrase string
 	HostKey    ssh.HostKeyCallback
+	// SetupTimeout bounds authentication and underlying TCP/tunnel creation.
+	// Zero uses two minutes; it does not limit an established connection.
+	SetupTimeout        time.Duration
+	KeyboardInteractive ssh.KeyboardInteractiveChallenge
 	// DialContext opens the underlying connection, such as through a jump host.
 	// Nil uses a TCP dialer with a 20-second timeout.
 	DialContext func(context.Context, string, string) (net.Conn, error)
-	// KeepAlive sends a request at this interval; zero disables it. Each request
-	// has the same timeout, and an unsupported-request reply still proves liveness.
+	// KeepAlive sends automatic requests at this interval; zero disables them.
+	// Each request has the same timeout; unsupported replies also prove liveness.
 	KeepAlive time.Duration
 }
 
@@ -57,6 +61,7 @@ type Connection struct {
 	failureErr  error
 	closeOnce   sync.Once
 	closeErr    error
+	probe       *latencyProbe
 }
 
 type lease struct {
@@ -81,13 +86,22 @@ func Dial(ctx context.Context, cfg Config) (*Connection, error) {
 	if cfg.KeepAlive < 0 {
 		return nil, errors.New("SSH keepalive interval must not be negative")
 	}
-	auth, agentConn, err := authentication(ctx, cfg)
+	if cfg.SetupTimeout < 0 {
+		return nil, errors.New("SSH setup timeout must not be negative")
+	}
+	timeout := cfg.SetupTimeout
+	if timeout == 0 {
+		timeout = 2 * time.Minute
+	}
+	setupCtx, cancelSetup := context.WithTimeout(ctx, timeout)
+	defer cancelSetup()
+	auth, agentConn, err := authentication(setupCtx, cfg)
 	if err != nil {
 		return nil, err
 	}
 	if agentConn != nil {
 		defer agentConn.Close()
-		stopAgent := context.AfterFunc(ctx, func() { agentConn.Close() })
+		stopAgent := context.AfterFunc(setupCtx, func() { agentConn.Close() })
 		defer stopAgent()
 	}
 	address := net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.Port))
@@ -95,8 +109,11 @@ func Dial(ctx context.Context, cfg Config) (*Connection, error) {
 	if dial == nil {
 		dial = (&net.Dialer{Timeout: 20 * time.Second}).DialContext
 	}
-	raw, err := dial(ctx, "tcp", address)
+	raw, err := dial(setupCtx, "tcp", address)
 	if err != nil {
+		if setupCtx.Err() != nil {
+			return nil, fmt.Errorf("connect SSH: %w", setupCtx.Err())
+		}
 		return nil, fmt.Errorf("connect SSH: %w", err)
 	}
 	stopCancel := context.AfterFunc(ctx, func() { raw.Close() })
@@ -109,12 +126,14 @@ func Dial(ctx context.Context, cfg Config) (*Connection, error) {
 	}()
 	// A jump-host channel has no socket deadline of its own. Closing only this
 	// raw connection bounds setup without changing a shared parent's deadline.
-	setupCtx, cancelSetup := context.WithTimeout(ctx, 2*time.Minute)
-	defer cancelSetup()
 	stopSetup := context.AfterFunc(setupCtx, func() { raw.Close() })
 	defer stopSetup()
+	methods := []ssh.AuthMethod{auth}
+	if cfg.Auth == "password" && cfg.KeyboardInteractive != nil {
+		methods = append(methods, ssh.KeyboardInteractive(cfg.KeyboardInteractive))
+	}
 	transport, channels, requests, err := ssh.NewClientConn(raw, address, &ssh.ClientConfig{
-		User: cfg.User, Auth: []ssh.AuthMethod{auth}, HostKeyCallback: cfg.HostKey,
+		User: cfg.User, Auth: methods, HostKeyCallback: cfg.HostKey,
 	})
 	if err != nil {
 		if setupCtx.Err() != nil {
@@ -313,13 +332,15 @@ func (c *Connection) keepAlive(interval time.Duration) {
 			return
 		case <-ticker.C:
 		}
-		timer := time.AfterFunc(interval, func() {
-			c.failTransport(errors.New("SSH keepalive timed out"))
-		})
-		_, _, err := c.client.SendRequest("keepalive@"+"openssh.com", true, nil)
-		timer.Stop()
+		ctx, cancel := context.WithTimeout(c.ctx, interval)
+		_, err := c.ProbeLatency(ctx)
+		cancel()
 		if err != nil {
-			c.failTransport(fmt.Errorf("SSH keepalive: %w", err))
+			if errors.Is(err, context.DeadlineExceeded) {
+				c.failTransport(errors.New("SSH keepalive timed out"))
+			} else {
+				c.failTransport(fmt.Errorf("SSH keepalive: %w", err))
+			}
 			return
 		}
 	}

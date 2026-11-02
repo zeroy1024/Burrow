@@ -19,12 +19,31 @@ type closedWorkspaceTab struct {
 	section    section
 }
 
+type paneCloseRequest struct {
+	tab     *workspaceTab
+	session *remoteSession
+}
+
 func (a *app) navigationSelected(target section) bool {
 	return a.activeSection() == target
 }
 
 func (a *app) translucencyEnabled(c *ui.Context) bool {
 	return a.prefs.Translucency && !a.reduceTransparency
+}
+
+func (a *app) syncWindowMaterial() {
+	if a.window == nil {
+		return
+	}
+	material := mygo.VibrancyNone
+	if a.prefs.Translucency && !a.reduceTransparency {
+		material = mygo.VibrancyTitlebar
+	}
+	if material != a.windowMaterial {
+		a.windowMaterial = material
+		a.window.SetVibrancy(material)
+	}
 }
 
 func (a *app) glassRadius(c *ui.Context, radius float32) float32 {
@@ -151,7 +170,7 @@ func (a *app) installAppMenu() func() {
 		Click: func(*mygo.MenuItem, *mygo.Window) {
 			// Native menu callbacks do not pass through the UI modal scope.
 			if a.page().addHostOpen || a.page().groupDialogOpen || a.files.dialog != nil ||
-				a.files.conflict != nil || a.credentials.draft != nil || a.closeRequest != nil || a.closeFileRequest != nil {
+				a.files.conflict != nil || a.credentials.draft != nil || a.closeRequest != nil || a.closeFileRequest != nil || a.closePaneRequest != nil {
 				return
 			}
 			a.openSettings()
@@ -175,25 +194,40 @@ func (a *app) installAppMenu() func() {
 func (a *app) requestCloseTab(index int) {
 	tab := a.tabs[index]
 	if a.prefs.ConfirmCloseActive && slices.ContainsFunc(tab.root.sessions(), func(s *remoteSession) bool { return s.state == connected || s.state == connecting }) {
-		a.closeRequest = tab
-		a.closeFileRequest = nil
+		a.closeRequest, a.closeFileRequest, a.closePaneRequest = tab, nil, nil
 		return
 	}
 	a.closeTab(index)
 	a.afterLastTabClosed()
 }
 
+func (a *app) requestClosePane(tab *workspaceTab, session *remoteSession) {
+	if !tab.canClosePane(session) {
+		return
+	}
+	if a.prefs.ConfirmCloseActive && (session.state == connected || session.state == connecting) {
+		a.closePaneRequest = &paneCloseRequest{tab: tab, session: session}
+		a.closeRequest, a.closeFileRequest = nil, nil
+		return
+	}
+	a.closePane(tab, session)
+}
+
 func (a *app) closeTabDialog(c *ui.Context) {
-	open := a.closeRequest != nil || a.closeFileRequest != nil
+	open := a.closeRequest != nil || a.closeFileRequest != nil || a.closePaneRequest != nil
 	if !open {
 		return
 	}
 	t := theme.Current()
 	fileRequest := a.closeFileRequest
+	paneRequest := a.closePaneRequest
 	var key any = a.closeRequest
 	detail := "关闭此选项卡将结束其中的会话。"
+	button := "关闭选项卡"
 	if fileRequest != nil {
 		key, detail = fileRequest, "关闭此选项卡将结束文件会话。"
+	} else if paneRequest != nil {
+		key, detail, button = paneRequest.session, "关闭此窗格将结束其中的会话。", "关闭窗格"
 	}
 	closeRequested := false
 	result := uikit.Modal(c.Key(key), &open, uikit.ModalProps{
@@ -203,13 +237,17 @@ func (a *app) closeTabDialog(c *ui.Context) {
 		uikit.Text(c, detail, uikit.TextProps{})
 		ui.Row(c).Justify(ui.End).Gap(t.Space.N8).Children(func() {
 			uikit.Button(c, "取消", uikit.ButtonProps{}).OnClick(parts.RequestDismiss)
-			closeRequested = uikit.Button(c, "关闭选项卡", uikit.ButtonProps{Variant: uikit.ButtonDanger}).Clicked()
+			closeRequested = uikit.Button(c, button, uikit.ButtonProps{Variant: uikit.ButtonDanger}).Clicked()
 		})
 	})
 	if closeRequested || result.Submit {
 		tabRequest := a.closeRequest
-		a.closeRequest, a.closeFileRequest = nil, nil
-		if fileRequest != nil {
+		a.closeRequest, a.closeFileRequest, a.closePaneRequest = nil, nil, nil
+		if paneRequest != nil {
+			if slices.Contains(a.tabs, paneRequest.tab) {
+				a.closePane(paneRequest.tab, paneRequest.session)
+			}
+		} else if fileRequest != nil {
 			if index := slices.Index(a.fileSessions, fileRequest); index >= 0 {
 				a.closedTabs = append(a.closedTabs, closedWorkspaceTab{host: fileRequest.host, section: sectionFiles, endpoint: cloneHostEndpoint(fileRequest.endpoint), temporary: fileRequest.temporary, connection: fileRequest.connection})
 				a.closeFileSession(index)
@@ -221,7 +259,7 @@ func (a *app) closeTabDialog(c *ui.Context) {
 		}
 	}
 	if !open {
-		a.closeRequest, a.closeFileRequest = nil, nil
+		a.closeRequest, a.closeFileRequest, a.closePaneRequest = nil, nil, nil
 	}
 }
 
@@ -241,7 +279,7 @@ func (a *app) afterLastTabClosed() {
 func (a *app) requestCloseFileTab(index int) {
 	session := a.fileSessions[index]
 	if a.prefs.ConfirmCloseActive && (session.state == connected || session.state == connecting) {
-		a.closeFileRequest, a.closeRequest = session, nil
+		a.closeFileRequest, a.closeRequest, a.closePaneRequest = session, nil, nil
 		return
 	}
 	a.closedTabs = append(a.closedTabs, closedWorkspaceTab{host: session.host, section: sectionFiles, endpoint: cloneHostEndpoint(session.endpoint), temporary: session.temporary, connection: session.connection})

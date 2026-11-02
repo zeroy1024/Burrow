@@ -154,17 +154,11 @@ func (a *app) catalogHeader(c *ui.Context, slot catalogSlot) ui.Element {
 			uikit.Toast(c, uikit.ToastProps{Tone: uikit.ToneDanger, Title: "保存分组状态失败", Detail: err.Error()})
 		}
 	}
+	var menu []uikit.MenuEntry
 	if a.page().catalogDrag == nil {
-		header.ContextMenu(func(m *ui.Menu) {
-			if m.Item("添加主机").Chosen() {
-				a.startHostDraft()
-				a.page().draft.group = group.name
-			}
-			if m.Item("新建分组").Chosen() {
-				a.startGroupDraft()
-			}
-		})
+		menu = a.catalogGroupMenu(c, group)
 	}
+	uikit.ContextMenuOn(c, header, menu)
 	if highlight && a.groupCollapsed(group) && !a.page().catalogDrag.autoExpanded[group] {
 		header.Children(func() {
 			progress := min(1, float32(c.Now().Sub(a.page().catalogDrag.hoverStarted))/float32(t.C.GroupHeader.ExpandDelay))
@@ -174,10 +168,38 @@ func (a *app) catalogHeader(c *ui.Context, slot catalogSlot) ui.Element {
 	return header
 }
 
+func (a *app) catalogGroupMenu(c *ui.Context, group *hostGroup) []uikit.MenuEntry {
+	addLabel := "添加主机"
+	if group.scope == sectionFiles {
+		addLabel = "添加站点"
+	}
+	return []uikit.MenuEntry{
+		{ID: "add", Label: localize(c, addLabel), Icon: uikit.IconPlus, OnChoose: func() {
+			a.page().lastGroup = group
+			a.startHostDraft()
+		}},
+		{ID: "new-group", Label: localize(c, "新建分组"), Icon: uikit.IconFolder, OnChoose: a.startGroupDraft},
+		{ID: "rename-group", Label: localize(c, "修改组名"), Icon: uikit.IconEdit, OnChoose: func() {
+			a.startGroupRename(group)
+		}},
+		{ID: "before-delete", Separator: true},
+		{ID: "delete-group", Label: localize(c, "删除分组"), Icon: uikit.IconTrash, Danger: true,
+			Disabled: a.groupDeleteDestination(group) == nil, OnChoose: func() {
+				a.page().groupDelete = group
+				a.page().groupRename = nil
+				a.page().groupDialogOpen = true
+			}},
+	}
+}
+
 func (a *app) catalogHostMenu(c *ui.Context, id hostID) []uikit.MenuEntry {
 	h := a.hosts[id]
+	connectLabel, editLabel, deleteLabel := "连接主机", "编辑主机", "删除主机"
+	if a.section == sectionFiles {
+		connectLabel, editLabel, deleteLabel = "连接站点", "编辑站点", "删除站点"
+	}
 	return []uikit.MenuEntry{
-		{ID: "connect", Label: localize(c, "连接"), Icon: uikit.IconTerminal, OnChoose: func() {
+		{ID: "connect", Label: localize(c, connectLabel), Icon: uikit.IconTerminal, OnChoose: func() {
 			a.openCatalogHost(id)
 			if a.section == sectionFiles {
 				session := a.currentFileSession()
@@ -187,7 +209,7 @@ func (a *app) catalogHostMenu(c *ui.Context, id hostID) []uikit.MenuEntry {
 			}
 		}},
 		{ID: "after-connect", Separator: true},
-		{ID: "edit", Label: localize(c, "编辑"), Icon: uikit.IconEdit, OnChoose: func() {
+		{ID: "edit", Label: localize(c, editLabel), Icon: uikit.IconEdit, OnChoose: func() {
 			for _, group := range a.catalogGroups() {
 				if slices.Contains(group.hosts, id) {
 					a.page().lastGroup = group
@@ -196,7 +218,7 @@ func (a *app) catalogHostMenu(c *ui.Context, id hostID) []uikit.MenuEntry {
 			}
 			a.startEditHostDraft(id)
 		}},
-		{ID: "copy", Label: localize(c, "复制"), Icon: uikit.IconCopy, OnChoose: func() {
+		{ID: "copy", Label: localize(c, "复制地址"), Icon: uikit.IconCopy, OnChoose: func() {
 			address := fmt.Sprintf("%s@%s:%d", h.user, h.address, h.port)
 			if a.section == sectionFiles {
 				protocol := "sftp"
@@ -208,7 +230,7 @@ func (a *app) catalogHostMenu(c *ui.Context, id hostID) []uikit.MenuEntry {
 			mygo.Clipboard.WriteText(address)
 		}},
 		{ID: "before-delete", Separator: true},
-		{ID: "delete", Label: localize(c, "删除"), Icon: uikit.IconTrash, Danger: true, OnChoose: func() {
+		{ID: "delete", Label: localize(c, deleteLabel), Icon: uikit.IconTrash, Danger: true, OnChoose: func() {
 			if a.fileSiteBusy(id) {
 				uikit.Notify(c, "请先取消或清除该会话的传输任务")
 				return

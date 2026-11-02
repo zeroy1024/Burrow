@@ -337,17 +337,23 @@ func (a *app) splitSession(session *remoteSession, stacked bool) {
 	a.setPaneZoom(tab, false)
 }
 
-func (a *app) closePane(session *remoteSession) {
+func (tab *workspaceTab) canClosePane(session *remoteSession) bool {
+	if session.closing || tab.root.find(session) == nil {
+		return false
+	}
 	available := 0
-	for _, candidate := range a.currentTab().root.sessions() {
+	for _, candidate := range tab.root.sessions() {
 		if !candidate.closing {
 			available++
 		}
 	}
-	if available <= 1 || session.closing {
-		return
+	return available > 1
+}
+
+func (a *app) closePane(tab *workspaceTab, session *remoteSession) {
+	if tab.canClosePane(session) {
+		session.closing = true
 	}
-	session.closing = true
 }
 
 func (a *app) removePane(tab *workspaceTab, session *remoteSession) {
@@ -366,8 +372,7 @@ func (a *app) removePane(tab *workspaceTab, session *remoteSession) {
 
 // Runtime endpoints are snapshots; catalog edits cannot retarget a live channel.
 func cloneHostEndpoint(endpoint host) host {
-	// Catalog values are not a live latency sample. Monitoring may replace this
-	// with a measured SSH response time after the runtime is connected.
+	// Catalog values are not live samples; SSH latency belongs to the transport group.
 	endpoint.latency = -1
 	if options := endpoint.session.SSH; options != nil {
 		copy := *options

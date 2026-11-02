@@ -64,7 +64,13 @@ func RowMenu(row ui.Element, entries []MenuEntry) ui.Element {
 // RowMenuOn shares one popup and renderer between a row's context gesture and
 // its more button. Context gestures use a point anchor, never a native menu.
 func RowMenuOn(c *ui.Context, row, trigger ui.Element, entries []MenuEntry) bool {
-	return menuOn(c, trigger, row, entries)
+	return menuOn(c, trigger, row, entries, false)
+}
+
+// ContextMenuOn uses the shared popup at the context gesture without taking
+// over the row's primary click, keyboard navigation, role or expanded state.
+func ContextMenuOn(c *ui.Context, row ui.Element, entries []MenuEntry) bool {
+	return menuOn(c, row, row, entries, true)
 }
 
 func MenuButton[T IconSource](c *ui.Context, icon T, label string, entries []MenuEntry) ui.Element {
@@ -73,7 +79,7 @@ func MenuButton[T IconSource](c *ui.Context, icon T, label string, entries []Men
 
 // MenuOn adds a token-styled menu to an existing, independently styled trigger.
 func MenuOn(c *ui.Context, trigger ui.Element, entries []MenuEntry) ui.Element {
-	menuOn(c, trigger, ui.Element{}, entries)
+	menuOn(c, trigger, ui.Element{}, entries, false)
 	return trigger
 }
 
@@ -82,13 +88,13 @@ type menuState struct {
 	Point         ui.Point
 }
 
-func menuOn(c *ui.Context, trigger, row ui.Element, entries []MenuEntry) bool {
+func menuOn(c *ui.Context, trigger, row ui.Element, entries []MenuEntry, contextOnly bool) bool {
 	state := ui.Local(trigger, "uikit.menu.state", func() menuState { return menuState{} })
 	open := &state.Open
 	wasOpen := *open
 	opening := false
-	keyOpen := trigger.Shortcut(0, ui.KeyDown)
-	if trigger.IsDisabled() {
+	keyOpen := !contextOnly && trigger.Shortcut(0, ui.KeyDown)
+	if trigger.IsDisabled() || len(entries) == 0 {
 		*open = false
 	} else {
 		context, keyboard := false, false
@@ -104,14 +110,16 @@ func menuOn(c *ui.Context, trigger, row ui.Element, entries []MenuEntry) bool {
 				state.Point = ui.Point{X: bounds.X + x, Y: bounds.Y + y}
 			}
 			*open, state.Context, opening = true, true, true
-		} else if trigger.Clicked() || keyOpen {
+		} else if !contextOnly && (trigger.Clicked() || keyOpen) {
 			*open, state.Context = !*open, false
 			opening = *open
 		}
 	}
-	trigger.Role(ui.RoleMenuButton).Expanded(*open)
-	if *open {
-		trigger.Opacity(1).Background(Color(theme.Current().C.IconButton.BgOn))
+	if !contextOnly {
+		trigger.Role(ui.RoleMenuButton).Expanded(*open)
+		if *open {
+			trigger.Opacity(1).Background(Color(theme.Current().C.IconButton.BgOn))
+		}
 	}
 	focusTarget := trigger
 	if state.Context {

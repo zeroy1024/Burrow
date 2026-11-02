@@ -7,9 +7,11 @@ import (
 )
 
 type ScrollFadeProps struct {
-	Height               float32
-	Translucent          bool
-	Gradient             bool
+	Height      float32
+	Translucent bool
+	Gradient    bool
+	// Uniform keeps an entire control bar frosted instead of fading to clear.
+	Uniform              bool
 	Background, MaskTint ui.Color
 }
 
@@ -47,6 +49,11 @@ func ScrollFade(c *ui.Context, edge Edge, options ...ScrollFadeProps) ui.Element
 		}
 		if !props.Translucent {
 			band().Background(props.Background)
+			return
+		}
+		if props.Uniform {
+			band().Material(glass.Blur{Radius: t.Glass.Bar.Blur})
+			band().Background(props.Background.Alpha(fade.TintMid))
 			return
 		}
 		// Mask progressively stronger blur layers before adding the surface tint.

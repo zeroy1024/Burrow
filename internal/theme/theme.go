@@ -1057,6 +1057,7 @@ type Glass struct {
 
 // Opacities groups tokens.
 type Opacities struct {
+	TitlebarTint              float32 // 原生标题栏材质上的窗口底色着色强度 [derived]
 	PaneUnfocusedContent      float32
 	PaneUnfocusedSaturate     float32
 	PaneUnfocusedStatus       float32
@@ -1177,6 +1178,7 @@ type WindowTokens struct {
 // TitlebarTokens groups tokens.
 type TitlebarTokens struct {
 	Height              float32     // ← size.titlebar
+	TintOpacity         float32     // ← opacity.titlebarTint
 	LeftWidth           float32     // ← size.titleLeft
 	LeftPaddingX        float32     // ← space.16
 	LeftGap             float32     // ← space.8
@@ -3392,6 +3394,7 @@ func lightSemantic() Semantic {
 			PaneRevealBlur: Palette.Blur.N8,
 		},
 		Opacity: Opacities{
+			TitlebarTint:              Palette.Ratio.N0_92,
 			PaneUnfocusedContent:      Palette.Ratio.N0_5,
 			PaneUnfocusedSaturate:     Palette.Ratio.N0_35,
 			PaneUnfocusedStatus:       Palette.Ratio.N0_55,
@@ -3600,6 +3603,7 @@ func buildComponents(s *Semantic) Components {
 		},
 		Titlebar: TitlebarTokens{
 			Height:              s.Size.Titlebar,
+			TintOpacity:         s.Opacity.TitlebarTint,
 			LeftWidth:           s.Size.TitleLeft,
 			LeftPaddingX:        s.Space.N16,
 			LeftGap:             s.Space.N8,

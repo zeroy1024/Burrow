@@ -20,7 +20,8 @@ import (
 
 type fileNavigation struct {
 	path         string
-	historyIndex int // -1 appends a directory only after it was read successfully.
+	historyIndex int        // -1 appends a directory only after it was read successfully.
+	link         *fileEntry // Only an explicit Open may resolve a directory link.
 }
 
 type fileRuntime struct {
@@ -337,6 +338,14 @@ func (a *app) readFileDirectory(session *fileSession, pane *filePaneState, run *
 			location, err = localFileLocation(location)
 		}
 		var entries []fileclient.Entry
+		if err == nil && navigation.link != nil {
+			resolver, ok := run.client.(fileclient.DirectoryResolver)
+			if !ok {
+				err = errors.New("此文件连接不支持解析目录链接")
+			} else {
+				location, err = resolver.ResolveDirectory(run.ctx, location)
+			}
+		}
 		if err == nil {
 			entries, err = run.client.ReadDir(run.ctx, location)
 		}
@@ -354,6 +363,10 @@ func (a *app) readFileDirectory(session *fileSession, pane *filePaneState, run *
 				return
 			}
 			pane.loading = false
+			if navigation.link != nil && errors.Is(err, fileclient.ErrNotDirectory) {
+				a.files.dialog = &fileActionDialog{session: session, pane: pane, kind: "preview", preview: *navigation.link}
+				return
+			}
 			if err != nil {
 				pane.errorText = err.Error()
 				a.files.notice = &uikit.ToastProps{ID: "directory-error", Tone: uikit.ToneDanger, Title: "读取目录失败", Detail: err.Error()}

@@ -197,6 +197,7 @@ func (a *app) validateAppPreferences() error {
 }
 
 func (a *app) preferencesChanged() {
+	a.syncWindowMaterial()
 	a.prefsSave.dirty = true
 	a.prefsSave.dirtyAt = time.Time{}
 	if a.window != nil {
@@ -265,6 +266,7 @@ func (a *app) syncAppearance() {
 	}
 	theme.Set(theme.WithAccent(t, accent))
 	termtheme.Apply(a.terminal.mode, dark)
+	a.syncWindowMaterial()
 }
 
 func (a *app) setAppearance(index int) {

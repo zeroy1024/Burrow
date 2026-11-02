@@ -76,6 +76,18 @@ const (
 type FileIconProps struct{ Selected, Focused bool }
 
 func FileIcon(c *ui.Context, kind FileKind, name string, options ...FileIconProps) ui.Element {
+	icon, ink := fileIconAppearance(kind, name, options...)
+	return ui.Icon(c, icon).Size(theme.Current().Size.Icon, theme.Current().Size.Icon).TextColor(ink).Shrink(0).PassThrough()
+}
+
+// PaintFileIcon shares the actual file icon and selection colours with FileIcon
+// for decorative drawings that must not create another input or reader target.
+func PaintFileIcon(p *ui.Painter, rect ui.Rect, kind FileKind, name string, options ...FileIconProps) {
+	icon, ink := fileIconAppearance(kind, name, options...)
+	p.Icon(icon, rect, ink)
+}
+
+func fileIconAppearance(kind FileKind, name string, options ...FileIconProps) (*ui.SVG, ui.Color) {
 	t := theme.Current()
 	if kind == FileRegular {
 		kind = fileKind(name)
@@ -101,7 +113,7 @@ func FileIcon(c *ui.Context, kind FileKind, name string, options ...FileIconProp
 			ink = t.C.FilePaneFocus.SelTextActive
 		}
 	}
-	return ui.Icon(c, icon).Size(t.Size.Icon, t.Size.Icon).TextColor(Color(ink)).Shrink(0).PassThrough()
+	return icon, Color(ink)
 }
 
 func fileKind(name string) FileKind {

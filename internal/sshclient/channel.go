@@ -347,6 +347,13 @@ func (s *Stream) Wait() error {
 	return s.waitErr
 }
 
+// Size returns the last PTY grid accepted by the server.
+func (c *Conn) Size() (columns, rows int) {
+	c.resizeMu.Lock()
+	defer c.resizeMu.Unlock()
+	return c.columns, c.rows
+}
+
 func (c *Conn) Resize(columns, rows int) error {
 	if columns < 1 || rows < 1 {
 		return errors.New("SSH terminal size must be positive")

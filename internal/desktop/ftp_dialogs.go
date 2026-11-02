@@ -94,14 +94,14 @@ func (a *app) fileActionModal(c *ui.Context) {
 			}
 			uikit.Text(c, message, uikit.TextProps{})
 		} else {
-			initial := ui.Local(parts.Panel, "uikit.file-action.initial-name", func() string { return strings.TrimSpace(dialog.name) })
+			initial := ui.Local(parts.Panel, "uikit.file-action.initial-name", func() string { return dialog.name })
 			input := uikit.Input(c, &dialog.name, uikit.InputProps{Label: "名称", DeferStyle: true}).AutoFocus().FillWidth()
 			if input.Changed() {
 				dialog.errorText = ""
 			}
 			nameError = fileActionNameError(dialog)
 			uikit.StyleFormControl(input, nameError)
-			parts.SetDirty(strings.TrimSpace(dialog.name) != *initial)
+			parts.SetDirty(dialog.name != *initial)
 			submitted = input.Submitted()
 			if nameError != "" {
 				uikit.FieldMessage(c, nameError, uikit.FieldMessageProps{Tone: uikit.ToneDanger})
@@ -131,8 +131,8 @@ func fileActionNameError(dialog *fileActionDialog) string {
 	if dialog.kind == "delete" {
 		return ""
 	}
-	name := strings.TrimSpace(dialog.name)
-	invalid := name == "" || name == "." || name == ".." || strings.ContainsAny(name, "/\x00")
+	name := dialog.name
+	invalid := strings.TrimSpace(name) == "" || name == "." || name == ".." || strings.ContainsAny(name, "/\x00")
 	if invalid {
 		return "请输入有效名称，不能包含 /，也不能使用 . 或 ..。"
 	}

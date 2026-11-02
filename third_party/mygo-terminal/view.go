@@ -165,6 +165,9 @@ type view struct {
 	cursor    vt.Cursor
 	scrollbar vt.Scrollbar
 	lines     []rowCache
+	backdrop  ViewportBackdropOptions
+	overscan  vt.Overscan
+	edgeRows  []viewportBackdropRow
 	shaped    lru
 	// images are the placements of images that show, and bitmaps their
 	// images' (readImages).
@@ -508,6 +511,7 @@ func previewText(text string) string {
 // release frees what the view made of the library, once the terminal is
 // closed.
 func (v *view) release() {
+	v.edgeRows = nil
 	if v.keys != nil {
 		v.keys.Free()
 		v.keys = nil

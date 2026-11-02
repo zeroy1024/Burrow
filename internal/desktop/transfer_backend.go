@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"hash"
 	"io"
 	"io/fs"
 	"math"
@@ -75,11 +76,21 @@ type transferNode struct {
 	children                       []*transferNode
 	approved                       *fileclient.Entry
 	staged                         *fileclient.Entry
+	partial                        *fileclient.Entry
+	checkpoint                     *transferCheckpoint
 	digest                         string
 	committing                     bool
 	commitLegacy                   bool
 	total                          int64
 	done, skipped                  bool
+}
+
+// Only a digest and acknowledged offset are persisted, never file bytes or a
+// hash implementation's internal buffer. Resume reconstructs the hash while
+// verifying the target prefix and then reads the source from this offset.
+type transferCheckpoint struct {
+	Offset int64  `json:"offset"`
+	Digest string `json:"digest"`
 }
 
 func transferPolicy(policy string) int {
@@ -535,43 +546,31 @@ func (a *app) copyTransferNode(ctx context.Context, task *transferTask, run *tra
 		node.temporary = temporary
 		job.temporary[node.temporary] = struct{}{}
 	}
-	offset := int64(0)
-	partial, err := target.Stat(ctx, node.temporary)
-	if err == nil {
-		if partial.Symlink || partial.Directory || partial.Size < 0 || partial.Size > node.entry.Size {
-			return fmt.Errorf("临时文件状态无效：%s", node.temporary)
-		}
-		if node.staged != nil && !sameTransferEntry(partial, *node.staged) {
-			return fmt.Errorf("已验证的临时文件已改变：%s", node.temporary)
-		}
-		offset = partial.Size
-	} else if !errors.Is(err, fs.ErrNotExist) {
+	resume, err := prepareTransferResume(ctx, source, target, node)
+	if err != nil {
 		return err
-	} else {
-		node.staged, node.digest = nil, ""
 	}
+	offset := resume.offset
 	run.bytes.Store(job.doneBytes + offset)
-	digest := node.digest
-	// Read a resumed source from the beginning so its prefix contributes to the
-	// expected digest. Never require reading the destination's staging file.
-	if offset < node.entry.Size || (offset == 0 && errors.Is(err, fs.ErrNotExist)) {
-		input, err := source.OpenRead(ctx, node.source, 0)
-		if err != nil {
-			return err
-		}
-		hash := sha256.New()
-		if offset > 0 {
-			if _, err := io.CopyN(hash, input, offset); err != nil {
-				return errors.Join(err, input.Close())
+	if offset < node.entry.Size || !resume.exists {
+		input := resume.input
+		if input == nil {
+			input, err = source.OpenRead(ctx, node.source, offset)
+			if err != nil {
+				return err
 			}
 		}
+		node.partial = nil
 		output, err := target.OpenWrite(ctx, node.temporary, offset, offset == 0)
 		if err != nil {
 			return errors.Join(err, input.Close())
 		}
-		writer := transferCountingWriter{writer: output, bytes: &run.bytes, written: &run.written}
+		writer := transferCountingWriter{
+			writer: output, bytes: &run.bytes, written: &run.written,
+			hash: resume.hash, offset: offset, node: node,
+		}
 		reader := transferSizedReader(input, node.entry.Size-offset)
-		copied, copyErr := io.CopyBuffer(&writer, io.TeeReader(reader, hash), make([]byte, 64<<10))
+		copied, copyErr := io.CopyBuffer(&writer, reader, make([]byte, 64<<10))
 		closeErr := errors.Join(output.Close(), input.Close())
 		if copyErr != nil || closeErr != nil {
 			return errors.Join(copyErr, closeErr)
@@ -579,13 +578,19 @@ func (a *app) copyTransferNode(ctx context.Context, task *transferTask, run *tra
 		if copied != node.entry.Size-offset {
 			return fmt.Errorf("源文件大小在传输期间已改变：%s", node.source)
 		}
-		digest = hex.EncodeToString(hash.Sum(nil))
-	} else if digest == "" {
-		digest, err = hashTransferFile(ctx, source, node.source, node.entry.Size)
-		if err != nil {
-			return err
+	} else if resume.input != nil {
+		// A legacy full-length part may have needed a source-prefix comparison.
+		// Consume EOF before Close so FTP can finish its data command normally.
+		extra, readErr := io.Copy(io.Discard, transferSizedReader(resume.input, 0))
+		closeErr := resume.input.Close()
+		if readErr != nil || closeErr != nil {
+			return errors.Join(readErr, closeErr)
+		}
+		if extra != 0 {
+			return fmt.Errorf("源文件大小在传输期间已改变：%s", node.source)
 		}
 	}
+	digest := hex.EncodeToString(resume.hash.Sum(nil))
 	fresh, err = source.Stat(ctx, node.source)
 	if err != nil {
 		return err
@@ -600,11 +605,16 @@ func (a *app) copyTransferNode(ctx context.Context, task *transferTask, run *tra
 	if written.Symlink || written.Directory || written.Size != node.entry.Size {
 		return fmt.Errorf("目标临时文件大小不匹配：%s", node.temporary)
 	}
-	node.staged, node.digest = &written, digest
+	node.staged, node.partial, node.digest = &written, &written, digest
 	for {
 		current, err := target.Stat(ctx, node.destination)
 		if err != nil && !errors.Is(err, fs.ErrNotExist) {
 			return err
+		}
+		if errors.Is(err, fs.ErrNotExist) {
+			// Approval belonged to the previous inode. A later arrival must win
+			// an exclusive commit and get its own conflict/permission decision.
+			node.approved = nil
 		}
 		if err == nil && (node.approved == nil || !sameTransferEntry(current, *node.approved)) {
 			destination, approved, skip, err := a.chooseTransferDestination(ctx, task, job, target,
@@ -626,8 +636,12 @@ func (a *app) copyTransferNode(ctx context.Context, task *transferTask, run *tra
 			if node == job.root {
 				a.publishTransferDestination(task, run, job.sourceRemote, destination)
 			}
+			continue // Refresh metadata if conflict handling selected another name.
 		}
 		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if err := preserveTransferPermissions(ctx, target, node, current, err == nil); err != nil {
 			return err
 		}
 		node.committing = true
@@ -647,6 +661,171 @@ func (a *app) copyTransferNode(ctx context.Context, task *transferTask, run *tra
 		}
 		return fmt.Errorf("提交结果不确定，重试时将核对暂存文件和目标：%w", err)
 	}
+}
+
+type transferResume struct {
+	offset int64
+	hash   hash.Hash
+	input  io.ReadCloser // Only a legacy part needs a source read from zero.
+	exists bool
+}
+
+func prepareTransferResume(
+	ctx context.Context,
+	source, target fileclient.Client,
+	node *transferNode,
+) (resume transferResume, err error) {
+	resume.hash = sha256.New()
+	defer func() {
+		if err != nil && resume.input != nil {
+			err = errors.Join(err, resume.input.Close())
+			resume.input = nil
+		}
+	}()
+	partial, err := target.Stat(ctx, node.temporary)
+	if errors.Is(err, fs.ErrNotExist) {
+		node.staged, node.partial, node.checkpoint, node.digest = nil, nil, nil, ""
+		node.checkpoint = &transferCheckpoint{Digest: hex.EncodeToString(resume.hash.Sum(nil))}
+		return resume, nil
+	}
+	if err != nil {
+		return resume, err
+	}
+	resume.exists = true
+	if partial.Symlink || partial.Directory || partial.Size < 0 || partial.Size > node.entry.Size {
+		return resume, fmt.Errorf("临时文件状态无效：%s", node.temporary)
+	}
+	if checkpoint := node.checkpoint; checkpoint != nil && checkpoint.Offset > partial.Size {
+		// A failed network write may have acknowledged more bytes than the server
+		// retained. None of that prefix is trusted; rewrite this owned part fully.
+		node.staged, node.partial, node.digest = nil, nil, ""
+		node.checkpoint = &transferCheckpoint{Digest: hex.EncodeToString(resume.hash.Sum(nil))}
+		return resume, nil
+	}
+	if node.staged != nil && !sameTransferEntry(partial, *node.staged) {
+		return resume, fmt.Errorf("已验证的临时文件已改变：%s", node.temporary)
+	}
+	if node.partial != nil && !sameTransferEntry(partial, *node.partial) {
+		return resume, fmt.Errorf("已记录的部分文件已改变：%s", node.temporary)
+	}
+	checkpoint := node.checkpoint
+	legacyCompared := false
+	if checkpoint == nil {
+		checkpoint = &transferCheckpoint{Offset: partial.Size}
+		if partial.Size == node.entry.Size && node.digest != "" {
+			checkpoint.Digest = node.digest
+		} else if partial.Size == 0 {
+			checkpoint.Digest = hex.EncodeToString(resume.hash.Sum(nil))
+		} else {
+			// Old journals did not know the prefix digest. Compare it once with
+			// the source and keep this stream positioned for the remaining copy.
+			// Read the target first so a large verification cannot leave an open
+			// FTP source data connection idle while the target prefix is scanned.
+			targetDigest, readErr := hashTransferFile(ctx, target, node.temporary, partial.Size)
+			if readErr != nil {
+				return resume, fmt.Errorf("无法校验旧版已传部分，未继续复用：%w", readErr)
+			}
+			resume.input, err = source.OpenRead(ctx, node.source, 0)
+			if err != nil {
+				return resume, err
+			}
+			if _, err = io.CopyN(resume.hash, resume.input, partial.Size); err != nil {
+				return resume, err
+			}
+			checkpoint.Digest = hex.EncodeToString(resume.hash.Sum(nil))
+			fresh, statErr := target.Stat(ctx, node.temporary)
+			if statErr != nil {
+				return resume, statErr
+			}
+			if checkpoint.Digest != targetDigest || !sameTransferEntry(fresh, partial) {
+				return resume, fmt.Errorf("旧版已传部分已改变，未继续复用：%s", node.temporary)
+			}
+			legacyCompared = true
+		}
+	}
+	if checkpoint.Offset > 0 && !legacyCompared {
+		resume.hash, err = verifiedTransferPrefix(ctx, target, node.temporary, partial, checkpoint)
+		if err != nil {
+			return resume, err
+		}
+	} else if checkpoint.Digest != hex.EncodeToString(resume.hash.Sum(nil)) {
+		return resume, errors.New("传输前缀检查点无效")
+	}
+	resume.offset = checkpoint.Offset
+	node.checkpoint, node.partial = checkpoint, &partial
+	return resume, nil
+}
+
+func verifiedTransferPrefix(
+	ctx context.Context,
+	target fileclient.Client,
+	name string,
+	partial fileclient.Entry,
+	checkpoint *transferCheckpoint,
+) (hash.Hash, error) {
+	input, err := target.OpenRead(ctx, name, 0)
+	if err != nil {
+		return nil, fmt.Errorf("无法校验已传部分，未继续复用：%s：%w", name, err)
+	}
+	h := sha256.New()
+	prefix, readErr := io.CopyN(h, input, checkpoint.Offset)
+	tail := int64(0)
+	if readErr == nil {
+		// FTP requires the RETR data stream to reach EOF before its final reply.
+		// Unacknowledged trailing bytes are discarded and overwritten on resume.
+		tail, readErr = io.Copy(io.Discard, transferSizedReader(input, partial.Size-checkpoint.Offset))
+	}
+	closeErr := input.Close()
+	if readErr != nil || closeErr != nil {
+		return nil, errors.Join(readErr, closeErr)
+	}
+	if prefix+tail != partial.Size || hex.EncodeToString(h.Sum(nil)) != checkpoint.Digest {
+		return nil, fmt.Errorf("已传部分的内容已改变，未继续复用：%s", name)
+	}
+	fresh, err := target.Stat(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+	if !sameTransferEntry(fresh, partial) {
+		return nil, fmt.Errorf("部分文件在核对期间已改变：%s", name)
+	}
+	return h, nil
+}
+
+func preserveTransferPermissions(
+	ctx context.Context,
+	target fileclient.Client,
+	node *transferNode,
+	current fileclient.Entry,
+	exists bool,
+) error {
+	if !exists {
+		// A new target keeps its client's creation policy. Requiring chmod here
+		// would reject otherwise valid uploads to FTP servers without SITE CHMOD.
+		return nil
+	}
+	if !current.ModeKnown {
+		return fmt.Errorf("无法确认已有目标的权限，未执行覆盖：%s", node.destination)
+	}
+	mask := fs.ModePerm | fs.ModeSetuid | fs.ModeSetgid | fs.ModeSticky
+	mode := current.Mode & mask
+	setter, ok := target.(fileclient.PermissionSetter)
+	if !ok {
+		return fmt.Errorf("目标不支持保留文件权限，未提交：%s", node.destination)
+	}
+	if err := setter.Chmod(ctx, node.temporary, mode); err != nil {
+		return fmt.Errorf("保留目标权限失败，未提交：%s：%w", node.destination, err)
+	}
+	staged, err := target.Stat(ctx, node.temporary)
+	if err != nil {
+		return err
+	}
+	if staged.Symlink || staged.Directory || staged.Size != node.entry.Size ||
+		!staged.ModeKnown || staged.Mode&mask != mode {
+		return fmt.Errorf("无法确认暂存文件权限，未提交：%s", node.temporary)
+	}
+	node.staged, node.partial = &staged, &staged
+	return nil
 }
 
 func transferSizedReader(reader io.Reader, size int64) io.Reader {
@@ -695,6 +874,7 @@ func uncertainTransferCommit(ctx context.Context, target fileclient.Client, err 
 func markTransferCommitted(job *transferJob, node *transferNode, run *transferRun) {
 	delete(job.temporary, node.temporary)
 	node.temporary, node.done, node.committing, node.commitLegacy = "", true, false, false
+	node.partial, node.checkpoint = nil, nil
 	job.doneBytes += node.entry.Size
 	run.bytes.Store(job.doneBytes)
 }
@@ -707,6 +887,7 @@ func discardTransferStage(ctx context.Context, target fileclient.Client, job *tr
 		delete(job.temporary, node.temporary)
 	}
 	node.temporary, node.digest, node.staged = "", "", nil
+	node.partial, node.checkpoint = nil, nil
 	node.committing, node.commitLegacy = false, false
 	return nil
 }
@@ -842,12 +1023,27 @@ type transferCountingWriter struct {
 	writer  io.Writer
 	bytes   *atomic.Int64
 	written *atomic.Int64
+	hash    hash.Hash
+	offset  int64
+	node    *transferNode
 }
 
 func (w *transferCountingWriter) Write(buffer []byte) (int, error) {
 	n, err := w.writer.Write(buffer)
 	w.bytes.Add(int64(n))
 	w.written.Add(int64(n))
+	if n > 0 {
+		w.hash.Write(buffer[:n])
+		w.offset += int64(n)
+		w.node.partial = nil
+		if w.offset <= w.node.entry.Size {
+			w.node.checkpoint = &transferCheckpoint{Offset: w.offset, Digest: hex.EncodeToString(w.hash.Sum(nil))}
+		} else {
+			// The extra EOF-check byte detects a growing source. Do not persist
+			// an acknowledged offset outside the immutable manifest's bounds.
+			w.node.checkpoint = nil
+		}
+	}
 	return n, err
 }
 
@@ -953,7 +1149,9 @@ func validTransferDestinationName(source, target string, directory bool) bool {
 }
 
 func sameTransferEntry(left, right fileclient.Entry) bool {
-	return left.Size == right.Size && left.Directory == right.Directory && left.Symlink == right.Symlink && left.Modified.Equal(right.Modified)
+	modeMatches := !left.ModeKnown || !right.ModeKnown || left.Mode.Perm() == right.Mode.Perm()
+	return left.Size == right.Size && left.Directory == right.Directory && left.Symlink == right.Symlink &&
+		left.Modified.Equal(right.Modified) && modeMatches
 }
 
 func transferSafeName(name string) bool {
@@ -1040,6 +1238,7 @@ func clearTransferTemporary(node *transferNode, name string) {
 	if node.temporary == name {
 		node.temporary = ""
 		node.staged, node.digest = nil, ""
+		node.partial, node.checkpoint = nil, nil
 		node.committing, node.commitLegacy = false, false
 	}
 	for _, child := range node.children {

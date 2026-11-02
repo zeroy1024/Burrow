@@ -656,16 +656,18 @@ func (a *app) catalogBytes() ([]byte, error) {
 		}
 		config.Sessions[id] = storedSession{sessionConfig: h.session, Name: h.name, User: h.user, Host: h.address, Port: h.port, OS: h.os, System: h.system, Protocol: protocol}
 	}
+	// Persist dense IDs required by this format without renumbering the live
+	// group keys used by drag gestures, transitions and page state.
 	for order, group := range a.groups {
 		scope := "ssh"
 		if group.scope == sectionFiles {
 			scope = "files"
 		}
 		config.Groups[order] = catalogConfigGroup{
-			ID: group.id, Scope: scope, Name: group.name, Order: order, Collapsed: group.collapsed,
+			ID: order, Scope: scope, Name: group.name, Order: order, Collapsed: group.collapsed,
 		}
 		for position, id := range group.hosts {
-			config.Sessions[id].GroupID, config.Sessions[id].Order = group.id, position
+			config.Sessions[id].GroupID, config.Sessions[id].Order = order, position
 		}
 	}
 	data, err := json.MarshalIndent(config, "", "  ")

@@ -73,6 +73,9 @@ const (
 
 // Options configure a terminal.
 type Options struct {
+	// Columns and Rows set the initial grid before Conn output is read. Zero
+	// uses 80 columns or 24 rows; a view can resize the same terminal later.
+	Columns, Rows int
 	// Command is the program the terminal runs and its arguments. Empty
 	// runs the user's shell as a login shell, as terminal apps do: $SHELL,
 	// else /bin/zsh on macOS and /bin/sh elsewhere; PowerShell on Windows.
@@ -588,7 +591,7 @@ type events struct {
 
 // New makes a terminal running opts.Command, or connected to opts.Conn.
 // The program starts once a view shows the terminal, at the size of the
-// view, or half a second later at 80×24 when none does.
+// view, or half a second later at its initial grid when none does.
 func New(opts Options) (*Terminal, error) {
 	if err := Load(); err != nil {
 		return nil, err
@@ -596,9 +599,19 @@ func New(opts Options) (*Terminal, error) {
 	opts.Font.Features = append([]string(nil), opts.Font.Features...)
 	t := &Terminal{opts: opts, done: make(chan struct{})}
 	t.binds = keybinds(&opts)
-	t.size = gridSize{80, 24, 8, 16}
+	columns, rows := opts.Columns, opts.Rows
+	if columns <= 0 {
+		columns = 80
+	}
+	if rows <= 0 {
+		rows = 24
+	}
+	if columns > 65535 || rows > 65535 {
+		return nil, errors.New("terminal grid exceeds 65535 cells on an axis")
+	}
+	t.size = gridSize{columns, rows, 8, 16}
 	var err error
-	t.term, err = vt.NewTerminal(80, 24, vt.Effects{
+	t.term, err = vt.NewTerminal(columns, rows, vt.Effects{
 		WritePTY: func(p []byte) {
 			if !t.replying {
 				t.in.push(append([]byte(nil), p...))

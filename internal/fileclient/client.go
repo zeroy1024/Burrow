@@ -3,11 +3,16 @@ package fileclient
 
 import (
 	"context"
+	"errors"
 	"io"
 	"io/fs"
 	"strings"
 	"time"
+
+	"golang.org/x/text/unicode/norm"
 )
+
+var ErrNotDirectory = errors.New("not a directory")
 
 type Entry struct {
 	Name        string
@@ -17,6 +22,31 @@ type Entry struct {
 	Modified    time.Time
 	Permissions string
 	Owner       string
+	Mode        fs.FileMode
+	ModeKnown   bool
+}
+
+// These optional capabilities keep transport clients and existing adapters
+// usable without making mutation or symlink traversal part of ordinary Stat.
+type PermissionSetter interface {
+	Chmod(context.Context, string, fs.FileMode) error
+}
+
+type DirectoryResolver interface {
+	ResolveDirectory(context.Context, string) (string, error)
+}
+
+type TreeRemover interface {
+	RemoveTree(context.Context, string) error
+}
+
+type FilesystemStats struct {
+	Total, Free uint64
+}
+
+// FilesystemStatter is optional; it does not run remote utility programs.
+type FilesystemStatter interface {
+	StatFilesystem(context.Context, string) (FilesystemStats, error)
 }
 
 type RenameOptions struct {
@@ -50,4 +80,8 @@ func validRemotePath(name string) error {
 		return fs.ErrInvalid
 	}
 	return nil
+}
+
+func sameRenameSpelling(first, second string) bool {
+	return strings.EqualFold(norm.NFC.String(first), norm.NFC.String(second))
 }

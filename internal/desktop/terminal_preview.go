@@ -215,6 +215,7 @@ func (a *app) nativeTerminalDragContents(c *ui.Context, session *remoteSession, 
 		colors := live.colors
 		conn := &terminalPreviewConn{done: make(chan struct{})}
 		view, err := nativeterm.New(nativeterm.Options{
+			Columns: columns, Rows: rows,
 			Conn: conn, ResizeByConn: true, Font: live.font, Theme: &colors, ScrollbackLines: live.scrollbackLines,
 			Padding: nativeterm.Padding{X: -1, Y: -1}, Transparent: true,
 			NoBlink: true, NoDefaultKeybinds: true, NoClipboardWrite: true,

@@ -166,7 +166,7 @@ func (a *app) settingMatches(label, description string) bool {
 
 func (a *app) settingsCategoryHasMatch(index int) bool {
 	texts := []string{
-		"语言 跟随系统 简体中文 English 启动时恢复会话 关闭最后一个选项卡时 关闭有活动连接的选项卡前确认",
+		"语言 跟随系统 简体中文 English 启动时恢复会话 关闭最后一个选项卡时 关闭活动连接前确认",
 		"应用主题 浅色 深色 跟随系统 强调色 预览 减少动态效果 窗口半透明 标题栏 玻璃栏",
 		"配色方案 跟随应用明暗 固定一种 浅色外观时 深色外观时 配色 终端背景 字体 字号 行高 光标 样式 闪烁 回滚行数",
 		"默认本地目录 同时传输数 同名冲突",
@@ -275,8 +275,8 @@ func (a *app) generalSettings(c *ui.Context) {
 			values := []string{"keep", "closeWindow", "quit"}
 			settingsSegment(c, "last-tab-close", "关闭最后一个选项卡时", []string{"保留窗口", "关闭窗口", "退出应用"}, slices.Index(values, a.prefs.LastTabClose), func(index int) { a.prefs.LastTabClose = values[index]; a.preferencesChanged() })
 		}},
-		{"关闭有活动连接的选项卡前确认", "", func() {
-			a.preferenceSwitch(c, "关闭有活动连接的选项卡前确认", &a.prefs.ConfirmCloseActive)
+		{"关闭活动连接前确认", "", func() {
+			a.preferenceSwitch(c, "关闭活动连接前确认", &a.prefs.ConfirmCloseActive)
 		}},
 	})
 }

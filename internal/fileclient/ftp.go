@@ -3,6 +3,7 @@ package fileclient
 import (
 	"bufio"
 	"context"
+	"crypto/rand"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -158,6 +159,7 @@ func DialFTP(ctx context.Context, cfg FTPConfig) (Client, error) {
 		}
 		if code == 211 {
 			utf8 := false
+			requestedFacts := []string{}
 			for _, line := range strings.Split(features, "\n") {
 				feature := strings.Fields(strings.ToUpper(line))
 				if len(feature) == 0 {
@@ -166,8 +168,26 @@ func DialFTP(ctx context.Context, cfg FTPConfig) (Client, error) {
 				switch feature[0] {
 				case "MLST", "MLSD":
 					c.mlsd = true
+					if feature[0] == "MLST" && len(feature) > 1 {
+						for _, fact := range strings.Split(feature[1], ";") {
+							name := strings.TrimSuffix(fact, "*")
+							switch name {
+							case "TYPE", "SIZE", "MODIFY", "UNIX.MODE", "UNIX.UID", "UNIX.GID", "UNIX.OWNERNAME", "UNIX.GROUPNAME":
+								requestedFacts = append(requestedFacts, strings.ToLower(name))
+							}
+						}
+					}
 				case "UTF8", "UTF-8":
 					utf8 = true
+				}
+			}
+			if len(requestedFacts) > 0 {
+				code, message, err := c.command(0, "OPTS MLST %s;", strings.Join(requestedFacts, ";"))
+				if err != nil {
+					return err
+				}
+				if code != 200 && code != 202 && code != 500 && code != 501 && code != 502 && code != 504 {
+					return &textproto.Error{Code: code, Msg: message}
 				}
 			}
 			if utf8 {
@@ -300,9 +320,11 @@ func (c *ftpClient) begin(ctx context.Context, timed bool) (context.Context, fun
 		}
 		cancel()
 		var protocolError textproto.ProtocolError
+		var reply *textproto.Error
 		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) ||
 			errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, net.ErrClosed) ||
-			errors.As(err, &networkError) || errors.As(err, &protocolError) {
+			errors.As(err, &networkError) || errors.As(err, &protocolError) ||
+			errors.As(err, &reply) && reply.Code == 421 {
 			c.Close()
 		}
 		<-c.gate
@@ -442,19 +464,37 @@ func (c *ftpClient) readDirectory(ctx context.Context, wire string) ([]Entry, er
 	if err != nil {
 		return nil, err
 	}
-	// LIST alone can report a denied directory as an empty successful result.
 	if _, _, err := c.command(250, "CWD %s", wire); err != nil {
 		return nil, err
 	}
-	verb := "LIST"
 	if c.mlsd {
-		verb = "MLSD"
-	}
-	data, raw, err := c.openData(ctx, verb, "", 0, false)
-	if err != nil && c.mlsd && unsupportedFTPCommand(err) {
+		entries, err := c.readListing(ctx, "MLSD", "", true)
+		if err == nil {
+			for _, entry := range entries {
+				if !validEntryName(entry.Name) || invalidFTPArgument(entry.Name) {
+					return nil, errors.New("FTP server returned an invalid entry name")
+				}
+			}
+			return entries, nil
+		}
+		if !unsupportedFTPCommand(err) {
+			return nil, err
+		}
 		c.mlsd = false
-		data, raw, err = c.openData(ctx, "LIST", "", 0, false)
 	}
+	entries, err := c.readListing(ctx, "LIST", "-a", false)
+	if err != nil {
+		return nil, err
+	}
+	names, err := c.listNames(ctx, wire)
+	if err != nil {
+		return nil, err
+	}
+	return reconcileFTPNames(entries, names)
+}
+
+func (c *ftpClient) readListing(ctx context.Context, verb, argument string, machine bool) ([]Entry, error) {
+	data, raw, err := c.openData(ctx, verb, argument, 0, false)
 	if err != nil {
 		return nil, err
 	}
@@ -468,17 +508,13 @@ func (c *ftpClient) readDirectory(ctx context.Context, wire string) ([]Entry, er
 			parseErr = err
 			break
 		}
-		entry, skip, err := parseFTPEntry(line, c.mlsd)
+		entry, skip, err := parseFTPEntry(line, machine)
 		if err != nil {
 			parseErr = err
 			break
 		}
 		if skip {
 			continue
-		}
-		if !validEntryName(entry.Name) || invalidFTPArgument(entry.Name) {
-			parseErr = errors.New("FTP server returned an invalid entry name")
-			break
 		}
 		entries = append(entries, entry)
 	}
@@ -533,6 +569,19 @@ func (c *ftpClient) Stat(ctx context.Context, name string) (Entry, error) {
 		for _, candidate := range entries {
 			if candidate.Name == decoded {
 				entry = candidate
+				if !entry.ModeKnown && !entry.Directory && !entry.Symlink {
+					listed, listErr := c.readListing(opCtx, "LIST", "-a "+wire, false)
+					if listErr != nil {
+						if unsupportedFTPCommand(listErr) {
+							return nil
+						}
+						return listErr
+					}
+					if len(listed) == 1 && !listed[0].Directory && !listed[0].Symlink && listed[0].Size == entry.Size {
+						entry.Mode, entry.ModeKnown = listed[0].Mode, listed[0].ModeKnown
+						entry.Permissions, entry.Owner = listed[0].Permissions, listed[0].Owner
+					}
+				}
 				return nil
 			}
 		}
@@ -588,6 +637,23 @@ func (c *ftpClient) Rename(ctx context.Context, oldName, newName string, options
 			return fs.ErrExist
 		} else if !errors.Is(err, fs.ErrNotExist) {
 			return err
+		}
+		if oldWire != newWire && path.Dir(oldWire) == path.Dir(newWire) && sameRenameSpelling(path.Base(oldName), path.Base(newName)) {
+			temporary := path.Join(path.Dir(oldWire), ".sshdesk-rename-"+rand.Text())
+			decoded, err := c.codec.decode(temporary)
+			if err != nil {
+				return err
+			}
+			if err := c.Rename(ctx, oldName, decoded, RenameOptions{NoReplace: true}); err != nil {
+				return err
+			}
+			if err := c.Rename(ctx, decoded, newName, RenameOptions{NoReplace: true}); err != nil {
+				if rollback := c.Rename(ctx, decoded, oldName, RenameOptions{NoReplace: true}); rollback != nil {
+					return fmt.Errorf("FTP rename failed; original remains at %s: %w", decoded, errors.Join(err, rollback))
+				}
+				return err
+			}
+			return nil
 		}
 	}
 	return c.run(ctx, func(context.Context) error {

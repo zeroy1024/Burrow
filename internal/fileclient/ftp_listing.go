@@ -3,6 +3,7 @@ package fileclient
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"strconv"
 	"strings"
 	"time"
@@ -87,6 +88,38 @@ func parseMLSDEntry(line string) (Entry, bool, error) {
 			return Entry{}, false, err
 		}
 	}
+	if value, ok := values["unix.mode"]; ok {
+		value = strings.TrimPrefix(strings.ToLower(value), "0o")
+		bits, err := strconv.ParseUint(value, 8, 32)
+		if err != nil {
+			return Entry{}, false, fmt.Errorf("invalid FTP Unix mode: %w", err)
+		}
+		entry.Mode, entry.ModeKnown = unixFTPMode(uint32(bits)), true
+		if entry.Directory {
+			entry.Mode |= fs.ModeDir
+		}
+		if entry.Symlink {
+			entry.Mode |= fs.ModeSymlink
+		}
+		entry.Permissions = entry.Mode.String()
+	}
+	owner, group := values["unix.ownername"], values["unix.groupname"]
+	if owner == "" {
+		owner = values["unix.uid"]
+	}
+	if owner == "" {
+		owner = values["unix.owner"]
+	}
+	if group == "" {
+		group = values["unix.gid"]
+	}
+	if group == "" {
+		group = values["unix.group"]
+	}
+	entry.Owner = owner
+	if group != "" {
+		entry.Owner += ":" + group
+	}
 	return entry, false, nil
 }
 
@@ -132,7 +165,8 @@ func parseUnixFTPEntry(line string) (Entry, error) {
 	if err != nil {
 		return Entry{}, err
 	}
-	entry := Entry{Name: name, Size: size, Modified: modified}
+	entry := Entry{Name: name, Size: size, Modified: modified, Permissions: mode, Owner: fields[2] + ":" + fields[3]}
+	entry.Mode, entry.ModeKnown = symbolicFTPMode(mode), true
 	switch mode[0] {
 	case '-':
 	case 'd':
@@ -218,7 +252,7 @@ func ftpListingFields(line string, count int) ([]string, string, bool) {
 		fields = append(fields, line[:end])
 		line = line[end:]
 	}
-	name := strings.TrimLeft(line, " \t")
+	name := line[1:]
 	return fields, name, name != ""
 }
 
@@ -243,4 +277,44 @@ func ftpDigits(value string) bool {
 		}
 	}
 	return true
+}
+
+func unixFTPMode(bits uint32) fs.FileMode {
+	mode := fs.FileMode(bits & 0777)
+	if bits&04000 != 0 {
+		mode |= fs.ModeSetuid
+	}
+	if bits&02000 != 0 {
+		mode |= fs.ModeSetgid
+	}
+	if bits&01000 != 0 {
+		mode |= fs.ModeSticky
+	}
+	return mode
+}
+
+func symbolicFTPMode(text string) fs.FileMode {
+	mode := fs.FileMode(0)
+	for i, bit := range []fs.FileMode{0400, 0200, 0100, 0040, 0020, 0010, 0004, 0002, 0001} {
+		value := text[i+1]
+		if value != '-' && value != 'S' && value != 'T' {
+			mode |= bit
+		}
+	}
+	if strings.ContainsAny(text[3:4], "sS") {
+		mode |= fs.ModeSetuid
+	}
+	if strings.ContainsAny(text[6:7], "sS") {
+		mode |= fs.ModeSetgid
+	}
+	if strings.ContainsAny(text[9:10], "tT") {
+		mode |= fs.ModeSticky
+	}
+	if text[0] == 'd' {
+		mode |= fs.ModeDir
+	}
+	if text[0] == 'l' {
+		mode |= fs.ModeSymlink
+	}
+	return mode
 }

@@ -295,6 +295,7 @@ func layouts() map[string]layout {
 			"cursor_has_value": unsafe.Offsetof(rc.cursorHasValue), "palette": unsafe.Offsetof(rc.palette),
 		}},
 		"GhosttyRenderStateRowSelection": {unsafe.Sizeof(rs), map[string]uintptr{"start_x": unsafe.Offsetof(rs.startX), "end_x": unsafe.Offsetof(rs.endX)}},
+		"GhosttyRenderStateOverscan":     {unsafe.Sizeof(Overscan{}), map[string]uintptr{"above": 0, "below": 2}},
 		"GhosttyCellsView":               {unsafe.Sizeof(cv), map[string]uintptr{"ptr": 0, "len": unsafe.Offsetof(cv.len)}},
 		"GhosttyString":                  {unsafe.Sizeof(cString{}), map[string]uintptr{"ptr": 0, "len": unsafe.Offsetof(cString{}.len)}},
 		"GhosttyTerminalScrollbar":       {unsafe.Sizeof(sb), map[string]uintptr{"total": 0, "offset": unsafe.Offsetof(sb.Offset), "len": unsafe.Offsetof(sb.Len)}},

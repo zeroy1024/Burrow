@@ -76,6 +76,8 @@ type storedTransferNode struct {
 	Committing   bool                  `json:"committing,omitempty"`
 	CommitLegacy bool                  `json:"commitLegacy,omitempty"`
 	Staged       *fileclient.Entry     `json:"staged,omitempty"`
+	Partial      *fileclient.Entry     `json:"partial,omitempty"`
+	Checkpoint   *transferCheckpoint   `json:"checkpoint,omitempty"`
 	Digest       string                `json:"digest,omitempty"`
 	Approved     *fileclient.Entry     `json:"approved,omitempty"`
 	Children     []*storedTransferNode `json:"children,omitempty"`
@@ -165,7 +167,7 @@ func (a *app) finishTransferQuitIfReady() {
 }
 
 func (a *app) transferSnapshot() *storedTransferQueue {
-	result := &storedTransferQueue{Version: 2, NextID: a.transfers.nextID, NextBatchID: a.transfers.nextBatchID,
+	result := &storedTransferQueue{Version: 3, NextID: a.transfers.nextID, NextBatchID: a.transfers.nextBatchID,
 		Sessions: []storedTransferSession{}, Connections: []storedTransferConnection{}, Tasks: []storedTransferTask{}}
 	groups := map[*sshConnectionGroup]int{}
 	groupID := func(group *sshConnectionGroup) int {
@@ -229,7 +231,13 @@ func snapshotTransferNode(node *transferNode) *storedTransferNode {
 		return nil
 	}
 	stored := &storedTransferNode{Source: node.source, Destination: node.destination, Temporary: node.temporary,
-		Entry: node.entry, Approved: node.approved, Committing: node.committing, CommitLegacy: node.commitLegacy, Staged: node.staged, Digest: node.digest, Total: node.total, Done: node.done, Skipped: node.skipped}
+		Entry: node.entry, Approved: node.approved, Committing: node.committing, CommitLegacy: node.commitLegacy,
+		Staged: node.staged, Partial: node.partial, Digest: node.digest,
+		Total: node.total, Done: node.done, Skipped: node.skipped}
+	if node.checkpoint != nil {
+		checkpoint := *node.checkpoint
+		stored.Checkpoint = &checkpoint
+	}
 	for _, child := range node.children {
 		stored.Children = append(stored.Children, snapshotTransferNode(child))
 	}
@@ -342,7 +350,13 @@ func restoreTransferNode(stored *storedTransferNode) *transferNode {
 		return nil
 	}
 	node := &transferNode{source: stored.Source, destination: stored.Destination, temporary: stored.Temporary,
-		entry: stored.Entry, approved: stored.Approved, committing: stored.Committing, commitLegacy: stored.CommitLegacy, staged: stored.Staged, digest: stored.Digest, total: stored.Total, done: stored.Done, skipped: stored.Skipped}
+		entry: stored.Entry, approved: stored.Approved, committing: stored.Committing, commitLegacy: stored.CommitLegacy,
+		staged: stored.Staged, partial: stored.Partial, digest: stored.Digest,
+		total: stored.Total, done: stored.Done, skipped: stored.Skipped}
+	if stored.Checkpoint != nil {
+		checkpoint := *stored.Checkpoint
+		node.checkpoint = &checkpoint
+	}
 	for _, child := range stored.Children {
 		node.children = append(node.children, restoreTransferNode(child))
 	}
@@ -399,7 +413,13 @@ func sameTransferEndpoint(left, right storedSession) bool {
 // per task and had no commit acknowledgement state. Preserve those boundaries;
 // a pending old part must be reconciled before it can be uploaded again.
 func migrateTransferQueue(saved *storedTransferQueue) error {
+	if saved.Version == 3 {
+		return nil
+	}
 	if saved.Version == 2 {
+		// Existing parts keep their names and bytes. Their first resume compares
+		// source and target prefixes once before establishing a v3 checkpoint.
+		saved.Version = 3
 		return nil
 	}
 	if saved.Version != 1 {
@@ -443,12 +463,12 @@ func migrateTransferQueue(saved *storedTransferQueue) error {
 		task.Batch, task.Policy = task.Session, decisions[task.Session]
 		markPending(task.Root)
 	}
-	saved.Version = 2
+	saved.Version = 3
 	return nil
 }
 
 func validateTransferQueue(saved *storedTransferQueue) error {
-	if saved.Version != 2 || saved.NextID < 0 || saved.NextBatchID < 0 {
+	if saved.Version != 3 || saved.NextID < 0 || saved.NextBatchID < 0 {
 		return errors.New("传输记录版本或计数无效")
 	}
 	batches := map[int]storedTransferBatch{}
@@ -610,6 +630,21 @@ func validateTransferNode(node *storedTransferNode, sourceRemote bool, source, d
 	if node.Staged != nil && (node.Entry.Directory || node.Staged.Directory || node.Staged.Symlink ||
 		node.Staged.Size != node.Entry.Size || node.Digest == "") {
 		return 0, 0, errors.New("传输暂存基线无效")
+	}
+	if checkpoint := node.Checkpoint; checkpoint != nil {
+		decoded, err := hex.DecodeString(checkpoint.Digest)
+		if node.Entry.Directory || node.Done || node.Skipped || node.Temporary == "" ||
+			checkpoint.Offset < 0 || checkpoint.Offset > node.Entry.Size || err != nil ||
+			len(decoded) != 32 || hex.EncodeToString(decoded) != checkpoint.Digest {
+			return 0, 0, errors.New("传输前缀检查点无效")
+		}
+	}
+	if partial := node.Partial; partial != nil {
+		if node.Checkpoint == nil || node.Entry.Directory || node.Done || node.Skipped ||
+			node.Temporary == "" || partial.Directory || partial.Symlink ||
+			partial.Size < node.Checkpoint.Offset || partial.Size > node.Entry.Size {
+			return 0, 0, errors.New("传输部分文件基线无效")
+		}
 	}
 	if node.Committing && (node.Staged == nil || node.Digest == "") {
 		return 0, 0, errors.New("传输提交缺少已验证基线")

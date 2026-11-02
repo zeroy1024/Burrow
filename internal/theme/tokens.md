@@ -8,8 +8,8 @@
 | 层 | 数量 | 说明 |
 |---|---|---|
 | palette（primitives） | 280 | 原始色值与刻度，其中 50 个为推导值（derived） |
-| semantic（每个主题一份） | 465 | Light = 当前设计；Dark 覆盖其中 110 个（全部 derived） |
-| component | 1044 | 只引用 semantic；换主题时自动跟随 |
+| semantic（每个主题一份） | 466 | Light = 当前设计；Dark 覆盖其中 110 个（全部 derived） |
+| component | 1045 | 只引用 semantic；换主题时自动跟随 |
 
 ## 1. 三层结构与引用规则
 
@@ -913,6 +913,7 @@ siderItem.nameColor             ← component，只能引用 semantic
 ### opacity
 | token | Light | Dark（derived） | 用途 |
 |---|---|---|---|
+| `opacity.titlebarTint` | 0.92 | ＝ | **derived** 原生标题栏材质上的窗口底色着色强度 |
 | `opacity.paneUnfocusedContent` | 0.5 | 0.45 |  |
 | `opacity.paneUnfocusedSaturate` | 0.35 | ＝ |  |
 | `opacity.paneUnfocusedStatus` | 0.55 | ＝ |  |
@@ -1004,6 +1005,7 @@ siderItem.nameColor             ← component，只能引用 semantic
 | token | 引用 | Light 值 | 说明 |
 |---|---|---|---|
 | `titlebar.height` | `{size.titlebar}` | 44px |  |
+| `titlebar.tintOpacity` | `{opacity.titlebarTint}` | 0.92 | 原生标题栏材质上的窗口底色着色强度 |
 | `titlebar.leftWidth` | `{size.titleLeft}` | 296px | 标题栏左区（交通灯 + 侧栏开关），与 rail+sider 对齐 |
 | `titlebar.leftPaddingX` | `{space.16}` | 16px |  |
 | `titlebar.leftGap` | `{space.8}` | 8px |  |

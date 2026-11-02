@@ -113,9 +113,13 @@ func (a *app) hostDialog(c *ui.Context) {
 		uikit.StyleModalScrim(backdrop, alpha)
 		noticeHeight := float32(0)
 		if count := a.draftOpenTabs(d); count > 0 {
-			notice := uikit.Banner(c, fmt.Sprintf("此会话已在 %d 个选项卡中打开，修改将在下次连接时生效。", count), uikit.BannerProps{Icon: infoIcon}).Root.
-				Margin(0, p.BodyPaddingX, t.Space.N12, p.BodyPaddingX)
-			noticeHeight = notice.LayoutBounds().H + t.Space.N12
+			// Banner fills its parent's content width. Inset that content with
+			// padding rather than adding margins outside an already full width.
+			notice := ui.Box(c).FillWidth().MinWidth(0).Shrink(0).
+				Padding(0, p.BodyPaddingX, t.Space.N12, p.BodyPaddingX).Children(func() {
+				uikit.Banner(c, fmt.Sprintf("此会话已在 %d 个选项卡中打开，修改将在下次连接时生效。", count), uikit.BannerProps{Icon: infoIcon})
+			})
+			noticeHeight = notice.LayoutBounds().H
 		}
 		headerHeight := p.HeaderPaddingTop + p.IconTile + p.HeaderPaddingBottom
 		footerHeight := p.FooterPaddingTop + t.C.Button.Height + p.FooterPaddingBottom

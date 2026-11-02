@@ -16,11 +16,13 @@ type tunnelConn struct {
 	bridge net.Conn
 	remote net.Conn
 	lease  *lease
+	cancel context.CancelFunc
 	once   sync.Once
 }
 
 func (t *tunnelConn) abort() {
 	t.once.Do(func() {
+		t.cancel()
 		t.Conn.Close()
 		t.bridge.Close()
 		t.lease.owner.workers.Go(func() { t.remote.Close() })
@@ -38,14 +40,24 @@ func (t *tunnelConn) LocalAddr() net.Addr { return t.remote.LocalAddr() }
 func (t *tunnelConn) RemoteAddr() net.Addr { return t.remote.RemoteAddr() }
 
 // DialContext opens a TCP connection from the remote host for a jump-host
-// handshake. Closing or canceling it releases its lease without closing sibling
-// channels. A server that never answers channel creation keeps the single open
+// handshake. Its context bounds establishment, as net.Dialer does; Close owns
+// an established tunnel without closing siblings. A server that never answers
+// channel creation keeps the single open
 // slot busy until it replies or the parent transport ends.
 func (c *Connection) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
 	if network != "tcp" && network != "tcp4" && network != "tcp6" {
 		return nil, fmt.Errorf("unsupported SSH tunnel network %q", network)
 	}
-	l, err := c.acquireOpen(ctx)
+	lifetime, cancel := context.WithCancel(c.ctx)
+	stopSetup := context.AfterFunc(ctx, cancel)
+	keep := false
+	defer func() {
+		stopSetup()
+		if !keep {
+			cancel()
+		}
+	}()
+	l, err := c.acquireOpen(lifetime)
 	if err != nil {
 		return nil, err
 	}
@@ -60,7 +72,7 @@ func (c *Connection) DialContext(ctx context.Context, network, address string) (
 		var tunnel *tunnelConn
 		if err == nil {
 			local, bridge := net.Pipe()
-			tunnel = &tunnelConn{Conn: local, bridge: bridge, remote: conn, lease: l}
+			tunnel = &tunnelConn{Conn: local, bridge: bridge, remote: conn, lease: l, cancel: cancel}
 			if !l.bind(tunnel.abort) {
 				tunnel.abort()
 				tunnel, err = nil, ErrClosed
@@ -90,10 +102,16 @@ func (c *Connection) DialContext(ctx context.Context, network, address string) (
 	}()
 	select {
 	case opened := <-ready:
+		stopSetup()
 		if err := ctx.Err(); err != nil {
 			l.release(true)
 			return nil, err
 		}
+		if lifetime.Err() != nil {
+			l.release(true)
+			return nil, ErrClosed
+		}
+		keep = opened.err == nil
 		return opened.conn, opened.err
 	case <-ctx.Done():
 		l.release(true)

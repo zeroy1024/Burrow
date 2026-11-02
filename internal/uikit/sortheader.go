@@ -12,6 +12,8 @@ type SortHeaderProps struct {
 	Width    float32
 	Scroller ui.Element
 	Chevron  *ui.SVG
+	// Translucent leaves the background to the table's shared glass underlay.
+	Translucent bool
 }
 
 type SortHeaderParts struct {
@@ -26,6 +28,9 @@ func SortHeader(c *ui.Context, props SortHeaderProps) SortHeaderParts {
 	widths := resolveColumnWidths(props.Columns, props.State.List.Columns.Widths, props.Width-2*t.C.FilePane.ContentPadding)
 	parts.Root = ui.Row(c).Height(t.C.FileList.HeaderHeight).Padding(0, t.C.FilePane.ContentPadding+t.C.FileList.RowPaddingX).
 		Gap(t.C.FileList.ColumnGap).FillWidth().Background(Color(t.C.FileList.HeaderBg)).Role(ui.RoleRow)
+	if props.Translucent {
+		parts.Root.Background(ui.Transparent)
+	}
 	if props.Scroller.Valid() {
 		parts.Root.ScrollWith(props.Scroller)
 	}

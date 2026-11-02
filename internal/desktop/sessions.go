@@ -46,45 +46,124 @@ func (a *app) sidebar(c *ui.Context, shown float32) {
 
 func (a *app) startGroupDraft() {
 	a.page().groupDraft = ""
+	a.page().groupDelete = nil
+	a.page().groupRename = nil
 	a.page().groupDialogOpen = true
+}
+
+func (a *app) startGroupRename(group *hostGroup) {
+	page := a.page()
+	page.groupDraft, page.groupRename, page.groupDelete = group.name, group, nil
+	page.groupDialogOpen = true
 }
 
 func (a *app) groupDialog(c *ui.Context) {
 	t := theme.Current()
 	page := a.page()
-	create := false
+	if page.groupDelete != nil {
+		a.deleteGroupDialog(c)
+		return
+	}
+	target := page.groupRename
+	title, action, detail := "新建分组", "创建", "将主机拖入分组，整理主机目录。"
+	dialogContext := c.Key("new-group-dialog")
+	if target != nil {
+		title, action, detail = "重命名分组", "保存", "输入新的分组名称。"
+		dialogContext = c.Key("rename-group-dialog").Key(target)
+	}
+	save := false
 	var name string
 	valid := false
-	result := uikit.Modal(c.Key("new-group-dialog"), &page.groupDialogOpen, uikit.ModalProps{
-		Title: "新建分组", Compact: true, Width: t.C.Dialog.GroupWidth,
+	result := uikit.Modal(dialogContext, &page.groupDialogOpen, uikit.ModalProps{
+		Title: localize(c, title), Compact: true, Width: t.C.Dialog.GroupWidth,
 		Motion: uikit.MotionOverride(a.reduceMotion(c)),
 	}, func(parts uikit.ModalParts) {
-		uikit.Text(c, "将主机拖入分组，整理主机目录。", uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneSecondary})
+		uikit.Text(c, localize(c, detail), uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneSecondary})
 		input := uikit.Input(c, &page.groupDraft, uikit.InputProps{DeferStyle: true}).
-			AutoFocus().Label("分组名称").Placeholder("分组名称").FillWidth()
+			AutoFocus().Label(localize(c, "分组名称")).Placeholder(localize(c, "分组名称")).FillWidth()
 		name = strings.TrimSpace(page.groupDraft)
-		duplicate := slices.Contains(a.groupNames(), name)
-		valid = name != "" && !duplicate
+		duplicate := slices.ContainsFunc(a.catalogGroups(), func(group *hostGroup) bool {
+			return group != target && group.name == name
+		})
+		valid = name != "" && !duplicate && (target == nil || slices.Contains(a.groups, target) && name != target.name)
 		message := ""
 		if duplicate {
-			message = "此分组名称已存在"
+			message = localize(c, "此分组名称已存在")
 			uikit.FieldMessage(c, message, uikit.FieldMessageProps{Tone: uikit.ToneDanger})
 		}
 		uikit.StyleFormControl(input, message)
-		parts.SetDirty(name != "")
+		dirty := name != ""
+		if target != nil {
+			dirty = page.groupDraft != target.name
+		}
+		parts.SetDirty(dirty)
 		ui.Row(c).Gap(t.Space.N8).Justify(ui.End).Children(func() {
-			uikit.Button(c, "取消", uikit.ButtonProps{}).OnClick(parts.RequestDismiss)
-			create = uikit.Button(c, "创建", uikit.ButtonProps{Variant: uikit.ButtonPrimary, Disabled: !valid}).Clicked()
+			uikit.Button(c, localize(c, "取消"), uikit.ButtonProps{}).OnClick(parts.RequestDismiss)
+			save = uikit.Button(c, localize(c, action), uikit.ButtonProps{Variant: uikit.ButtonPrimary, Disabled: !valid}).Clicked()
 		})
 	})
-	if (create || result.Submit) && valid {
+	if (save || result.Submit) && valid {
 		if err := a.commitCatalogMove(func() {
-			a.groups = append(a.groups, a.newCatalogGroup(name))
+			if target != nil {
+				target.name = name
+			} else {
+				a.groups = append(a.groups, a.newCatalogGroup(name))
+			}
 		}); err != nil {
 			uikit.Toast(c, uikit.ToastProps{Tone: uikit.ToneDanger, Title: "保存分组失败", Detail: err.Error()})
 			return
 		}
-		page.groupDialogOpen, page.query = false, ""
+		page.groupDialogOpen = false
+		if target == nil {
+			page.query = ""
+		}
+	}
+	if !page.groupDialogOpen {
+		page.groupRename = nil
+	}
+}
+
+func (a *app) deleteGroupDialog(c *ui.Context) {
+	page := a.page()
+	group := page.groupDelete
+	destination := a.groupDeleteDestination(group)
+	valid := destination != nil && slices.Contains(a.groups, group)
+	remove := false
+	t := theme.Current()
+	result := uikit.Modal(c.Key(group), &page.groupDialogOpen, uikit.ModalProps{
+		Title: localize(c, "删除分组？"), Compact: true, Width: t.C.Dialog.GroupWidth,
+		Motion: uikit.MotionOverride(a.reduceMotion(c)),
+	}, func(parts uikit.ModalParts) {
+		detail := fmt.Sprintf(localize(c, "删除「%s」分组，连接配置、已打开的会话和传输任务会保留。"), group.name)
+		if valid && len(group.hosts) > 0 {
+			detail = fmt.Sprintf(localize(c, "删除「%s」分组后，组内 %d 个条目将移至「%s」。连接配置、已打开的会话和传输任务会保留。"), group.name, len(group.hosts), destination.name)
+		}
+		uikit.Text(c, detail, uikit.TextProps{})
+		ui.Row(c).Justify(ui.End).Gap(t.Space.N8).Children(func() {
+			uikit.Button(c, localize(c, "取消"), uikit.ButtonProps{}).OnClick(parts.RequestDismiss)
+			remove = uikit.Button(c, localize(c, "删除"), uikit.ButtonProps{Variant: uikit.ButtonDanger, Disabled: !valid}).Clicked()
+		})
+	})
+	if (remove || result.Submit) && valid {
+		if err := a.commitCatalogMove(func() {
+			destination.hosts = append(destination.hosts, group.hosts...)
+			a.groups = slices.DeleteFunc(a.groups, func(candidate *hostGroup) bool { return candidate == group })
+		}); err != nil {
+			uikit.Toast(c, uikit.ToastProps{Tone: uikit.ToneDanger, Title: "删除分组失败", Detail: err.Error()})
+			return
+		}
+		if page.lastGroup == group {
+			page.lastGroup = destination
+		}
+		key := catalogKey{kind: catalogGroupDrag, id: group.id}
+		delete(page.catalogItems, key)
+		if page.catalogFlash != nil && *page.catalogFlash == key {
+			page.catalogFlash = nil
+		}
+		page.groupDialogOpen = false
+	}
+	if !page.groupDialogOpen {
+		page.groupDelete = nil
 	}
 }
 

@@ -45,7 +45,28 @@ func (a *app) catalogGroups() []*hostGroup {
 }
 
 func (a *app) newCatalogGroup(name string) *hostGroup {
-	return &hostGroup{id: len(a.groups), scope: a.section, name: name}
+	id := a.nextCatalogGroupID
+	for _, group := range a.groups {
+		id = max(id, group.id+1)
+	}
+	a.nextCatalogGroupID = id + 1
+	return &hostGroup{id: id, scope: a.section, name: name}
+}
+
+func (a *app) groupDeleteDestination(source *hostGroup) *hostGroup {
+	var destination *hostGroup
+	for _, group := range a.groups {
+		if group == source || group.scope != source.scope {
+			continue
+		}
+		if group.name == "个人" {
+			return group
+		}
+		if destination == nil {
+			destination = group
+		}
+	}
+	return destination
 }
 
 func (a *app) groupNames() []string {

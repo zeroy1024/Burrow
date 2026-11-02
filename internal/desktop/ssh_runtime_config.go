@@ -113,6 +113,16 @@ func (a *app) dialSSHPlan(ctx context.Context, plan sshDialPlan, override sshSec
 		if connection != nil {
 			cfg.DialContext = connection.DialContext
 		}
+		if err := setupCtx.Err(); err != nil {
+			cancelSetup()
+			return nil, err
+		}
+		deadline, _ := setupCtx.Deadline()
+		cfg.SetupTimeout = time.Until(deadline)
+		if cfg.SetupTimeout <= 0 {
+			cancelSetup()
+			return nil, context.DeadlineExceeded
+		}
 		connection, err = sshclient.Dial(ctx, cfg)
 		cfg.Password, cfg.Passphrase = "", ""
 		setupErr := setupCtx.Err()
@@ -145,6 +155,23 @@ func (a *app) sshRuntimeConfig(ctx context.Context, step sshDialStep, override s
 		cfg.KeepAlive = time.Duration(options.KeepAlive) * time.Second
 	}
 	address := cfg.User + "@" + net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.Port))
+	cfg.KeyboardInteractive = func(user, instruction string, questions []string, echoes []bool) ([]string, error) {
+		answers := make([]string, 0, len(questions))
+		for index, question := range questions {
+			answer := a.askSSH(ctx, &sshPrompt{
+				title: "SSH 交互认证", address: address, detail: instruction + "\n" + question,
+				echo: index < len(echoes) && echoes[index],
+			})
+			if !answer.accepted {
+				if ctx.Err() != nil {
+					return nil, ctx.Err()
+				}
+				return nil, errSSHConnectCanceled
+			}
+			answers = append(answers, answer.secret)
+		}
+		return answers, nil
+	}
 	switch cfg.Auth {
 	case "", "password":
 		cfg.Auth = "password"

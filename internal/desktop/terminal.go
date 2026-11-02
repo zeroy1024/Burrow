@@ -9,6 +9,7 @@ import (
 	"sshdesk/internal/theme"
 	"sshdesk/internal/uikit"
 
+	nativeterm "github.com/egoist/mygo/sshdesk-terminal"
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/shader"
 )
@@ -189,6 +190,18 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 				if appearance.Saturation != 1 {
 					output.Effect(terminalSaturation.Effect(shader.Options{Uniforms: map[string]any{"Saturation": appearance.Saturation}}))
 				}
+				backdropOptions := nativeterm.ViewportBackdropOptions{Radius: p.Radius}
+				if a.translucencyEnabled(c) {
+					backdropOptions.Bottom, backdropOptions.Gap = status.HeightPane, contentGap
+					if multiple {
+						backdropOptions.Top = p.HeaderHeight
+					}
+				}
+				backdrop := nativeterm.ViewportBackdrop(c.Key("live-backdrop"), session.terminal.view, backdropOptions).
+					Absolute().Fill().Opacity(appearance.Opacity)
+				if appearance.Saturation != 1 {
+					backdrop.Effect(terminalSaturation.Effect(shader.Options{Uniforms: map[string]any{"Saturation": appearance.Saturation}}))
+				}
 			} else {
 				// Scrollbars decorates this same scroll node without replacing its handle.
 				output := ui.Scroll(c.Key("output")).Fill().MinWidth(0).MinHeight(0).
@@ -210,12 +223,12 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 				output.Children(func() {
 					a.terminalLines(c, session, focused)
 				})
-				if multiple {
-					a.terminalScrollEdge(c, p.HeaderHeight, false, background)
-				}
-				a.terminalScrollEdge(c, status.HeightPane, true, background)
 				terminalScrollbar(c, card, output, scroll, terminalBackground)
 			}
+			if multiple {
+				a.terminalScrollEdge(c, p.HeaderHeight, false, background)
+			}
+			a.terminalScrollEdge(c, status.HeightPane, true, background)
 			var header ui.Element
 			if multiple {
 				// A shared drag ancestor lets the title and bell keep their own hover targets.
@@ -275,7 +288,7 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 					})
 					close := uikit.PaneIconButton(c, "关闭窗格 "+h.name, closeIcon, surface).Absolute().Top(0).Left(2*(p.ActionWidth+p.ActionGap)).Size(p.ActionWidth, p.ActionHeight)
 					keyboardFocus = keyboardFocus || close.FocusVisible()
-					close.OnClick(func() { a.closePane(session) })
+					close.OnClick(func() { a.requestClosePane(tab, session) })
 				}
 			})
 			target := f.ButtonsOpacityUnfocused
@@ -290,11 +303,7 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 			uikit.PaneFooter(c, uikit.FooterProps{Key: "status", Surface: surface}).Absolute().Bottom(0).Left(0).Right(0).
 				Opacity(appearance.FooterOpacity).PassThrough().Children(func() {
 				uikit.ConnectionBadge(c, connectionIndicatorState(session.state), surface)
-				latency := h.latency
-				if session.state != connected {
-					latency = -1
-				}
-				uikit.Latency(c, latency, uikit.LatencyProps{Surface: surface, Prefix: "延迟"})
+				uikit.Latency(c, sshLatencyMS(session, c.Now()), uikit.LatencyProps{Surface: surface, Prefix: "延迟"})
 				ui.Spacer(c)
 				ui.Text(c, a.paneSizeLabel(session)).FontSize(status.FontSize).SingleLine()
 			})

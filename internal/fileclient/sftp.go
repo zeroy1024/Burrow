@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"path"
 	"strconv"
 	"sync"
 	"time"
@@ -275,6 +276,7 @@ func (c *sftpClient) entry(info os.FileInfo) (Entry, error) {
 		Symlink: info.Mode()&os.ModeSymlink != 0, Modified: info.ModTime(), Permissions: info.Mode().String()}
 	if stat, ok := info.Sys().(*sftp.FileStat); ok {
 		entry.Owner = strconv.FormatUint(uint64(stat.UID), 10) + ":" + strconv.FormatUint(uint64(stat.GID), 10)
+		entry.Mode, entry.ModeKnown = info.Mode(), stat.Mode != 0
 	}
 	return entry, nil
 }
@@ -312,6 +314,29 @@ func (c *sftpClient) Stat(ctx context.Context, name string) (Entry, error) {
 		return Entry{}, fmt.Errorf("stat SFTP entry: %w", err)
 	}
 	return c.entry(info)
+}
+
+func (c *sftpClient) StatFilesystem(ctx context.Context, name string) (FilesystemStats, error) {
+	wire, err := c.wirePath(name)
+	if err != nil {
+		return FilesystemStats{}, err
+	}
+	return sftpOperation(c, ctx, func() (FilesystemStats, error) {
+		if _, supported := c.client.HasExtension("statvfs" + "@" + "openssh.com"); !supported {
+			return FilesystemStats{}, errors.ErrUnsupported
+		}
+		stat, err := c.client.StatVFS(wire)
+		if err != nil {
+			return FilesystemStats{}, err
+		}
+		if stat.Frsize == 0 || stat.Blocks == 0 || stat.Bfree > stat.Blocks ||
+			stat.Blocks > ^uint64(0)/stat.Frsize {
+			return FilesystemStats{}, errors.New("SFTP server returned invalid filesystem statistics")
+		}
+		return FilesystemStats{
+			Total: stat.Blocks * stat.Frsize, Free: stat.Bfree * stat.Frsize,
+		}, nil
+	})
 }
 
 func (c *sftpClient) OpenRead(ctx context.Context, name string, offset int64) (io.ReadCloser, error) {
@@ -377,19 +402,34 @@ func (c *sftpClient) Rename(ctx context.Context, oldName, newName string, option
 	}
 	_, err = sftpOperation(c, ctx, func() (struct{}, error) {
 		if len(options) > 0 && options[0].NoReplace {
+			if oldWire == newWire {
+				_, err := c.client.Lstat(oldWire)
+				return struct{}{}, err
+			}
 			if _, statErr := c.client.Lstat(newWire); statErr == nil {
-				return struct{}{}, fs.ErrExist
+				if path.Dir(oldName) != path.Dir(newName) || !sameRenameSpelling(path.Base(oldName), path.Base(newName)) {
+					return struct{}{}, fs.ErrExist
+				}
+				name, err := localRenameTemporary()
+				if err != nil {
+					return struct{}{}, err
+				}
+				temporary := path.Join(path.Dir(oldWire), name)
+				if err := c.renameNoReplace(oldWire, temporary); err != nil {
+					return struct{}{}, err
+				}
+				err = c.renameNoReplace(temporary, newWire)
+				if err != nil {
+					rollback := c.renameNoReplace(temporary, oldWire)
+					if rollback != nil {
+						return struct{}{}, fmt.Errorf("rename failed; original remains at %s: %w", path.Join(path.Dir(oldName), name), errors.Join(err, rollback))
+					}
+				}
+				return struct{}{}, err
 			} else if !errors.Is(statErr, fs.ErrNotExist) {
 				return struct{}{}, statErr
 			}
-			renameErr := c.client.Rename(oldWire, newWire)
-			var status *sftp.StatusError
-			if errors.As(renameErr, &status) && (status.Code == 4 || status.Code == 11) {
-				if _, statErr := c.client.Lstat(newWire); statErr == nil {
-					return struct{}{}, errors.Join(fs.ErrExist, renameErr)
-				}
-			}
-			return struct{}{}, renameErr
+			return struct{}{}, c.renameNoReplace(oldWire, newWire)
 		}
 		// OpenSSH's extension supplies replacement semantics needed by the
 		// explicit overwrite policy. Standard SFTP rename handles other servers.
@@ -397,6 +437,61 @@ func (c *sftpClient) Rename(ctx context.Context, oldName, newName string, option
 			return struct{}{}, c.client.PosixRename(oldWire, newWire)
 		}
 		return struct{}{}, c.client.Rename(oldWire, newWire)
+	})
+	return err
+}
+
+func (c *sftpClient) renameNoReplace(from, to string) error {
+	if _, err := c.client.Lstat(to); err == nil {
+		return fs.ErrExist
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
+	err := c.client.Rename(from, to)
+	var status *sftp.StatusError
+	if errors.As(err, &status) && (status.Code == 4 || status.Code == 11) {
+		if _, statErr := c.client.Lstat(to); statErr == nil {
+			return errors.Join(fs.ErrExist, err)
+		}
+	}
+	return err
+}
+
+func (c *sftpClient) ResolveDirectory(ctx context.Context, name string) (string, error) {
+	wire, err := c.wirePath(name)
+	if err != nil {
+		return "", err
+	}
+	return sftpOperation(c, ctx, func() (string, error) {
+		info, err := c.client.Stat(wire)
+		if err != nil {
+			return "", err
+		}
+		if !info.IsDir() {
+			return "", ErrNotDirectory
+		}
+		resolved, err := c.client.RealPath(wire)
+		if err != nil {
+			return "", err
+		}
+		return c.codec.decode(resolved)
+	})
+}
+
+func (c *sftpClient) Chmod(ctx context.Context, name string, mode fs.FileMode) error {
+	wire, err := c.wirePath(name)
+	if err != nil {
+		return err
+	}
+	_, err = sftpOperation(c, ctx, func() (struct{}, error) {
+		info, err := c.client.Lstat(wire)
+		if err != nil {
+			return struct{}{}, err
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			return struct{}{}, fs.ErrInvalid
+		}
+		return struct{}{}, c.client.Chmod(wire, mode)
 	})
 	return err
 }

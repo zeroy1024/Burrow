@@ -227,10 +227,14 @@ func PaneActions(c *ui.Context, width float32, surface *theme.Theme) ui.Element 
 
 func PaneActionBackdrop(c *ui.Context, width, blurRadius float32, background ui.Color, surface *theme.Theme) {
 	p := surface.C.Pane
+	material := ui.Box(c).Absolute().Top(0).Left(0).Size(width, p.ActionHeight).Radius(p.ActionRadius).PassThrough()
+	tint := background
+	if blurRadius > 0 {
+		material.Material(glass.Blur{Radius: blurRadius})
+		tint = background.Alpha(p.ActionTint)
+	}
 	ui.Box(c).Absolute().Top(0).Left(0).Size(width, p.ActionHeight).Radius(p.ActionRadius).PassThrough().
-		Material(glass.Blur{Radius: blurRadius})
-	ui.Box(c).Absolute().Top(0).Left(0).Size(width, p.ActionHeight).Radius(p.ActionRadius).PassThrough().
-		Background(background.Alpha(p.ActionTint))
+		Background(tint)
 }
 
 type PaneIconButtonProps struct {
