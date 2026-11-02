@@ -66,10 +66,14 @@ func (a *app) startHostDraft() {
 	if a.section == sectionFiles {
 		protocol = "SFTP"
 	}
+	groups := a.catalogGroups()
 	page.draft = hostDraft{
 		port: "22", protocol: protocol, files: a.section == sectionFiles,
 		auth: "password", keepalive: "30", encoding: "UTF-8", ftpMode: "passive", ftpTLS: "explicit",
-		group: a.catalogGroups()[0].name, advanced: a.modalAdvancedOpen(strings.ToLower(protocol)),
+		creatingGroup: len(groups) == 0, advanced: a.modalAdvancedOpen(strings.ToLower(protocol)),
+	}
+	if len(groups) > 0 {
+		page.draft.group = groups[0].name
 	}
 	if page.lastGroup != nil {
 		page.draft.group = page.lastGroup.name

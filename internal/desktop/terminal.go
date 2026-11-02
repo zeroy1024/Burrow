@@ -121,11 +121,9 @@ func (a *app) terminals(c *ui.Context, size ui.Point) {
 func (a *app) terminalCellWidth() float32 {
 	prefs := a.terminal.prefs
 	font := ui.Font{Family: strings.Join(prefs.FontFamily, ", "), Size: prefs.FontSize}
-	if a.cellWidth == 0 || a.cellFont != font || a.cellTracking != prefs.Tracking {
+	if a.cellWidth == 0 || a.cellFont != font {
 		a.cellFont = font
-		a.cellTracking = prefs.Tracking
 		a.cellWidth, _ = ui.ShapeText("M", font, 0).Size()
-		a.cellWidth += prefs.Tracking
 	}
 	return a.cellWidth
 }
@@ -212,7 +210,7 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 					bottomPadding,
 					p.ContentSide,
 				).Font(strings.Join(prefs.FontFamily, ", ")).FontSize(prefs.FontSize).
-					LetterSpacing(prefs.Tracking).TextColor(uikit.Color(colors.Foreground)).SelectionColor(uikit.Color(colors.Selection)).
+					TextColor(uikit.Color(colors.Foreground)).SelectionColor(uikit.Color(colors.Selection)).
 					Opacity(appearance.Opacity).Cache().
 					OnClick(func() { a.focusSession(tab, session) })
 				if session.focusPending {

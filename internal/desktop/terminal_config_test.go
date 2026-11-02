@@ -26,7 +26,6 @@ func TestTerminalSettingsRoundTrip(t *testing.T) {
 	a.terminal.prefs.Background = termtheme.BackgroundCard
 	a.terminal.prefs.FontSize = 14
 	a.terminal.prefs.LineHeight = 22
-	a.terminal.prefs.Tracking = 0.2
 	a.terminal.prefs.CursorShape = termtheme.CursorBar
 	a.terminal.prefs.CursorBlink = false
 	a.terminal.prefs.BoldIsBright = true
@@ -120,14 +119,6 @@ func TestImportTerminalThemeRejectsInvalidAndConflictingFiles(t *testing.T) {
 	}
 	if err := a.importTerminalTheme(path); err == nil || !strings.Contains(err.Error(), "line 2") {
 		t.Fatalf("expected an error with a line number, got %v", err)
-	}
-}
-
-func TestTerminalSettingsRejectNonpositiveCellWidth(t *testing.T) {
-	config := terminalSettingsForTest("").config()
-	config.FontSize, config.Tracking = 6, -4
-	if err := config.validate(); err == nil {
-		t.Fatal("expected an invalid character width to be rejected")
 	}
 }
 

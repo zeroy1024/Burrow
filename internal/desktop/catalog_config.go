@@ -122,7 +122,7 @@ func (a *app) loadCatalog() error {
 		a.emptyCatalog()
 	}
 	err := a.readCatalog()
-	// A failed read must never turn the demo data into an overwrite of the user's file.
+	// A failed read must never turn the initial state into an overwrite of the user's file.
 	a.catalogConfig.loadErr = err
 	return err
 }
@@ -144,10 +144,7 @@ func (a *app) readCatalog() error {
 func (a *app) emptyCatalog() {
 	a.hosts, a.keys = []host{}, []managedKey{}
 	a.savedWorkspace = nil
-	a.groups = []*hostGroup{
-		{id: 0, scope: sectionSSH, name: "个人", hosts: []hostID{}},
-		{id: 1, scope: sectionFiles, name: "个人", hosts: []hostID{}},
-	}
+	a.groups = []*hostGroup{}
 }
 
 func (a *app) readCatalogFile() error {
@@ -488,9 +485,6 @@ func backupLegacyConfig(path string, data []byte, version int) error {
 }
 
 func (config catalogConfig) catalog(runtimeHosts []host) ([]host, []*hostGroup, error) {
-	if len(config.Groups) == 0 {
-		return nil, nil, errors.New("catalog must contain a group")
-	}
 	groups := make([]*hostGroup, len(config.Groups))
 	byID := make(map[int]*hostGroup, len(groups))
 	type groupName struct {
@@ -609,17 +603,6 @@ func (config catalogConfig) catalog(runtimeHosts []host) ([]host, []*hostGroup, 
 		group.hosts = sshHosts
 		groups = append(groups, filesGroup)
 		names[name] = true
-	}
-	sshGroups, filesGroups := 0, 0
-	for _, group := range groups {
-		if group.scope == sectionFiles {
-			filesGroups++
-		} else {
-			sshGroups++
-		}
-	}
-	if sshGroups == 0 || filesGroups == 0 {
-		return nil, nil, errors.New("catalog must contain a group for SSH and file transfer")
 	}
 	return hosts, groups, nil
 }

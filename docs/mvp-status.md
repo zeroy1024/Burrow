@@ -17,7 +17,7 @@
 | SSH延迟 | 完整接入 | `Connection.ProbeLatency`复用现有transport测SSH应用层往返时间；`updateSSHLatency`独立于监控，当前可见Shell按连接组共享，首次可见连接立即采样、每5秒刷新，3秒超时或10秒过期显示未知 |
 | 窗口及栏半透明 | 已修正渲染回归，GUI待复测 | `syncWindowMaterial`即时切换原生VibrancyTitlebar，系统降低透明度强制停用；三页标题栏用92%主题Window.Bg着色，保留原灰色外观；真实终端ViewportBackdrop读取固定Ghostty的实际overscan行，使用自身绘制坐标及上下栏外侧圆角裁剪，修正焦点/非焦点不同离屏绘制路径的错位与直角底板；文件TableProps.Backdrop绘制实际条目，SSH上下栏和文件页头/页脚统一ScrollFade多层渐进模式（1/3/5px模糊，92%→78%→0各自背景着色），文件工具栏和列头共用唯一背景，SortHeader.Translucent清除自身底色，关闭半透明时恢复实体背景；原视口、4px留白及输入/拖动身份保留 |
 | Linux监控 | 完整接入，附能力边界 | 主体`/proc`、`os-release`及可选SFTP `statvfs`；默认路由单接口、PID＋启动时间差分Top、单指标失败隔离；同transport切Shell保留基线，隐藏取消自有采集通道。实际API、预算及未实测边界见[监控覆盖清单](monitoring.md) |
-| 真实终端字体/颜色/光标 | 当前验收范围完整接入 | 每会话scheme、字体/字号/行高、背景、光标通过公开API接入；用户允许忽略Tracking差异，粗体提亮设置入口已删除 |
+| 真实终端字体/颜色/光标 | 当前验收范围完整接入 | 每会话scheme、字体/字号/行高、背景、光标通过公开API接入；终端字距遗留参数已移除，粗体提亮设置入口已删除 |
 | 实时回滚行数 | 完整实现（接受页级误差） | 本地终端包公开`Options.ScrollbackLines` / `SetScrollbackLines(int) error`；创建时按物理显示行设置，`enforceScrollback`遍历全部SSH标签原地同步，含后台标签与非SSH页面；缩小淘汰最旧历史页，增大不恢复旧输出 |
 | 真实终端滚动条风格 | 当前风格范围已有实现 | 原生VT与UIKit均为半透明胶囊、滚动/贴边显示与淡出；按用户要求保留原生实现，不再要求组件或参数完全相同，未做像素验收 |
 | 拖动真实内容 | 完整接入，附边界 | 可见来源pointerdown捕获真实正文视口，后台裁切、单手势缓存；不可见来源/捕获失败用独立真实emulator Snapshot，不制造占位内容。SDK Snapshot不暴露历史视口位置，备用路径不能保证历史中部逐像素同位 |

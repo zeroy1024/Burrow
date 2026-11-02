@@ -311,7 +311,6 @@ type Prefs struct {
 	FontFamily  []string // fallback chain
 	FontSize    float32  // logical px
 	LineHeight  float32  // logical px
-	Tracking    float32  // letter spacing, logical px
 	CursorShape CursorShape
 	CursorBlink bool
 	// Background is the 终端背景 option (default BackgroundScheme).
@@ -321,14 +320,12 @@ type Prefs struct {
 	BoldIsBright bool
 }
 
-// DefaultPrefs matches the terminal text in the mockups (ssh-v6.html:
-// JetBrains Mono 12.5px / 19px line, -0.1px tracking).
+// DefaultPrefs uses JetBrains Mono at 13px with a 19px line height.
 func DefaultPrefs() Prefs {
 	return Prefs{
 		FontFamily:  []string{"JetBrains Mono", "Menlo", "monospace"},
-		FontSize:    12.5,
+		FontSize:    13,
 		LineHeight:  19,
-		Tracking:    -0.1,
 		CursorShape: CursorBlock,
 		CursorBlink: true,
 		Background:  BackgroundScheme,

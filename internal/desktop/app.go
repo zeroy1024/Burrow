@@ -90,7 +90,6 @@ type app struct {
 	pointer            ui.Point
 	cellWidth          float32
 	cellFont           ui.Font
-	cellTracking       float32
 	terminal           terminalSettingsState
 	terminalError      error
 	drag               *paneDragState

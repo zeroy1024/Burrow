@@ -589,7 +589,10 @@ func (a *app) terminalTextSettings(c *ui.Context) {
 				a.changeTerminalSettings(func() {
 					a.terminal.prefs.FontSize = float32(value)
 					if !a.prefs.LineHeightEdited {
-						a.terminal.prefs.LineHeight = float32(math.Round(value * 19 / 12.5))
+						defaults := termtheme.DefaultPrefs()
+						a.terminal.prefs.LineHeight = float32(math.Round(
+							value * float64(defaults.LineHeight) / float64(defaults.FontSize),
+						))
 					}
 					a.terminal.prefs.LineHeight = max(a.terminal.prefs.LineHeight, float32(math.Ceil(value*1.2)))
 				})

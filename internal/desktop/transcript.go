@@ -238,7 +238,7 @@ func (a *app) terminalDragContents(
 		ui.Box(c).Absolute().Left(0).Top(0).Size(sourceWidth, sourceHeight).
 			Scale(scale, scale).TransformOrigin(0, 0).Clip().PassThrough().
 			Font(strings.Join(prefs.FontFamily, ", ")).FontSize(prefs.FontSize).
-			LetterSpacing(prefs.Tracking).TextColor(uikit.Color(colors.Foreground)).Children(func() {
+			TextColor(uikit.Color(colors.Foreground)).Children(func() {
 			ui.Column(c).Absolute().Left(t.C.Pane.ContentSide).Top(t.Space.N4 - viewport.ScrollY).
 				Width(sourceWidth - 2*t.C.Pane.ContentSide).MinWidth(0).Shrink(0).PassThrough().Children(func() {
 				lineView := func(line terminalLine) {
