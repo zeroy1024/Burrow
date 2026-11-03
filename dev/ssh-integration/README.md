@@ -30,7 +30,9 @@ python3 -B scripts/ssh-integration-server.py --ftp
 export SSHDESK_FTP_ADDRESS='127.0.0.1:FTP映射端口'
 ```
 
-FTP 使用独立的 vsftpd 容器和 init 进程托管，控制端口及五个被动数据端口都只映射到本机。夹具允许已认证用户读写，每条连接限速 1 MiB/s，为暂停、取消和恢复提供可观测的传输窗口。SSH 元数据保存在临时目录的 `server.json`，FTP 元数据保存在 `ftp-server.json`；两容器共享测试密码，连接与会话独立。
+FTP 使用独立的 vsftpd 容器和 init 进程托管，控制端口及 64 个被动数据端口都只映射到本机。夹具允许已认证用户读写，每条连接限速 1 MiB/s，为暂停、取消和恢复提供可观测的传输窗口。SSH 元数据保存在临时目录的 `server.json`，FTP 元数据保存在 `ftp-server.json`；两容器共享测试密码，连接与会话独立。
+
+显式和隐式 FTPS 分别运行 `python3 -B scripts/ssh-integration-server.py --ftps` 与 `python3 -B scripts/ssh-integration-server.py --ftps --implicit`。临时 CA、带回环地址 SAN 的服务器证书及连接元数据保存在同一夹具目录；TLS 校验和数据通道会话复用保持启用。MCP 的真实 HTTP、原生控制和任务恢复联调见 [MCP 联调说明](../mcp-integration/README.md)。
 
 ## 传输层验证
 

@@ -27,8 +27,9 @@ type sshDialStep struct {
 // Plans contain value snapshots only. Workers never inspect the live catalogs
 // while the window thread edits or reorders them.
 type sshDialPlan struct {
-	steps []sshDialStep
-	trust sshclient.HostKeyStore
+	promptChanged func(bool, string)
+	steps         []sshDialStep
+	trust         sshclient.HostKeyStore
 }
 
 type sshSecretsOverride struct {
@@ -84,6 +85,9 @@ func (a *app) captureSSHPlan(endpoint host) (sshDialPlan, error) {
 }
 
 func (a *app) dialSSHPlan(ctx context.Context, plan sshDialPlan, override sshSecretsOverride, result *connectionTestResult) (*sshclient.Connection, error) {
+	if plan.promptChanged != nil {
+		ctx = context.WithValue(ctx, mcpPromptObserverKey{}, plan.promptChanged)
+	}
 	var connection *sshclient.Connection
 	var chain []*sshclient.Connection
 	success := false

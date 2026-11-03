@@ -27,12 +27,15 @@ func SidePanelViewport(c *ui.Context) ui.Element {
 
 type SidePanelProps struct {
 	Title, Subtitle, CloseLabel string
+	Width                       float32
 	Open                        *bool
 	Scroll                      *ui.ScrollState
 	Scrollbar                   *ScrollbarState
 	ScrollInput                 func(ui.InputEvent) bool
 	ContentPaddingX             float32
 	ScrollOverlay               func(ui.Element, *ui.ScrollState)
+	Header                      func() bool
+	Footer                      func()
 }
 
 type SidePanelResult struct {
@@ -47,7 +50,11 @@ func SidePanel(c *ui.Context, props SidePanelProps, body func()) SidePanelResult
 	if padding == 0 {
 		padding = p.PaddingX
 	}
-	result := SidePanelResult{Root: ui.Column(c).Width(p.Width).FillHeight()}
+	width := props.Width
+	if width == 0 {
+		width = p.Width
+	}
+	result := SidePanelResult{Root: ui.Column(c).Width(width).FillHeight()}
 	if props.Open != nil && !*props.Open {
 		result.Root.Hidden(true)
 		return result
@@ -63,12 +70,16 @@ func SidePanel(c *ui.Context, props SidePanelProps, body func()) SidePanelResult
 		}
 	})
 	result.Root.Children(func() {
-		header := PaneHeader(c, HeaderProps{
-			Density: DensityTitle, Title: props.Title, Subtitle: props.Subtitle,
-			Close: true, CloseLabel: props.CloseLabel,
-		})
-		header.Root.FillWidth().Height(p.HeaderHeight).Padding(0, p.PaddingX)
-		result.Close = header.Close
+		if props.Header != nil {
+			result.Close = props.Header()
+		} else {
+			header := PaneHeader(c, HeaderProps{
+				Density: DensityTitle, Title: props.Title, Subtitle: props.Subtitle,
+				Close: true, CloseLabel: props.CloseLabel,
+			})
+			header.Root.FillWidth().Height(p.HeaderHeight).Padding(0, padding)
+			result.Close = header.Close
+		}
 		if result.Close && props.Open != nil {
 			*props.Open = false
 		}
@@ -93,6 +104,11 @@ func SidePanel(c *ui.Context, props SidePanelProps, body func()) SidePanelResult
 				})
 			}
 		})
+		if props.Footer != nil {
+			ui.Row(c).FillWidth().Shrink(0).Padding(t.Space.N10, padding).
+				BorderWidth(t.Size.Divider, 0, 0, 0).BorderColor(Color(t.Color.Border.Divider)).
+				AlignItems(ui.Center).Gap(t.Space.N8).Children(props.Footer)
+		}
 	})
 	return result
 }

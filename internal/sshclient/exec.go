@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+
+	"golang.org/x/crypto/ssh"
 )
 
 const (
@@ -15,6 +17,13 @@ const (
 )
 
 var errExecOutputLimit = errors.New("SSH command output exceeds its limit")
+
+type ExecResult struct {
+	Stdout    []byte
+	Stderr    []byte
+	ExitCode  *int
+	Truncated bool
+}
 
 type commandOutput struct {
 	buffer   bytes.Buffer
@@ -40,15 +49,27 @@ func (b *commandOutput) Write(p []byte) (int, error) {
 // The channel slot stays occupied until command I/O ends, including after a
 // cancellation, so a server ignoring channel close cannot accumulate workers.
 func (c *Connection) Exec(ctx context.Context, command string) ([]byte, error) {
+	result, err := c.ExecCommand(ctx, command)
+	if err != nil && len(result.Stderr) > 0 {
+		err = fmt.Errorf("%w; stderr: %s", err, strings.TrimSpace(string(result.Stderr)))
+	} else if err == nil && len(result.Stderr) > 0 {
+		err = fmt.Errorf("SSH command diagnostics: %s", strings.TrimSpace(string(result.Stderr)))
+	}
+	return result.Stdout, err
+}
+
+// ExecCommand keeps diagnostics and the remote exit status separate. A nil
+// ExitCode means the remote result is unknown, including interrupted channels.
+func (c *Connection) ExecCommand(ctx context.Context, command string) (ExecResult, error) {
 	if strings.TrimSpace(command) == "" {
-		return nil, errors.New("SSH command must not be empty")
+		return ExecResult{}, errors.New("SSH command must not be empty")
 	}
 	l, err := c.acquireOpen(ctx)
 	if err != nil {
-		return nil, err
+		return ExecResult{}, err
 	}
 	type result struct {
-		output []byte
+		output ExecResult
 		err    error
 	}
 	ready := make(chan result, 1)
@@ -75,32 +96,38 @@ func (c *Connection) Exec(ctx context.Context, command string) ([]byte, error) {
 		stderr := &commandOutput{limit: maxExecStderr, abort: abort}
 		session.Stdout, session.Stderr = stdout, stderr
 		err = session.Run(command)
+		output := ExecResult{Stdout: stdout.buffer.Bytes(), Stderr: stderr.buffer.Bytes()}
+		var exit *ssh.ExitError
+		if err == nil {
+			code := 0
+			output.ExitCode = &code
+		} else if errors.As(err, &exit) {
+			code := exit.ExitStatus()
+			if code >= 0 {
+				output.ExitCode = &code
+			}
+		}
 		if stdout.exceeded || stderr.exceeded {
+			output.Truncated = true
 			err = errors.Join(errExecOutputLimit, err)
 		}
 		if err != nil {
-			if stderr.buffer.Len() > 0 {
-				err = fmt.Errorf("run SSH command: %w; stderr: %s", err, strings.TrimSpace(stderr.buffer.String()))
-			} else {
-				err = fmt.Errorf("run SSH command: %w", err)
-			}
-		} else if stderr.buffer.Len() > 0 {
-			err = fmt.Errorf("SSH command diagnostics: %s", strings.TrimSpace(stderr.buffer.String()))
+			err = fmt.Errorf("run SSH command: %w", err)
 		}
-		ready <- result{output: stdout.buffer.Bytes(), err: err}
+		ready <- result{output: output, err: err}
 	}()
 	select {
 	case completed := <-ready:
 		if err := ctx.Err(); err != nil {
 			l.release(true)
-			return nil, err
+			return ExecResult{}, err
 		}
 		return completed.output, completed.err
 	case <-ctx.Done():
 		l.release(true)
-		return nil, ctx.Err()
+		return ExecResult{}, ctx.Err()
 	case <-c.done:
 		l.release(true)
-		return nil, ErrClosed
+		return ExecResult{}, ErrClosed
 	}
 }

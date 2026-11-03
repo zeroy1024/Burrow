@@ -122,12 +122,29 @@ func (a *app) appShortcuts(c *ui.Context) {
 	if a.actionPressed(c, "session.new") {
 		run(func() {
 			a.closeSettings()
+			if a.section == sectionMCP {
+				if a.mcp.activeTab == 1 {
+					a.openNewMCPPolicyModal()
+				} else {
+					a.openNewMCPKeyModal()
+				}
+				return
+			}
 			a.startHostDraft()
 		})
 	}
 	if a.settingsUI.open {
 		if a.actionPressed(c, "host.search") {
 			a.settingsUI.search.Focus()
+		}
+		return
+	}
+	if a.section == sectionMCP {
+		for n := range 3 {
+			if a.actionPressed(c, fmt.Sprintf("tab.select.%d", n+1)) {
+				a.mcp.activeTab = n
+				return
+			}
 		}
 		return
 	}

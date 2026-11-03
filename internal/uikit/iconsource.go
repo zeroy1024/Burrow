@@ -50,6 +50,9 @@ const (
 	IconImage       IconName = "image"
 	IconArchive     IconName = "archive"
 	IconKey         IconName = "key"
+	IconMCP         IconName = "mcp"
+	IconShield      IconName = "shield"
+	IconBan         IconName = "ban"
 )
 
 var iconShapes = map[IconName]string{
@@ -92,6 +95,9 @@ var iconShapes = map[IconName]string{
 	IconImage:       `<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8" cy="8" r="2"/><path d="m21 15-5-5-6 7-3-3-4 5"/>`,
 	IconArchive:     `<path d="M4 8h16v13H4Z"/><rect x="3" y="3" width="18" height="5" rx="1"/><path d="M10 12h4"/>`,
 	IconKey:         `<circle cx="8" cy="8" r="5"/><path d="m12 12 9 9m-3-3 3-3m-6 0 3-3"/>`,
+	IconMCP:         `<path d="M7.5 4.5 4.5 7.5a3.5 3.5 0 0 0 5 5l6-6a3.5 3.5 0 0 1 5 5l-3 3"/><path d="m16.5 19.5 3-3a3.5 3.5 0 0 0-5-5l-6 6a3.5 3.5 0 0 1-5-5l3-3"/>`,
+	IconShield:      `<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/>`,
+	IconBan:         `<circle cx="12" cy="12" r="9"/><path d="m5.7 5.7 12.6 12.6"/>`,
 }
 
 // The cache holds immutable SVG geometry, keyed by the current token stroke.

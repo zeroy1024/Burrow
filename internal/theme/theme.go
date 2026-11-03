@@ -1708,8 +1708,8 @@ type MenuTokens struct {
 	ItemHeight    float32     // ← size.control
 	ItemRadius    float32     // ← radius.controlSm
 	ItemPaddingX  float32     // ← space.8
-	ItemHover     color.NRGBA // ← color.accent.default
-	ItemHoverText color.NRGBA // ← color.text.onAccent
+	ItemHover     color.NRGBA // ← color.state.hover
+	ItemHoverText color.NRGBA // ← color.text.primary
 	FontSize      float32     // ← font.size.body
 	Separator     color.NRGBA // ← color.border.subtle
 }
@@ -4089,8 +4089,8 @@ func buildComponents(s *Semantic) Components {
 			ItemHeight:    s.Size.Control,
 			ItemRadius:    s.Radius.ControlSm,
 			ItemPaddingX:  s.Space.N8,
-			ItemHover:     s.Color.Accent.Default,
-			ItemHoverText: s.Color.Text.OnAccent,
+			ItemHover:     s.Color.State.Hover,
+			ItemHoverText: s.Color.Text.Primary,
 			FontSize:      s.Font.Size.Body,
 			Separator:     s.Color.Border.Subtle,
 		},

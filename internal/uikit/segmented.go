@@ -16,11 +16,12 @@ type SegItem struct {
 }
 
 type SegmentedProps struct {
-	Size   Size
-	Fill   bool
-	Label  string
-	Cards  bool
-	Motion MotionMode
+	Size     Size
+	Fill     bool
+	Label    string
+	Cards    bool
+	Motion   MotionMode
+	CountMax int
 }
 
 func SegmentItems(labels []string) []SegItem {
@@ -91,7 +92,8 @@ func Segmented(c *ui.Context, selected *int, items []SegItem, props SegmentedPro
 					if index == *selected {
 						ink = p.CountTextOn
 					}
-					Count(c, *item.Count, CountProps{Style: CountQuiet}).FontSize(p.FontSize).TextColor(Color(ink))
+					Count(c, *item.Count, CountProps{Style: CountQuiet, Max: props.CountMax}).
+						FontSize(p.FontSize).TextColor(Color(ink))
 				}
 			})
 		}

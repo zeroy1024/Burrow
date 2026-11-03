@@ -264,17 +264,6 @@ func menuPopup(
 				item.Background(background).TextColor(ink)
 				StyleDisabled(item, entry.Disabled)
 				item.Children(func() {
-					if hasChecks {
-						ui.Box(c).Size(t.Size.Icon, t.Size.Icon).Center().PassThrough().Children(func() {
-							if entry.Checked != nil && *entry.Checked {
-								if entry.Radio {
-									ui.Box(c).Size(t.C.Check.RadioDot, t.C.Check.RadioDot).Radius(t.Radius.Pill).Background(ink).PassThrough()
-								} else {
-									ui.Icon(c, IconSVG(IconCheck)).Size(t.Size.IconSm, t.Size.IconSm).PassThrough()
-								}
-							}
-						})
-					}
 					if hasIcons {
 						ui.Box(c).Size(t.Size.Icon, t.Size.Icon).Center().PassThrough().Children(func() {
 							if entry.Icon != "" {
@@ -288,6 +277,13 @@ func menuPopup(
 					ui.Spacer(c).PassThrough()
 					if entry.Shortcut != "" {
 						Kbd(c, entry.Shortcut, KbdProps{Tone: KbdFlat}).TextColor(ink)
+					}
+					if hasChecks {
+						ui.Box(c).Size(t.Size.Icon, t.Size.Icon).Center().PassThrough().Children(func() {
+							if entry.Checked != nil && *entry.Checked {
+								ui.Icon(c, IconSVG(IconCheck)).Size(t.Size.IconSm, t.Size.IconSm).PassThrough()
+							}
+						})
 					}
 					if len(entry.Children) != 0 {
 						ui.Icon(c, IconSVG(IconArrowRight)).Size(t.Size.IconXs, t.Size.IconXs).PassThrough()

@@ -93,23 +93,20 @@ func Select[T comparable](c *ui.Context, selected *T, options []Option[T], props
 					item.FillWidth().MinWidth(0).MinHeight(p.Height).Padding(t.Space.N6, t.C.Menu.ItemPaddingX).Gap(t.Space.N8).
 						Radius(t.C.Menu.ItemRadius).AlignItems(ui.Center)
 					if item.Highlighted() {
-						item.Background(Color(t.Color.Accent.Default)).TextColor(Color(t.Color.Text.OnAccent))
+						item.Background(Color(t.C.Menu.ItemHover)).TextColor(Color(t.C.Menu.ItemHoverText))
 					}
 					item.Children(func() {
-						tone := ToneNeutral
-						if item.Highlighted() {
-							tone = ToneOnAccent
-						}
-						mark := Icon(c, IconCheck, IconProps{Size: SizeSm, Tone: tone}).Shrink(0).PassThrough()
-						if option.Value != *selected {
-							mark.Opacity(0)
-						}
 						if option.Leading != nil {
 							option.Leading()
 						}
 						ui.Text(c, option.Label).FontSize(p.FontSize).SingleLine().Ellipsis("…").MinWidth(0).Shrink(1).PassThrough()
 						if option.Detail != "" {
 							ui.Text(c, option.Detail).FontSize(t.Font.Size.Footnote).SingleLine().Ellipsis("…").MinWidth(0).Shrink(1).PassThrough()
+						}
+						ui.Spacer(c).PassThrough()
+						mark := ui.Icon(c, IconSVG(IconCheck)).Size(t.Size.IconSm, t.Size.IconSm).Shrink(0).PassThrough()
+						if option.Value != *selected {
+							mark.Opacity(0)
 						}
 					})
 				}

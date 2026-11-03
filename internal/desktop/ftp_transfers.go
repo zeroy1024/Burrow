@@ -23,6 +23,7 @@ const (
 )
 
 type transferTask struct {
+	mcp       *mcpTransferOwner
 	id        int
 	persisted bool
 	session   *fileSession

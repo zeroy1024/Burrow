@@ -13,6 +13,8 @@ type ModalProps struct {
 	Icon                   *ui.SVG
 	Disabled, Dirty        bool
 	Width                  float32
+	// DismissDisabled blocks closing while keeping the content interactive.
+	DismissDisabled bool
 	// Compact keeps a centered confirmation/input layout. Width is its content
 	// width, matching the Dialog.GroupWidth/HostWidth tokens.
 	Compact           bool
@@ -94,6 +96,7 @@ func Modal(c *ui.Context, open *bool, props ModalProps, body func(ModalParts)) M
 	ui.DialogBase(c, open, func(backdrop, panel ui.Element) {
 		state = ui.Local(panel, "uikit.modal.state", func() modalState { return modalState{} })
 		state.Dirty = props.Dirty
+		dismissDisabled := props.Disabled || props.DismissDisabled || state.Closing
 		result.Panel, result.Backdrop = panel, backdrop
 		backdrop.Column().Justify(ui.Start).AlignItems(ui.Center).Padding(top, 0, 0, 0)
 		panel.Column().Width(panelWidth).MaxWidth(bounds.MaxWidth).MaxHeight(bounds.MaxHeight).
@@ -114,7 +117,7 @@ func Modal(c *ui.Context, open *bool, props ModalProps, body func(ModalParts)) M
 		}
 		if panel.Dismissed() {
 			*open = true
-			if !props.Disabled && !state.Closing {
+			if !dismissDisabled {
 				state.Requested = true
 			}
 		}
@@ -172,7 +175,9 @@ func Modal(c *ui.Context, open *bool, props ModalProps, body func(ModalParts)) M
 			if closeLabel == "" {
 				closeLabel = "关闭窗口"
 			}
-			closeButton := IconButton(c, IconClose, IconButtonProps{Key: props.CloseKey, Label: closeLabel, Size: SizeSm}).
+			closeButton := IconButton(c, IconClose, IconButtonProps{
+				Key: props.CloseKey, Label: closeLabel, Size: SizeSm, Disabled: dismissDisabled,
+			}).
 				Absolute().Top(p.HeaderPaddingTop).Right(p.HeaderPaddingRight)
 			if closeButton.Clicked() {
 				parts.RequestDismiss()
@@ -183,7 +188,7 @@ func Modal(c *ui.Context, open *bool, props ModalProps, body func(ModalParts)) M
 		}
 		if state.Requested {
 			state.Requested = false
-			if !props.Disabled && !state.Closing {
+			if !dismissDisabled {
 				if state.Dirty {
 					state.Confirm = true
 				} else {
