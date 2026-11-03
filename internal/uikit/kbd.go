@@ -2,6 +2,8 @@ package uikit
 
 import (
 	"image/color"
+	"runtime"
+	"strings"
 
 	"github.com/egoist/mygo/ui"
 	"sshdesk/internal/theme"
@@ -20,6 +22,20 @@ type KbdProps struct {
 	Tone     KbdTone
 	FontSize float32
 	Text     *color.NRGBA
+}
+
+// ShortcutDisplay uses the platform's command modifier and key labels.
+func ShortcutDisplay(binding string) string {
+	if runtime.GOOS == "darwin" {
+		return strings.NewReplacer(
+			"Cmd+", "⌘", "Shift+", "⇧", "Alt+", "⌥", "Ctrl+", "⌃", "Super+", "⌘",
+			"Left", "←", "Right", "→", "Up", "↑", "Down", "↓",
+		).Replace(binding)
+	}
+	if runtime.GOOS == "windows" {
+		return strings.NewReplacer("Cmd+", "Ctrl+", "Super+", "Win+").Replace(binding)
+	}
+	return strings.ReplaceAll(binding, "Cmd+", "Ctrl+")
 }
 
 // Kbd is decorative. Flat hints add no padding or height to the original text.

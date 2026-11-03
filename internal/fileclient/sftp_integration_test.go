@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"sshdesk/internal/sshclient"
+	"sshdesk/internal/store"
 )
 
 func sftpFixtureConnection(t *testing.T) *sshclient.Connection {
@@ -40,10 +41,15 @@ func sftpFixtureConnection(t *testing.T) *sshclient.Connection {
 	if err != nil {
 		t.Fatal(err)
 	}
+	db, err := store.Open(t.Context(), filepath.Join(t.TempDir(), "burrow.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
 	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 	connection, err := sshclient.Dial(ctx, sshclient.Config{Host: host, Port: port, User: "sshdesk", Auth: "key",
 		KeyPath: filepath.Join(directory, "key_plain"),
-		HostKey: sshclient.KnownHosts(filepath.Join(t.TempDir(), "known_hosts"), func(string, string, string) bool { return true })})
+		HostKey: sshclient.KnownHosts(t.Context(), db, func(string, string, string) bool { return true })})
 	if err != nil {
 		cancel()
 		t.Fatal(err)

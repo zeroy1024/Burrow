@@ -1,16 +1,19 @@
 package desktop
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/egoist/mygo/ui"
 	"slices"
+	"sshdesk/internal/store"
 	"strings"
+	"time"
 )
 
 type storedWorkspace struct {
 	Version     int                         `json:"version,omitempty"`
-	SSH         []string                    `json:"ssh,omitempty"`
-	Files       []string                    `json:"files,omitempty"`
 	Tabs        []storedWorkspaceTab        `json:"tabs,omitempty"`
 	FileTabs    []storedFileTab             `json:"fileTabs,omitempty"`
 	Connections []storedWorkspaceConnection `json:"connections,omitempty"`
@@ -20,8 +23,9 @@ type storedWorkspace struct {
 }
 
 type storedWorkspaceConnection struct {
-	ID       int           `json:"id"`
-	Endpoint storedSession `json:"endpoint"`
+	EndpointRef string        `json:"endpointRef,omitempty"`
+	ID          int           `json:"id"`
+	Endpoint    storedSession `json:"endpoint,omitzero"`
 }
 
 type storedWorkspaceTab struct {
@@ -39,10 +43,11 @@ type storedWorkspaceLayout struct {
 }
 
 type storedWorkspaceSession struct {
-	ProfileID  string        `json:"profileId,omitempty"`
-	Endpoint   storedSession `json:"endpoint"`
-	Temporary  bool          `json:"temporary,omitempty"`
-	Connection int           `json:"connection,omitempty"`
+	EndpointRef string        `json:"endpointRef,omitempty"`
+	ProfileID   string        `json:"profileId,omitempty"`
+	Endpoint    storedSession `json:"endpoint,omitzero"`
+	Temporary   bool          `json:"temporary,omitempty"`
+	Connection  int           `json:"connection,omitempty"`
 }
 
 type storedFileTab struct {
@@ -114,47 +119,8 @@ func snapshotWorkspaceLayout(node *terminalLayout, connectionID func(*sshConnect
 }
 
 func (a *app) restoreWorkspace() {
-	saved := a.savedWorkspace
-	if !a.prefs.RestoreSessions || saved == nil {
-		return
-	}
-	if saved.Version >= 1 {
-		a.restoreWorkspaceTabs(saved)
-		return
-	}
-	activeSSH, activeFile := saved.ActiveSSH, saved.ActiveFile
-	for savedIndex, id := range saved.SSH {
-		for i, h := range a.hosts {
-			if h.session.ID == id && h.protocol == "" {
-				session := a.newDisconnectedSession(hostID(i), h, false, nil)
-				a.nextTab++
-				a.tabs = append(a.tabs, &workspaceTab{id: a.nextTab, root: &terminalLayout{session: session}, focused: session})
-				if savedIndex == saved.ActiveSSH {
-					activeSSH = len(a.tabs) - 1
-				}
-				break
-			}
-		}
-	}
-	for savedIndex, id := range saved.Files {
-		for i, h := range a.hosts {
-			if h.session.ID == id && (h.protocol == "sftp" || h.protocol == "ftp") {
-				a.fileSessions = append(a.fileSessions, a.newFileSession(hostID(i), h, false, nil))
-				if savedIndex == saved.ActiveFile {
-					activeFile = len(a.fileSessions) - 1
-				}
-				break
-			}
-		}
-	}
-	if len(a.tabs) > 0 {
-		a.activeTab = max(0, min(activeSSH, len(a.tabs)-1))
-	}
-	if len(a.fileSessions) > 0 {
-		a.activeFile = max(0, min(activeFile, len(a.fileSessions)-1))
-	}
-	if saved.Section == sectionFiles {
-		a.section = sectionFiles
+	if a.prefs.RestoreSessions && a.savedWorkspace != nil {
+		a.restoreWorkspaceTabs(a.savedWorkspace)
 	}
 }
 
@@ -224,26 +190,15 @@ func validateStoredWorkspace(saved *storedWorkspace, hosts []host, keys []manage
 	if saved == nil {
 		return nil
 	}
-	if saved.Version != 0 && saved.Version != 1 && saved.Version != 2 {
+	if saved.Version != 2 {
 		return errors.New("unsupported workspace version")
 	}
 	if saved.Section != sectionSSH && saved.Section != sectionFiles {
 		return errors.New("invalid workspace section")
 	}
-	sshCount, fileCount := len(saved.SSH), len(saved.Files)
-	if saved.Version >= 1 {
-		sshCount, fileCount = len(saved.Tabs), len(saved.FileTabs)
-	}
+	sshCount, fileCount := len(saved.Tabs), len(saved.FileTabs)
 	if saved.ActiveSSH < 0 || saved.ActiveSSH >= max(1, sshCount) || saved.ActiveFile < 0 || saved.ActiveFile >= max(1, fileCount) {
 		return errors.New("invalid active workspace tab")
-	}
-	if saved.Version == 0 {
-		for _, id := range append(slices.Clone(saved.SSH), saved.Files...) {
-			if id == "" {
-				return errors.New("empty legacy workspace session id")
-			}
-		}
-		return nil
 	}
 	profiles := map[string]host{}
 	for _, profile := range hosts {
@@ -354,31 +309,85 @@ func validateStoredWorkspace(saved *storedWorkspace, hosts []host, keys []manage
 	return nil
 }
 
-func (a *app) saveWorkspace() error {
-	previous := a.savedWorkspace
-	a.savedWorkspace = a.workspaceSnapshot()
-	if err := validateStoredWorkspace(a.savedWorkspace, a.hosts, a.keys); err != nil {
-		a.savedWorkspace = previous
-		return err
-	}
-	if err := a.saveCatalog(); err != nil {
-		a.savedWorkspace = previous
-		return err
-	}
-	return nil
+type workspaceSaveState struct {
+	last    []byte
+	dirtyAt time.Time
 }
 
-func (a *app) persistBeforeClose() error {
-	var catalogErr, prefsErr error
-	// A file rejected at load time is never overwritten. It already has a
-	// visible error; it must not trap the user in an unclosable window.
+func (a *app) tickWorkspace(c *ui.Context) {
+	if a.catalogConfig.loadErr != nil || a.catalogSaving || a.quitPending || a.transfers.quitting {
+		return
+	}
+	saved := a.workspaceSnapshot()
+	data, err := json.Marshal(saved)
+	if err != nil {
+		a.persistenceNotice("保存工作区失败", err)
+		return
+	}
+	if !bytes.Equal(data, a.workspaceSave.last) {
+		a.workspaceSave.last = data
+		a.workspaceSave.dirtyAt = c.Now()
+	}
+	if a.workspaceSave.dirtyAt.IsZero() {
+		return
+	}
+	remaining := 300*time.Millisecond - c.Now().Sub(a.workspaceSave.dirtyAt)
+	if remaining > 0 {
+		c.After(remaining)
+		return
+	}
+	a.workspaceSave.dirtyAt = time.Time{}
+	if err := validateStoredWorkspace(saved, a.hosts, a.keys); err != nil {
+		a.persistenceNotice("保存工作区失败", err)
+		return
+	}
+	value, err := encodeWorkspace(saved)
+	if err != nil {
+		a.persistenceNotice("保存工作区失败", err)
+		return
+	}
+	a.persist(func() error { return a.store.SaveWorkspace(a.ctx, value) }, func(err error) {
+		if err == nil {
+			a.savedWorkspace = saved
+		} else {
+			a.persistenceNotice("保存工作区失败", err)
+		}
+	})
+}
+
+func (a *app) persistBeforeClose(done func(error)) {
+	var workspace *store.Workspace
+	settings := map[string][]byte{}
 	if a.catalogConfig.loadErr == nil {
-		catalogErr = a.saveWorkspace()
+		saved := a.workspaceSnapshot()
+		if err := validateStoredWorkspace(saved, a.hosts, a.keys); err != nil {
+			done(err)
+			return
+		}
+		value, err := encodeWorkspace(saved)
+		if err != nil {
+			done(err)
+			return
+		}
+		workspace = &value
 	}
 	if a.prefsLoadErr == nil {
-		prefsErr = a.flushAppPreferences()
+		data, err := a.preferencesData()
+		if err != nil {
+			done(err)
+			return
+		}
+		settings["preferences"] = data
 	}
-	return errors.Join(catalogErr, prefsErr)
+	if a.filePrefs.loadErr == nil {
+		data, err := a.filePreferencesData()
+		if err != nil {
+			done(err)
+			return
+		}
+		settings["files"] = data
+	}
+	a.persist(func() error { return a.store.SaveDesktopState(a.ctx, workspace, settings) }, done)
 }
 
 func (a *app) savingSession() bool {

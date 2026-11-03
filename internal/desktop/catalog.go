@@ -4,6 +4,7 @@ import "slices"
 
 type hostGroup struct {
 	id        int
+	stableID  string
 	scope     section
 	name      string
 	hosts     []hostID
@@ -50,7 +51,7 @@ func (a *app) newCatalogGroup(name string) *hostGroup {
 		id = max(id, group.id+1)
 	}
 	a.nextCatalogGroupID = id + 1
-	return &hostGroup{id: id, scope: a.section, name: name}
+	return &hostGroup{id: id, stableID: newSessionID(), scope: a.section, name: name}
 }
 
 func (a *app) groupDeleteDestination(source *hostGroup) *hostGroup {

@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"sshdesk/internal/sshclient"
+	"sshdesk/internal/store"
 
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
@@ -56,7 +57,7 @@ func sshFixture(t *testing.T) integrationFixture {
 		config: sshclient.Config{
 			Host: host, Port: port, User: "sshdesk", Auth: "key",
 			KeyPath: filepath.Join(directory, "key_plain"),
-			HostKey: sshclient.KnownHosts(filepath.Join(t.TempDir(), "known_hosts"), func(string, string, string) bool { return true }),
+			HostKey: sshclient.KnownHosts(t.Context(), integrationTrustStore(t, filepath.Join(t.TempDir(), "burrow.db")), func(string, string, string) bool { return true }),
 		},
 	}
 }
@@ -248,9 +249,10 @@ func TestSSHIntegrationAuthentication(t *testing.T) {
 func TestSSHIntegrationHostKeyTrust(t *testing.T) {
 	fixture := sshFixture(t)
 	t.Run("reject_unknown", func(t *testing.T) {
-		cfg, path := fixture.config, filepath.Join(t.TempDir(), "known_hosts")
+		cfg, path := fixture.config, filepath.Join(t.TempDir(), "burrow.db")
+		db := integrationTrustStore(t, path)
 		called := false
-		cfg.HostKey = sshclient.KnownHosts(path, func(string, string, string) bool { called = true; return false })
+		cfg.HostKey = sshclient.KnownHosts(t.Context(), db, func(string, string, string) bool { called = true; return false })
 		ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 		defer cancel()
 		conn, err := sshclient.Dial(ctx, cfg)
@@ -261,14 +263,30 @@ func TestSSHIntegrationHostKeyTrust(t *testing.T) {
 		if !called || !strings.Contains(err.Error(), "not trusted") {
 			t.Fatalf("unknown host was not rejected by trust decision: %v", err)
 		}
-		if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
-			t.Fatal("rejecting the host persisted a known_hosts file")
+		other, _, keyErr := ed25519.GenerateKey(rand.Reader)
+		if keyErr != nil {
+			t.Fatal(keyErr)
 		}
+		key, keyErr := ssh.NewPublicKey(other)
+		if keyErr != nil {
+			t.Fatal(keyErr)
+		}
+		remote, keyErr := net.ResolveTCPAddr("tcp", fixture.address)
+		if keyErr != nil {
+			t.Fatal(keyErr)
+		}
+		checkErr := db.CheckHostKey(t.Context(), fixture.address, remote, key)
+		var unknown *knownhosts.KeyError
+		if !errors.As(checkErr, &unknown) || len(unknown.Want) != 0 {
+			t.Fatalf("rejecting the host persisted trust: %v", checkErr)
+		}
+
 	})
 	t.Run("accept_persist_and_reuse", func(t *testing.T) {
-		cfg, path := fixture.config, filepath.Join(t.TempDir(), "known_hosts")
+		cfg, path := fixture.config, filepath.Join(t.TempDir(), "burrow.db")
+		db := integrationTrustStore(t, path)
 		calls := 0
-		cfg.HostKey = sshclient.KnownHosts(path, func(_ string, fingerprint, keyType string) bool {
+		cfg.HostKey = sshclient.KnownHosts(t.Context(), db, func(_ string, fingerprint, keyType string) bool {
 			calls++
 			if !strings.HasPrefix(fingerprint, "SHA256:") || keyType == "" {
 				t.Error("host confirmation omitted fingerprint or key type")
@@ -291,7 +309,8 @@ func TestSSHIntegrationHostKeyTrust(t *testing.T) {
 		}
 	})
 	t.Run("reject_changed_without_confirmation", func(t *testing.T) {
-		cfg, path := fixture.config, filepath.Join(t.TempDir(), "known_hosts")
+		cfg, path := fixture.config, filepath.Join(t.TempDir(), "burrow.db")
+		db := integrationTrustStore(t, path)
 		other, _, err := ed25519.GenerateKey(rand.Reader)
 		if err != nil {
 			t.Fatal(err)
@@ -300,12 +319,15 @@ func TestSSHIntegrationHostKeyTrust(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		entry := knownhosts.Line([]string{knownhosts.Normalize(fixture.address)}, key) + "\n"
-		if err := os.WriteFile(path, []byte(entry), 0o600); err != nil {
+		remote, err := net.ResolveTCPAddr("tcp", fixture.address)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := db.TrustHostKey(t.Context(), fixture.address, remote, key); err != nil {
 			t.Fatal(err)
 		}
 		called := false
-		cfg.HostKey = sshclient.KnownHosts(path, func(string, string, string) bool { called = true; return true })
+		cfg.HostKey = sshclient.KnownHosts(t.Context(), db, func(string, string, string) bool { called = true; return true })
 		ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 		defer cancel()
 		conn, err := sshclient.Dial(ctx, cfg)
@@ -487,7 +509,7 @@ func TestSSHIntegrationCancellation(t *testing.T) {
 		defer cancel()
 		cfg := fixture.config
 		entered := make(chan struct{})
-		cfg.HostKey = sshclient.KnownHosts(filepath.Join(t.TempDir(), "known_hosts"), func(string, string, string) bool {
+		cfg.HostKey = sshclient.KnownHosts(t.Context(), integrationTrustStore(t, filepath.Join(t.TempDir(), "burrow.db")), func(string, string, string) bool {
 			close(entered)
 			<-ctx.Done()
 			return false
@@ -574,4 +596,14 @@ func startIntegrationAgent(t *testing.T, directory string) {
 		}
 	})
 	t.Setenv("SSH_AUTH_SOCK", socket)
+}
+
+func integrationTrustStore(t *testing.T, path string) *store.Store {
+	t.Helper()
+	db, err := store.Open(t.Context(), path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	return db
 }

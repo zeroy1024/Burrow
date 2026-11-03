@@ -6,6 +6,11 @@ automation and configuration isolation; release sources and user data stay intac
 """
 
 import argparse
+import base64
+import hashlib
+import sqlite3
+import uuid
+from datetime import datetime, timezone
 from contextlib import contextmanager
 import json
 import os
@@ -161,11 +166,7 @@ func dockerIntegrationSnapshot() {
       SSHProfiles:dockerIntegrationProfiles(a, sectionSSH), FileProfiles:dockerIntegrationProfiles(a, sectionFiles),
       SSHGroups:dockerIntegrationGroups(a, sectionSSH), FileGroups:dockerIntegrationGroups(a, sectionFiles)}
     if err := a.catalogConfig.loadErr; err != nil { out.CatalogError = err.Error() }
-    configData, err := os.ReadFile(a.catalogConfig.path)
-    if err != nil { panic(err) }
-    var saved struct { Version int `json:"version"` }
-    if err := json.Unmarshal(configData, &saved); err != nil { panic(err) }
-    out.CatalogVersion = saved.Version
+    out.CatalogVersion = 1 // Store.Open has validated the schema version.
     for _, tab := range a.tabs {
         for _, s := range tab.root.sessions() {
             item := sessionInfo{ID:s.id, Host:int(s.host), State:int(s.state),
@@ -326,22 +327,51 @@ def prepare(repo, task_dir, address):
     local_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
     for name in ("cache", "logs"):
         (config_root / name).mkdir(mode=0o700)
-    # Exercise the real v0 -> current sessions.json migration. These source
-    # records contain only disposable fixture paths, never stored passwords.
-    hosts = []
-    for i, (name, auth, key) in enumerate([
-        ("Docker Password", "password", ""),
-        ("Docker Plain Key", "key", str(task_dir / "key_plain")),
-        ("Docker Encrypted Key", "key", str(task_dir / "key_encrypted")),
-        ("Docker Agent", "agent", ""),
-    ]):
-        hosts.append(dict(id=i, group_id=0, order=i, name=name, user="sshdesk", address=host.strip("[]"),
-                          port=int(port), os=0, system="Linux", auth=auth, key_path=key))
-    (config_dir / "catalog.json").write_text(json.dumps(dict(
-        groups=[dict(id=0, name="Docker integration", order=0, collapsed=False)], hosts=hosts)))
-    os.chmod(config_dir / "catalog.json", 0o600)
-    (config_dir / "prefs.json").write_text(json.dumps(dict(version=1, defaultLocalDir=str(local_dir))))
-    os.chmod(config_dir / "prefs.json", 0o600)
+    # Seed only the current schema in a disposable directory; no legacy import.
+    now = datetime.now(timezone.utc).isoformat()
+    key_ids = {}
+    with sqlite3.connect(config_dir / "burrow.db") as db:
+        db.executescript((repo / "internal/store/schema.sql").read_text())
+        (config_dir / "keys").mkdir(mode=0o700)
+        for filename in ("key_plain", "key_encrypted"):
+            key_id = str(uuid.uuid4())
+            key_ids[filename] = key_id
+            source = task_dir / filename
+            target = config_dir / "keys" / key_id
+            shutil.copyfile(source, target)
+            os.chmod(target, 0o600)
+            public = (task_dir / (filename + ".pub")).read_bytes()
+            (config_dir / "keys" / (key_id + ".pub")).write_bytes(public)
+            blob = base64.b64decode(public.split()[1])
+            fingerprint = "SHA256:" + base64.b64encode(hashlib.sha256(blob).digest()).decode().rstrip("=")
+            db.execute("INSERT INTO managed_keys VALUES(?,?,?,?,?,?,?,?,?)",
+                       (key_id, filename, "Ed25519", fingerprint, str(target), "", 256, now, public))
+        for group_order, scope in enumerate(("ssh", "files")):
+            group_id = str(uuid.uuid4())
+            db.execute("INSERT INTO catalog_groups VALUES(?,?,?,?,?)",
+                       (group_id, scope, "Docker integration", group_order, 0))
+            for order, (name, auth, key) in enumerate([
+                ("Docker Password", "password", ""),
+                ("Docker Plain Key", "key", "key_plain"),
+                ("Docker Encrypted Key", "key", "key_encrypted"),
+                ("Docker Agent", "agent", ""),
+            ]):
+                profile_id = str(uuid.uuid4())
+                key_id = key_ids.get(key)
+                value = dict(id=profile_id, auth=auth, protocol="ssh" if scope == "ssh" else "sftp",
+                             name=name, user="sshdesk", host=host.strip("[]"), port=int(port),
+                             os=0, system="Linux", createdAt=now, updatedAt=now)
+                if key_id:
+                    value["keyId"] = key_id
+                if scope == "ssh":
+                    value["ssh"] = dict(keepAlive=30)
+                else:
+                    value["files"] = dict(encoding="UTF-8")
+                db.execute("INSERT INTO profiles VALUES(?,?,?,?,?,?)",
+                           (profile_id, group_id, order, key_id, None, json.dumps(value)))
+        db.execute("INSERT INTO settings VALUES(?,?)",
+                   ("preferences", json.dumps(dict(version=1, defaultLocalDir=str(local_dir)))))
+    os.chmod(config_dir / "burrow.db", 0o600)
     mapping = {}
     def replace_once(content, before, after):
         if content.count(before) != 1:
@@ -353,6 +383,23 @@ def prepare(repo, task_dir, address):
     replacement.write_text(replace_once(original.read_text(),
         "func (a *app) view(c *ui.Context) {",
         "func (a *app) view(c *ui.Context) {\n dockerIntegrationApp = a\n dockerIntegrationContext = c"))
+    mapping[str(original)] = str(replacement)
+    original = repo / "internal/desktop/data_paths.go"
+    replacement = overlay_dir / "data_paths.go"
+    replacement.write_text('''package desktop
+import (
+ "path/filepath"
+ "github.com/egoist/mygo"
+)
+func configureDataDirectory() (string,error) {
+ root,err:=dockerIntegrationConfigDir();if err!=nil{return "",err}
+ directory:=filepath.Join(root,"Burrow")
+ mygo.App.SetName("Burrow Integration")
+ mygo.App.SetPath(mygo.PathUserData,directory)
+ return directory,nil
+}
+func credentialStore() mygo.SecretsModule {return mygo.Secrets.Service("dev.burrow.app.integration")}
+''')
     mapping[str(original)] = str(replacement)
     original = repo / "internal/desktop/ssh_terminal.go"
     replacement = overlay_dir / "ssh_terminal.go"
@@ -979,18 +1026,16 @@ class Driver:
         passphrase = (self.task_dir / "key_passphrase").read_text().strip()
         initial = self.snapshot()
         if initial["CatalogVersion"] != 1 or len(initial["SSHProfiles"]) != 4 or len(initial["FileProfiles"]) != 4:
-            raise RuntimeError("legacy fixture did not migrate to independent SSH and file sessions")
-        backup = json.loads((self.config_root / "Burrow/catalog.json.v1.bak").read_text())
-        if len(backup.get("hosts", [])) != 4 or backup.get("version", 0) != 0:
-            raise RuntimeError("legacy catalog backup was not preserved")
-        print("PASS native UI: legacy catalog migration to sessions v1")
+            raise RuntimeError("SQLite fixture did not load independent SSH and file sessions")
+        print("PASS native UI: SQLite session catalog")
         self.open_host("Docker Password")
         self.secret("输入 SSH 密码", password)
         self.wait("first host trust", lambda: self.node("信任并连接", "button"))
         self.click("取消")
         self.state(3)
-        if (self.config_root / "Burrow/known_hosts").exists():
-            raise RuntimeError("rejected host key was persisted")
+        with sqlite3.connect(self.config_root / "Burrow/burrow.db") as db:
+            if db.execute("SELECT count(*) FROM host_keys").fetchone()[0] != 0:
+                raise RuntimeError("rejected host key was persisted")
         self.close_tab()
         print("PASS native UI: first host-key rejection")
 

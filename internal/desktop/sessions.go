@@ -103,20 +103,22 @@ func (a *app) groupDialog(c *ui.Context) {
 		})
 	})
 	if (save || result.Submit) && valid {
-		if err := a.commitCatalogMove(func() {
+		a.commitCatalogMoveAsync(func() {
 			if target != nil {
 				target.name = name
 			} else {
 				a.groups = append(a.groups, a.newCatalogGroup(name))
 			}
-		}); err != nil {
-			uikit.Toast(c, uikit.ToastProps{Tone: uikit.ToneDanger, Title: "保存分组失败", Detail: err.Error()})
-			return
-		}
-		page.groupDialogOpen = false
-		if target == nil {
-			page.query = ""
-		}
+		}, func(err error) {
+			if err != nil {
+				a.persistenceNotice("保存分组失败", err)
+				return
+			}
+			page.groupDialogOpen = false
+			if target == nil {
+				page.query = ""
+			}
+		})
 	}
 	if !page.groupDialogOpen {
 		page.groupRename = nil
@@ -145,22 +147,24 @@ func (a *app) deleteGroupDialog(c *ui.Context) {
 		})
 	})
 	if (remove || result.Submit) && valid {
-		if err := a.commitCatalogMove(func() {
+		a.commitCatalogMoveAsync(func() {
 			destination.hosts = append(destination.hosts, group.hosts...)
 			a.groups = slices.DeleteFunc(a.groups, func(candidate *hostGroup) bool { return candidate == group })
-		}); err != nil {
-			uikit.Toast(c, uikit.ToastProps{Tone: uikit.ToneDanger, Title: "删除分组失败", Detail: err.Error()})
-			return
-		}
-		if page.lastGroup == group {
-			page.lastGroup = destination
-		}
-		key := catalogKey{kind: catalogGroupDrag, id: group.id}
-		delete(page.catalogItems, key)
-		if page.catalogFlash != nil && *page.catalogFlash == key {
-			page.catalogFlash = nil
-		}
-		page.groupDialogOpen = false
+		}, func(err error) {
+			if err != nil {
+				a.persistenceNotice("删除分组失败", err)
+				return
+			}
+			if page.lastGroup == group {
+				page.lastGroup = destination
+			}
+			key := catalogKey{kind: catalogGroupDrag, id: group.id}
+			delete(page.catalogItems, key)
+			if page.catalogFlash != nil && *page.catalogFlash == key {
+				page.catalogFlash = nil
+			}
+			page.groupDialogOpen = false
+		})
 	}
 	if !page.groupDialogOpen {
 		page.groupDelete = nil

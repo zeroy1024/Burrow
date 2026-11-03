@@ -258,7 +258,9 @@ func (a *app) fileToolbar(c *ui.Context, session *fileSession, pane *filePaneSta
 			if a.files.localOpen {
 				label = "隐藏本地面板"
 			}
-			toggle := uikit.PaneToggle(c, &a.files.localOpen, uikit.PaneToggleProps{Label: label, Icon: sidebarIcon, IconOn: fileSidebarOnIcon, Shortcut: "⌘⇧L"})
+			toggle := uikit.PaneToggle(c, &a.files.localOpen, uikit.PaneToggleProps{
+				Label: label, Icon: sidebarIcon, IconOn: fileSidebarOnIcon, Shortcut: shortcutDisplay("Cmd+Shift+L"),
+			})
 			if toggle.Changed() {
 				if !a.files.localOpen {
 					a.files.activeRemote = true
@@ -267,7 +269,9 @@ func (a *app) fileToolbar(c *ui.Context, session *fileSession, pane *filePaneSta
 			}
 		}
 		a.filePaneLabel(c, pane)
-		history := uikit.HistoryButtons(c, pane.historyIndex > 0, pane.historyIndex+1 < len(pane.history), fileBackIcon, fileForwardIcon, uikit.HistoryButtonProps{BackShortcut: "⌘←", ForwardShortcut: "⌘→"})
+		history := uikit.HistoryButtons(c, pane.historyIndex > 0, pane.historyIndex+1 < len(pane.history), fileBackIcon, fileForwardIcon, uikit.HistoryButtonProps{
+			BackShortcut: shortcutDisplay("Cmd+Left"), ForwardShortcut: shortcutDisplay("Cmd+Right"),
+		})
 		history.Back.OnClick(func() { a.fileHistory(c, session, pane, -1) })
 		history.Forward.OnClick(func() { a.fileHistory(c, session, pane, 1) })
 		if compact {

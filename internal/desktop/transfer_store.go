@@ -1,15 +1,10 @@
 package desktop
 
 import (
-	"bytes"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"io/fs"
 	"math"
-	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -42,9 +37,11 @@ type storedTransferSession struct {
 }
 
 type storedTransferConnection struct {
-	ID       int             `json:"id"`
-	Endpoint storedSession   `json:"endpoint"`
-	Steps    []storedSession `json:"steps,omitempty"`
+	EndpointRef string          `json:"endpointRef,omitempty"`
+	StepRefs    []string        `json:"stepRefs,omitempty"`
+	ID          int             `json:"id"`
+	Endpoint    storedSession   `json:"endpoint,omitzero"`
+	Steps       []storedSession `json:"steps,omitempty"`
 }
 
 type storedTransferTask struct {
@@ -70,21 +67,20 @@ type storedTransferTask struct {
 }
 
 type storedTransferNode struct {
-	Source       string                `json:"source"`
-	Destination  string                `json:"destination,omitempty"`
-	Temporary    string                `json:"temporary,omitempty"`
-	Entry        fileclient.Entry      `json:"entry"`
-	Committing   bool                  `json:"committing,omitempty"`
-	CommitLegacy bool                  `json:"commitLegacy,omitempty"`
-	Staged       *fileclient.Entry     `json:"staged,omitempty"`
-	Partial      *fileclient.Entry     `json:"partial,omitempty"`
-	Checkpoint   *transferCheckpoint   `json:"checkpoint,omitempty"`
-	Digest       string                `json:"digest,omitempty"`
-	Approved     *fileclient.Entry     `json:"approved,omitempty"`
-	Children     []*storedTransferNode `json:"children,omitempty"`
-	Total        int64                 `json:"total"`
-	Done         bool                  `json:"done,omitempty"`
-	Skipped      bool                  `json:"skipped,omitempty"`
+	Source      string                `json:"source"`
+	Destination string                `json:"destination,omitempty"`
+	Temporary   string                `json:"temporary,omitempty"`
+	Entry       fileclient.Entry      `json:"entry"`
+	Committing  bool                  `json:"committing,omitempty"`
+	Staged      *fileclient.Entry     `json:"staged,omitempty"`
+	Partial     *fileclient.Entry     `json:"partial,omitempty"`
+	Checkpoint  *transferCheckpoint   `json:"checkpoint,omitempty"`
+	Digest      string                `json:"digest,omitempty"`
+	Approved    *fileclient.Entry     `json:"approved,omitempty"`
+	Children    []*storedTransferNode `json:"children,omitempty"`
+	Total       int64                 `json:"total"`
+	Done        bool                  `json:"done,omitempty"`
+	Skipped     bool                  `json:"skipped,omitempty"`
 }
 
 // prepareTransferQuit leaves the application context alive until every transfer
@@ -147,7 +143,7 @@ func (a *app) finishTransferQuitIfReady() {
 		finish(fmt.Errorf("传输记录读取失败，已阻止覆盖：%w", q.storeErr))
 		return
 	}
-	if q.storePath == "" {
+	if a.store == nil {
 		finish(errors.New("传输记录目录不可用"))
 		return
 	}
@@ -157,14 +153,13 @@ func (a *app) finishTransferQuitIfReady() {
 		return
 	}
 	q.storing = true
-	name := q.storePath
-	a.sshWorkers.Go(func() {
-		data, err := json.MarshalIndent(snapshot, "", "  ")
-		if err == nil {
-			err = writeCatalog(name, append(data, '\n'))
+	a.persist(func() error {
+		saved, err := encodeTransfers(snapshot)
+		if err != nil {
+			return err
 		}
-		a.window.Update(func() { finish(err) })
-	})
+		return a.store.SaveTransfers(a.ctx, saved)
+	}, finish)
 }
 
 func (a *app) transferSnapshot() *storedTransferQueue {
@@ -208,23 +203,33 @@ func (a *app) transferSnapshot() *storedTransferQueue {
 			})
 		}
 		job := task.job
+		manifest := (*transferManifestSnapshot)(nil)
+		if task.run != nil {
+			manifest = task.run.manifest.Load()
+		} else {
+			manifest = transferManifest(job)
+		}
 		if !batches[job.batch] {
 			batches[job.batch] = true
 			result.Batches = append(result.Batches, storedTransferBatch{ID: job.batch.id, Policy: int(job.batch.policy.Load())})
 		}
 		entry := task.entry
-		if job.root != nil && job.root.destination != "" {
-			entry.name = transferBase(!job.sourceRemote, job.root.destination)
+		if manifest.Root != nil && manifest.Root.Destination != "" {
+			entry.name = transferBase(!job.sourceRemote, manifest.Root.Destination)
+		}
+		state := task.state
+		if task.cleanupPending || task.removeRequested {
+			state = transferFailed
 		}
 		stored := storedTransferTask{ID: task.id, Session: sessionID, Batch: job.batch.id,
 			Entry: fileclient.Entry{Name: entry.name, Size: entry.size, Directory: entry.dir, Symlink: entry.symlink,
 				Modified: entry.modified, Owner: entry.owner, Permissions: entry.permissions},
-			State: task.state, Transferred: task.transferred, Started: task.started, Completed: task.completed,
+			State: state, Transferred: task.transferred, Started: task.started, Completed: task.completed,
 			Error: task.errorText, CleanupPending: task.cleanupPending || task.removeRequested,
-			SourceRemote: job.sourceRemote, SourcePath: job.sourcePath, TargetPath: job.targetPath,
-			Name: job.name, Policy: int(job.batch.policy.Load()), Total: job.total, DoneBytes: job.doneBytes,
-			Root: snapshotTransferNode(job.root)}
-		for name := range job.temporary {
+			SourceRemote: job.sourceRemote, SourcePath: manifest.SourcePath, TargetPath: manifest.TargetPath,
+			Name: job.name, Policy: int(job.batch.policy.Load()), Total: manifest.Total, DoneBytes: manifest.Done,
+			Root: manifest.Root}
+		for _, name := range manifest.Temporary {
 			stored.Temporary = append(stored.Temporary, name)
 		}
 		slices.Sort(stored.Temporary)
@@ -238,9 +243,18 @@ func snapshotTransferNode(node *transferNode) *storedTransferNode {
 		return nil
 	}
 	stored := &storedTransferNode{Source: node.source, Destination: node.destination, Temporary: node.temporary,
-		Entry: node.entry, Approved: node.approved, Committing: node.committing, CommitLegacy: node.commitLegacy,
+		Entry: node.entry, Approved: node.approved, Committing: node.committing,
 		Staged: node.staged, Partial: node.partial, Digest: node.digest,
 		Total: node.total, Done: node.done, Skipped: node.skipped}
+	for _, pair := range []struct {
+		src *fileclient.Entry
+		dst **fileclient.Entry
+	}{{node.approved, &stored.Approved}, {node.staged, &stored.Staged}, {node.partial, &stored.Partial}} {
+		if pair.src != nil {
+			value := *pair.src
+			*pair.dst = &value
+		}
+	}
 	if node.checkpoint != nil {
 		checkpoint := *node.checkpoint
 		stored.Checkpoint = &checkpoint
@@ -254,39 +268,15 @@ func snapshotTransferNode(node *transferNode) *storedTransferNode {
 func (a *app) restoreTransfers() (err error) {
 	q := &a.transfers
 	defer func() { q.storeErr = err }()
-	if a.catalogConfig.path == "" {
-		return errors.New("传输记录目录不可用")
-	}
-	q.storePath = filepath.Join(filepath.Dir(a.catalogConfig.path), "transfers.json")
-	info, err := os.Lstat(q.storePath)
-	if errors.Is(err, fs.ErrNotExist) {
-		return nil
-	}
+	data, err := a.store.ReadTransfers(a.ctx)
 	if err != nil {
 		return err
 	}
-	if !info.Mode().IsRegular() {
-		return errors.New("传输记录必须为普通文件")
-	}
-	data, err := os.ReadFile(q.storePath)
+	decoded, err := decodeTransfers(data)
 	if err != nil {
 		return err
 	}
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-	var saved storedTransferQueue
-	if err := decoder.Decode(&saved); err != nil {
-		return err
-	}
-	if err := decoder.Decode(new(any)); err != io.EOF {
-		if err == nil {
-			return errors.New("传输记录包含多个JSON值")
-		}
-		return err
-	}
-	if err := migrateTransferQueue(&saved); err != nil {
-		return err
-	}
+	saved := *decoded
 	if err := validateTransferQueue(&saved); err != nil {
 		return err
 	}
@@ -295,7 +285,7 @@ func (a *app) restoreTransfers() (err error) {
 		endpoint := transferStoredHost(stored.Endpoint)
 		group := a.newSSHGroup(endpoint)
 		if len(stored.Steps) > 0 {
-			group.plan, group.planErr = sshDialPlan{knownHosts: filepath.Join(filepath.Dir(q.storePath), "known_hosts")}, nil
+			group.plan, group.planErr = sshDialPlan{trust: a.store}, nil
 			for _, value := range stored.Steps {
 				step := sshDialStep{endpoint: transferStoredHost(value)}
 				if step.endpoint.session.Auth == "key" {
@@ -320,8 +310,7 @@ func (a *app) restoreTransfers() (err error) {
 		endpoint := transferStoredHost(stored.Session.Endpoint)
 		profile := hostID(slices.IndexFunc(a.hosts, func(h host) bool { return h.session.ID == stored.Session.ProfileID }))
 		session := a.newFileSession(profile, endpoint, stored.Session.Temporary || profile < 0, groups[stored.Session.Connection])
-		// Legacy journals lack a tab identity. Preserve their checkpoints
-		// without guessing an owner from a host/profile or a matching address.
+		// Ownership follows the original tab identity, independently of profile edits.
 		session.restoreID = stored.ViewID
 		if stored.ViewID != "" {
 			owners[stored.ID] = views[stored.ViewID]
@@ -359,7 +348,7 @@ func (a *app) restoreTransfers() (err error) {
 				symlink: entry.Symlink, modified: entry.Modified, owner: entry.Owner, permissions: entry.Permissions},
 			sourceRemote: stored.SourceRemote, sourcePath: stored.SourcePath, targetPath: stored.TargetPath,
 			state: state, transferred: stored.Transferred, total: stored.Total, started: stored.Started,
-			completed: stored.Completed, errorText: stored.Error, cleanupPending: stored.CleanupPending, job: job})
+			completed: stored.Completed, errorText: stored.Error, cleanupPending: stored.CleanupPending, job: job, persisted: true})
 	}
 	q.nextID, q.nextBatchID = saved.NextID, saved.NextBatchID
 	return nil
@@ -370,7 +359,7 @@ func restoreTransferNode(stored *storedTransferNode) *transferNode {
 		return nil
 	}
 	node := &transferNode{source: stored.Source, destination: stored.Destination, temporary: stored.Temporary,
-		entry: stored.Entry, approved: stored.Approved, committing: stored.Committing, commitLegacy: stored.CommitLegacy,
+		entry: stored.Entry, approved: stored.Approved, committing: stored.Committing,
 		staged: stored.Staged, partial: stored.Partial, digest: stored.Digest,
 		total: stored.Total, done: stored.Done, skipped: stored.Skipped}
 	if stored.Checkpoint != nil {
@@ -427,68 +416,6 @@ func validateTransferEndpoint(endpoint storedSession, files bool) error {
 func sameTransferEndpoint(left, right storedSession) bool {
 	return left.Host == right.Host && left.Port == right.Port && left.User == right.User &&
 		left.Auth == right.Auth && left.KeyID == right.KeyID && left.ID == right.ID
-}
-
-// Version 1 used one private session per enqueue batch, but only stored policy
-// per task and had no commit acknowledgement state. Preserve those boundaries;
-// a pending old part must be reconciled before it can be uploaded again.
-func migrateTransferQueue(saved *storedTransferQueue) error {
-	if saved.Version == 4 {
-		return nil
-	}
-	if saved.Version == 3 {
-		saved.Version = 4
-		return nil
-	}
-	if saved.Version == 2 {
-		// Existing parts keep their names and bytes. Their first resume compares
-		// source and target prefixes once before establishing a v3 checkpoint.
-		saved.Version = 4
-		return nil
-	}
-	if saved.Version != 1 {
-		return errors.New("传输记录版本无效")
-	}
-	policies := map[int]map[int]bool{}
-	for _, task := range saved.Tasks {
-		if policies[task.Session] == nil {
-			policies[task.Session] = map[int]bool{}
-		}
-		if task.Policy != 0 {
-			policies[task.Session][task.Policy] = true
-		}
-	}
-	decisions := map[int]int{}
-	for id, values := range policies {
-		policy := 0
-		if len(values) == 1 {
-			for value := range values {
-				policy = value
-			}
-		}
-		decisions[id] = policy
-		saved.Batches = append(saved.Batches, storedTransferBatch{ID: id, Policy: policy})
-		saved.NextBatchID = max(saved.NextBatchID, id)
-	}
-	var markPending func(*storedTransferNode)
-	markPending = func(node *storedTransferNode) {
-		if node == nil {
-			return
-		}
-		if node.Temporary != "" && !node.Done && !node.Skipped && !node.Committing {
-			node.CommitLegacy = true
-		}
-		for _, child := range node.Children {
-			markPending(child)
-		}
-	}
-	for index := range saved.Tasks {
-		task := &saved.Tasks[index]
-		task.Batch, task.Policy = task.Session, decisions[task.Session]
-		markPending(task.Root)
-	}
-	saved.Version = 4
-	return nil
 }
 
 func validateTransferQueue(saved *storedTransferQueue) error {
@@ -644,7 +571,7 @@ func validateTransferNode(node *storedTransferNode, sourceRemote bool, source, d
 		!transferSafeName(node.Entry.Name) || node.Entry.Symlink || node.Entry.Size < 0 || node.Total < 0 || node.Done && node.Skipped {
 		return 0, 0, errors.New("传输清单节点无效")
 	}
-	if node.Committing && node.CommitLegacy || (node.Committing || node.CommitLegacy) &&
+	if node.Committing &&
 		(node.Entry.Directory || node.Done || node.Skipped || node.Temporary == "") {
 		return 0, 0, errors.New("传输提交阶段无效")
 	}

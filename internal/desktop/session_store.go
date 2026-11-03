@@ -1,21 +1,16 @@
 package desktop
 
 import (
-	"crypto/ecdsa"
-	"crypto/ed25519"
 	"crypto/rand"
-	"crypto/rsa"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"slices"
 	"time"
 
 	"github.com/egoist/mygo"
-	"golang.org/x/crypto/ssh"
 )
 
 type sessionConfig struct {
@@ -48,6 +43,7 @@ type fileOptions struct {
 }
 
 type managedKey struct {
+	PublicKey   []byte    `json:"publicKey"`
 	ID          string    `json:"id"`
 	Name        string    `json:"name"`
 	Type        string    `json:"type"`
@@ -108,13 +104,11 @@ type sessionCredential struct {
 	Secret   string `json:"secret"`
 }
 
-func sessionCredentialKey(id string) string     { return "session/" + id + "/credential" }
-func sessionLegacyPasswordKey(id string) string { return "session/" + id + "/password" }
+func sessionCredentialKey(id string) string { return "session/" + id + "/credential" }
 
-// Both credential formats belong to the same profile. The new item never
-// overwrites raw bytes with JSON; a successful update retires the old item.
+// Credentials are revision-bound to immutable endpoint snapshots.
 func deleteSessionCredentials(id string) error {
-	return errors.Join(mygo.Secrets.Delete(sessionCredentialKey(id)), mygo.Secrets.Delete(sessionLegacyPasswordKey(id)))
+	return credentialStore().Delete(sessionCredentialKey(id))
 }
 
 // Secret JSON lives only in the credential store; configuration records keep
@@ -131,12 +125,9 @@ func (a *app) storeSessionSecrets(h *host, password string, changed bool, passph
 			var data []byte
 			data, err = json.Marshal(sessionCredential{Revision: revision, Secret: password})
 			if err == nil {
-				err = mygo.Secrets.Set(sessionCredentialKey(h.session.ID), data)
+				err = credentialStore().Set(sessionCredentialKey(h.session.ID), data)
 			}
 			clear(data)
-			if err == nil {
-				err = mygo.Secrets.Delete(sessionLegacyPasswordKey(h.session.ID))
-			}
 		}
 		if err != nil {
 			return fmt.Errorf("系统钥匙串：%w", err)
@@ -148,9 +139,9 @@ func (a *app) storeSessionSecrets(h *host, password string, changed bool, passph
 		key := "key/" + h.session.KeyID + "/passphrase"
 		var err error
 		if passphrase == "" {
-			err = mygo.Secrets.Delete(key)
+			err = credentialStore().Delete(key)
 		} else {
-			err = mygo.Secrets.Set(key, []byte(passphrase))
+			err = credentialStore().Set(key, []byte(passphrase))
 		}
 		if err != nil {
 			return fmt.Errorf("保存私钥口令：%w", err)
@@ -164,7 +155,7 @@ func (a *app) sessionPassword(h host) (string, error) {
 	if !h.session.PasswordSaved {
 		return "", nil
 	}
-	data, err := mygo.Secrets.Get(sessionCredentialKey(h.session.ID))
+	data, err := credentialStore().Get(sessionCredentialKey(h.session.ID))
 	if err == nil {
 		defer clear(data)
 		if h.session.PasswordRevision == "" {
@@ -182,15 +173,7 @@ func (a *app) sessionPassword(h host) (string, error) {
 	if !errors.Is(err, mygo.ErrSecretNotFound) {
 		return "", fmt.Errorf("读取会话密码：%w", err)
 	}
-	if h.session.PasswordRevision != "" {
-		return "", fmt.Errorf("此会话保存的密码已不可用，请重新输入：%w", mygo.ErrSecretNotFound)
-	}
-	data, err = mygo.Secrets.Get(sessionLegacyPasswordKey(h.session.ID))
-	if err != nil {
-		return "", fmt.Errorf("读取旧会话密码：%w", err)
-	}
-	defer clear(data)
-	return string(data), nil
+	return "", fmt.Errorf("此会话保存的密码已不可用，请重新输入：%w", mygo.ErrSecretNotFound)
 }
 
 // Keep the previous credential values until the atomic catalog write commits,
@@ -198,7 +181,7 @@ func (a *app) sessionPassword(h host) (string, error) {
 func snapshotSessionSecrets(h host, passwordChanged, passphraseChanged bool) (func() error, func(), error) {
 	keys := []string{}
 	if passwordChanged {
-		keys = append(keys, sessionCredentialKey(h.session.ID), sessionLegacyPasswordKey(h.session.ID))
+		keys = append(keys, sessionCredentialKey(h.session.ID))
 	}
 	if passphraseChanged && h.session.KeyID != "" {
 		keys = append(keys, "key/"+h.session.KeyID+"/passphrase")
@@ -210,7 +193,7 @@ func snapshotSessionSecrets(h host, passwordChanged, passphraseChanged bool) (fu
 		}
 	}
 	for _, key := range keys {
-		data, err := mygo.Secrets.Get(key)
+		data, err := credentialStore().Get(key)
 		if err != nil && !errors.Is(err, mygo.ErrSecretNotFound) {
 			release()
 			return nil, nil, err
@@ -224,9 +207,9 @@ func snapshotSessionSecrets(h host, passwordChanged, passphraseChanged bool) (fu
 		for _, key := range keys {
 			var err error
 			if data, ok := values[key]; ok {
-				err = mygo.Secrets.Set(key, data)
+				err = credentialStore().Set(key, data)
 			} else {
-				err = mygo.Secrets.Delete(key)
+				err = credentialStore().Delete(key)
 			}
 			result = errors.Join(result, err)
 		}
@@ -323,106 +306,4 @@ func validateSessionProfile(h host, byID map[string]host, keyIDs map[string]bool
 		}
 	}
 	return nil
-}
-
-// Legacy catalogs referenced external files. Copy each one into the managed
-// store without changing the original or creating a new credential-store entry.
-var errLegacyPrivateKeyLocked = errors.New("旧私钥需要口令才能读取公钥")
-
-func copyLegacyPrivateKey(source, directory string, unlock func() ([]byte, error)) (managedKey, []string, error) {
-	info, err := os.Stat(source)
-	if err != nil {
-		return managedKey{}, nil, err
-	}
-	if !info.Mode().IsRegular() {
-		return managedKey{}, nil, errors.New("legacy private key must be a regular file")
-	}
-	data, err := os.ReadFile(source)
-	if err != nil {
-		return managedKey{}, nil, err
-	}
-	defer clear(data)
-	raw, err := ssh.ParseRawPrivateKey(data)
-	var public ssh.PublicKey
-	var encrypted *ssh.PassphraseMissingError
-	if errors.As(err, &encrypted) {
-		public = encrypted.PublicKey
-		if public == nil {
-			if unlock == nil {
-				return managedKey{}, nil, errLegacyPrivateKeyLocked
-			}
-			passphrase, unlockErr := unlock()
-			if unlockErr != nil {
-				clear(passphrase)
-				return managedKey{}, nil, unlockErr
-			}
-			raw, err = ssh.ParseRawPrivateKeyWithPassphrase(data, passphrase)
-			clear(passphrase)
-			if err != nil {
-				return managedKey{}, nil, fmt.Errorf("解锁旧私钥失败：%w", err)
-			}
-			signer, err := ssh.NewSignerFromKey(raw)
-			if err != nil {
-				return managedKey{}, nil, err
-			}
-			public = signer.PublicKey()
-		}
-	} else if err != nil {
-		return managedKey{}, nil, fmt.Errorf("parse legacy private key: %w", err)
-	} else {
-		signer, signErr := ssh.NewSignerFromKey(raw)
-		if signErr != nil {
-			return managedKey{}, nil, signErr
-		}
-		public = signer.PublicKey()
-	}
-	keyType, bits := managedKeyType(raw, public)
-	if bits == 0 {
-		if cryptoPublic, ok := public.(ssh.CryptoPublicKey); ok {
-			switch value := cryptoPublic.CryptoPublicKey().(type) {
-			case *rsa.PublicKey:
-				bits, keyType = value.N.BitLen(), "RSA"
-			case ed25519.PublicKey:
-				bits, keyType = 256, "Ed25519"
-			case *ecdsa.PublicKey:
-				bits, keyType = value.Curve.Params().BitSize, "ECDSA"
-			}
-		}
-	}
-	keysDirectory := filepath.Join(directory, "keys")
-	if err := os.MkdirAll(keysDirectory, 0700); err != nil {
-		return managedKey{}, nil, err
-	}
-	id := newSessionID()
-	destination := filepath.Join(keysDirectory, id)
-	created := []string{}
-	for _, item := range []struct {
-		path string
-		data []byte
-		mode os.FileMode
-	}{{destination, data, 0600}, {destination + ".pub", ssh.MarshalAuthorizedKey(public), 0644}} {
-		file, err := os.OpenFile(item.path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, item.mode)
-		if err != nil {
-			return managedKey{}, created, err
-		}
-		created = append(created, item.path)
-		_, writeErr := file.Write(item.data)
-		if err := errors.Join(writeErr, file.Sync(), file.Close()); err != nil {
-			return managedKey{}, created, err
-		}
-	}
-	return managedKey{
-		ID: id, Name: filepath.Base(source), Path: destination, Type: keyType, Bits: bits,
-		Fingerprint: ssh.FingerprintSHA256(public), CreatedAt: time.Now().UTC(),
-	}, created, nil
-}
-
-func discardMigrationFiles(paths []string) error {
-	var result error
-	for _, path := range paths {
-		if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
-			result = errors.Join(result, fmt.Errorf("remove unpublished migrated key: %w", err))
-		}
-	}
-	return result
 }

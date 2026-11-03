@@ -2,13 +2,13 @@ package desktop
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"sshdesk/internal/store"
 	"sshdesk/internal/termtheme"
 	"sshdesk/internal/theme"
 
@@ -21,7 +21,6 @@ type terminalSettingsState struct {
 	prefs       termtheme.Prefs
 	followLight string
 	followDark  string
-	path        string
 	loadErr     error
 	scroll      ui.ScrollState
 	importing   bool
@@ -55,66 +54,41 @@ func (a *app) loadTerminalSettings() error {
 		mode: termtheme.FollowAppTheme(), prefs: termtheme.DefaultPrefs(),
 		followLight: termtheme.DefaultLight, followDark: termtheme.DefaultDark,
 	}
-	directory, err := mygo.App.Path(mygo.PathUserData)
-	if err != nil {
-		a.terminal.loadErr = fmt.Errorf("locate terminal configuration directory: %w", err)
-		a.applyTerminalSettings()
-		return a.terminal.loadErr
-	}
-	a.terminal.path = filepath.Join(directory, "terminal.json")
-	importErr := a.loadTerminalThemes()
-	a.terminal.loadErr = a.readTerminalSettings()
+	a.terminal.loadErr = a.loadTerminalThemes()
 	a.applyTerminalSettings()
-	return errors.Join(importErr, a.terminal.loadErr)
+	return a.terminal.loadErr
+}
+
+func parseImportedTheme(filename string, data []byte) (*termtheme.Scheme, error) {
+	scheme, err := termtheme.Parse(bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+	if scheme.Name == "" {
+		scheme.Name = filepath.Base(filename)
+		if ext := filepath.Ext(scheme.Name); ext == ".conf" || ext == ".ghostty" {
+			scheme.Name = strings.TrimSuffix(scheme.Name, ext)
+		}
+	}
+	return scheme, nil
 }
 
 func (a *app) loadTerminalThemes() error {
 	a.terminal.imported = map[string]string{}
-	directory := filepath.Join(filepath.Dir(a.terminal.path), "themes")
-	files, err := os.ReadDir(directory)
-	if errors.Is(err, os.ErrNotExist) {
-		return nil
-	}
+	themes, err := a.store.Themes(a.ctx)
 	if err != nil {
-		return fmt.Errorf("read imported terminal themes: %w", err)
+		return err
 	}
-	var importErr error
-	for _, file := range files {
-		if file.IsDir() || strings.HasPrefix(file.Name(), ".terminal-") {
-			continue
-		}
-		path := filepath.Join(directory, file.Name())
-		scheme, err := termtheme.Import(path)
+	for _, saved := range themes {
+		scheme, err := parseImportedTheme(saved.Filename, saved.Source)
 		if err != nil {
-			importErr = errors.Join(importErr, fmt.Errorf("import %s: %w", file.Name(), err))
-		} else {
-			a.terminal.imported[scheme.Name] = path
+			return err
 		}
-	}
-	return importErr
-}
-
-func (a *app) readTerminalSettings() error {
-	data, err := os.ReadFile(a.terminal.path)
-	if errors.Is(err, os.ErrNotExist) {
-		return nil
-	}
-	if err != nil {
-		return fmt.Errorf("read terminal settings: %w", err)
-	}
-	config := a.terminal.config()
-	if err := json.Unmarshal(data, &config); err != nil {
-		return fmt.Errorf("decode terminal settings: %w", err)
-	}
-	if err := config.validate(); err != nil {
-		return fmt.Errorf("validate terminal settings: %w", err)
-	}
-	a.terminal.mode = termtheme.ParseMode(config.Mode)
-	a.terminal.followLight, a.terminal.followDark = config.FollowLight, config.FollowDark
-	a.terminal.prefs = termtheme.Prefs{
-		FontFamily: config.FontFamily, FontSize: config.FontSize, LineHeight: config.LineHeight,
-		CursorShape: config.CursorShape, CursorBlink: config.CursorBlink,
-		Background: termtheme.ParseBackgroundSource(config.Background), BoldIsBright: config.BoldBright,
+		if scheme.Name != saved.Name || termtheme.IsBundled(scheme.Name) {
+			return fmt.Errorf("invalid imported theme %q", saved.Name)
+		}
+		termtheme.Register(scheme)
+		a.terminal.imported[scheme.Name] = saved.Filename
 	}
 	return nil
 }
@@ -158,162 +132,77 @@ func (a *app) changeTerminalSettings(change func()) {
 }
 
 func (a *app) saveTerminalSettings() error {
-	if a.prefsPath != "" {
-		if err := a.terminal.config().validate(); err != nil {
-			return err
-		}
-		a.preferencesChanged()
-		return nil
-	}
 	if a.terminal.loadErr != nil {
-		return fmt.Errorf("terminal settings were not loaded: %w", a.terminal.loadErr)
+		return a.terminal.loadErr
 	}
-	config := a.terminal.config()
-	if err := config.validate(); err != nil {
+	if a.prefsLoadErr != nil {
+		return a.prefsLoadErr
+	}
+	if err := a.terminal.config().validate(); err != nil {
 		return err
 	}
-	data, err := json.MarshalIndent(config, "", "  ")
-	if err != nil {
-		return fmt.Errorf("encode terminal settings: %w", err)
-	}
-	return writeTerminalFile(a.terminal.path, append(data, '\n'))
+	a.preferencesChanged()
+	return nil
 }
 
 func (a *app) chooseTerminalTheme() {
+	if a.terminal.loadErr != nil {
+		a.terminalError = a.terminal.loadErr
+		return
+	}
 	a.terminal.importing = true
 	window := a.window
-	go func() {
-		paths, err := mygo.Dialog.Open(mygo.OpenDialogOptions{
-			Parent: window, Title: "导入终端配色", Message: "选择 Ghostty 格式的配色文件",
-		})
+	a.sshWorkers.Go(func() {
+		paths, err := mygo.Dialog.Open(mygo.OpenDialogOptions{Parent: window, Title: "导入终端配色", Message: "选择 Ghostty 格式的配色文件"})
+		var source *termtheme.Scheme
+		filename := ""
+		if err == nil && len(paths) > 0 {
+			source, filename, err = a.persistImportedTheme(paths[0])
+		}
 		window.Update(func() {
 			a.terminal.importing = false
 			if err != nil {
-				a.terminalError = fmt.Errorf("open terminal theme: %w", err)
-				return
-			}
-			if len(paths) == 0 {
-				return
-			}
-			if err := a.importTerminalTheme(paths[0]); err != nil {
 				a.terminalError = err
+				return
+			}
+			if source != nil {
+				a.activateImportedTheme(source, filename)
 			}
 		})
-	}()
+	})
 }
 
-func (a *app) importTerminalTheme(path string) error {
-	if a.terminal.loadErr != nil {
-		return fmt.Errorf("terminal settings were not loaded: %w", a.terminal.loadErr)
-	}
-	// Validate before copying; keep the original bytes, including source and license comments.
-	source, err := termtheme.Load(path)
-	if err != nil {
-		return fmt.Errorf("import terminal theme: %w", err)
-	}
+func (a *app) persistImportedTheme(path string) (*termtheme.Scheme, string, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return fmt.Errorf("read terminal theme: %w", err)
+		return nil, "", err
+	}
+	filename := filepath.Base(path)
+	source, err := parseImportedTheme(filename, data)
+	if err != nil {
+		return nil, "", fmt.Errorf("import terminal theme: %w", err)
 	}
 	if termtheme.IsBundled(source.Name) {
-		return fmt.Errorf("内置配色 %q 不能覆盖，请修改 name 后导入", source.Name)
+		return nil, "", fmt.Errorf("内置配色 %q 不能覆盖，请修改 name 后导入", source.Name)
 	}
-	// Retain the filename: themes without a name comment derive their name from it.
-	destination := filepath.Join(filepath.Dir(a.terminal.path), "themes", filepath.Base(path))
-	if err := checkTerminalThemeName(destination, source.Name); err != nil {
-		return err
+	if err := a.store.SaveTheme(a.ctx, store.Theme{Name: source.Name, Filename: filename, Source: data}); err != nil {
+		return nil, "", err
 	}
-	existing, err := os.ReadFile(destination)
-	switch {
-	case err == nil:
-		if !bytes.Equal(existing, data) {
-			return fmt.Errorf("已存在同名配色文件 %q，请重命名后导入", filepath.Base(destination))
-		}
-	case errors.Is(err, os.ErrNotExist):
-		if err := writeTerminalFile(destination, data); err != nil {
-			return fmt.Errorf("copy terminal theme: %w", err)
-		}
-	default:
-		return fmt.Errorf("read existing terminal theme: %w", err)
-	}
-	scheme, err := termtheme.Import(destination)
-	if err != nil {
-		return fmt.Errorf("import terminal theme: %w", err)
-	}
+	return source, filename, nil
+}
+
+func (a *app) activateImportedTheme(source *termtheme.Scheme, filename string) {
+	termtheme.Register(source)
 	if a.terminal.imported == nil {
 		a.terminal.imported = map[string]string{}
 	}
-	a.terminal.imported[scheme.Name] = destination
+	a.terminal.imported[source.Name] = filename
 	previous := a.terminal.mode
-	a.terminal.mode = termtheme.Fixed(scheme.Name)
+	a.terminal.mode = termtheme.Fixed(source.Name)
 	if err := a.saveTerminalSettings(); err != nil {
 		a.terminal.mode = previous
-		return err
+		a.terminalError = err
+		return
 	}
 	a.applyTerminalSettings()
-	return nil
-}
-
-// A scheme name must identify one persisted file, so restart order cannot select older colors.
-func checkTerminalThemeName(destination, name string) error {
-	files, err := os.ReadDir(filepath.Dir(destination))
-	if errors.Is(err, os.ErrNotExist) {
-		return nil
-	}
-	if err != nil {
-		return fmt.Errorf("read imported terminal themes: %w", err)
-	}
-	for _, file := range files {
-		if file.IsDir() || strings.HasPrefix(file.Name(), ".terminal-") || file.Name() == filepath.Base(destination) {
-			continue
-		}
-		other, err := termtheme.Load(filepath.Join(filepath.Dir(destination), file.Name()))
-		if err != nil {
-			return fmt.Errorf("read imported terminal theme %s: %w", file.Name(), err)
-		}
-		if other.Name == name {
-			return fmt.Errorf("配色名称 %q 已由文件 %q 使用，请修改 name 后导入", name, file.Name())
-		}
-	}
-	return nil
-}
-
-func writeTerminalFile(path string, data []byte) (err error) {
-	directory := filepath.Dir(path)
-	if err := os.MkdirAll(directory, 0o700); err != nil {
-		return fmt.Errorf("create terminal configuration directory: %w", err)
-	}
-	file, err := os.CreateTemp(directory, ".terminal-*")
-	if err != nil {
-		return fmt.Errorf("create pending terminal configuration: %w", err)
-	}
-	closed, committed := false, false
-	defer func() {
-		if !closed {
-			if closeErr := file.Close(); closeErr != nil {
-				err = errors.Join(err, fmt.Errorf("close pending terminal configuration: %w", closeErr))
-			}
-		}
-		if !committed {
-			if removeErr := os.Remove(file.Name()); removeErr != nil {
-				err = errors.Join(err, fmt.Errorf("remove pending terminal configuration: %w", removeErr))
-			}
-		}
-	}()
-	if _, err := file.Write(data); err != nil {
-		return fmt.Errorf("write pending terminal configuration: %w", err)
-	}
-	if err := file.Sync(); err != nil {
-		return fmt.Errorf("sync pending terminal configuration: %w", err)
-	}
-	err = file.Close()
-	closed = true
-	if err != nil {
-		return fmt.Errorf("close pending terminal configuration: %w", err)
-	}
-	if err := os.Rename(file.Name(), path); err != nil {
-		return fmt.Errorf("replace terminal configuration: %w", err)
-	}
-	committed = true
-	return nil
 }

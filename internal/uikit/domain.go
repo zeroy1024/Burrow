@@ -268,7 +268,7 @@ func MiddlePath(text string, width float32, font ui.Font) string {
 }
 
 func PaneBadge(c *ui.Context, n int, focused bool, surface *theme.Theme) ui.Element {
-	return PaneShortcut(c, fmt.Sprintf("⌘%d", n), focused, surface)
+	return PaneShortcut(c, ShortcutDisplay(fmt.Sprintf("Cmd+%d", n)), focused, surface)
 }
 
 func ConnectionDot(c *ui.Context, state ConnState, size float32) {

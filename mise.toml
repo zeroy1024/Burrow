@@ -3,5 +3,5 @@ go = "1.27.3"
 uv = "0.13.6"
 
 [tasks.build]
-description = "构建 macOS 应用、ZIP 和 DMG"
-run = "uv run --script scripts/build-macos.py"
+description = "构建当前平台产物，可用 --platform 指定 macOS/Windows/Linux"
+run = "uv run --script scripts/build.py"

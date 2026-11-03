@@ -10,7 +10,6 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"net"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -21,7 +20,8 @@ import (
 	"github.com/egoist/mygo"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
-	"sshdesk/internal/uikit"
+	"sshdesk/internal/localfs"
+	"sshdesk/internal/sshclient"
 )
 
 type credentialState struct {
@@ -81,114 +81,113 @@ func (a *app) credentialWork(work func(context.Context) credentialResult) {
 	a.credentials.notice = ""
 	a.sshWorkers.Go(func() {
 		result := work(ctx)
-		accepted := false
-		discardNewKey := false
-		passwordRollback := false
-		mygo.RunOnMain(func() {
+		accepted, discardNewKey, passwordRollback := false, false, false
+		finished := make(chan struct{})
+		var stage func()
+		stage = func() {
 			if ctx.Err() != nil || a.credentials.serial != serial {
+				close(finished)
+				return
+			}
+			if a.catalogSaving {
+				a.catalogReady = append(a.catalogReady, stage)
 				return
 			}
 			accepted = true
-			cancel()
-			a.credentials.cancel = nil
-			a.credentials.busy = false
+			previousKeys := slices.Clone(a.keys)
+			completePasswords := func(error) {}
 			if result.passwords != nil {
-				if err := a.commitPasswordClear(result.clearedIDs); err != nil {
-					result.err = errors.Join(result.err, err)
-					passwordRollback = true
-				}
+				completePasswords = a.preparePasswordClear(result.clearedIDs)
 			}
-			catalogChanged := result.key != nil || result.restoreKey != nil
 			if result.key != nil {
 				a.keys = append(a.keys, *result.key)
 			}
 			if result.restoreKey != nil {
 				a.keys = slices.Insert(a.keys, min(result.restoreIndex, len(a.keys)), *result.restoreKey)
 			}
-			if catalogChanged {
-				if err := a.saveCatalog(); err != nil {
+			finish := func(err error) {
+				defer close(finished)
+				completePasswords(err)
+				if err != nil {
+					a.keys = previousKeys
 					result.err = errors.Join(result.err, fmt.Errorf("保存凭据目录：%w", err))
+					discardNewKey = result.key != nil
+					passwordRollback = result.passwords != nil
+				}
+				cancel()
+				a.credentials.cancel = nil
+				a.credentials.busy = discardNewKey || passwordRollback
+				if result.err != nil {
+					a.credentials.notice = result.err.Error()
+					if a.credentials.draft != nil {
+						a.credentials.draft.errorText = result.err.Error()
+					}
+				} else if result.draft != nil {
+					a.credentials.draft = result.draft
+				} else {
 					if result.key != nil {
-						a.keys = slices.DeleteFunc(a.keys, func(key managedKey) bool { return key.ID == result.key.ID })
-						discardNewKey = true
+						a.credentials.flashID = result.key.ID
+						a.credentials.flashAt = time.Time{}
+						a.credentials.notice = "密钥已保存，可从会话认证列表中选择。"
+						a.dismissCredentialDraft()
+					}
+					if result.deletedID != "" || len(result.clearedIDs) > 0 {
+						a.dismissCredentialDraft()
+					}
+					if result.publicKey != "" {
+						mygo.Clipboard.WriteText(result.publicKey)
+						a.credentials.notice = "公钥已复制"
+					}
+					if result.notice != "" {
+						a.credentials.notice = result.notice
 					}
 				}
-			}
-			if result.err != nil {
-				a.credentials.notice = result.err.Error()
-				if a.credentials.draft != nil {
-					a.credentials.draft.errorText = result.err.Error()
+				if a.window != nil {
+					a.window.Invalidate()
 				}
-			} else if result.draft != nil {
-				a.credentials.draft = result.draft
+			}
+			if result.key != nil || result.restoreKey != nil || result.passwords != nil {
+				a.saveCatalogAsync(finish)
 			} else {
-				if result.key != nil {
-					a.credentials.flashID = result.key.ID
-					a.credentials.flashAt = time.Time{}
-					a.credentials.notice = "密钥已保存，可从会话认证列表中选择。"
-					a.dismissCredentialDraft()
-				}
-				if result.deletedID != "" || len(result.clearedIDs) > 0 {
-					a.dismissCredentialDraft()
-				}
-				if result.publicKey != "" {
-					mygo.Clipboard.WriteText(result.publicKey)
-					a.credentials.notice = "公钥已复制"
-				}
-				if result.notice != "" {
-					a.credentials.notice = result.notice
-				}
+				finish(nil)
 			}
-			if a.window != nil {
-				a.window.Invalidate()
-			}
-			if discardNewKey || passwordRollback {
-				a.credentials.busy = true
-			}
-		})
+		}
+		mygo.RunOnMain(stage)
+		select {
+		case <-finished:
+		case <-a.ctx.Done():
+		}
+		var cleanupErr error
 		if result.passwords != nil {
-			var rollbackErr error
 			if !accepted || passwordRollback {
-				rollbackErr = result.passwords.restore()
+				cleanupErr = result.passwords.restore()
 			}
 			result.passwords.release()
-			if passwordRollback || rollbackErr != nil {
-				mygo.RunOnMain(func() {
-					err := errors.Join(result.err, rollbackErr)
-					if a.credentials.serial == serial {
-						a.credentials.busy = false
-						a.credentials.notice = err.Error()
-						if a.credentials.draft != nil {
-							a.credentials.draft.errorText = err.Error()
-						}
-					} else {
-						a.files.notice = &uikit.ToastProps{ID: "password-clear-rollback", Tone: uikit.ToneDanger, Title: "恢复保存的密码失败", Detail: err.Error()}
-					}
-					if a.window != nil {
-						a.window.Invalidate()
-					}
-				})
-			}
 		}
 		if !accepted || discardNewKey {
 			if result.draft != nil {
 				clear(result.draft.data)
 			}
 			if result.key != nil {
-				err := discardManagedKey(result.key.ID, []string{result.key.Path, result.key.Path + ".pub"})
-				mygo.RunOnMain(func() {
-					if a.credentials.serial != serial {
-						return
-					}
-					a.credentials.busy = false
-					if err != nil {
-						a.credentials.notice += "\n清理未保存的密钥失败：" + err.Error()
-					}
-					if a.window != nil {
-						a.window.Invalidate()
-					}
-				})
+				cleanupErr = errors.Join(cleanupErr, discardManagedKey(result.key.ID, []string{result.key.Path, result.key.Path + ".pub"}))
 			}
+		}
+		if discardNewKey || passwordRollback || cleanupErr != nil {
+			mygo.RunOnMain(func() {
+				if a.credentials.serial != serial {
+					return
+				}
+				a.credentials.busy = false
+				if cleanupErr != nil {
+					a.credentials.notice += "\n恢复外部凭据失败：" + cleanupErr.Error()
+					if a.credentials.draft != nil {
+						a.credentials.draft.errorText = a.credentials.notice
+					}
+				}
+				if a.window != nil {
+					a.window.Invalidate()
+				}
+			})
 		}
 	})
 }
@@ -202,7 +201,7 @@ type passwordClearSnapshot struct {
 func (s *passwordClearSnapshot) restore() error {
 	var result error
 	for _, key := range s.attempted {
-		if err := mygo.Secrets.Set(key, s.values[key]); err != nil {
+		if err := credentialStore().Set(key, s.values[key]); err != nil {
 			result = errors.Join(result, fmt.Errorf("恢复保存的会话密码：%w", err))
 		}
 	}
@@ -224,11 +223,11 @@ func clearStoredPasswords(ctx context.Context, ids []string) credentialResult {
 		return credentialResult{err: err}
 	}
 	for _, id := range snapshot.ids {
-		for _, key := range []string{sessionCredentialKey(id), sessionLegacyPasswordKey(id)} {
+		for _, key := range []string{sessionCredentialKey(id)} {
 			if err := ctx.Err(); err != nil {
 				return fail(err)
 			}
-			value, err := mygo.Secrets.Get(key)
+			value, err := credentialStore().Get(key)
 			if errors.Is(err, mygo.ErrSecretNotFound) {
 				continue
 			}
@@ -239,7 +238,7 @@ func clearStoredPasswords(ctx context.Context, ids []string) credentialResult {
 		}
 	}
 	for _, id := range snapshot.ids {
-		for _, key := range []string{sessionCredentialKey(id), sessionLegacyPasswordKey(id)} {
+		for _, key := range []string{sessionCredentialKey(id)} {
 			if err := ctx.Err(); err != nil {
 				return fail(err)
 			}
@@ -247,7 +246,7 @@ func clearStoredPasswords(ctx context.Context, ids []string) credentialResult {
 				continue
 			}
 			snapshot.attempted = append(snapshot.attempted, key)
-			if err := mygo.Secrets.Delete(key); err != nil {
+			if err := credentialStore().Delete(key); err != nil {
 				return fail(fmt.Errorf("清除保存的密码：%w", err))
 			}
 		}
@@ -257,7 +256,7 @@ func clearStoredPasswords(ctx context.Context, ids []string) credentialResult {
 
 // Run on the UI thread. Catalog persistence commits before cached credentials
 // and runtime flags change; the worker retains secret values until this succeeds.
-func (a *app) commitPasswordClear(ids []string) error {
+func (a *app) preparePasswordClear(ids []string) func(error) {
 	type previousFlag struct {
 		saved    bool
 		revision string
@@ -276,41 +275,42 @@ func (a *app) commitPasswordClear(ids []string) error {
 			profile.PasswordSaved, profile.PasswordRevision, profile.UpdatedAt = false, "", updated
 		}
 	}
-	if err := a.saveCatalog(); err != nil {
-		for i := range a.hosts {
-			profile := &a.hosts[i].session
-			if flag, exists := previous[profile.ID]; exists {
-				profile.PasswordSaved, profile.PasswordRevision, profile.UpdatedAt = flag.saved, flag.revision, flag.updated
+	return func(err error) {
+		if err != nil {
+			for i := range a.hosts {
+				profile := &a.hosts[i].session
+				if flag, exists := previous[profile.ID]; exists {
+					profile.PasswordSaved, profile.PasswordRevision, profile.UpdatedAt = flag.saved, flag.revision, flag.updated
+				}
+			}
+			return
+		}
+		clearFlag := func(config *sessionConfig) {
+			if changed[config.ID] {
+				config.PasswordSaved, config.PasswordRevision, config.UpdatedAt = false, "", updated
 			}
 		}
-		return fmt.Errorf("保存密码清理状态：%w", err)
-	}
-	clearFlag := func(config *sessionConfig) {
-		if changed[config.ID] {
-			config.PasswordSaved, config.PasswordRevision, config.UpdatedAt = false, "", updated
+		for _, tab := range a.tabs {
+			for _, session := range tab.root.sessions() {
+				clearFlag(&session.config)
+				clearFlag(&session.endpoint.session)
+			}
 		}
-	}
-	for _, tab := range a.tabs {
-		for _, session := range tab.root.sessions() {
+		files := map[*fileSession]bool{}
+		for _, session := range a.fileSessions {
+			files[session] = true
+		}
+		for _, task := range a.transfers.tasks {
+			files[task.session] = true
+		}
+		for session := range files {
+			if changed[session.config.ID] || changed[session.endpoint.session.ID] {
+				session.ftpSecret = ""
+			}
 			clearFlag(&session.config)
 			clearFlag(&session.endpoint.session)
 		}
 	}
-	files := map[*fileSession]bool{}
-	for _, session := range a.fileSessions {
-		files[session] = true
-	}
-	for _, task := range a.transfers.tasks {
-		files[task.session] = true
-	}
-	for session := range files {
-		if changed[session.config.ID] || changed[session.endpoint.session.ID] {
-			session.ftpSecret = ""
-		}
-		clearFlag(&session.config)
-		clearFlag(&session.endpoint.session)
-	}
-	return nil
 }
 
 func (a *app) dismissCredentialDraft() {
@@ -435,12 +435,12 @@ func storeManagedKey(ctx context.Context, data []byte, raw any, name, comment, p
 		return credentialResult{err: err}
 	}
 	directory = filepath.Join(directory, "keys")
-	if err := os.MkdirAll(directory, 0700); err != nil {
+	if err := localfs.MkdirAll(directory, 0700); err != nil {
 		return credentialResult{err: fmt.Errorf("创建密钥目录：%w", err)}
 	}
 	id := newSessionID()
 	destination := filepath.Join(directory, id)
-	file, err := os.OpenFile(destination, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	file, err := localfs.OpenFile(destination, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
 	if err != nil {
 		return credentialResult{err: fmt.Errorf("创建密钥文件：%w", err)}
 	}
@@ -451,7 +451,7 @@ func storeManagedKey(ctx context.Context, data []byte, raw any, name, comment, p
 		}
 	}()
 	_, writeErr := file.Write(data)
-	err = errors.Join(writeErr, file.Close())
+	err = errors.Join(writeErr, file.Sync(), file.Close())
 	if err != nil {
 		return credentialResult{err: fmt.Errorf("写入密钥文件：%w", err)}
 	}
@@ -465,11 +465,11 @@ func storeManagedKey(ctx context.Context, data []byte, raw any, name, comment, p
 	}
 	created = append(created, destination+".pub")
 	_, writeErr = publicFile.Write(public)
-	if err := errors.Join(writeErr, publicFile.Close()); err != nil {
+	if err := errors.Join(writeErr, publicFile.Sync(), publicFile.Close()); err != nil {
 		return credentialResult{err: fmt.Errorf("写入公钥：%w", err)}
 	}
 	if remember && passphrase != "" {
-		if err := mygo.Secrets.Set("key/"+id+"/passphrase", []byte(passphrase)); err != nil {
+		if err := credentialStore().Set("key/"+id+"/passphrase", []byte(passphrase)); err != nil {
 			return credentialResult{err: fmt.Errorf("保存私钥口令：%w", err)}
 		}
 	}
@@ -477,14 +477,14 @@ func storeManagedKey(ctx context.Context, data []byte, raw any, name, comment, p
 		return credentialResult{err: err}
 	}
 	keyType, bits := managedKeyType(raw, signer.PublicKey())
-	key := managedKey{ID: id, Name: name, Type: keyType, Bits: bits, Fingerprint: ssh.FingerprintSHA256(signer.PublicKey()), Path: destination, Comment: comment, CreatedAt: time.Now().UTC()}
+	key := managedKey{PublicKey: public, ID: id, Name: name, Type: keyType, Bits: bits, Fingerprint: ssh.FingerprintSHA256(signer.PublicKey()), Path: destination, Comment: comment, CreatedAt: time.Now().UTC()}
 	return credentialResult{key: &key}
 }
 
 // Only files created by the current, unpublished key operation are rolled back.
 func discardManagedKey(id string, paths []string) error {
 	var cleanup error
-	if err := mygo.Secrets.Delete("key/" + id + "/passphrase"); err != nil {
+	if err := credentialStore().Delete("key/" + id + "/passphrase"); err != nil {
 		cleanup = fmt.Errorf("清理口令：%w", err)
 	}
 	for _, path := range paths {
@@ -568,7 +568,7 @@ func (a *app) keyUseCount(id string) int {
 // directory succeeds; failures restore the original file paths and credential.
 func trashManagedKey(ctx context.Context, key managedKey, index int) credentialResult {
 	secretName := "key/" + key.ID + "/passphrase"
-	secret, err := mygo.Secrets.Get(secretName)
+	secret, err := credentialStore().Get(secretName)
 	secretExists := err == nil
 	if err != nil && !errors.Is(err, mygo.ErrSecretNotFound) {
 		return credentialResult{restoreKey: &key, restoreIndex: index, err: fmt.Errorf("读取保存的口令：%w", err)}
@@ -596,7 +596,7 @@ func trashManagedKey(ctx context.Context, key managedKey, index int) credentialR
 			}
 		}
 		if secretDeleted {
-			if err := mygo.Secrets.Set(secretName, secret); err != nil {
+			if err := credentialStore().Set(secretName, secret); err != nil {
 				rollbackErr = errors.Join(rollbackErr, fmt.Errorf("恢复保存的口令：%w", err))
 			}
 		}
@@ -631,7 +631,7 @@ func trashManagedKey(ctx context.Context, key managedKey, index int) credentialR
 		// A failed credential API call may already have changed the item. Restore
 		// its captured value on every failure after attempting deletion.
 		secretDeleted = true
-		if err := mygo.Secrets.Delete(secretName); err != nil {
+		if err := credentialStore().Delete(secretName); err != nil {
 			return rollback(fmt.Errorf("删除保存的口令：%w", err))
 		}
 	}
@@ -646,27 +646,18 @@ func trashManagedKey(ctx context.Context, key managedKey, index int) credentialR
 
 func (a *app) copyManagedPublicKey(key managedKey) {
 	a.credentialWork(func(ctx context.Context) credentialResult {
-		data, err := os.ReadFile(key.Path + ".pub")
-		if err != nil {
-			return credentialResult{err: fmt.Errorf("读取公钥：%w", err)}
-		}
-		if _, _, _, _, err := ssh.ParseAuthorizedKey(data); err != nil {
-			return credentialResult{err: fmt.Errorf("解析公钥：%w", err)}
-		}
 		if ctx.Err() != nil {
 			return credentialResult{err: ctx.Err()}
 		}
-		return credentialResult{publicKey: string(data)}
+		return credentialResult{publicKey: string(key.PublicKey)}
 	})
 }
 
-// agentState only queries the local Unix socket, with bounded I/O.
+// agentState queries the platform's local agent with bounded I/O.
 func agentState() (int, error) {
-	socket := os.Getenv("SSH_AUTH_SOCK")
-	if socket == "" {
-		return 0, errors.New("未检测到 ssh-agent（SSH_AUTH_SOCK）")
-	}
-	conn, err := net.DialTimeout("unix", socket, 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	conn, err := sshclient.DialAgent(ctx)
 	if err != nil {
 		return 0, err
 	}

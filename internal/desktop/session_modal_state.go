@@ -421,24 +421,25 @@ func (a *app) saveSessionDraft(c *ui.Context, d *hostDraft, connect bool) {
 		return
 	}
 	d.saving = true
-	defer func() { d.saving = false }()
 	h := a.draftHost(d)
 	initializeSession(&h)
 	rollback, release, err := snapshotSessionSecrets(h, d.passwordChanged, d.passphraseChanged)
 	if err != nil {
 		uikit.Toast(c, uikit.ToastProps{Tone: uikit.ToneDanger, Title: "读取原有凭据失败", Detail: err.Error()})
+		d.saving = false
 		return
 	}
-	defer release()
 	if err := a.storeSessionSecrets(&h, d.password, d.passwordChanged, d.passphrase, d.passphraseChanged); err != nil {
 		uikit.Toast(c, uikit.ToastProps{Tone: uikit.ToneDanger, Title: "保存凭据失败", Detail: errors.Join(err, rollback()).Error()})
+		release()
+		d.saving = false
 		return
 	}
 	id := hostID(len(a.hosts))
 	if d.editing {
 		id = d.id
 	}
-	err = a.commitCatalogMove(func() {
+	a.commitCatalogMoveAsync(func() {
 		if d.editing {
 			a.hosts[id] = h
 		} else {
@@ -459,32 +460,36 @@ func (a *app) saveSessionDraft(c *ui.Context, d *hostDraft, connect bool) {
 				group.hosts = slices.DeleteFunc(group.hosts, func(candidate hostID) bool { return candidate == id })
 			}
 		}
-	})
-	if err != nil {
-		uikit.Toast(c, uikit.ToastProps{Tone: uikit.ToneDanger, Title: "保存会话失败", Detail: errors.Join(err, rollback()).Error()})
-		return
-	}
-	a.page().query = ""
-	a.closeSessionDraft(d)
-	if connect {
-		target := sectionSSH
-		if d.files {
-			target = sectionFiles
+	}, func(err error) {
+		defer release()
+		d.saving = false
+		if err != nil {
+			a.persistenceNotice("保存会话失败", errors.Join(err, rollback()))
+			return
 		}
-		open := func() {
-			a.switchSection(target)
-			if target == sectionFiles {
-				a.openNewFileHost(id)
+
+		a.page().query = ""
+		a.closeSessionDraft(d)
+		if connect {
+			target := sectionSSH
+			if d.files {
+				target = sectionFiles
+			}
+			open := func() {
+				a.switchSection(target)
+				if target == sectionFiles {
+					a.openNewFileHost(id)
+				} else {
+					a.openHost(id)
+				}
+			}
+			if target != a.section {
+				d.afterClose = open
 			} else {
-				a.openHost(id)
+				open()
 			}
 		}
-		if target != a.section {
-			d.afterClose = open
-		} else {
-			open()
-		}
-	}
+	})
 }
 
 func (a *app) closeSessionDraft(d *hostDraft) {

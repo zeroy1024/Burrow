@@ -32,6 +32,13 @@ type PermissionSetter interface {
 	Chmod(context.Context, string, fs.FileMode) error
 }
 
+// PermissionPreserver copies and verifies native access rules when Unix mode
+// bits cannot describe them. The source is the existing target, the destination
+// is the completed staging file, and both must be ordinary files.
+type PermissionPreserver interface {
+	PreservePermissions(ctx context.Context, source, destination string) error
+}
+
 // PrivateStageWriter restricts a staging file to 0600 before returning a writer.
 // create requests exclusive creation; otherwise the file must already exist.
 // created reports confirmed creation even when a later permission check fails,

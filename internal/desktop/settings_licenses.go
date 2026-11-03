@@ -17,6 +17,9 @@ import (
 //go:embed licenses/mygo.txt
 var mygoLicense string
 
+//go:embed licenses/sqlite.txt
+var sqliteLicense string
+
 //go:embed licenses/purego.txt
 var puregoLicense string
 
@@ -25,6 +28,9 @@ var goTextLicense string
 
 //go:embed licenses/x-crypto.txt
 var cryptoLicense string
+
+//go:embed licenses/go-winio.txt
+var winioLicense string
 
 //go:embed licenses/x-image.txt
 var imageLicense string
@@ -48,7 +54,9 @@ var burrowIcon = func() *ui.Bitmap {
 
 var dependencyNotices = []struct{ name, license, text string }{
 	{"MyGo", "MIT", mygoLicense},
+	{"modernc SQLite 及运行依赖", "BSD / MIT", sqliteLicense},
 	{"golang.org/x/crypto/ssh", "BSD-3-Clause", cryptoLicense},
+	{"go-winio", "MIT", winioLicense},
 	{"PureGo", "Apache-2.0", puregoLicense},
 	{"go-text/typesetting", "Unlicense / BSD-3-Clause", goTextLicense},
 	{"golang.org/x/image", "BSD-3-Clause", imageLicense},

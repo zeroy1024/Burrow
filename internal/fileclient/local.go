@@ -220,6 +220,9 @@ func (c *localClient) open(ctx context.Context, name string, offset int64, flags
 	if err == nil {
 		err = c.check(ctx)
 	}
+	if err == nil && info != nil && flags&(os.O_WRONLY|os.O_RDWR) != 0 {
+		err = secureLocalWrite(file)
+	}
 	if err == nil && truncate {
 		err = file.Truncate(0)
 	}
@@ -371,7 +374,7 @@ func (c *localClient) Chmod(ctx context.Context, name string, mode fs.FileMode) 
 		err = c.check(ctx)
 	}
 	if err == nil {
-		err = file.Chmod(mode)
+		err = chmodLocalFile(file, mode)
 	}
 	return errors.Join(err, file.Close())
 }
@@ -497,9 +500,7 @@ func localEntry(info fs.FileInfo) Entry {
 		Permissions: info.Mode().String(),
 		Mode:        info.Mode(), ModeKnown: true,
 	}
-	if stat, ok := info.Sys().(*syscall.Stat_t); ok {
-		entry.Owner = fmt.Sprintf("%d:%d", stat.Uid, stat.Gid)
-	}
+	setLocalMetadata(&entry, info)
 	return entry
 }
 
