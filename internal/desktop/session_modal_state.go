@@ -350,7 +350,7 @@ func (a *app) validateDraft(d *hostDraft) bool {
 }
 
 func (a *app) draftHost(d *hostDraft) host {
-	h := host{os: 0}
+	h := host{os: linuxSystem}
 	if d.editing {
 		h = a.hosts[d.id]
 	}

@@ -105,6 +105,8 @@ type systemStyle struct {
 	icon  *ui.SVG
 }
 
+const linuxSystem = 5
+
 var systems = []systemStyle{
 	{name: "Ubuntu", color: color.NRGBA{R: 0xed, G: 0x54, B: 0x22, A: 0xff}, icon: ubuntuIcon},
 	{name: "Debian", color: color.NRGBA{R: 0xbd, G: 0x17, B: 0x47, A: 0xff}, icon: debianIcon},

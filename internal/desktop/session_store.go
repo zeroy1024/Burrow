@@ -69,6 +69,9 @@ func newSessionID() string {
 }
 
 func initializeSession(h *host) {
+	if h.system == "" {
+		h.os = linuxSystem
+	}
 	if h.session.ID == "" {
 		h.session.ID = newSessionID()
 	}
