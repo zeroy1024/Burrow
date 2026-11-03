@@ -91,7 +91,7 @@ GOCACHE=/private/tmp/sshdesk-go-build mise exec -- go test ./...
 
 两个 workflow 都使用现有的 `ubuntu-latest` runner 标签，在任务容器内准备工具，不修改 runner 宿主机。mise 读取仓库的 `mise.toml`，使用固定的 Go、uv 版本；action 固定到 commit，mise 本体固定为 2026.10.25。
 
-当前 rootless runner 限制容器内的 UID/GID 切换；APT 使用 `APT::Sandbox::User=root`，以当前容器用户下载依赖，避免切换到 `_apt` 失败，不增加容器能力或修改宿主机权限。
+当前 rootless runner 限制容器内的 UID/GID 切换；APT 使用 `APT::Sandbox::User=root`，并将下载缓存放在当前任务的 `RUNNER_TEMP` 下，避免切换到 `_apt` 或访问镜像中 `_apt` 专属目录失败，不增加容器能力或修改宿主机权限。
 
 | Workflow | 触发条件 | 内容 |
 |---|---|---|
