@@ -29,8 +29,9 @@ jobs:
 
       - name: 安装打包依赖
         run: |
-          apt-get update
-          apt-get install -y --no-install-recommends ca-certificates curl nsis
+          # The rootless runner cannot switch to APT's _apt UID/GID.
+          apt-get -o APT::Sandbox::User=root update
+          apt-get -o APT::Sandbox::User=root install -y --no-install-recommends ca-certificates curl nsis
 
       - name: 准备项目工具链
         uses: https://github.com/jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5
