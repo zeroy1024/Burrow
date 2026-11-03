@@ -56,7 +56,7 @@ python3 -B -u scripts/ssh-integration-ui.py --file-protocols
 python3 -B -u scripts/ssh-integration-ui.py --core-e2e
 ```
 
-脚本通过 Go overlay 启用固定 MyGo 版本的 automation 插件，只在临时构建中将应用配置路径指向独立目录；不修改 `HOME`、正式构建或现有 Burrow 配置。固定 SDK 复制到测试临时目录后通过独立 modfile 引用，不修改全局模块缓存或项目依赖。用户数据、旧配置迁移路径、本地默认目录、缓存和日志均隔离。测试专用凭据 provider 以 `0600` 文件保存临时秘密，保留应用的凭据调用与版本校验；这些测试不覆盖 macOS 钥匙串集成。
+脚本通过 Go overlay 启用固定 MyGo 版本的 automation 插件，只在临时构建中将应用配置路径指向独立目录；不修改 `HOME`、正式构建或现有 Burrow 配置。固定 SDK 复制到测试临时目录后通过独立 modfile 引用，不修改全局模块缓存或项目依赖。用户数据、SQLite 配置加载路径、本地默认目录、缓存和日志均隔离。测试专用凭据 provider 以 `0600` 文件保存临时秘密，保留应用的凭据调用与版本校验；这些测试不覆盖 macOS 钥匙串集成。
 
 它启动真实 macOS 窗口，以本地 Unix socket 发送点击、键盘和菜单操作，并从实际 Ghostty 实例读取文字与网格。Snapshot 只读观测应用状态；不拍截图或进行视觉验收。
 
@@ -64,7 +64,7 @@ python3 -B -u scripts/ssh-integration-ui.py --core-e2e
 
 覆盖认证弹窗、首次信任拒绝与确认、终端输入、`vim` 日文编辑与 `top`、分屏默认键盘焦点、独立 Shell、尺寸变化、关闭窗格、断开、重连历史及四种认证。尺寸检查同时比较应用状态、Ghostty 网格和远端 `stty size`。脚本使用自己启动的 SSH Agent，仅加载临时公钥对应的密钥；结束时关闭自己启动的应用与 Agent。
 
-默认模式还验证两套目录的增改删隔离、旧目录迁移为 `sessions.json` v1 和备份、运行会话身份快照，以及同连接分屏不增加 TCP 或认证。`--concurrent-split` 验证同一次操作创建三个已连接通道、单 TCP / 单次认证及退出清理；该模式通过测试菜单调用拆分动作，属于模型与协议集成，不能代替真实分屏输入验证。
+默认模式还验证两套目录的增改删隔离、SQLite schema v1 目录加载与主机信任记录、运行会话身份快照，以及同连接分屏不增加 TCP 或认证。`--concurrent-split` 验证同一次操作创建三个已连接通道、单 TCP / 单次认证及退出清理；该模式通过测试菜单调用拆分动作，属于模型与协议集成，不能代替真实分屏输入验证。
 
 `--file-protocols` 通过当前保存站点 UI 验证 SFTP / FTP 中文条目、目录导航与历史、权限错误后的连接可用性、文件操作控件、本地面板切换、错误 FTP 密码拒绝后的重新连接，以及 SSH / SFTP / FTP 独立关闭和实际连接释放。当前界面没有旧脚本依赖的跨页快捷按钮，该模式不计入临时快捷视图和跨页 transport 复用覆盖；共享 SSH / SFTP 通道生命周期仍由 Go 协议集成测试验证。
 

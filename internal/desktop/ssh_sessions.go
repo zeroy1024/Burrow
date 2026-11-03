@@ -375,7 +375,7 @@ func (a *app) reconnectSSHGroup(previous *sshConnectionGroup, endpoint host) *ss
 }
 
 func sameSSHPlan(left, right sshDialPlan) bool {
-	if left.knownHosts != right.knownHosts || len(left.steps) != len(right.steps) {
+	if left.trust != right.trust || len(left.steps) != len(right.steps) {
 		return false
 	}
 	keepalive := func(h host) int {

@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
 	"sshdesk/internal/termtheme"
 	"sshdesk/internal/theme"
@@ -30,6 +29,22 @@ func (a *app) importedThemeUse(name string) string {
 			}
 		}
 	}
+	for _, closed := range a.closedTabs {
+		if options := closed.endpoint.session.SSH; options != nil && termtheme.ParseMode(options.TermScheme) == termtheme.Fixed(name) {
+			return "可恢复的会话正在使用"
+		}
+	}
+	for _, group := range a.runtimeSSHGroups() {
+		if options := group.endpoint.session.SSH; options != nil && termtheme.ParseMode(options.TermScheme) == termtheme.Fixed(name) {
+			return "连接快照正在使用"
+		}
+		for _, step := range group.plan.steps {
+			if options := step.endpoint.session.SSH; options != nil && termtheme.ParseMode(options.TermScheme) == termtheme.Fixed(name) {
+				return "连接快照正在使用"
+			}
+		}
+	}
+
 	return ""
 }
 
@@ -49,23 +64,31 @@ func (a *app) importedThemeMenu(c *ui.Context, name string) func(*ui.Menu) {
 }
 
 func (a *app) deleteImportedTheme(name string) error {
+	if a.terminal.importing {
+		return errors.New("正在处理配色")
+	}
 	if termtheme.IsBundled(name) {
 		return errors.New("不能删除内置配色")
 	}
 	if reason := a.importedThemeUse(name); reason != "" {
 		return errors.New(reason)
 	}
-	path, ok := a.terminal.imported[name]
+	_, ok := a.terminal.imported[name]
 	if !ok {
 		return fmt.Errorf("找不到配色文件 %q", name)
 	}
-	if err := mygo.Shell.TrashItem(path); err != nil {
-		return err
-	}
-	if err := termtheme.Unregister(name); err != nil {
-		return err
-	}
-	delete(a.terminal.imported, name)
+	a.terminal.importing = true
+	a.persist(func() error { return a.store.DeleteTheme(a.ctx, name) }, func(err error) {
+		a.terminal.importing = false
+		if err == nil {
+			err = termtheme.Unregister(name)
+		}
+		if err != nil {
+			a.persistenceNotice("删除配色失败", err)
+			return
+		}
+		delete(a.terminal.imported, name)
+	})
 	return nil
 }
 

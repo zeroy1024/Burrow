@@ -4,11 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"runtime"
 	"slices"
 	"sync"
 	"time"
 
+	"sshdesk/internal/localfs"
+	"sshdesk/internal/store"
 	"sshdesk/internal/termtheme"
 	"sshdesk/internal/theme"
 	"sshdesk/internal/uikit"
@@ -58,6 +61,13 @@ type pageState struct {
 }
 
 type app struct {
+	store                  *store.Store
+	persistence            *persistenceWorker
+	dataDirectory          string
+	catalogSaving          bool
+	windowSaving           bool
+	catalogReady           []func()
+	workspaceSave          workspaceSaveState
 	quitReady, quitPending bool
 	terminalCapture        terminalCaptureState
 	terminalPreviews       map[*remoteSession]*terminalPreview
@@ -113,7 +123,6 @@ type app struct {
 	prefs              appPreferences
 	prefsSave          preferenceSaveState
 	settingsUI         settingsState
-	prefsPath          string
 	prefsLoadErr       error
 	keys               []managedKey
 	credentials        credentialState
@@ -188,18 +197,32 @@ func (a *app) clearWorkspaceGestures() {
 }
 
 // Run starts the native desktop application and its main window.
-func Run() error {
-	mygo.App.SetName("Burrow")
+func Run() (runErr error) {
+	directory, err := configureDataDirectory()
+	if err != nil {
+		return err
+	}
 	mygo.App.SetLanguages("zh-Hans", "en")
+	if err := localfs.MkdirAll(directory, 0700); err != nil {
+		return fmt.Errorf("保护应用数据目录：%w", err)
+	}
 	if err := nativeterm.Load(); err != nil {
 		return fmt.Errorf("加载原生终端：%w", err)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	a := &app{ctx: ctx, cancel: cancel, tabs: []*workspaceTab{}}
+	db, err := store.Open(ctx, filepath.Join(directory, "burrow.db"))
+	if err != nil {
+		cancel()
+		return fmt.Errorf("打开应用数据库：%w", err)
+	}
+
+	a := &app{ctx: ctx, cancel: cancel, store: db, dataDirectory: directory, tabs: []*workspaceTab{}}
 	defer func() {
 		a.cancel()
 		a.sshWorkers.Wait()
+		runErr = errors.Join(runErr, a.finishPersistence())
 	}()
+	a.persistence = newPersistenceWorker(func() *mygo.Window { return a.window })
 	for i := range a.pages {
 		a.pages[i].sidebarWidth = theme.Current().C.Sider.Width
 	}
@@ -261,6 +284,7 @@ func Run() error {
 			MinWidth:             int(t.C.Desktop.WindowMinWidth),
 			MinHeight:            int(t.C.Desktop.WindowMinHeight),
 			TitleBarStyle:        mygo.TitleBarHidden,
+			TitleBarHeight:       int(t.C.Titlebar.Height),
 			TrafficLightPosition: &mygo.Point{X: int(t.C.Desktop.TrafficLightX), Y: int(t.C.Desktop.TrafficLightY)},
 			BackgroundColor:      "#00000000",
 			Transparent:          true,
@@ -269,41 +293,42 @@ func Run() error {
 		})
 		a.windowMaterial = material
 		a.syncWindowMaterial()
-		a.startCatalogMigration()
 		a.window.OnClose(func(e *mygo.CloseEvent) {
 			if a.quitPending {
 				e.PreventDefault()
 				a.window.Hide()
 				return
 			}
-			if a.credentials.busy || a.savingSession() || a.catalogMigrationBusy() {
+			if a.credentials.busy || a.terminal.importing || a.savingSession() || a.catalogSaving || a.windowSaving {
 				a.resetQuitAttempt()
 				e.PreventDefault()
 				a.files.notice = &uikit.ToastProps{ID: "save-before-close", Tone: uikit.ToneWarning, Title: "正在保存凭据，完成后再关闭窗口。"}
 				a.window.Invalidate()
 				return
 			}
-			if err := a.persistBeforeClose(); err != nil {
-				a.resetQuitAttempt()
-				e.PreventDefault()
-				a.files.notice = &uikit.ToastProps{
-					ID: "关闭前保存失败：" + err.Error(), Tone: uikit.ToneDanger,
-					Title: "关闭前保存失败", Detail: err.Error(),
-				}
-				a.window.Invalidate()
+			if a.quitReady {
 				return
 			}
-			for i := range a.pages {
-				a.pages[i].draft.cancelTest()
-			}
-			if !a.quitReady {
-				// Keep one stable window/dispatcher while sessions and jobs run in
-				// the background. Dock activation shows this same native window.
-				e.PreventDefault()
+			e.PreventDefault()
+			a.windowSaving = true
+			a.persistBeforeClose(func(err error) {
+				a.windowSaving = false
+				if err != nil {
+					a.resetQuitAttempt()
+					a.persistenceNotice("关闭前保存失败", err)
+					return
+				}
+				for i := range a.pages {
+					a.pages[i].draft.cancelTest()
+				}
 				a.closeSettings()
 				a.monitor.stop()
-				a.window.Hide()
-			}
+				if runtime.GOOS == "darwin" {
+					a.window.Hide()
+				} else {
+					a.window.Minimize()
+				}
+			})
 		})
 		if stopMenuLocale != nil {
 			stopMenuLocale()
@@ -324,7 +349,7 @@ func Run() error {
 			e.PreventDefault()
 			return
 		}
-		if a.credentials.busy || a.savingSession() || a.catalogMigrationBusy() || a.files.dialog != nil && a.files.dialog.busy {
+		if a.credentials.busy || a.terminal.importing || a.savingSession() || a.catalogSaving || a.windowSaving || a.files.dialog != nil && a.files.dialog.busy {
 			a.resetQuitAttempt()
 			e.PreventDefault()
 			a.files.notice = &uikit.ToastProps{ID: "work-before-quit", Tone: uikit.ToneWarning, Title: "文件或凭据操作进行中，完成后再退出。"}
@@ -334,32 +359,27 @@ func Run() error {
 			}
 			return
 		}
-		if err := a.persistBeforeClose(); err != nil {
-			a.resetQuitAttempt()
-			e.PreventDefault()
-			a.files.notice = &uikit.ToastProps{ID: "quit-save-error", Tone: uikit.ToneDanger, Title: "退出前保存失败", Detail: err.Error()}
-			if a.window != nil {
-				a.window.Show()
-				a.window.Invalidate()
-			}
-			return
-		}
 		if !a.quitReady {
 			e.PreventDefault()
-			if !a.quitPending {
-				a.quitPending = true
+			a.quitPending = true
+			a.persistBeforeClose(func(err error) {
+				if err != nil {
+					a.quitPending = false
+					a.persistenceNotice("退出前保存失败", err)
+					a.window.Show()
+					return
+				}
 				a.prepareTransferQuit(func(err error) {
 					a.quitPending = false
 					if err != nil {
-						a.files.notice = &uikit.ToastProps{ID: "quit-transfer-save", Tone: uikit.ToneDanger, Title: "保存传输记录失败", Detail: err.Error()}
+						a.persistenceNotice("保存传输记录失败", err)
 						a.window.Show()
-						a.window.Invalidate()
 						return
 					}
 					a.quitReady = true
 					a.window.Update(func() { mygo.App.Quit() })
 				})
-			}
+			})
 			return
 		}
 		a.cancelCredentialWork()
@@ -389,7 +409,7 @@ func (a *app) view(c *ui.Context) {
 			background = ui.Transparent
 		}
 	}
-	c.Root().Background(background).Disabled(a.transfers.quitting)
+	c.Root().Background(background).Disabled(a.transfers.quitting || a.catalogSaving || a.windowSaving || a.quitPending || a.terminal.importing)
 	root := ui.Column(c).Fill()
 	x, y, _ := root.PointerPosition()
 	a.pointer = ui.Point{X: x, Y: y}
@@ -414,6 +434,8 @@ func (a *app) view(c *ui.Context) {
 	a.updateSSHLatency(c)
 	a.updateMonitor(c)
 	a.tickPreferences(c)
+	a.tickFilePreferences(c)
+	a.tickWorkspace(c)
 	target := float32(1)
 	if a.page().sidebarCollapsed {
 		target = 0
@@ -456,7 +478,7 @@ func (a *app) view(c *ui.Context) {
 			a.catalogDragPreview(c)
 		}
 	})
-	a.showCatalogMigrationError(c)
+	a.showCatalogError(c)
 	if a.terminalError != nil {
 		uikit.Toast(c, uikit.ToastProps{Title: "终端设置", Detail: a.terminalError.Error(), Tone: uikit.ToneDanger})
 		a.terminalError = nil

@@ -215,6 +215,5 @@ func keyToBinding(mods ui.Modifiers, key ui.Key) (string, bool) {
 }
 
 func shortcutDisplay(binding string) string {
-	replacements := strings.NewReplacer("Cmd+", "⌘", "Shift+", "⇧", "Alt+", "⌥", "Ctrl+", "⌃", "Super+", "⌘")
-	return replacements.Replace(binding)
+	return uikit.ShortcutDisplay(binding)
 }

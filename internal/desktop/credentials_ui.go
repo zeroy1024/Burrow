@@ -287,12 +287,14 @@ func (a *app) renameManagedKey(d *credentialDraft) {
 	}
 	old := a.keys[index].Name
 	a.keys[index].Name = name
-	if err := a.saveCatalog(); err != nil {
-		a.keys[index].Name = old
-		d.errorText = err.Error()
-		return
-	}
-	a.dismissCredentialDraft()
+	a.saveCatalogAsync(func(err error) {
+		if err != nil {
+			a.keys[index].Name = old
+			d.errorText = err.Error()
+			return
+		}
+		a.dismissCredentialDraft()
+	})
 }
 
 func (a *app) deleteManagedKey(d *credentialDraft) {
@@ -310,13 +312,15 @@ func (a *app) deleteManagedKey(d *credentialDraft) {
 	previousWorkspace := a.savedWorkspace
 	a.savedWorkspace = a.workspaceSnapshot()
 	a.keys = slices.Delete(a.keys, index, index+1)
-	if err := a.saveCatalog(); err != nil {
-		a.keys = previous
-		a.savedWorkspace = previousWorkspace
-		d.errorText = "保存凭据目录：" + err.Error()
-		return
-	}
-	a.credentialWork(func(ctx context.Context) credentialResult { return trashManagedKey(ctx, key, index) })
+	a.saveCatalogAsync(func(err error) {
+		if err != nil {
+			a.keys = previous
+			a.savedWorkspace = previousWorkspace
+			d.errorText = "保存凭据目录：" + err.Error()
+			return
+		}
+		a.credentialWork(func(ctx context.Context) credentialResult { return trashManagedKey(ctx, key, index) })
+	})
 }
 
 func (a *app) clearCredentialPasswords() {

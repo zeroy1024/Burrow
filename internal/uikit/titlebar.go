@@ -8,7 +8,9 @@ import (
 
 func TitleBar(c *ui.Context) ui.Element {
 	t := theme.Current()
-	return ui.Row(c).Height(max(t.C.Titlebar.Height, c.TitleBar().Height)).Shrink(0).Gap(t.Space.N6).DragWindow()
+	bar := c.TitleBar()
+	return ui.Row(c).Height(max(t.C.Titlebar.Height, bar.Height)).PaddingEnd(bar.Right).
+		Shrink(0).Gap(t.Space.N6).DragWindow()
 }
 
 func TitleBarLeading(c *ui.Context, workspaceWidth float32) ui.Element {

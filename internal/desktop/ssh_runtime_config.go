@@ -7,7 +7,6 @@ import (
 	"net"
 	"os"
 	"os/user"
-	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -28,8 +27,8 @@ type sshDialStep struct {
 // Plans contain value snapshots only. Workers never inspect the live catalogs
 // while the window thread edits or reorders them.
 type sshDialPlan struct {
-	steps      []sshDialStep
-	knownHosts string
+	steps []sshDialStep
+	trust sshclient.HostKeyStore
 }
 
 type sshSecretsOverride struct {
@@ -51,11 +50,8 @@ func sshHostSnapshot(h host) host {
 
 // captureSSHPlan is called on the window thread before starting a worker.
 func (a *app) captureSSHPlan(endpoint host) (sshDialPlan, error) {
-	directory, err := mygo.App.Path(mygo.PathUserData)
-	if err != nil {
-		return sshDialPlan{}, fmt.Errorf("定位 SSH 配置：%w", err)
-	}
-	plan := sshDialPlan{knownHosts: filepath.Join(directory, "known_hosts")}
+	plan := sshDialPlan{trust: a.store}
+	var err error
 	seen := map[string]bool{}
 	for {
 		endpoint = sshHostSnapshot(endpoint)
@@ -109,7 +105,7 @@ func (a *app) dialSSHPlan(ctx context.Context, plan sshDialPlan, override sshSec
 			cancelSetup()
 			return nil, err
 		}
-		cfg.HostKey = a.sshHostKeyCallback(setupCtx, plan.knownHosts, result)
+		cfg.HostKey = a.sshHostKeyCallback(setupCtx, plan.trust, result)
 		if connection != nil {
 			cfg.DialContext = connection.DialContext
 		}
@@ -215,7 +211,7 @@ func (a *app) sshRuntimeConfig(ctx context.Context, step sshDialStep, override s
 		if override.passphrase != nil {
 			cfg.Passphrase = *override.passphrase
 		} else {
-			secret, err := mygo.Secrets.Get("key/" + step.key.ID + "/passphrase")
+			secret, err := credentialStore().Get("key/" + step.key.ID + "/passphrase")
 			if err != nil && !errors.Is(err, mygo.ErrSecretNotFound) {
 				return cfg, fmt.Errorf("读取私钥口令：%w", err)
 			}
@@ -239,8 +235,8 @@ func (a *app) sshRuntimeConfig(ctx context.Context, step sshDialStep, override s
 	return cfg, nil
 }
 
-func (a *app) sshHostKeyCallback(ctx context.Context, path string, result *connectionTestResult) ssh.HostKeyCallback {
-	verify := sshclient.KnownHosts(path, func(hostname, fingerprint, keyType string) bool {
+func (a *app) sshHostKeyCallback(ctx context.Context, trust sshclient.HostKeyStore, result *connectionTestResult) ssh.HostKeyCallback {
+	verify := sshclient.KnownHosts(ctx, trust, func(hostname, fingerprint, keyType string) bool {
 		accepted := a.askSSH(ctx, &sshPrompt{title: "信任服务器主机密钥？", address: hostname,
 			fingerprint: fingerprint, keyType: keyType}).accepted
 		if accepted && result != nil {

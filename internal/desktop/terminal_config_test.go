@@ -11,16 +11,21 @@ import (
 	"sshdesk/internal/termtheme"
 )
 
-func terminalSettingsForTest(path string) terminalSettingsState {
-	return terminalSettingsState{
-		mode: termtheme.FollowAppTheme(), prefs: termtheme.DefaultPrefs(),
-		followLight: termtheme.DefaultLight, followDark: termtheme.DefaultDark, path: path,
+func terminalAppForTest(t *testing.T, path string) *app {
+	t.Helper()
+	a := catalogAppForTest(t, path)
+	if err := a.loadTerminalSettings(); err != nil {
+		t.Fatal(err)
 	}
+	if err := a.loadAppPreferences(); err != nil {
+		t.Fatal(err)
+	}
+	return a
 }
 
 func TestTerminalSettingsRoundTrip(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "terminal.json")
-	a := &app{terminal: terminalSettingsForTest(path)}
+	path := filepath.Join(t.TempDir(), "burrow.db")
+	a := terminalAppForTest(t, path)
 	a.terminal.mode = termtheme.Fixed("Dracula")
 	a.terminal.followLight, a.terminal.followDark = "Nord", "Dracula"
 	a.terminal.prefs.Background = termtheme.BackgroundCard
@@ -29,18 +34,22 @@ func TestTerminalSettingsRoundTrip(t *testing.T) {
 	a.terminal.prefs.CursorShape = termtheme.CursorBar
 	a.terminal.prefs.CursorBlink = false
 	a.terminal.prefs.BoldIsBright = true
-	if err := a.saveTerminalSettings(); err != nil {
+	if err := a.flushAppPreferences(); err != nil {
 		t.Fatal(err)
 	}
-	data, err := os.ReadFile(path)
+	var data []byte
+	_, err := a.store.ReadSetting(t.Context(), "preferences", &data)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.Contains(data, []byte(`"mode": "fixed:Dracula"`)) || !bytes.Contains(data, []byte(`"background": "card"`)) {
+	if !bytes.Contains(data, []byte(`"termMode":"fixed:Dracula"`)) || !bytes.Contains(data, []byte(`"termBackground":"card"`)) {
 		t.Fatalf("settings do not use string encodings: %s", data)
 	}
-	restarted := &app{terminal: terminalSettingsForTest(path)}
-	if err := restarted.readTerminalSettings(); err != nil {
+	if err := a.store.Close(); err != nil {
+		t.Fatal(err)
+	}
+	restarted := terminalAppForTest(t, path)
+	if err := restarted.loadAppPreferences(); err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(a.terminal.config(), restarted.terminal.config()) {
@@ -58,13 +67,19 @@ func TestImportTerminalThemePreservesBytesAndFilename(t *testing.T) {
 	if err := os.WriteFile(path, data, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	configPath := filepath.Join(directory, "config", "terminal.json")
-	a := &app{terminal: terminalSettingsForTest(configPath)}
+	configPath := filepath.Join(directory, "config", "burrow.db")
+	a := terminalAppForTest(t, configPath)
 	if err := a.importTerminalTheme(path); err != nil {
 		t.Fatal(err)
 	}
-	destination := filepath.Join(directory, "config", "themes", filepath.Base(path))
-	copied, err := os.ReadFile(destination)
+	if err := a.flushAppPreferences(); err != nil {
+		t.Fatal(err)
+	}
+	themes, err := a.store.Themes(t.Context())
+	var copied []byte
+	if len(themes) > 0 {
+		copied = themes[0].Source
+	}
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,18 +89,21 @@ func TestImportTerminalThemePreservesBytesAndFilename(t *testing.T) {
 	if a.terminal.mode != termtheme.Fixed(filepath.Base(path)) {
 		t.Fatalf("unnamed theme lost its filename: %v", a.terminal.mode)
 	}
-	restarted := &app{terminal: terminalSettingsForTest(configPath)}
+	if err := a.store.Close(); err != nil {
+		t.Fatal(err)
+	}
+	restarted := terminalAppForTest(t, configPath)
 	if err := restarted.loadTerminalThemes(); err != nil {
 		t.Fatal(err)
 	}
-	if err := restarted.readTerminalSettings(); err != nil {
+	if err := restarted.loadAppPreferences(); err != nil {
 		t.Fatal(err)
 	}
 	scheme := termtheme.Resolve(restarted.terminal.mode, false)
 	if scheme.Name != filepath.Base(path) || termtheme.Hex(scheme.Background) != "#123456" {
 		t.Fatalf("imported theme changed after restart: %#v", scheme)
 	}
-	if err := a.importTerminalTheme(path); err != nil {
+	if err := restarted.importTerminalTheme(path); err != nil {
 		t.Fatalf("identical repeat import failed: %v", err)
 	}
 }
@@ -97,7 +115,7 @@ func TestImportTerminalThemeRejectsInvalidAndConflictingFiles(t *testing.T) {
 	if err := os.WriteFile(path, data, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	a := &app{terminal: terminalSettingsForTest(filepath.Join(directory, "config", "terminal.json"))}
+	a := terminalAppForTest(t, filepath.Join(directory, "config", "burrow.db"))
 	if err := a.importTerminalTheme(path); err != nil {
 		t.Fatal(err)
 	}
@@ -107,7 +125,11 @@ func TestImportTerminalThemeRejectsInvalidAndConflictingFiles(t *testing.T) {
 	if err := a.importTerminalTheme(path); err == nil || !strings.Contains(err.Error(), "同名配色文件") {
 		t.Fatalf("expected filename conflict, got %v", err)
 	}
-	copied, err := os.ReadFile(filepath.Join(directory, "config", "themes", filepath.Base(path)))
+	themes, err := a.store.Themes(t.Context())
+	var copied []byte
+	if len(themes) > 0 {
+		copied = themes[0].Source
+	}
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -124,7 +146,7 @@ func TestImportTerminalThemeRejectsInvalidAndConflictingFiles(t *testing.T) {
 
 func TestImportTerminalThemeRejectsDuplicateSchemeName(t *testing.T) {
 	directory := t.TempDir()
-	a := &app{terminal: terminalSettingsForTest(filepath.Join(directory, "config", "terminal.json"))}
+	a := terminalAppForTest(t, filepath.Join(directory, "config", "burrow.db"))
 	for index, filename := range []string{"first", "second"} {
 		path := filepath.Join(directory, filename)
 		if err := os.WriteFile(path, []byte("# name: Duplicate Test Theme\nbackground = #123456\n"), 0o600); err != nil {
@@ -138,4 +160,23 @@ func TestImportTerminalThemeRejectsDuplicateSchemeName(t *testing.T) {
 			t.Fatalf("expected scheme name conflict, got %v", err)
 		}
 	}
+}
+func (a *app) flushAppPreferences() error {
+	data, err := a.preferencesData()
+	if err != nil {
+		return err
+	}
+	return a.store.SaveSetting(a.ctx, "preferences", data)
+}
+
+func (a *app) importTerminalTheme(path string) error {
+	if a.terminal.loadErr != nil {
+		return a.terminal.loadErr
+	}
+	source, filename, err := a.persistImportedTheme(path)
+	if err != nil {
+		return err
+	}
+	a.activateImportedTheme(source, filename)
+	return a.terminalError
 }

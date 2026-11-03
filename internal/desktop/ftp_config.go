@@ -2,11 +2,9 @@ package desktop
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"maps"
-	"os"
-	"path/filepath"
+	"time"
 
 	"sshdesk/internal/theme"
 
@@ -15,7 +13,7 @@ import (
 )
 
 type filePreferencesState struct {
-	path    string
+	save    preferenceSaveState
 	loadErr error
 }
 
@@ -23,7 +21,6 @@ type filePreferences struct {
 	LocalPaneOpen         bool              `json:"localPaneOpen"`
 	LocalRatio            float32           `json:"localRatio"`
 	LocalPaths            map[string]string `json:"localPaths"`
-	LocalPathKeysVersion  int               `json:"localPathKeysVersion"`
 	TransferDockCollapsed bool              `json:"transferDockCollapsed"`
 	TransferFilter        int               `json:"transferFilter"`
 	TransferDockHeight    float32           `json:"transferDockHeight,omitempty"`
@@ -93,78 +90,25 @@ func (a *app) loadFilePreferences() error {
 }
 
 func (a *app) readFilePreferences() error {
-	if a.catalogConfig.path == "" {
-		return fmt.Errorf("主机配置目录不可用")
-	}
-	a.filePrefs.path = filepath.Join(filepath.Dir(a.catalogConfig.path), "files.json")
-	data, err := os.ReadFile(a.filePrefs.path)
-	legacy := false
-	if errors.Is(err, os.ErrNotExist) {
-		legacyPath := filepath.Join(filepath.Dir(a.catalogConfig.legacyPath), "files.json")
-		if a.catalogConfig.legacyPath == "" || legacyPath == a.filePrefs.path {
-			return nil
-		}
-		data, err = os.ReadFile(legacyPath)
-		if errors.Is(err, os.ErrNotExist) {
-			return nil
-		}
-		legacy = true
-	}
-	if err != nil {
+	var data []byte
+	found, err := a.store.ReadSetting(a.ctx, "files", &data)
+	if err != nil || !found {
 		return err
 	}
 	prefs := filePreferences{LocalRatio: theme.Current().C.FTPSplit.DefaultRatio}
 	if err := json.Unmarshal(data, &prefs); err != nil {
 		return err
 	}
-	if prefs.LocalRatio <= 0 || prefs.LocalRatio >= 1 {
-		return fmt.Errorf("localRatio 必须介于 0 与 1 之间")
-	}
-	if prefs.TransferFilter < 0 || prefs.TransferFilter > 2 {
-		return fmt.Errorf("无效的传输筛选项")
-	}
-	if prefs.TransferDockHeight < 0 {
-		return fmt.Errorf("transferDockHeight 不能为负数")
-	}
-	if prefs.LocalPathKeysVersion != 0 && prefs.LocalPathKeysVersion != 1 {
-		return fmt.Errorf("不支持的站点本地路径版本 %d", prefs.LocalPathKeysVersion)
-	}
-	if prefs.LocalPathKeysVersion == 0 && a.catalogConfig.loadErr != nil {
-		return fmt.Errorf("会话配置读取失败，无法迁移站点本地路径：%w", a.catalogConfig.loadErr)
+	if prefs.LocalRatio <= 0 || prefs.LocalRatio >= 1 || prefs.TransferFilter < 0 || prefs.TransferFilter > 2 || prefs.TransferDockHeight < 0 {
+		return fmt.Errorf("无效的文件面板设置")
 	}
 	a.files.localOpen, a.files.ratio = prefs.LocalPaneOpen, prefs.LocalRatio
-	a.files.localPaths = map[string]string{}
-	if prefs.LocalPaths != nil {
-		if prefs.LocalPathKeysVersion == 1 {
-			a.files.localPaths = maps.Clone(prefs.LocalPaths)
-		} else {
-			for _, h := range a.hosts {
-				if h.protocol != "sftp" && h.protocol != "ftp" {
-					continue
-				}
-				if local := prefs.LocalPaths[h.session.ID]; local != "" {
-					a.files.localPaths[h.session.ID] = local
-					continue
-				}
-				if h.session.Files != nil && h.session.Files.LocalDir != "" {
-					a.files.localPaths[h.session.ID] = h.session.Files.LocalDir
-					continue
-				}
-				address := fmt.Sprintf("%s@%s:%d", h.user, h.address, h.port)
-				if path, exists := prefs.LocalPaths[address]; exists {
-					a.files.localPaths[h.session.ID] = path
-				}
-			}
-		}
+	a.files.localPaths = maps.Clone(prefs.LocalPaths)
+	if a.files.localPaths == nil {
+		a.files.localPaths = map[string]string{}
 	}
 	a.transfers.collapsed, a.transfers.filter = prefs.TransferDockCollapsed, prefs.TransferFilter
 	a.transfers.dockHeight = prefs.TransferDockHeight
-	// Finish migration before newly created sites could inherit an old address key.
-	if prefs.LocalPathKeysVersion == 0 || legacy {
-		if err := a.writeFilePreferences(); err != nil {
-			return fmt.Errorf("迁移站点本地路径失败：%w", err)
-		}
-	}
 	return nil
 }
 
@@ -178,18 +122,40 @@ func (a *app) writeFilePreferences() error {
 	if a.filePrefs.loadErr != nil {
 		return fmt.Errorf("原配置读取失败，已阻止覆盖：%w", a.filePrefs.loadErr)
 	}
-	if a.filePrefs.path == "" {
-		return fmt.Errorf("配置目录不可用")
+	a.filePrefs.save = preferenceSaveState{dirty: true}
+	if a.window != nil {
+		a.window.Invalidate()
 	}
-	prefs := filePreferences{
-		LocalPaneOpen: a.files.localOpen, LocalRatio: a.files.ratio, LocalPaths: a.files.localPaths,
-		LocalPathKeysVersion:  1,
-		TransferDockCollapsed: a.transfers.collapsed, TransferFilter: a.transfers.filter,
-		TransferDockHeight: a.transfers.dockHeight,
+	return nil
+}
+
+func (a *app) tickFilePreferences(c *ui.Context) {
+	save := &a.filePrefs.save
+	if !save.dirty {
+		return
 	}
-	data, err := json.MarshalIndent(prefs, "", "  ")
+	if save.dirtyAt.IsZero() {
+		save.dirtyAt = c.Now()
+	}
+	remaining := 300*time.Millisecond - c.Now().Sub(save.dirtyAt)
+	if remaining > 0 {
+		c.After(remaining)
+		return
+	}
+	save.dirty = false
+	data, err := a.filePreferencesData()
 	if err != nil {
-		return err
+		a.persistenceNotice("保存文件传输偏好失败", err)
+		return
 	}
-	return writeCatalog(a.filePrefs.path, append(data, '\n'))
+	a.persist(func() error { return a.store.SaveSetting(a.ctx, "files", data) }, func(err error) { a.persistenceNotice("保存文件传输偏好失败", err) })
+}
+
+func (a *app) filePreferencesData() ([]byte, error) {
+	if a.filePrefs.loadErr != nil {
+		return nil, fmt.Errorf("原配置读取失败，已阻止覆盖：%w", a.filePrefs.loadErr)
+	}
+	prefs := filePreferences{LocalPaneOpen: a.files.localOpen, LocalRatio: a.files.ratio, LocalPaths: a.files.localPaths,
+		TransferDockCollapsed: a.transfers.collapsed, TransferFilter: a.transfers.filter, TransferDockHeight: a.transfers.dockHeight}
+	return json.Marshal(prefs)
 }

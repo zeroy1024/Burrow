@@ -7,7 +7,6 @@ import (
 	"image/color"
 	"maps"
 	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 	"time"
@@ -90,15 +89,10 @@ func (a *app) loadAppPreferences() error {
 		ConflictPolicy: "ask", Keymap: map[string]string{},
 		LastSettingsTab: "terminal", ModalAdvancedOpen: map[string]bool{},
 	}
-	directory, err := mygo.App.Path(mygo.PathUserData)
-	if err != nil {
-		a.prefsLoadErr = err
-		return err
-	}
-	a.prefsPath = filepath.Join(directory, "prefs.json")
 	previous := a.prefs
-	data, err := os.ReadFile(a.prefsPath)
-	if err == nil {
+	var data []byte
+	found, err := a.store.ReadSetting(a.ctx, "preferences", &data)
+	if err == nil && found {
 		candidate := previous
 		candidate.Keymap = maps.Clone(previous.Keymap)
 		candidate.ModalAdvancedOpen = maps.Clone(previous.ModalAdvancedOpen)
@@ -108,8 +102,6 @@ func (a *app) loadAppPreferences() error {
 			a.prefs = candidate
 			err = a.validateAppPreferences()
 		}
-	} else if errors.Is(err, os.ErrNotExist) {
-		err = nil
 	}
 	if err != nil {
 		a.prefs = previous
@@ -126,11 +118,17 @@ func (a *app) loadAppPreferences() error {
 	a.terminal.prefs.Background = termtheme.ParseBackgroundSource(a.prefs.TermBackground)
 	a.applyTerminalSettings()
 	a.appearance = slices.Index([]string{"light", "dark", "system"}, a.prefs.AppTheme)
+	if os.Getenv("MYGO_LOCALE") == "" {
+		mygo.App.SetLocale(a.prefs.Locale)
+	}
 	return nil
 }
 
 func (a *app) validateAppPreferences() error {
 	p := a.prefs
+	if !slices.Contains([]string{"", "zh-Hans", "en"}, p.Locale) {
+		return errors.New("无效的界面语言")
+	}
 	if p.Keymap == nil || p.ModalAdvancedOpen == nil {
 		return errors.New("设置映射不能为 null")
 	}
@@ -217,35 +215,39 @@ func (a *app) tickPreferences(c *ui.Context) {
 		return
 	}
 	a.prefsSave.dirty = false
-	if err := a.flushAppPreferences(); err != nil {
-		if a.settingsUI.open {
-			a.settingsUI.notice = err.Error()
-		}
-		uikit.Toast(c, uikit.ToastProps{Tone: uikit.ToneDanger, Title: "保存设置失败", Detail: err.Error()})
+	data, err := a.preferencesData()
+	if err != nil {
+		a.persistenceNotice("保存设置失败", err)
+		return
 	}
+	a.persist(func() error { return a.store.SaveSetting(a.ctx, "preferences", data) }, func(err error) {
+		if err != nil {
+			a.settingsUI.notice = err.Error()
+			a.persistenceNotice("保存设置失败", err)
+		}
+	})
 }
 
-func (a *app) flushAppPreferences() error {
-	if a.prefsPath == "" {
-		return nil
+func (a *app) preferencesData() ([]byte, error) {
+	if a.store == nil {
+		return nil, nil
 	}
 	if a.prefsLoadErr != nil {
-		return fmt.Errorf("原设置读取失败，已阻止覆盖：%w", a.prefsLoadErr)
+		return nil, fmt.Errorf("原设置读取失败，已阻止覆盖：%w", a.prefsLoadErr)
 	}
 	a.prefs.TermMode = a.terminal.mode.String()
 	a.prefs.TermFollowLight, a.prefs.TermFollowDark = a.terminal.followLight, a.terminal.followDark
 	a.prefs.TermBackground = a.terminal.prefs.Background.String()
 	a.prefs.Term = a.terminal.prefs
 	if err := a.validateAppPreferences(); err != nil {
-		return err
+		return nil, err
 	}
-	data, err := json.MarshalIndent(a.prefs, "", "  ")
+	data, err := json.Marshal(a.prefs)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return writeTerminalFile(a.prefsPath, append(data, '\n'))
+	return data, nil
 }
-
 func (a *app) reduceMotion(c *ui.Context) bool {
 	return uikit.Reduced(c, a.prefs.ReduceMotion)
 }

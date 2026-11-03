@@ -494,7 +494,7 @@ func (a *app) settleCatalogDrag(c *ui.Context, commit bool) {
 	d.phase = catalogCanceling
 	d.awaitingRelease = !d.released
 	if commit {
-		err := a.commitCatalogMove(func() {
+		a.commitCatalogMoveAsync(func() {
 			if d.kind == catalogHostDrag {
 				moveHost(d.host, d.targetGroup, d.targetIndex)
 			} else {
@@ -503,15 +503,13 @@ func (a *app) settleCatalogDrag(c *ui.Context, commit bool) {
 			for group := range d.autoExpanded {
 				a.setGroupCollapsed(group, false)
 			}
+		}, func(err error) {
+			if err != nil {
+				a.persistenceNotice("保存排序失败，已恢复原位置", err)
+			} else {
+				d.phase = catalogSettling
+			}
 		})
-		if err != nil {
-			uikit.Toast(c, uikit.ToastProps{
-				ID: "保存排序失败，已恢复原位置：" + err.Error(), Tone: uikit.ToneDanger,
-				Title: "保存排序失败", Detail: "已恢复原位置：" + err.Error(),
-			})
-		} else {
-			d.phase = catalogSettling
-		}
 	}
 	// Collapsed flags were never changed while dragging; cancellation simply
 	// discards the temporary expansion map and preview order.

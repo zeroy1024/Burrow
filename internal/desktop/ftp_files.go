@@ -180,6 +180,7 @@ func (a *app) resolveFileConflicts(c *ui.Context) {
 	}
 	if conflict.applyAll {
 		conflict.task.job.batch.policy.Store(int32(conflict.choice))
+		a.persistTransfers()
 	}
 	select {
 	case conflict.reply <- transferConflictChoice{choice: conflict.choice, applyAll: conflict.applyAll}:

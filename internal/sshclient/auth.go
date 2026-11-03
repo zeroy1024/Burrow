@@ -46,11 +46,7 @@ func authentication(ctx context.Context, cfg Config) (ssh.AuthMethod, net.Conn, 
 		}
 		return ssh.PublicKeys(signer), nil, nil
 	case "agent":
-		socket := os.Getenv("SSH_AUTH_SOCK")
-		if socket == "" {
-			return nil, nil, errors.New("SSH agent is unavailable: SSH_AUTH_SOCK is not set")
-		}
-		conn, err := (&net.Dialer{Timeout: 10 * time.Second}).DialContext(ctx, "unix", socket)
+		conn, err := DialAgent(ctx)
 		if err != nil {
 			return nil, nil, fmt.Errorf("connect SSH agent: %w", err)
 		}

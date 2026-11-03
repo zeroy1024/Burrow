@@ -23,8 +23,9 @@ const (
 )
 
 type transferTask struct {
-	id      int
-	session *fileSession
+	id        int
+	persisted bool
+	session   *fileSession
 	// view is the owning tab; destination reveal never transfers ownership.
 	view                   *fileSession
 	entry                  fileEntry
@@ -43,22 +44,23 @@ type transferTask struct {
 }
 
 type transferQueueState struct {
-	tasks        []*transferTask
-	nextID       int
-	nextBatchID  int
-	collapsed    bool
-	filter       int
-	displaySpeed float64
-	dockScroll   ui.ScrollState
-	dockHeight   float32
-	dockResizing bool
-	conflicts    []*fileConflict
-	locks        transferLocks
-	storePath    string
-	storeErr     error
-	quitting     bool
-	storing      bool
-	quitDone     []func(error)
+	persistenceRevision uint64
+	tasks               []*transferTask
+	nextID              int
+	nextBatchID         int
+	collapsed           bool
+	filter              int
+	displaySpeed        float64
+	dockScroll          ui.ScrollState
+	dockHeight          float32
+	dockResizing        bool
+	conflicts           []*fileConflict
+	locks               transferLocks
+	storeErr            error
+	writeErr            error
+	quitting            bool
+	storing             bool
+	quitDone            []func(error)
 }
 
 type transferSummary struct {
@@ -207,6 +209,7 @@ func (a *app) enqueueFiles(
 			temporary: map[string]struct{}{}}
 		a.transfers.tasks = append(a.transfers.tasks, task)
 	}
+	a.persistTransfers()
 	a.scheduleTransfers()
 }
 

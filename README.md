@@ -2,7 +2,7 @@
 
 Burrow 是一款原生 SSH 与文件传输桌面应用，提供多标签终端、分屏、SFTP / FTP / FTPS、传输队列和 Linux 服务器监控。界面使用 Go 与 MyGo 构建，终端由 Ghostty VT 内核驱动。
 
-当前运行与打包入口面向 macOS 13 及以上系统。
+macOS 运行基线为 13 及以上系统；Windows amd64/arm64 的平台适配和构建入口已接入，原生运行验收尚未完成。各平台状态见[平台支持](docs/platform-support.md)。
 
 ## 主要功能
 
@@ -32,11 +32,13 @@ mise run build
 
 工具链要求、产物位置和验证命令见[开发与构建](docs/development.md)。
 
+Gitea 提供[提交检查](.gitea/workflows/check.yml)与[编译打包](.gitea/workflows/package.yml)两个 CI，统一使用 `ubuntu-latest`；触发规则和 Windows 安装包附件说明见[Gitea CI](docs/development.md#gitea-ci)。
+
 ## 使用须知
 
-- 密码和私钥口令使用系统钥匙串；配置、托管私钥与任务记录位于应用数据目录。详见[数据与凭据](docs/storage.md)。
+- 结构化数据统一使用 SQLite；密码和私钥口令使用系统凭据存储，托管私钥保留独立文件。详见[数据与凭据](docs/storage.md)。
 - 恢复工作区和任务时保持离线，不会自动登录服务器或继续传输。
-- 正常退出会保存传输检查点；强制结束进程或断电不保证恢复最新进度。
+- 运行中保存传输检查点，正常退出再停稳任务并保存；强制结束或断电仍不保证恢复最后进度。
 - 服务器能力会影响续传、覆盖、权限保留和监控。详见[已知限制与验证范围](docs/limitations.md)。
 
 ## 文档
@@ -46,9 +48,10 @@ mise run build
 | 使用应用 | 开发与维护 |
 |---|---|
 | [首次使用](docs/getting-started.md) | [开发与构建](docs/development.md) |
-| [会话与设置](docs/session-settings.md) | [架构与生命周期](docs/architecture.md) |
+| [平台支持与验收状态](docs/platform-support.md) | [架构与生命周期](docs/architecture.md) |
+| [会话与设置](docs/session-settings.md) | [联调与原生 E2E](dev/ssh-integration/README.md) |
 | [终端与配色](docs/terminal-themes.md) | [主题与设计令牌](docs/theme-integration.md) |
 | [文件管理与传输](docs/file-transfer.md) | [共享 UI 组件](docs/uikit.md) |
-| [Linux 监控](docs/monitoring.md) | [联调与原生 E2E](dev/ssh-integration/README.md) |
+| [Linux 监控](docs/monitoring.md) | [历史归档](docs/archive/README.md) |
 
 阶段计划、整改和历史验收记录保存在[历史归档](docs/archive/README.md)，不作为当前使用说明。

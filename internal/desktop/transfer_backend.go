@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"sshdesk/internal/fileclient"
+	"sshdesk/internal/localfs"
 
 	"golang.org/x/text/cases"
 	"golang.org/x/text/unicode/norm"
@@ -42,6 +43,8 @@ type transferClientResult struct {
 }
 
 type transferRun struct {
+	manifest       atomic.Pointer[transferManifestSnapshot]
+	journal        func() error
 	ctx            context.Context
 	cancel         context.CancelFunc
 	request        *sshConnectionRequest
@@ -80,7 +83,6 @@ type transferNode struct {
 	checkpoint                     *transferCheckpoint
 	digest                         string
 	committing                     bool
-	commitLegacy                   bool
 	total                          int64
 	done, skipped                  bool
 }
@@ -108,7 +110,7 @@ func transferFraction(task *transferTask) float32 {
 }
 
 func (a *app) scheduleTransfers() {
-	if a.ctx.Err() != nil || a.transfers.quitting {
+	if a.ctx.Err() != nil || a.transfers.quitting || a.transfers.storeErr != nil || a.transfers.writeErr != nil {
 		return
 	}
 	active := 0
@@ -121,7 +123,12 @@ func (a *app) scheduleTransfers() {
 		if active >= a.prefs.TransferParallel {
 			break
 		}
-		if task.state != transferQueued || task.run != nil || task.removeRequested {
+		if task.run == nil && task.removeRequested && (a.store == nil || task.persisted) {
+			a.startTransfer(task, true)
+			active++
+			continue
+		}
+		if task.state != transferQueued || task.run != nil || task.removeRequested || a.store != nil && !task.persisted {
 			continue
 		}
 		if task.session.endpoint.protocol == "ftp" && task.session.endpoint.session.Auth != "anonymous" && task.session.ftpSecret == "" {
@@ -148,6 +155,9 @@ func (a *app) startTransfer(task *transferTask, cleanup bool) {
 		}
 	}
 	job := task.job
+	run.manifest.Store(transferManifest(job))
+	run.journal = func() error { return a.journalTransfer(task.id, run, job) }
+	a.persistTransfers()
 	if job.destinationKey == "" {
 		job.destinationKey = "local"
 		if !job.sourceRemote {
@@ -205,6 +215,9 @@ func (a *app) startTransfer(task *transferTask, cleanup bool) {
 		}
 		if err == nil {
 			err = closeErr
+		}
+		if journalErr := run.journal(); journalErr != nil {
+			err = errors.Join(err, fmt.Errorf("保存传输检查点：%w", journalErr))
 		}
 		if a.ctx.Err() != nil {
 			return
@@ -311,7 +324,8 @@ func (a *app) finishTransfer(task *transferTask, run *transferRun, cleanup bool,
 				task.removeRequested, task.cleanupPending = false, true
 				task.state, task.errorText = transferFailed, "取消后的临时文件等待清理"
 			} else {
-				a.startTransfer(task, true)
+				task.cleanupPending = true
+				task.state = transferFailed
 			}
 		} else if task.state == transferPaused || task.state == transferQueued {
 			// A pause may already have been followed by resume. The old worker
@@ -329,6 +343,7 @@ func (a *app) finishTransfer(task *transferTask, run *transferRun, cleanup bool,
 	}
 	a.transfers.displaySpeed = a.transfers.summary().speed
 	a.advanceTransferConflicts()
+	a.persistTransfers()
 	a.scheduleTransfers()
 	a.finishTransferQuitIfReady()
 }
@@ -344,6 +359,7 @@ func (a *app) pauseTransfer(task *transferTask) {
 		cancelSSHRequest(task.run.request)
 	}
 	a.advanceTransferConflicts()
+	a.persistTransfers()
 }
 
 func (a *app) resumeTransfer(task *transferTask) {
@@ -361,6 +377,7 @@ func (a *app) resumeTransfer(task *transferTask) {
 		return
 	}
 	task.state, task.errorText, task.failureNotice = transferQueued, "", false
+	a.persistTransfers()
 	a.scheduleTransfers()
 }
 
@@ -377,11 +394,12 @@ func (a *app) cancelTransfer(task *transferTask) {
 		cancelSSHRequest(task.run.request)
 	} else if task.job == nil || len(task.job.temporary) == 0 {
 		a.transfers.tasks = slices.DeleteFunc(a.transfers.tasks, func(candidate *transferTask) bool { return candidate == task })
-		a.scheduleTransfers()
 	} else {
-		a.startTransfer(task, true)
+		task.cleanupPending = true
+		task.state = transferFailed
 	}
 	a.advanceTransferConflicts()
+	a.persistTransfers()
 }
 
 func (a *app) performTransfer(ctx context.Context, task *transferTask, run *transferRun, job *transferJob,
@@ -407,6 +425,11 @@ func (a *app) performTransfer(ctx context.Context, task *transferTask, run *tran
 	}
 	run.total.Store(job.total)
 	run.bytes.Store(job.doneBytes)
+	if run.journal != nil {
+		if err := run.journal(); err != nil {
+			return err
+		}
+	}
 	var releases []func()
 	defer func() {
 		for _, release := range releases {
@@ -425,7 +448,7 @@ func (a *app) performTransfer(ctx context.Context, task *transferTask, run *tran
 			return err
 		}
 	}
-	if err := reconcileTransferCommits(ctx, source, target, job, job.root, run); err != nil {
+	if err := reconcileTransferCommits(ctx, target, job, job.root, run); err != nil {
 		return err
 	}
 	if err := verifyCompletedTransfers(ctx, target, job.root); err != nil {
@@ -613,19 +636,21 @@ func (a *app) copyTransferNode(ctx context.Context, task *transferTask, run *tra
 			job.temporary[temporary] = struct{}{}
 		}
 	}
-	resume, err := prepareTransferResume(ctx, source, target, node)
+	if run.journal != nil {
+		if err := run.journal(); err != nil {
+			return err
+		}
+	}
+	resume, err := prepareTransferResume(ctx, target, node)
 	if err != nil {
 		return err
 	}
 	offset := resume.offset
 	run.bytes.Store(job.doneBytes + offset)
 	if offset < node.entry.Size || !resume.exists {
-		input := resume.input
-		if input == nil {
-			input, err = source.OpenRead(ctx, node.source, offset)
-			if err != nil {
-				return err
-			}
+		input, err := source.OpenRead(ctx, node.source, offset)
+		if err != nil {
+			return err
 		}
 		node.partial = nil
 		var output io.WriteCloser
@@ -640,6 +665,7 @@ func (a *app) copyTransferNode(ctx context.Context, task *transferTask, run *tra
 		writer := transferCountingWriter{
 			writer: output, bytes: &run.bytes, written: &run.written,
 			hash: resume.hash, offset: offset, node: node,
+			journal: run.journal, lastJournal: time.Now(), journalOffset: offset,
 		}
 		reader := transferSizedReader(input, node.entry.Size-offset)
 		copied, copyErr := io.CopyBuffer(&writer, reader, make([]byte, 64<<10))
@@ -648,17 +674,6 @@ func (a *app) copyTransferNode(ctx context.Context, task *transferTask, run *tra
 			return errors.Join(copyErr, closeErr)
 		}
 		if copied != node.entry.Size-offset {
-			return fmt.Errorf("源文件大小在传输期间已改变：%s", node.source)
-		}
-	} else if resume.input != nil {
-		// A legacy full-length part may have needed a source-prefix comparison.
-		// Consume EOF before Close so FTP can finish its data command normally.
-		extra, readErr := io.Copy(io.Discard, transferSizedReader(resume.input, 0))
-		closeErr := resume.input.Close()
-		if readErr != nil || closeErr != nil {
-			return errors.Join(readErr, closeErr)
-		}
-		if extra != 0 {
 			return fmt.Errorf("源文件大小在传输期间已改变：%s", node.source)
 		}
 	}
@@ -718,10 +733,18 @@ func (a *app) copyTransferNode(ctx context.Context, task *transferTask, run *tra
 			return err
 		}
 		node.committing = true
+		if run.journal != nil {
+			if err := run.journal(); err != nil {
+				return err
+			}
+		}
 		noReplace := node.approved == nil
 		err = target.Rename(ctx, node.temporary, node.destination, fileclient.RenameOptions{NoReplace: noReplace})
 		if err == nil {
 			markTransferCommitted(job, node, run)
+			if run.journal != nil {
+				return run.journal()
+			}
 			return nil
 		}
 		if noReplace && errors.Is(err, fs.ErrExist) {
@@ -739,22 +762,15 @@ func (a *app) copyTransferNode(ctx context.Context, task *transferTask, run *tra
 type transferResume struct {
 	offset int64
 	hash   hash.Hash
-	input  io.ReadCloser // Only a legacy part needs a source read from zero.
 	exists bool
 }
 
 func prepareTransferResume(
 	ctx context.Context,
-	source, target fileclient.Client,
+	target fileclient.Client,
 	node *transferNode,
 ) (resume transferResume, err error) {
 	resume.hash = sha256.New()
-	defer func() {
-		if err != nil && resume.input != nil {
-			err = errors.Join(err, resume.input.Close())
-			resume.input = nil
-		}
-	}()
 	partial, err := target.Stat(ctx, node.temporary)
 	if errors.Is(err, fs.ErrNotExist) {
 		node.staged, node.partial, node.checkpoint, node.digest = nil, nil, nil, ""
@@ -783,41 +799,14 @@ func prepareTransferResume(
 		return resume, fmt.Errorf("已记录的部分文件已改变：%s", node.temporary)
 	}
 	checkpoint := node.checkpoint
-	legacyCompared := false
 	if checkpoint == nil {
-		checkpoint = &transferCheckpoint{Offset: partial.Size}
-		if partial.Size == node.entry.Size && node.digest != "" {
-			checkpoint.Digest = node.digest
-		} else if partial.Size == 0 {
-			checkpoint.Digest = hex.EncodeToString(resume.hash.Sum(nil))
-		} else {
-			// Old journals did not know the prefix digest. Compare it once with
-			// the source and keep this stream positioned for the remaining copy.
-			// Read the target first so a large verification cannot leave an open
-			// FTP source data connection idle while the target prefix is scanned.
-			targetDigest, readErr := hashTransferFile(ctx, target, node.temporary, partial.Size)
-			if readErr != nil {
-				return resume, fmt.Errorf("无法校验旧版已传部分，未继续复用：%w", readErr)
-			}
-			resume.input, err = source.OpenRead(ctx, node.source, 0)
-			if err != nil {
-				return resume, err
-			}
-			if _, err = io.CopyN(resume.hash, resume.input, partial.Size); err != nil {
-				return resume, err
-			}
-			checkpoint.Digest = hex.EncodeToString(resume.hash.Sum(nil))
-			fresh, statErr := target.Stat(ctx, node.temporary)
-			if statErr != nil {
-				return resume, statErr
-			}
-			if checkpoint.Digest != targetDigest || !sameTransferEntry(fresh, partial) {
-				return resume, fmt.Errorf("旧版已传部分已改变，未继续复用：%s", node.temporary)
-			}
-			legacyCompared = true
+		if partial.Size != 0 {
+			return resume, errors.New("暂存文件缺少可验证的检查点")
 		}
+		checkpoint = &transferCheckpoint{Digest: hex.EncodeToString(resume.hash.Sum(nil))}
 	}
-	if checkpoint.Offset > 0 && !legacyCompared {
+
+	if checkpoint.Offset > 0 {
 		resume.hash, err = verifiedTransferPrefix(ctx, target, node.temporary, partial, checkpoint)
 		if err != nil {
 			return resume, err
@@ -876,6 +865,20 @@ func preserveTransferPermissions(
 	if !exists {
 		// A new target keeps its client's creation policy. Requiring chmod here
 		// would reject otherwise valid uploads to FTP servers without SITE CHMOD.
+		return nil
+	}
+	if preserver, ok := target.(fileclient.PermissionPreserver); ok {
+		if err := preserver.PreservePermissions(ctx, node.destination, node.temporary); err != nil {
+			return fmt.Errorf("保留目标权限失败，未提交：%s：%w", node.destination, err)
+		}
+		staged, err := target.Stat(ctx, node.temporary)
+		if err != nil {
+			return err
+		}
+		if staged.Symlink || staged.Directory || staged.Size != node.entry.Size {
+			return fmt.Errorf("暂存文件已改变，未提交：%s", node.temporary)
+		}
+		node.staged, node.partial = &staged, &staged
 		return nil
 	}
 	if !current.ModeKnown {
@@ -950,7 +953,7 @@ func uncertainTransferCommit(ctx context.Context, target fileclient.Client, err 
 
 func markTransferCommitted(job *transferJob, node *transferNode, run *transferRun) {
 	delete(job.temporary, node.temporary)
-	node.temporary, node.done, node.committing, node.commitLegacy = "", true, false, false
+	node.temporary, node.done, node.committing = "", true, false
 	node.partial, node.checkpoint = nil, nil
 	job.doneBytes += node.entry.Size
 	run.bytes.Store(job.doneBytes)
@@ -965,7 +968,7 @@ func discardTransferStage(ctx context.Context, target fileclient.Client, job *tr
 	}
 	node.temporary, node.digest, node.staged = "", "", nil
 	node.partial, node.checkpoint = nil, nil
-	node.committing, node.commitLegacy = false, false
+	node.committing = false
 	return nil
 }
 
@@ -991,21 +994,21 @@ func verifyCompletedTransfers(ctx context.Context, target fileclient.Client, nod
 	return nil
 }
 
-func reconcileTransferCommits(ctx context.Context, source, target fileclient.Client, job *transferJob, node *transferNode, run *transferRun) error {
-	if node.committing || node.commitLegacy {
-		if err := recoverTransferCommit(ctx, source, target, job, node, run); err != nil {
+func reconcileTransferCommits(ctx context.Context, target fileclient.Client, job *transferJob, node *transferNode, run *transferRun) error {
+	if node.committing {
+		if err := recoverTransferCommit(ctx, target, job, node, run); err != nil {
 			return err
 		}
 	}
 	for _, child := range node.children {
-		if err := reconcileTransferCommits(ctx, source, target, job, child, run); err != nil {
+		if err := reconcileTransferCommits(ctx, target, job, child, run); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func recoverTransferCommit(ctx context.Context, source, target fileclient.Client, job *transferJob, node *transferNode, run *transferRun) error {
+func recoverTransferCommit(ctx context.Context, target fileclient.Client, job *transferJob, node *transferNode, run *transferRun) error {
 	uncertain := func(err error) error {
 		return fmt.Errorf("提交结果仍不确定，请核对后重试或取消并重新排队：%s：%w", node.destination, err)
 	}
@@ -1023,7 +1026,7 @@ func recoverTransferCommit(ctx context.Context, source, target fileclient.Client
 	entry, targetErr := target.Stat(ctx, node.destination)
 	if errors.Is(targetErr, fs.ErrNotExist) {
 		if partialExists {
-			node.committing, node.commitLegacy = false, false
+			node.committing = false
 			return nil // The owned bytes remain staged; no final target exists.
 		}
 		return uncertain(errors.New("暂存文件和目标都不存在"))
@@ -1034,33 +1037,13 @@ func recoverTransferCommit(ctx context.Context, source, target fileclient.Client
 	if entry.Symlink || entry.Directory || entry.Size != node.entry.Size ||
 		entry.ModeKnown && !entry.Mode.IsRegular() {
 		if partialExists {
-			node.committing, node.commitLegacy = false, false
+			node.committing = false
 			return nil
 		}
 		return uncertain(errors.New("目标类型或大小不匹配"))
 	}
 	if node.digest == "" {
-		// Version 1 journals did not record commit state. Reconstruct only the
-		// expected source digest after validating its original metadata baseline.
-		fresh, err := source.Stat(ctx, node.source)
-		if err != nil {
-			return uncertain(err)
-		}
-		if !sameTransferEntry(fresh, node.entry) {
-			return uncertain(errors.New("原始源文件已改变"))
-		}
-		digest, err := hashTransferFile(ctx, source, node.source, node.entry.Size)
-		if err != nil {
-			return uncertain(err)
-		}
-		fresh, err = source.Stat(ctx, node.source)
-		if err != nil {
-			return uncertain(err)
-		}
-		if !sameTransferEntry(fresh, node.entry) {
-			return uncertain(errors.New("原始源文件已改变"))
-		}
-		node.digest = digest
+		return uncertain(errors.New("提交检查点缺少摘要"))
 	}
 	digest, err := hashTransferFile(ctx, target, node.destination, node.entry.Size)
 	if err != nil {
@@ -1075,7 +1058,7 @@ func recoverTransferCommit(ctx context.Context, source, target fileclient.Client
 	}
 	if digest != node.digest {
 		if partialExists {
-			node.committing, node.commitLegacy = false, false
+			node.committing = false
 			return nil
 		}
 		return uncertain(errors.New("目标内容不匹配"))
@@ -1099,12 +1082,15 @@ func (a *app) publishTransferDestination(task *transferTask, run *transferRun, s
 }
 
 type transferCountingWriter struct {
-	writer  io.Writer
-	bytes   *atomic.Int64
-	written *atomic.Int64
-	hash    hash.Hash
-	offset  int64
-	node    *transferNode
+	journal       func() error
+	lastJournal   time.Time
+	journalOffset int64
+	writer        io.Writer
+	bytes         *atomic.Int64
+	written       *atomic.Int64
+	hash          hash.Hash
+	offset        int64
+	node          *transferNode
 }
 
 func (w *transferCountingWriter) Write(buffer []byte) (int, error) {
@@ -1122,6 +1108,12 @@ func (w *transferCountingWriter) Write(buffer []byte) (int, error) {
 			// an acknowledged offset outside the immutable manifest's bounds.
 			w.node.checkpoint = nil
 		}
+	}
+	if n > 0 && err == nil && w.journal != nil && (time.Since(w.lastJournal) >= time.Second || w.offset-w.journalOffset >= 4<<20) {
+		if saveErr := w.journal(); saveErr != nil {
+			return n, saveErr
+		}
+		w.lastJournal, w.journalOffset = time.Now(), w.offset
 	}
 	return n, err
 }
@@ -1236,7 +1228,7 @@ func sameTransferEntry(left, right fileclient.Entry) bool {
 }
 
 func transferSafeName(name string) bool {
-	return name != "" && name != "." && name != ".." && !strings.ContainsAny(name, "/\x00") && filepath.IsLocal(name)
+	return localfs.ValidName(name)
 }
 
 func transferJoin(remote bool, parent, name string) string {
@@ -1320,7 +1312,7 @@ func clearTransferTemporary(node *transferNode, name string) {
 		node.temporary = ""
 		node.staged, node.digest = nil, ""
 		node.partial, node.checkpoint = nil, nil
-		node.committing, node.commitLegacy = false, false
+		node.committing = false
 	}
 	for _, child := range node.children {
 		clearTransferTemporary(child, name)

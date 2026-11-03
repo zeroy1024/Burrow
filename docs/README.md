@@ -7,6 +7,7 @@
 | 文档 | 内容 |
 |---|---|
 | [首次使用](getting-started.md) | 运行应用、第一次 SSH 连接、打开文件站点与工作区操作 |
+| [平台支持](platform-support.md) | macOS、Windows、Linux 的构建产物及运行验收状态 |
 | [会话与设置](session-settings.md) | 目录、认证、高级选项、快捷键和应用偏好 |
 | [终端与配色](terminal-themes.md) | 字体、配色、光标、回滚及终端显示行为 |
 | [文件管理与传输](file-transfer.md) | 上传下载、重名处理、任务归属、继续与恢复 |

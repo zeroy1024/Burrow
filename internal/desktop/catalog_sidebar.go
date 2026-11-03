@@ -150,9 +150,7 @@ func (a *app) catalogHeader(c *ui.Context, slot catalogSlot) ui.Element {
 	})
 	if result.Toggled {
 		a.page().lastGroup = group
-		if err := a.commitCatalogMove(func() { a.setGroupCollapsed(group, !a.groupCollapsed(group)) }); err != nil {
-			uikit.Toast(c, uikit.ToastProps{Tone: uikit.ToneDanger, Title: "保存分组状态失败", Detail: err.Error()})
-		}
+		a.commitCatalogMoveAsync(func() { a.setGroupCollapsed(group, !a.groupCollapsed(group)) }, func(err error) { a.persistenceNotice("保存分组状态失败", err) })
 	}
 	var menu []uikit.MenuEntry
 	if a.page().catalogDrag == nil {

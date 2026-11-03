@@ -3,6 +3,7 @@
 # dependencies = ["dmgbuild==1.6.7"]
 # ///
 
+import argparse
 import json
 from pathlib import Path
 import subprocess
@@ -12,7 +13,10 @@ import dmgbuild
 
 project_root = Path(__file__).resolve().parent.parent
 config = json.loads((project_root / "mygo.json").read_text(encoding="utf-8"))
-arch = subprocess.check_output(["go", "env", "GOARCH"], text=True).strip()
+parser = argparse.ArgumentParser(description="Build the macOS APP, DMG, and ZIP")
+parser.add_argument("--arch", choices=("amd64", "arm64"))
+args = parser.parse_args()
+arch = args.arch or subprocess.check_output(["go", "env", "GOARCH"], text=True).strip()
 
 subprocess.run(
     ["go", "tool", "mygo", "build", "-skip-dmg", "-platform", f"darwin/{arch}"],

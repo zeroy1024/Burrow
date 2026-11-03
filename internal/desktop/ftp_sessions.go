@@ -243,23 +243,25 @@ func (a *app) catalogHostIcon(c *ui.Context, id hostID) {
 	uikit.OsLogo(c, style.name, uikit.SizeDefault)
 }
 
-func (a *app) deleteFileSite(id hostID) error {
+func (a *app) deleteFileSite(id hostID, done func(error)) {
 	deleted := a.hosts[id]
 	for _, h := range a.hosts {
 		if h.session.SSH != nil && h.session.SSH.JumpHostID != "" && h.session.SSH.JumpHostID == deleted.session.ID {
-			return fmt.Errorf("会话正被「%s」用作跳板机，请先修改该会话", h.name)
+			done(fmt.Errorf("会话正被「%s」用作跳板机，请先修改该会话", h.name))
+			return
 		}
 	}
 	for _, group := range a.runtimeSSHGroups() {
 		for _, step := range group.plan.steps {
 			if options := step.endpoint.session.SSH; options != nil && options.JumpHostID == deleted.session.ID {
-				return fmt.Errorf("会话（含可恢复的关闭标签）仍将此条目用作跳板机，请先按新配置重连相关标签，或取消并清除相关传输")
+				done(fmt.Errorf("会话（含可恢复的关闭标签）仍将此条目用作跳板机，请先按新配置重连相关标签，或取消并清除相关传输"))
+				return
 			}
 		}
 	}
 	previousWorkspace := a.savedWorkspace
 	a.savedWorkspace = a.workspaceSnapshot()
-	if err := a.commitCatalogMove(func() {
+	a.commitCatalogMoveAsync(func() {
 		a.hosts = slices.Delete(a.hosts, int(id), int(id)+1)
 		for _, group := range a.groups {
 			group.hosts = slices.DeleteFunc(group.hosts, func(candidate hostID) bool { return candidate == id })
@@ -269,87 +271,91 @@ func (a *app) deleteFileSite(id hostID) error {
 				}
 			}
 		}
-	}); err != nil {
-		a.savedWorkspace = previousWorkspace
-		return err
-	}
-	// Hidden page drafts still refer to the compacted host array.
-	for i := range a.pages {
-		page := &a.pages[i]
-		if !page.draft.editing && !page.draft.deleting {
-			continue
+	}, func(err error) {
+		if err != nil {
+			a.savedWorkspace = previousWorkspace
+			done(err)
+			return
 		}
-		if page.draft.id == id {
-			page.draft.cancelTest()
-			page.draft, page.addHostOpen = hostDraft{}, false
-		} else if page.draft.id > id {
-			page.draft.id--
-		}
-	}
-	for i := len(a.fileSessions) - 1; i >= 0; i-- {
-		session := a.fileSessions[i]
-		if !session.temporary && session.endpoint.session.ID == deleted.session.ID {
-			a.closeFileSession(i)
-		}
-	}
-	remainingFiles := map[*fileSession]bool{}
-	for _, session := range a.fileSessions {
-		remainingFiles[session] = true
-	}
-	for _, task := range a.transfers.tasks {
-		remainingFiles[task.session] = true
-	}
-	for _, closed := range a.closedTabs {
-		if closed.section == sectionFiles {
-			remainingFiles[closed.file] = true
-		}
-	}
-	for _, tab := range a.tabs {
-		for _, session := range tab.root.sessions() {
-			if session.filePeer != nil {
-				remainingFiles[session.filePeer] = true
+
+		// Hidden page drafts still refer to the compacted host array.
+		for i := range a.pages {
+			page := &a.pages[i]
+			if !page.draft.editing && !page.draft.deleting {
+				continue
+			}
+			if page.draft.id == id {
+				page.draft.cancelTest()
+				page.draft, page.addHostOpen = hostDraft{}, false
+			} else if page.draft.id > id {
+				page.draft.id--
 			}
 		}
-	}
-	a.closedTabs = slices.DeleteFunc(a.closedTabs, func(candidate closedWorkspaceTab) bool {
-		if candidate.section == sectionFiles {
-			return !candidate.file.temporary && candidate.file.endpoint.session.ID == deleted.session.ID
-		}
-		return !candidate.temporary && candidate.endpoint.session.ID == deleted.session.ID
-	})
-	for session := range remainingFiles {
-		if !session.temporary && session.endpoint.session.ID == deleted.session.ID {
-			session.host, session.temporary = -1, true
-		} else if session.host > id {
-			session.host--
-		}
-	}
-	for i := len(a.tabs) - 1; i >= 0; i-- {
-		tab := a.tabs[i]
-		for _, session := range tab.root.sessions() {
+		for i := len(a.fileSessions) - 1; i >= 0; i-- {
+			session := a.fileSessions[i]
 			if !session.temporary && session.endpoint.session.ID == deleted.session.ID {
-				releaseSSH(session)
-				tab.root = tab.root.remove(session)
-				if tab.focused == session && tab.root != nil {
-					tab.focused = tab.root.firstSession()
+				a.closeFileSession(i)
+			}
+		}
+		remainingFiles := map[*fileSession]bool{}
+		for _, session := range a.fileSessions {
+			remainingFiles[session] = true
+		}
+		for _, task := range a.transfers.tasks {
+			remainingFiles[task.session] = true
+		}
+		for _, closed := range a.closedTabs {
+			if closed.section == sectionFiles {
+				remainingFiles[closed.file] = true
+			}
+		}
+		for _, tab := range a.tabs {
+			for _, session := range tab.root.sessions() {
+				if session.filePeer != nil {
+					remainingFiles[session.filePeer] = true
 				}
+			}
+		}
+		a.closedTabs = slices.DeleteFunc(a.closedTabs, func(candidate closedWorkspaceTab) bool {
+			if candidate.section == sectionFiles {
+				return !candidate.file.temporary && candidate.file.endpoint.session.ID == deleted.session.ID
+			}
+			return !candidate.temporary && candidate.endpoint.session.ID == deleted.session.ID
+		})
+		for session := range remainingFiles {
+			if !session.temporary && session.endpoint.session.ID == deleted.session.ID {
+				session.host, session.temporary = -1, true
 			} else if session.host > id {
 				session.host--
 			}
 		}
-		if tab.root == nil {
-			a.closeTab(i)
+		for i := len(a.tabs) - 1; i >= 0; i-- {
+			tab := a.tabs[i]
+			for _, session := range tab.root.sessions() {
+				if !session.temporary && session.endpoint.session.ID == deleted.session.ID {
+					releaseSSH(session)
+					tab.root = tab.root.remove(session)
+					if tab.focused == session && tab.root != nil {
+						tab.focused = tab.root.firstSession()
+					}
+				} else if session.host > id {
+					session.host--
+				}
+			}
+			if tab.root == nil {
+				a.closeTab(i)
+			}
 		}
-	}
-	for i, candidate := range a.closedTabs {
-		if candidate.section != sectionFiles && candidate.host > id {
-			a.closedTabs[i].host--
+		for i, candidate := range a.closedTabs {
+			if candidate.section != sectionFiles && candidate.host > id {
+				a.closedTabs[i].host--
+			}
 		}
-	}
-	if err := deleteSessionCredentials(deleted.session.ID); err != nil {
-		a.files.notice = &uikit.ToastProps{ID: "会话已移除，但钥匙串清理失败：" + err.Error(), Tone: uikit.ToneDanger, Title: "会话已移除，但钥匙串清理失败", Detail: err.Error()}
-	}
-	return nil
+		if err := deleteSessionCredentials(deleted.session.ID); err != nil {
+			a.files.notice = &uikit.ToastProps{ID: "会话已移除，但钥匙串清理失败：" + err.Error(), Tone: uikit.ToneDanger, Title: "会话已移除，但钥匙串清理失败", Detail: err.Error()}
+		}
+		done(nil)
+	})
 }
 
 func (a *app) deleteSiteDialogContents(c *ui.Context, parts uikit.ModalParts) bool {
@@ -368,9 +374,11 @@ func (a *app) confirmDeleteSite(c *ui.Context, id hostID) {
 		uikit.Notify(c, "请先取消或清除该会话的传输任务")
 		return
 	}
-	if err := a.deleteFileSite(id); err != nil {
-		uikit.Toast(c, uikit.ToastProps{ID: "删除会话失败：" + err.Error(), Tone: uikit.ToneDanger, Title: "删除会话失败", Detail: err.Error()})
-		return
-	}
-	a.page().addHostOpen = false
+	a.deleteFileSite(id, func(err error) {
+		if err != nil {
+			a.persistenceNotice("删除会话失败", err)
+			return
+		}
+		a.page().addHostOpen = false
+	})
 }
