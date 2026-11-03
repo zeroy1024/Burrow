@@ -1,6 +1,6 @@
-# Docker SSH 联调
+# 本机协议联调与原生 E2E
 
-此环境验证真实 SSH 传输和 macOS 原生应用窗口，不连接项目中的示例主机。
+此环境验证真实 SSH/SFTP/FTP 传输和 macOS 原生应用窗口。只使用脚本创建的本机服务与临时凭据，不连接现有私有站点。运行与打包环境见[开发与构建](../../docs/development.md)。
 
 ## 启动服务器
 
@@ -30,12 +30,12 @@ python3 -B scripts/ssh-integration-server.py --ftp
 export SSHDESK_FTP_ADDRESS='127.0.0.1:FTP映射端口'
 ```
 
-FTP 使用独立的 vsftpd 容器和 init 进程托管，控制端口及五个被动数据端口都只映射到本机。夹具允许已认证用户读写，每条连接限速 1 MiB/s，为暂停、取消和恢复提供可观测的传输窗口。SSH 元数据保存在临时目录的 `server.json`，FTP 元数据保存在 `ftp-server.json`；两容器共享测试密码，连接与会话独立。旧测试中直接以 PID 1 运行 vsftpd 曾被独立 Python 客户端复现拒绝登录后退出，当前启动方式已验证错误密码后仍可继续登录。
+FTP 使用独立的 vsftpd 容器和 init 进程托管，控制端口及五个被动数据端口都只映射到本机。夹具允许已认证用户读写，每条连接限速 1 MiB/s，为暂停、取消和恢复提供可观测的传输窗口。SSH 元数据保存在临时目录的 `server.json`，FTP 元数据保存在 `ftp-server.json`；两容器共享测试密码，连接与会话独立。
 
 ## 传输层验证
 
 ```sh
-go test -race -tags=integration ./... -count=1 -timeout=180s
+mise exec -- go test -race -tags=integration ./... -count=1 -timeout=180s
 ```
 
 覆盖密码、普通私钥、加密私钥和隔离 SSH Agent；错误凭据拒绝；首次主机密钥拒绝、保存、复用及变化拒绝；UTF-8 与原始颜色序列；远端 `stty size` 确认尺寸同步；四会话隔离；128 KiB 输出与退出码；握手等待和已连接会话的取消、关闭。
@@ -49,7 +49,7 @@ go test -race -tags=integration ./... -count=1 -timeout=180s
 ## 原生窗口验证
 
 ```sh
-go tool mygo build -skip-dmg
+mise exec -- go tool mygo build -skip-dmg
 python3 -B -u scripts/ssh-integration-ui.py
 python3 -B -u scripts/ssh-integration-ui.py --concurrent-split
 python3 -B -u scripts/ssh-integration-ui.py --file-protocols
@@ -60,7 +60,7 @@ python3 -B -u scripts/ssh-integration-ui.py --core-e2e
 
 它启动真实 macOS 窗口，以本地 Unix socket 发送点击、键盘和菜单操作，并从实际 Ghostty 实例读取文字与网格。Snapshot 只读观测应用状态；不拍截图或进行视觉验收。
 
-固定 SDK 的 automation 插件默认在后台格式化任意 Key；本轮已由 race 日志确认，指针 Key 会反射读取正在布局的对象。测试 overlay 将指针 Key 仅编码为类型和地址，避免这条竞争及对象内容披露；标量 Key、UI 行为和 race 检查保持原契约。失败诊断仅保存节点标签、角色、状态和几何信息，不保存输入框值或 Key 对象内容。
+固定 SDK 的 automation 插件默认在后台格式化任意 Key，指针 Key 可能反射读取正在布局的对象。测试 overlay 将指针 Key 仅编码为类型和地址，避免并发读取及对象内容披露；标量 Key、UI 行为和 race 检查保持原契约。失败诊断仅保存节点标签、角色、状态和几何信息，不保存输入框值或 Key 对象内容。
 
 覆盖认证弹窗、首次信任拒绝与确认、终端输入、`vim` 日文编辑与 `top`、分屏默认键盘焦点、独立 Shell、尺寸变化、关闭窗格、断开、重连历史及四种认证。尺寸检查同时比较应用状态、Ghostty 网格和远端 `stty size`。脚本使用自己启动的 SSH Agent，仅加载临时公钥对应的密钥；结束时关闭自己启动的应用与 Agent。
 
@@ -76,7 +76,7 @@ python3 -B -u scripts/ssh-integration-ui.py --core-e2e
 - 暂停受控 FTP 容器，使刷新应答在按住文件行时到达；释放前保留源，取消的 Drop 不产生传输。无论断言是否通过，都会解除本用例的容器暂停。
 - 正常退出后启动同一个测试应用、复用同一隔离配置，检查任务按原标签离线恢复、确认偏移不变、显式继续后的实际内容和部分文件清理。
 
-核心模式和文件模式均需要 `SSHDESK_FTP_ADDRESS`。每轮核心模式在两个容器内使用独立目录，可以重跑而不复用上轮目标文件。启动器分别检查每次原生进程的退出记录、race 日志以及 SSH / FTP 连接释放，并在本轮 `native-run-*/result.json` 写入结果；中途失败不能记为通过。
+核心模式和文件模式均需要 `SSHDESK_FTP_ADDRESS`。每轮核心模式在两个容器内使用独立目录，可以重跑而不复用上轮目标文件。启动器分别检查每次原生进程的退出记录、race 日志以及 SSH / FTP 连接释放，并在该次运行的 `native-run-*/result.json` 写入结果；中途失败不能记为通过。
 
 原生驱动会比较服务器连接数与认证次数，运行时不要并行执行 SDK Docker 测试，以免其他测试连接干扰统计。确认驱动成功需要真实应用的退出状态及竞态日志检查，不能只依据 LaunchServices `open` 的退出码。
 
@@ -84,7 +84,7 @@ python3 -B -u scripts/ssh-integration-ui.py --core-e2e
 
 ## 运行资源
 
-服务器在脚本结束后继续运行，便于手动复验。可用下面命令查看本任务容器；需要停止时，使用启动结果中的确切容器名：
+服务器在脚本结束后继续运行，便于手动复验。可用下面命令查看夹具容器；需要停止时，使用启动结果中的确切容器名：
 
 ```sh
 docker ps --filter label=dev.sshdesk.integration=true
@@ -92,3 +92,5 @@ docker stop 容器名
 ```
 
 不要使用项目之外的服务器或现有凭据运行这些自动化测试，也不要将临时凭据或日志加入 Git。
+
+记录结果时注明提交、夹具环境、实际命令、退出状态、跳过项及未覆盖范围。这份文档是运行说明，不代表某个版本已经执行并通过全部模式；判断依据见[验证范围](../../docs/limitations.md#验证如何解读)。

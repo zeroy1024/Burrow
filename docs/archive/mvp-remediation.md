@@ -1,3 +1,6 @@
+> 历史归档：2026-11-03 整理，来源为 `e98cf61` 的文档快照。
+> 文中的阶段计划、决定和验证结果仅代表记录当时的状态；当前说明见[文档索引](../README.md)，归档规则见[历史文档](README.md)。
+
 # MVP 后端审查整改
 
 本轮承接`73159b6`后的14项审查问题，保留UI布局、目录独立存储、三页切换和后台任务持有关系。下表记录当前源码接入，运行验证单独列明；“完整实现”不代表所有设备和服务器已经实测。
@@ -29,12 +32,12 @@
 
 ## 本轮验证证据
 
-- Local公开API临时`-race`验证9项通过：case-only重命名、不同目标NoReplace保护、新stage0600、Chmod、最终链接拒绝、递归不跟随树外链接、预取消、目录链接canonical导航、文件链接`ErrNotDirectory`。结果：[本地能力验证](/private/tmp/sshdesk-local-safety-s7_lj9ws/result-final.json)。首轮夹具将`/var`别名与`/private/var`真实路径混同的失败日志保留；更正canonical期望后通过，未为此修改生产逻辑。
-- 第14项先确定复现：132×50的PTY输出在80×24内核落到错误位置，后续Resize不能修复；再以真实native路径完成修后3组验证。SSH另4组覆盖PAM多问题/echo、转发与排队deadline、建立后setup取消和兄弟通道隔离。[修前/修后及SSH汇总](/private/tmp/sshdesk-initial-grid-539y3k6y/verification-summary.json)保留首轮deadline错误及补跑证据；未冒称真人认证弹窗验收。
+- Local公开API临时`-race`验证9项通过：case-only重命名、不同目标NoReplace保护、新stage0600、Chmod、最终链接拒绝、递归不跟随树外链接、预取消、目录链接canonical导航、文件链接`ErrNotDirectory`。结果：本地能力验证（历史临时路径：`/private/tmp/sshdesk-local-safety-s7_lj9ws/result-final.json`）。首轮夹具将`/var`别名与`/private/var`真实路径混同的失败日志保留；更正canonical期望后通过，未为此修改生产逻辑。
+- 第14项先确定复现：132×50的PTY输出在80×24内核落到错误位置，后续Resize不能修复；再以真实native路径完成修后3组验证。SSH另4组覆盖PAM多问题/echo、转发与排队deadline、建立后setup取消和兄弟通道隔离。修前/修后及SSH汇总（历史临时路径：`/private/tmp/sshdesk-initial-grid-539y3k6y/verification-summary.json`）保留首轮deadline错误及补跑证据；未冒称真人认证弹窗验收。
 - 文件公共层已有`go test ./internal/fileclient ./internal/desktop`、`go vet ./internal/fileclient`通过；fileclient普通tag当前没有测试文件，只提供编译证据，不算协议通过。
-- 真实loopback FTP覆盖LIST回退与MLSD两模式：隐藏stage的写入/Stat/权限/提交/offset、前后空格及成对名称不混淆、case重命名、Unix元数据、目录链接/普通文件链接和421断线，共15条协议断言通过。[FTP汇总](/private/tmp/sshdesk-ftp-fixes-1mijg17f/verification-summary.json)记录实际`0o644`兼容缺口及修正、夹具重用目标的失败和补验；最后通用550文件链接分类单独补验，未重复历史TLS/active组合。
-- 传输12组主用例及5子例覆盖CP真实偏移、改写prefix拒绝、部分Write、legacy/v3往返、不可读target、源增长、权限0600/0755/0000、无setter的新建与覆盖边界等，最终race通过。[检查点汇总](/private/tmp/sshdesk-transfer-checkpoints-yp536anl/verification-summary.json)。特殊位另补真实sticky、模拟完整mask支持/拒绝/剥离；本环境真实setuid/setgid三子例跳过，未计通过，不能保留的权限会在Rename前明确失败。[特殊权限证据](/private/tmp/sshdesk-transfer-special-mode-7_9w48zp/verification-summary.json)。
-- SFTP新增4项真实协议验证通过：普通文件/目录权限和实际Owner、显式链接浏览且Lstat仍拒绝传输链接、APFS case改名与不同目标保护、关闭单一SFTP不影响同transport兄弟通道。[SFTP汇总](/private/tmp/sshdesk-sftp-newcap-jp2df_54/verification-summary.json)明确夹具RENAME不作为外部并发原子保证证据、REALPATH未解析最终规范路径、额外setgid环境限制，未把它们当作通过。
+- 真实loopback FTP覆盖LIST回退与MLSD两模式：隐藏stage的写入/Stat/权限/提交/offset、前后空格及成对名称不混淆、case重命名、Unix元数据、目录链接/普通文件链接和421断线，共15条协议断言通过。FTP汇总（历史临时路径：`/private/tmp/sshdesk-ftp-fixes-1mijg17f/verification-summary.json`）记录实际`0o644`兼容缺口及修正、夹具重用目标的失败和补验；最后通用550文件链接分类单独补验，未重复历史TLS/active组合。
+- 传输12组主用例及5子例覆盖CP真实偏移、改写prefix拒绝、部分Write、legacy/v3往返、不可读target、源增长、权限0600/0755/0000、无setter的新建与覆盖边界等，最终race通过。检查点汇总（历史临时路径：`/private/tmp/sshdesk-transfer-checkpoints-yp536anl/verification-summary.json`）。特殊位另补真实sticky、模拟完整mask支持/拒绝/剥离；本环境真实setuid/setgid三子例跳过，未计通过，不能保留的权限会在Rename前明确失败。特殊权限证据（历史临时路径：`/private/tmp/sshdesk-transfer-special-mode-7_9w48zp/verification-summary.json`）。
+- SFTP新增4项真实协议验证通过：普通文件/目录权限和实际Owner、显式链接浏览且Lstat仍拒绝传输链接、APFS case改名与不同目标保护、关闭单一SFTP不影响同transport兄弟通道。SFTP汇总（历史临时路径：`/private/tmp/sshdesk-sftp-newcap-jp2df_54/verification-summary.json`）明确夹具RENAME不作为外部并发原子保证证据、REALPATH未解析最终规范路径、额外setgid环境限制，未把它们当作通过。
 - 全项目已有`go test -race ./...`、`go vet ./...`、`go build ./...`通过；终端子模块已有race测试通过。修改源码gofmt、tracked及新增文件diff检查通过。重新MyGo打包darwin/arm64应用18.8MB并签名，`codesign --verify --deep --strict`通过。检查在最后FTP兼容调整后完成；终端子模块无后续功能修改，未为文档更改重复运行测试。
 - 未新增永久测试、截图基线或CI，未访问用户真实服务器/配置/凭据，未做GUI视觉验收。原Docker集成未重跑（本机Docker daemon未启动），上述独立loopback与临时控制器证据不冒称完整设备端到端验收。所有自有临时服务、源码、测试数据及独立环境已停止或回收，保留非敏感日志/hash；各汇总附清理记录。
 
@@ -62,6 +65,6 @@
 
 ## 原生 E2E 与持久回归
 
-2026-11-02获得新增测试授权后，将本地 Root / Source 目录与文件替换边界、清理边界，以及 SFTP 原子私有创建和旧 part 续传权限固化为 Go 测试。原生驱动同步当前目录模型、表单与控件角色，新增真实拖拽传输、SHA-256、任务隔离、暂停取消、刷新期间拖拽和正常退出重启恢复；运行方式及覆盖边界见[联调与 E2E 说明](../dev/ssh-integration/README.md)。
+2026-11-02获得新增测试授权后，将本地 Root / Source 目录与文件替换边界、清理边界，以及 SFTP 原子私有创建和旧 part 续传权限固化为 Go 测试。原生驱动同步当前目录模型、表单与控件角色，新增真实拖拽传输、SHA-256、任务隔离、暂停取消、刷新期间拖拽和正常退出重启恢复；运行方式及覆盖边界见[联调与 E2E 说明](../../dev/ssh-integration/README.md)。
 
 真机回归发现分屏时，新 Shell 的异步终端尚未绑定，旧终端可将模型焦点抢回。修正在请求切换时保留焦点交接标记，并由离线占位和 live 输出各自在实际绑定后消费，避免连接失败时残留标记。测试 SDK 的 automation 指针 Key 序列化竞争仅在临时构建中修正，保留 race 检查；系统钥匙串与 GUI 视觉验收不计入本轮覆盖。

@@ -1,4 +1,4 @@
-# SSH Tool 终端配色包（termtheme）
+# Burrow 终端配色包（termtheme）
 
 终端配色和 App 界面 token 是**两套东西**：
 - **App token**（`package theme`）管窗格容器：圆角、内描边、焦点环、标题栏，以及卡片底色 `C.Pane.Bg`（只在「终端背景 = 与卡片底色一致」时铺进终端区）。
@@ -14,10 +14,9 @@
 | `termtheme_test.go` | 单元测试 |
 | `schemes/` | 内置配色文件（Ghostty 格式，无扩展名） |
 | `LICENSES.md` | 配色的 MIT 许可证全文 |
-| `preview.png` | 两套默认配色的终端效果预览（2x） |
-| `prompt.md` | 给编码 agent 的接入提示词 |
+| `licenses.go` | 内嵌许可证，供设置页展示 |
 
-只依赖 Go 标准库，已通过 `gofmt`、`go vet`、`go test`。放进项目时改成项目自己的导入路径即可（例如 `internal/termtheme`），`schemes/` 目录要和 `state.go` 放在一起，`//go:embed` 才能找到。
+本包只依赖 Go 标准库，通过 `sshdesk/internal/termtheme` 接入应用。`schemes/` 必须与 `state.go` 相邻，供 `//go:embed` 读取。用户操作见[终端与配色](../../docs/terminal-themes.md)，检查命令见[开发与构建](../../docs/development.md)。
 
 ## 内置配色
 
@@ -42,7 +41,7 @@
 | 配色自带背景（默认） | `BackgroundScheme`（存为 `"scheme"`） | 任何模式、任何 App 外观下都用 `scheme.Background` |
 | 与卡片底色一致 | `BackgroundCard`（存为 `"card"`） | 任何配色下都用 App 的卡片色 `C.Pane.Bg` |
 
-- 取色：`termtheme.TerminalBackground(s, theme.Current().C.Pane.Bg, prefs.Background)`。
+- 应用适配层取色：`termtheme.TerminalBackground(s, theme.Current().Color.Surface.Terminal, prefs.Background)`。
 - 窗格顶部 / 底部渐隐栏的着色色必须和这个颜色一致，否则会出现色块。
 - 默认下：浅色跟随主题是 Latte `#fbfbfc`（和卡片同色）；深色跟随主题是 Mocha `#1e1e2e`；固定 Dracula 时无论 App 是浅色还是深色都是 `#282a36`。
 - 选「与卡片底色一致」时，配色只提供文字 / 光标 / 选区颜色。深色配色放在浅色卡片上可能看不清，这是用户的选择，App 不做自动修正。
@@ -58,8 +57,10 @@
 导入方式：
 1. 从 [iTerm2-Color-Schemes](https://github.com/mbadolato/iTerm2-Color-Schemes) 的 `ghostty/` 目录下载任意文件（例如 `ghostty/GitHub Light Default`），或者用 Ghostty 本身的主题文件。
 2. 在 App 里点「导入文件」，或者在代码里调用 `termtheme.Import(path)`。名称取 `# name:` 注释；没有这个注释时取文件名。
-3. App 应把导入的文件复制到自己的配置目录（例如 `~/Library/Application Support/<App>/themes/`），启动时对目录里每个文件调用 `Import`。
-4. 用 `termtheme.Write(path, s)` 可以导出成 Ghostty 格式（`link-color` 是非标准键，Ghostty 不认识）。
+3. 应用将导入文件保存到自己的 `themes/` 目录，启动时重新导入；位置见[数据与凭据](../../docs/storage.md)。
+4. 包内 `termtheme.Write(path, s)` 可写出 Ghostty 格式；这不表示应用提供独立的导出按钮。`link-color` 是非标准键，Ghostty 不识别。
+
+解析器可保留 16–255 号索引色覆盖，但原生终端主题接口只接入 0–15 色，不能把解析能力等同于实际终端显示能力。
 
 **许可提醒：** iTerm2-Color-Schemes 仓库本身是 MIT，但每个配色还有作者自己的许可。如果要把新配色**内置进 App 分发**，请先确认那个配色的许可，并把许可证全文加进 `LICENSES.md`。用户自己导入的不受影响。
 

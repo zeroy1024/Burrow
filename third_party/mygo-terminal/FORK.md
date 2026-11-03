@@ -67,9 +67,11 @@ Source reference:
 
 `ViewportBackdrop(c, terminal, ViewportBackdropOptions{Top, Bottom, Gap, Radius})` is a
 decorative sibling built after the original `View`, in its full pane wrapper.
-It draws actual adjacent history rows only inside the two overlay bar bands.
+It draws actual adjacent history rows continuously from the visible grid to the
+overlay bars, including the layout gaps and fractional bottom slack.
 The terminal View, grid, font metrics, input coordinates, cursor, selection,
-scroll position, scrollbar and 4px content gaps keep their original geometry.
+scroll position and scrollbar keep their original geometry. The application
+supplies its content gap through `ViewportBackdropOptions.Gap`.
 There is no extra terminal, history replay, viewport movement or PTY resize.
 
 `backdrop.go`, `view.go` and `paint.go` retain a few outside rows from the same
@@ -91,10 +93,12 @@ material above this drawing and respects its translucency/accessibility switch.
 
 The grid origin comes from the backdrop subtree's own paint rectangle and the
 unchanged top bar/gap inset. It never copies a painted View rectangle across
-separate saturation-effect canvases. The two bands clip child drawings with
-their own outer corner radii (top corners for the header, bottom for the footer),
-with square inner edges. This keeps stationary GPU rendering from replacing
-the card's rounded clipping with an innermost rectangular painter clip.
+separate saturation-effect canvases. At paint time, the top band ends at the
+pixel-aligned grid origin and the bottom band starts after the last complete
+grid row. This prevents a bar boundary or unpainted gap from cutting a glyph.
+An outer rectangular clip limits each band; the innermost clip carries the full
+card's rounded outline. MyGo's stationary GPU path retains only the innermost
+rounded shape, so reversing these clips would lose the card's rounded corners.
 
 Source reference:
 [fixed Ghostty overscan contract](https://github.com/ghostty-org/ghostty/blob/befcdfd2c3a1cb24d9ec886e93c95b2b5daa7028/include/ghostty/vt/render.h#L98).

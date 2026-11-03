@@ -1,3 +1,6 @@
+> 历史归档：2026-11-03 整理，来源为 `e98cf61` 的文档快照。
+> 文中的阶段计划、决定和验证结果仅代表记录当时的状态；当前说明见[文档索引](../README.md)，归档规则见[历史文档](README.md)。
+
 # MVP 能力和验证状态
 
 以 `7decb9c` 为 UI 基线，合入本地 main `45d14ed`；仓库无远端，因此没有远端拉取或推送。原布局、三页互斥、独立目录及拖放模型保留，正文与事件接入真实后端。
@@ -42,8 +45,8 @@
 
 - 项目已有`go test ./...`、`go test -race ./...`、`go vet ./...`、`go build ./...`通过；本地终端子模块已有tests、race、vet亦通过。修改文件gofmt及diff检查通过。
 - 重新运行`go tool mygo build -skip-dmg`，darwin/arm64应用生成并签名，`codesign --verify --deep --strict`通过。主MyGo仍v0.7.3；固定Ghostty原生资源manifest逐字节一致，终端插件仅2个文件有功能修改，15个文件只有内部import改名。
-- 5组临时真实内核`-race`用例最终全部通过、0 skip/0 race：Terminal/VT/RenderState/Conn身份稳定；未淘汰的视口、选择、活动屏幕保留；缩小立即裁剪、增大允许后续增长；字节/行限制及零值语义；备用屏幕与同步输出；并发Feed/set/Close和关闭后错误；离屏功能帧在无追加输出时刷新缓存与滚动条。证据：[验证汇总](/private/tmp/sshdesk-live-scrollback-p33gieqk/verification-summary.json)。初次缓存权限及两次夹具假设错误的日志保留，没有算作通过；验证副本有效Go代码与生产一致。
-- 临时应用overlay直接调用真实`enforceScrollback`，3个后台原生终端在设置/文件页面下同步缩小/增大；终端对象、连接写入/resize/关闭计数、SSH上下文及传输状态哨兵保留，`-race`通过。证据：[应用结果](/private/tmp/sshdesk-scrollback-app-rr_surlg/result.json)。该验证使用内存连接和任务状态哨兵，不冒称本轮重新运行了真实SSH/FTP网络任务。
+- 5组临时真实内核`-race`用例最终全部通过、0 skip/0 race：Terminal/VT/RenderState/Conn身份稳定；未淘汰的视口、选择、活动屏幕保留；缩小立即裁剪、增大允许后续增长；字节/行限制及零值语义；备用屏幕与同步输出；并发Feed/set/Close和关闭后错误；离屏功能帧在无追加输出时刷新缓存与滚动条。证据：验证汇总（历史临时路径：`/private/tmp/sshdesk-live-scrollback-p33gieqk/verification-summary.json`）。初次缓存权限及两次夹具假设错误的日志保留，没有算作通过；验证副本有效Go代码与生产一致。
+- 临时应用overlay直接调用真实`enforceScrollback`，3个后台原生终端在设置/文件页面下同步缩小/增大；终端对象、连接写入/resize/关闭计数、SSH上下文及传输状态哨兵保留，`-race`通过。证据：应用结果（历史临时路径：`/private/tmp/sshdesk-scrollback-app-rr_surlg/result.json`）。该验证使用内存连接和任务状态哨兵，不冒称本轮重新运行了真实SSH/FTP网络任务。
 - 本轮只做受控功能验证，未做GUI视觉验收。页级误差随宽度、样式和内容变化，不保证固定的多出行数；增大上限不能恢复已丢弃历史。临时模块、测试源码和overlay已移入回收站并确认不存在，非敏感日志/hash保留，未新增永久测试、截图基线或CI。
 
 
@@ -51,7 +54,7 @@
 
 `887f4b1`后的复核修复了通道初始化竞争、PTY尺寸覆盖、隐藏监控重启、长初始命令背压、协议切换重连、同批冲突、同名并发、目录续传及不确定提交。
 
-真实MyGo隐藏窗口事件循环运行10个进程用例、11条业务分支，最终退出均0且无race；包含暂停→保存v2 journal→新进程离线恢复→继续及SHA-256校验、取消清理和延迟RNTO回复的不确定提交恢复。证据：[本地汇总](/private/tmp/sshdesk-queue-native-x8expv1d/verification-summary.json)。临时工具/服务/秘密已回收；原失败验证器日志保留并明确未算通过。没有原GUI点击、截图或像素验收。
+真实MyGo隐藏窗口事件循环运行10个进程用例、11条业务分支，最终退出均0且无race；包含暂停→保存v2 journal→新进程离线恢复→继续及SHA-256校验、取消清理和延迟RNTO回复的不确定提交恢复。证据：本地汇总（历史临时路径：`/private/tmp/sshdesk-queue-native-x8expv1d/verification-summary.json`）。临时工具/服务/秘密已回收；原失败验证器日志保留并明确未算通过。没有原GUI点击、截图或像素验收。
 
 持有保存目录的浏览视图在显式重连时采用最新配置；后台传输保持入队的端点/跳板/凭据版本快照。重启后两者都不自动连接，不将跨workspace和queue的独立恢复对象说成仍复用同一个活跃transport。
 
