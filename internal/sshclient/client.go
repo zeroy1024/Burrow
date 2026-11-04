@@ -360,6 +360,10 @@ func (c *Connection) failTransport(err error) {
 // Done closes when the transport has ended. Wait also joins channel workers.
 func (c *Connection) Done() <-chan struct{} { return c.done }
 
+// ServerVersion is the identification string the server sent, such as
+// "SSH-2.0-OpenSSH_for_Windows_9.5". Servers choose it freely.
+func (c *Connection) ServerVersion() string { return string(c.client.ServerVersion()) }
+
 func (c *Connection) Wait() error {
 	<-c.done
 	c.workers.Wait()

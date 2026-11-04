@@ -1,11 +1,179 @@
-package desktop
+package hostinfo
 
 import (
+	"context"
 	"errors"
+	"math"
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 )
+
+// Linux reads /proc through POSIX shell builtins, so it needs no procps.
+
+const linuxMountLimit = 131072
+
+type linuxCollector struct{}
+
+func (linuxCollector) Facts(ctx context.Context, r Runner, _ Detection) (Facts, error) {
+	return collectLinuxFacts(ctx, r)
+}
+
+func (linuxCollector) NewSampler(r Runner) Sampler { return &linuxSampler{r: r} }
+
+// linuxSampler turns cumulative /proc counters into rates against the previous
+// successful reading of the same transport.
+type linuxSampler struct {
+	r        Runner
+	previous *linuxSample
+}
+
+func (s *linuxSampler) Sample(ctx context.Context) (Metrics, error) {
+	output, err := s.r.Exec(ctx, monitorCommand)
+	var sample linuxSample
+	if err == nil {
+		sample, err = parseMonitorSample(string(output))
+	}
+	if err != nil {
+		s.previous = nil
+		return Metrics{}, err
+	}
+	completeMonitorRates(&sample, s.previous)
+	s.previous = &sample
+	return sample.metrics.export(), nil
+}
+
+// Disk uses a separate short-lived SFTP channel. An SFTP server can be
+// chrooted independently of the command channel, so its root mount must match
+// the sample's before its statistics are labeled as the SSH root disk.
+func (s *linuxSampler) Disk(ctx context.Context, key string) (Usage, error) {
+	files, err := s.r.Files(ctx)
+	if err != nil {
+		return Usage{}, err
+	}
+	defer files.Close()
+	usage, err := files.StatFilesystem(ctx, "/")
+	if err != nil {
+		return Usage{}, err
+	}
+	mounts, err := files.ReadFile(ctx, "/proc/self/mountinfo", linuxMountLimit)
+	if err != nil {
+		return Usage{}, err
+	}
+	if actual := parseMonitorRoot(string(mounts)); actual.identity == "" || actual.identity != key {
+		return Usage{}, errors.New("SFTP 根挂载与当前 SSH 会话不一致")
+	}
+	return usage, nil
+}
+
+type processMetric struct {
+	name string
+	cpu  float64
+}
+
+type linuxMetrics struct {
+	cores, processes        int
+	hasProcesses            bool
+	load                    string
+	uptime                  *float64
+	cpu, memory             *float64
+	memoryUsed, memoryTotal uint64
+	diskDevice, filesystem  string
+	root                    monitorRoot
+	networkInterface        string
+	down, up                *float64
+	top                     []processMetric
+	unavailable             []string
+}
+
+func (m linuxMetrics) export() Metrics {
+	out := Metrics{CPU: m.cpu, Memory: m.memory, Uptime: m.uptime, Down: m.down, Up: m.up, Cores: m.cores,
+		Load: m.load, MemoryUsed: m.memoryUsed, MemoryTotal: m.memoryTotal, DiskKey: m.root.identity,
+		DiskDevice: m.diskDevice, Filesystem: m.filesystem, Unavailable: m.unavailable}
+	if m.hasProcesses {
+		processes := m.processes
+		out.Processes = &processes
+	}
+	for _, p := range m.top {
+		out.Top = append(out.Top, Process{Name: p.name, CPU: p.cpu})
+	}
+	return out
+}
+
+type linuxSample struct {
+	metrics           linuxMetrics
+	cpuTotal, cpuIdle uint64
+	hasCPU            bool
+	bytesIn, bytesOut uint64
+	hasNetwork        bool
+	processes         map[monitorProcessID]monitorProcess
+}
+
+func monitorNumber(text string) (float64, bool) {
+	value, err := strconv.ParseFloat(text, 64)
+	return value, err == nil && value >= 0 && !math.IsNaN(value) && !math.IsInf(value, 0)
+}
+
+// The login shell only launches /bin/sh. The collector uses POSIX shell builtins
+// exclusively, emits NUL-delimited records, and never evaluates file contents.
+// Per-file and process budgets keep an oversized optional section below Exec's
+// output limit without discarding the other metrics.
+const linuxCollectorPrelude = `LC_ALL=C
+export LC_ALL
+if ! { IFS= read -r monitor_os < /proc/sys/kernel/ostype; } 2>/dev/null || [ "$monitor_os" != Linux ]; then
+  printf 'error\000Linux /proc 不可用\000'
+  exit 0
+fi
+read_file() {
+  monitor_body=
+  monitor_ok=1
+  if ! {
+    while IFS= read -r monitor_line || [ -n "$monitor_line" ]; do
+      monitor_body="$monitor_body$monitor_line
+"
+      if [ "${#monitor_body}" -gt "$2" ]; then monitor_ok=0; break; fi
+    done < "$1"
+  } 2>/dev/null; then monitor_ok=0; fi
+  if [ "$monitor_ok" -eq 0 ]; then monitor_body=; fi
+}
+emit_file() {
+  read_file "$2" "$3"
+  printf '%s\000%s\000' "$1" "$monitor_body"
+}
+`
+
+const monitorScript = "printf '__SSH_DESK_MONITOR_V2__\\000'\n" + linuxCollectorPrelude + `
+emit_file cpu /proc/stat 65536
+emit_file memory /proc/meminfo 16384
+emit_file network /proc/net/dev 65536
+emit_file route /proc/net/route 65536
+emit_file route6 /proc/net/ipv6_route 65536
+emit_file uptime /proc/uptime 1024
+emit_file load /proc/loadavg 1024
+emit_file mounts /proc/self/mountinfo 131072
+monitor_count=0
+monitor_bytes=0
+monitor_top=ok
+for monitor_dir in /proc/[0-9]*; do
+  [ -d "$monitor_dir" ] || continue
+  monitor_count=$((monitor_count + 1))
+  [ "$monitor_top" = ok ] || continue
+  read_file "$monitor_dir/stat" 4096
+  [ -n "$monitor_body" ] || continue
+  monitor_id="p/${monitor_dir##*/}"
+  monitor_bytes=$((monitor_bytes + ${#monitor_id} + ${#monitor_body} + 2))
+  if [ "$monitor_bytes" -gt 524288 ]; then monitor_top=limit; continue; fi
+  printf '%s\000%s\000' "$monitor_id" "$monitor_body"
+done
+printf 'processes\000%s\000top\000%s\000' "$monitor_count" "$monitor_top"
+`
+
+func shellCommand(script string) string {
+	return "exec /bin/sh -c '" + strings.ReplaceAll(script, "'", "'\\''") + "'"
+}
+
+var monitorCommand = shellCommand(monitorScript)
 
 type monitorRoot struct {
 	identity, device, filesystem string
@@ -21,15 +189,15 @@ type monitorProcess struct {
 	ticks uint64
 }
 
-func parseMonitorSample(output string) (monitorSample, error) {
-	sections, err := parseLinuxCollectorOutput(output, "__SSH_DESK_MONITOR_V2__")
+func parseMonitorSample(output string) (linuxSample, error) {
+	sections, err := parseRecords(output, "__SSH_DESK_MONITOR_V2__")
 	if err != nil {
-		return monitorSample{}, err
+		return linuxSample{}, err
 	}
 	return parseMonitorSections(sections), nil
 }
 
-func parseLinuxCollectorOutput(output, marker string) (map[string]string, error) {
+func parseRecords(output, marker string) (map[string]string, error) {
 	parts := strings.Split(output, "\x00")
 	if len(parts) < 2 || parts[0] != marker || parts[len(parts)-1] != "" || len(parts)%2 != 0 {
 		return nil, errors.New("服务器返回了无法识别的采集数据")
@@ -47,8 +215,8 @@ func parseLinuxCollectorOutput(output, marker string) (map[string]string, error)
 	return sections, nil
 }
 
-func parseMonitorSections(sections map[string]string) monitorSample {
-	var sample monitorSample
+func parseMonitorSections(sections map[string]string) linuxSample {
+	var sample linuxSample
 	metrics := &sample.metrics
 	metrics.root = parseMonitorRoot(sections["mounts"])
 	metrics.diskDevice, metrics.filesystem = metrics.root.device, metrics.root.filesystem
@@ -117,7 +285,7 @@ func parseMonitorSections(sections map[string]string) monitorSample {
 	return sample
 }
 
-func parseMonitorCPU(sample *monitorSample, text string) {
+func parseMonitorCPU(sample *linuxSample, text string) {
 	for _, line := range strings.Split(text, "\n") {
 		fields := strings.Fields(line)
 		if len(fields) >= 5 && fields[0] == "cpu" {
@@ -143,7 +311,7 @@ func parseMonitorCPU(sample *monitorSample, text string) {
 	}
 }
 
-func parseMonitorMemory(metrics *serverMetrics, text string) {
+func parseMonitorMemory(metrics *linuxMetrics, text string) {
 	memory := map[string]uint64{}
 	for _, line := range strings.Split(text, "\n") {
 		fields := strings.Fields(line)
@@ -180,7 +348,7 @@ func parseMonitorProcess(pidText, text string) (monitorProcessID, monitorProcess
 	return monitorProcessID{pid: pid, start: birth}, monitorProcess{name: name, ticks: user + system}, name != ""
 }
 
-func completeMonitorRates(sample, previous *monitorSample) {
+func completeMonitorRates(sample, previous *linuxSample) {
 	if previous == nil {
 		return
 	}
@@ -358,19 +526,38 @@ func monitorRouteInterface(ipv4, ipv6 string) string {
 	return choose(routes)
 }
 
-func monitorNotice(m *monitorState) string {
-	if m.errorText != "" {
-		return "监控采集失败：" + m.errorText
+const hostFactsScript = "printf '__BURROW_HOST_FACTS_V1__\\000'\n" + linuxCollectorPrelude + `
+emit_file hostname /proc/sys/kernel/hostname 4096
+emit_file kernel /proc/sys/kernel/osrelease 4096
+emit_file system /etc/os-release 16384
+printf 'arch\000%s\000' "$(uname -m 2>/dev/null)"
+`
+
+var hostFactsCommand = shellCommand(hostFactsScript)
+
+func collectLinuxFacts(ctx context.Context, r Runner) (Facts, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	collectedAt := time.Now().UTC()
+	output, err := r.Exec(ctx, hostFactsCommand)
+	if err != nil {
+		return Facts{}, err
 	}
-	if m.metrics == nil {
-		return "正在采集服务器状态…"
+	sections, err := parseRecords(string(output), "__BURROW_HOST_FACTS_V1__")
+	if err != nil {
+		return Facts{}, err
 	}
-	unavailable := append([]string(nil), m.metrics.unavailable...)
-	if m.diskError != "" {
-		unavailable = append(unavailable, "磁盘容量")
+	facts := Facts{Platform: Linux,
+		Hostname: strings.TrimSpace(sections["hostname"]), Kernel: strings.TrimSpace(sections["kernel"]),
+		OSID: osReleaseValue(sections["system"], "ID"), OSVersion: osReleaseValue(sections["system"], "VERSION_ID"),
+		OSName: osReleaseValue(sections["system"], "PRETTY_NAME"), Arch: strings.TrimSpace(sections["arch"]),
+		CollectedAt: collectedAt,
 	}
-	if len(unavailable) > 0 {
-		return "不可用：" + strings.Join(unavailable, "、")
+	if facts.OSName == "" {
+		facts.OSName = "Linux"
 	}
-	return ""
+	if !facts.Valid() {
+		return Facts{}, errors.New("无法读取 Linux 主机名或内核版本")
+	}
+	return facts, nil
 }

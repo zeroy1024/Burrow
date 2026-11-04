@@ -71,7 +71,15 @@ type systemStyle struct {
 	icon  *ui.SVG
 }
 
-const linuxSystem = 5
+// Indexes are persisted for file connections; append new systems only.
+const (
+	linuxSystem   = 5
+	macOSSystem   = 7
+	windowsSystem = 8
+)
+
+// macOS and Windows use generic device glyphs rather than vendor marks.
+var windowsIcon = uikit.BrandIcon(`<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>`)
 
 var systems = []systemStyle{
 	{name: "Ubuntu", color: color.NRGBA{R: 0xed, G: 0x54, B: 0x22, A: 0xff}, icon: ubuntuIcon},
@@ -81,6 +89,8 @@ var systems = []systemStyle{
 	{name: "Fedora", color: color.NRGBA{R: 0x4c, G: 0x9e, B: 0xd8, A: 0xff}, icon: fedoraIcon},
 	{name: "Linux", color: color.NRGBA{R: 0x34, G: 0x34, B: 0x38, A: 0xff}, icon: linuxIcon},
 	{name: "Arch", color: color.NRGBA{R: 0x15, G: 0x99, B: 0xd3, A: 0xff}, icon: archIcon},
+	{name: "macOS", color: color.NRGBA{R: 0x6e, G: 0x6e, B: 0x73, A: 0xff}, icon: uikit.IconSVG(uikit.IconLaptop)},
+	{name: "Windows", color: color.NRGBA{R: 0x00, G: 0x78, B: 0xd4, A: 0xff}, icon: windowsIcon},
 }
 
 func init() {

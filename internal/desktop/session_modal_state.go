@@ -13,6 +13,7 @@ import (
 	"unicode"
 
 	"github.com/egoist/mygo/ui"
+	"sshdesk/internal/hostinfo"
 	"sshdesk/internal/uikit"
 )
 
@@ -20,7 +21,7 @@ type hostDraft struct {
 	afterClose                                              func()
 	name, address, user, port, group, system                string
 	protocol, auth, keyID, password, passphrase             string
-	jumpID, keepalive, initCommand, termScheme              string
+	jumpID, keepalive, initCommand, termScheme, platform    string
 	remoteDir, localDir, encoding, ftpMode, ftpTLS          string
 	env                                                     []string
 	envInput, newGroup                                      string
@@ -46,7 +47,7 @@ type hostDraft struct {
 	saving                                                  bool
 	agentResults                                            <-chan sessionAgentResult
 	generation                                              string
-	initialValues                                           [20]string
+	initialValues                                           [21]string
 	initialEnv                                              []string
 	initialPortEdited                                       bool
 }
@@ -111,6 +112,7 @@ func (a *app) startEditHostDraft(id hostID) {
 	}
 	if p := h.session.SSH; p != nil && !d.files {
 		d.jumpID, d.keepalive, d.initCommand, d.termScheme = p.JumpHostID, strconv.Itoa(p.KeepAlive), p.InitCommand, p.TermScheme
+		d.platform = p.Platform
 		d.env = slices.Clone(p.Env)
 	}
 	if p := h.session.Files; p != nil && d.files {
@@ -137,9 +139,9 @@ func (d *hostDraft) initState() {
 	d.initialValues, d.initialEnv, d.initialPortEdited = d.inputValues(), slices.Clone(d.env), d.portEdited
 }
 
-func (d *hostDraft) inputValues() [20]string {
-	return [20]string{d.name, d.address, d.user, d.port, d.group, d.system,
-		d.protocol, d.auth, d.keyID, d.jumpID, d.keepalive, d.initCommand, d.termScheme,
+func (d *hostDraft) inputValues() [21]string {
+	return [21]string{d.name, d.address, d.user, d.port, d.group, d.system,
+		d.protocol, d.auth, d.keyID, d.jumpID, d.keepalive, d.initCommand, d.termScheme, d.platform,
 		d.remoteDir, d.localDir, d.encoding, d.ftpMode, d.ftpTLS, d.envInput, d.newGroup}
 }
 
@@ -190,7 +192,7 @@ func (d *hostDraft) hasAdvanced() bool {
 	if d.files {
 		return d.remoteDir != "" || d.localDir != "" || d.encoding != "UTF-8" || d.protocol == "FTP" && (d.ftpMode != "passive" || d.ftpTLS != "explicit")
 	}
-	return d.jumpID != "" || d.keepalive != "30" || d.initCommand != "" || d.termScheme != "" || len(d.env) > 0
+	return d.jumpID != "" || d.keepalive != "30" || d.initCommand != "" || d.termScheme != "" || len(d.env) > 0 || d.platform != ""
 }
 
 func (d *hostDraft) advancedSummary(a *app) string {
@@ -229,6 +231,9 @@ func (d *hostDraft) advancedSummary(a *app) string {
 		}
 		if len(d.env) > 0 {
 			parts = append(parts, fmt.Sprintf("%d 个环境变量", len(d.env)))
+		}
+		if d.platform != "" {
+			parts = append(parts, hostinfo.Platform(d.platform).DisplayName())
 		}
 	}
 	return strings.Join(parts, " · ")
@@ -382,7 +387,7 @@ func (a *app) draftHost(d *hostDraft) host {
 		if d.envInput != "" {
 			env = append(env, d.envInput)
 		}
-		h.session.SSH = &sshOptions{JumpHostID: d.jumpID, KeepAlive: keepalive, InitCommand: d.initCommand, TermScheme: d.termScheme, Env: env}
+		h.session.SSH = &sshOptions{JumpHostID: d.jumpID, KeepAlive: keepalive, InitCommand: d.initCommand, TermScheme: d.termScheme, Env: env, Platform: d.platform}
 	}
 	return h
 }

@@ -122,8 +122,16 @@ func (b *mcpDesktop) captureConnections() ([]mcpserver.Connection, error) {
 		if protocol == "ftp" && h.session.Files != nil && h.session.Files.FTPTLS != "" && h.session.Files.FTPTLS != "none" {
 			protocol = "ftps"
 		}
-		connections = append(connections, mcpserver.Connection{ID: h.session.ID, Name: h.name, Protocol: protocol,
-			Host: h.address, Port: h.port, User: h.user, Identity: digest, Runtime: session})
+		connection := mcpserver.Connection{ID: h.session.ID, Name: h.name, Protocol: protocol,
+			Host: h.address, Port: h.port, User: h.user, Identity: digest, Runtime: session}
+		if protocol == "ssh" {
+			platform := b.a.knownPlatform(h)
+			connection.OS = string(platform)
+			if facts := b.a.savedHostFacts(h); facts != nil && facts.Platform == platform {
+				connection.OSName, connection.Arch, connection.Shell = facts.OSName, facts.Arch, facts.Shell
+			}
+		}
+		connections = append(connections, connection)
 	}
 	return connections, nil
 }

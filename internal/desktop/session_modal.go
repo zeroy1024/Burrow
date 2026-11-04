@@ -185,8 +185,7 @@ func (a *app) sessionDraftHeader(c *ui.Context, d *hostDraft) {
 				ui.Box(c).Key("protocol-header-" + d.protocol).Fill().Radius(p.IconTileRadius).Background(uikit.Color(bg)).Center().
 					Transition(ui.ElementTransition{Duration: p.Fade, Enter: &ui.Motion{}, Exit: &ui.Motion{}}).
 					Children(func() { uikit.Icon(c, icon, uikit.IconProps{}).TextColor(uikit.Color(fg)) })
-			} else if facts := a.draftHostFacts(d); facts != nil {
-				style := facts.style()
+			} else if style, ok := a.draftSystemStyle(d); ok {
 				ui.Box(c).Fill().Radius(p.IconTileRadius).Background(uikit.Color(t.OSLogoBg(style.color))).Center().Children(func() {
 					ui.Image(c, style.icon).Size(t.C.OsLogo.GlyphSize, t.C.OsLogo.GlyphSize).TextColor(uikit.Color(style.color))
 				})

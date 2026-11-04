@@ -36,6 +36,14 @@ type Connection struct {
 	Host     string `json:"host"`
 	Port     int    `json:"port"`
 	User     string `json:"user"`
+	// OS is the SSH host's pinned or last detected platform (linux, darwin,
+	// windows or other); empty until detected.
+	OS string `json:"os,omitempty"`
+	// OSName, Arch and Shell come from the last facts collected for that
+	// platform; Shell is set for Windows hosts.
+	OSName   string `json:"os_name,omitempty"`
+	Arch     string `json:"arch,omitempty"`
+	Shell    string `json:"shell,omitempty"`
 	Identity string `json:"-"`
 	Runtime  any    `json:"-"`
 }
