@@ -629,9 +629,11 @@ class Suite:
         try:
             ssh = self.connection("Docker Plain Key", "ssh")
             marker = "/home/sshdesk/audit-must-not-execute-" + uuid.uuid4().hex
-            failure = self.full.call("ssh_exec",dict(connection_id=ssh["id"],command="touch " + marker),expect_error=True)
-            if failure["error"]["code"] != "audit_unavailable":
-                raise RuntimeError("audit failure was not exposed as unavailable")
+            # The audited /mcp entry persists the operation before the SDK runs the
+            # tool, so a failed beginning record is rejected there with HTTP 503.
+            failure = self.full.request("tools/call",dict(name="ssh_exec",arguments=dict(connection_id=ssh["id"],command="touch " + marker)))
+            if failure.get("http_error") != 503 or "audit storage unavailable" not in failure.get("message",""):
+                raise RuntimeError("audit failure was not rejected at the audited MCP entry: " + json.dumps(failure))
             server = json.loads((self.task_dir / "server.json").read_text())
             if self.remote(server["container"],"test ! -e " + marker + " && printf absent") != "absent":
                 raise RuntimeError("remote side effect occurred without durable beginning audit")
