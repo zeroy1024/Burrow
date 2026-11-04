@@ -71,10 +71,10 @@ type transferSummary struct {
 }
 
 var (
-	transferUpIcon    = uikit.LineIcon(`<path d="M12 16V3m-5 5 5-5 5 5M4 13v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6"/>`)
-	transferPauseIcon = uikit.LineIcon(`<path d="M9 5v14M15 5v14"/>`)
-	transferPlayIcon  = uikit.LineIcon(`<path d="m8 4 12 8-12 8Z"/>`)
-	transferTrashIcon = uikit.LineIcon(`<path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/>`)
+	transferUpIcon    = uikit.IconSVG(uikit.IconUpload)
+	transferPauseIcon = uikit.IconSVG(uikit.IconPause)
+	transferPlayIcon  = uikit.IconSVG(uikit.IconPlay)
+	transferTrashIcon = uikit.IconSVG(uikit.IconTrash)
 )
 
 func (q *transferQueueState) summary() transferSummary {

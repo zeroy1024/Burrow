@@ -270,9 +270,9 @@ func PermissionMatrix(c *ui.Context, rows []PermissionMatrixRow, onToggle func(i
 		ui.Row(c).FillWidth().Height(t.Size.ControlSm).Padding(0, t.Space.N12).
 			Radius(t.Radius.ControlSm).Background(Color(t.Color.Surface.Sunken)).
 			Border(t.Size.Hairline, Color(t.Color.Border.Subtle)).AlignItems(ui.Center).Gap(t.Space.N8).Children(func() {
-			ui.Text(c, "已保存连接（稳定 ID 绑定端点快照）").Grow(1).MinWidth(0).FontSize(t.Font.Size.Footnote).
+			ui.Text(c, "已保存连接").Grow(1).MinWidth(0).FontSize(t.Font.Size.Footnote).
 				FontWeight(t.Font.Weight.Medium).TextColor(Color(t.Color.Text.Secondary))
-			for _, header := range []string{"文件读取 (read)", "文件写入 (write)", "命令 (ssh.exec)"} {
+			for _, header := range []string{"文件读取", "文件写入", "命令执行"} {
 				ui.Text(c, header).Width(colW).Shrink(0).FontSize(t.Font.Size.Footnote).
 					FontWeight(t.Font.Weight.Medium).TextColor(Color(t.Color.Text.Secondary)).TextAlign(ui.Center)
 			}
@@ -308,7 +308,7 @@ func PermissionMatrix(c *ui.Context, rows []PermissionMatrixRow, onToggle func(i
 				}
 				renderCell("read", "文件读取", item.SupportsFiles, item.AllowRead)
 				renderCell("write", "文件写入", item.SupportsFiles, item.AllowWrite)
-				renderCell("exec", "SSH 命令执行", item.SupportsSSH, item.AllowExec)
+				renderCell("exec", "命令执行", item.SupportsSSH, item.AllowExec)
 			})
 		}
 	})
@@ -322,11 +322,11 @@ type PolicyActionItem struct {
 // DefaultFilePolicyActions returns the 7 file interception actions defined in the MCP spec.
 func DefaultFilePolicyActions() []PolicyActionItem {
 	return []PolicyActionItem{
-		{ID: "browse", Label: "浏览", Hint: "列目录/元数据"},
-		{ID: "read", Label: "读取", Hint: "读正文/传输源"},
-		{ID: "create", Label: "创建", Hint: "新建文件/目标"},
-		{ID: "write", Label: "写入", Hint: "修改/覆盖已有"},
-		{ID: "rename", Label: "重命名", Hint: "工具待上线", Deferred: true},
+		{ID: "browse", Label: "浏览", Hint: "目录与属性"},
+		{ID: "read", Label: "读取", Hint: "正文与传输"},
+		{ID: "create", Label: "创建", Hint: "新建与上传"},
+		{ID: "write", Label: "写入", Hint: "修改与覆盖"},
+		{ID: "rename", Label: "改名", Hint: "工具待上线", Deferred: true},
 		{ID: "move", Label: "移动", Hint: "工具待上线", Deferred: true},
 		{ID: "delete", Label: "删除", Hint: "工具待上线", Deferred: true},
 	}
@@ -444,13 +444,13 @@ type OneTimeSecretProps struct {
 func OneTimeSecretCard(c *ui.Context, props OneTimeSecretProps) ui.Element {
 	t := theme.Current()
 	return ui.Column(c).FillWidth().Gap(t.Space.N10).Children(func() {
-		Banner(c, "请立即复制并妥善保存。关闭后仅保留 SHA-256 校验摘要，无法再次查看明文。", BannerProps{
+		Banner(c, "请复制并妥善保存密钥，关闭后无法再次查看明文。", BannerProps{
 			Tone: ToneWarning, Icon: IconSVG(IconAlertCircle),
 		})
 		ui.Column(c).FillWidth().Gap(t.Space.N4).Children(func() {
-			Text(c, "授权密钥（"+props.KeyName+" · 仅展示一次）", TextProps{Style: TextFootnote, Tone: ToneSecondary})
+			Text(c, "密钥明文（"+props.KeyName+"）", TextProps{Style: TextFootnote, Tone: ToneSecondary})
 			copyRes := CopyField(c, props.Secret, CopyFieldProps{
-				Key: "secret-copy", Label: "复制一次性授权密钥", ButtonLabel: "复制密钥", Fill: true,
+				Key: "secret-copy", Label: "复制授权密钥", ButtonLabel: "复制密钥", Fill: true,
 			})
 			if copyRes.Copied && props.OnCopySecret != nil {
 				props.OnCopySecret()
@@ -458,9 +458,9 @@ func OneTimeSecretCard(c *ui.Context, props OneTimeSecretProps) ui.Element {
 		})
 		ui.Column(c).FillWidth().Gap(t.Space.N4).Children(func() {
 			ui.Row(c).FillWidth().AlignItems(ui.Center).Children(func() {
-				Text(c, "客户端接入配置模板（自动填入占位符，不持久化明文）", TextProps{Style: TextFootnote, Tone: ToneSecondary})
+				Text(c, "客户端配置（请替换密钥占位符）", TextProps{Style: TextFootnote, Tone: ToneSecondary})
 				ui.Spacer(c)
-				if Button(c.Key("copy-cfg"), "复制配置模板", ButtonProps{Size: SizeSm, Icon: IconCopy}).Clicked() && props.OnCopyConfig != nil {
+				if Button(c.Key("copy-cfg"), "复制配置", ButtonProps{Size: SizeSm, Icon: IconCopy}).Clicked() && props.OnCopyConfig != nil {
 					props.OnCopyConfig()
 				}
 			})
@@ -472,7 +472,7 @@ func OneTimeSecretCard(c *ui.Context, props OneTimeSecretProps) ui.Element {
 				})
 		})
 		if props.Confirmed != nil {
-			Checkbox(c, props.Confirmed, "我已复制并妥善保存该授权密钥（勾选后才允许关闭）")
+			Checkbox(c, props.Confirmed, "我已复制并妥善保存密钥")
 		}
 	})
 }

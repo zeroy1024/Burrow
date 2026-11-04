@@ -43,10 +43,10 @@ func Notify(c *ui.Context, message string) {
 }
 
 var (
-	toastOKIcon    = LineIcon(`<circle cx="12" cy="12" r="9"/><path d="m7 12 3 3 7-7"/>`)
-	toastErrorIcon = LineIcon(`<circle cx="12" cy="12" r="9"/><path d="M12 7v6m0 4h.01"/>`)
-	toastInfoIcon  = LineIcon(`<circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10h.01"/>`)
-	toastCloseIcon = LineIcon(`<path d="m6 6 12 12M6 18 18 6"/>`)
+	toastOKIcon    = IconSVG(IconCheckCircle)
+	toastErrorIcon = IconSVG(IconAlertCircle)
+	toastInfoIcon  = IconSVG(IconInfo)
+	toastCloseIcon = IconSVG(IconClose)
 )
 
 func ToastViewport(c *ui.Context, modes ...MotionMode) ui.Element {

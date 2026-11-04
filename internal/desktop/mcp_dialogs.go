@@ -124,7 +124,7 @@ func (a *app) mcpPolicyModal(c *ui.Context) {
 		Footer: func(parts uikit.ModalParts) {
 			uikit.ModalFooter(c).Children(func() {
 				if draft.CategorySeg == 1 {
-					uikit.Text(c, "重命名 / 移动 / 删除工具上线后自动接入对应禁止项", uikit.TextProps{
+					uikit.Text(c, "勾选即禁止；改名、移动、删除工具暂未提供。", uikit.TextProps{
 						Style: uikit.TextCaption, Tone: uikit.ToneTertiary,
 					}).Grow(1).MinWidth(0).SingleLine().Ellipsis("…")
 				} else {
@@ -133,7 +133,7 @@ func (a *app) mcpPolicyModal(c *ui.Context) {
 				if uikit.Button(c, "取消", uikit.ButtonProps{}).Clicked() {
 					parts.RequestDismiss()
 				}
-				saveRequested = uikit.Button(c, "保存并生效", uikit.ButtonProps{
+				saveRequested = uikit.Button(c, "保存策略", uikit.ButtonProps{
 					Variant: uikit.ButtonPrimary, Disabled: regexInvalid || a.mcpBusy(),
 				}).Clicked()
 			})
@@ -166,14 +166,14 @@ func (a *app) mcpPolicyFields(c *ui.Context) {
 		ui.Row(c).FillWidth().AlignItems(ui.Center).Children(func() {
 			uikit.Text(c, "基本信息与适用范围", uikit.TextProps{Style: uikit.TextBodyStrong})
 			ui.Spacer(c)
-			uikit.Text(c, fmt.Sprintf("保存后生成 v%d 并对新操作生效", draft.Version+1), uikit.TextProps{
+			uikit.Text(c, fmt.Sprintf("保存后更新至 v%d，启用后参与拦截", draft.Version+1), uikit.TextProps{
 				Style: uikit.TextCaption, Tone: uikit.ToneTertiary,
 			})
 		})
 		ui.Row(c).FillWidth().AlignItems(ui.Center).Gap(t.Space.N10).Children(func() {
 			uikit.Text(c, "策略名称", uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneSecondary}).Width(64).Shrink(0)
 			if uikit.Input(c, &draft.Name, uikit.InputProps{
-				Label: "策略名称", Placeholder: "例如：生产环境敏感配置与私钥保护", Error: draft.NameError,
+				Label: "策略名称", Placeholder: "例如：生产配置保护", Error: draft.NameError,
 			}).Grow(1).Changed() {
 				draft.NameError = ""
 			}
@@ -188,7 +188,7 @@ func (a *app) mcpPolicyFields(c *ui.Context) {
 		ui.Row(c).FillWidth().AlignItems(ui.Center).Gap(t.Space.N10).Children(func() {
 			uikit.Text(c, "用途说明", uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneSecondary}).Width(64).Shrink(0)
 			uikit.Input(c, &draft.Description, uikit.InputProps{
-				Label: "用途说明", Placeholder: "简要说明拦截目的与保护范围",
+				Label: "用途说明", Placeholder: "请输入拦截目的与保护范围",
 			}).Grow(1)
 		})
 		ui.Row(c).FillWidth().AlignItems(ui.Center).Gap(t.Space.N10).Children(func() {
@@ -200,7 +200,7 @@ func (a *app) mcpPolicyFields(c *ui.Context) {
 			if previousCategory != draft.CategorySeg {
 				draft.Connections = []string{}
 			}
-			uikit.Text(c, "（按连接协议过滤可选连接）", uikit.TextProps{Style: uikit.TextCaption, Tone: uikit.ToneTertiary})
+			uikit.Text(c, "仅显示当前分类支持的连接", uikit.TextProps{Style: uikit.TextCaption, Tone: uikit.ToneTertiary})
 		})
 		ui.Row(c).FillWidth().AlignItems(ui.Center).Gap(t.Space.N10).Children(func() {
 			uikit.Text(c, "适用连接", uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneSecondary}).Width(64).Shrink(0)
@@ -230,7 +230,7 @@ func (a *app) mcpPolicyFields(c *ui.Context) {
 	if draft.CategorySeg == 1 {
 		ui.Column(c).FillWidth().Gap(t.Space.N8).Children(func() {
 			ui.Row(c).FillWidth().AlignItems(ui.Center).Children(func() {
-				uikit.Text(c, "文件策略规则（每条路径独立勾选禁止操作）", uikit.TextProps{Style: uikit.TextBodyStrong})
+				uikit.Text(c, "文件拦截规则", uikit.TextProps{Style: uikit.TextBodyStrong})
 				ui.Spacer(c)
 				if uikit.Button(c, "+ 添加路径规则", uikit.ButtonProps{Size: uikit.SizeSm}).Clicked() {
 					draft.FileRules = append(draft.FileRules, mcpFileRule{
@@ -293,7 +293,7 @@ func (a *app) mcpPolicyFields(c *ui.Context) {
 			Radius(t.Radius.Control).Background(uikit.Color(t.Color.Surface.Card)).
 			Border(t.Size.Hairline, uikit.Color(t.Color.Border.Control)).Children(func() {
 			ui.Row(c).FillWidth().AlignItems(ui.Center).Children(func() {
-				uikit.Badge(c, "命令策略规则（精确匹配 / 正则匹配 / 模糊匹配）", uikit.BadgeProps{Tone: uikit.ToneWarning})
+				uikit.Badge(c, "命令拦截规则", uikit.BadgeProps{Tone: uikit.ToneWarning})
 				ui.Spacer(c)
 				if uikit.Button(c, "+ 添加命令规则", uikit.ButtonProps{Size: uikit.SizeSm}).Clicked() {
 					draft.CmdRules = append(draft.CmdRules, mcpCommandRule{Mode: "exact", Pattern: "shutdown -h now"})
@@ -306,21 +306,21 @@ func (a *app) mcpPolicyFields(c *ui.Context) {
 				var regErr string
 				if cmdRule.Mode == "regex" && strings.TrimSpace(cmdRule.Pattern) != "" {
 					if _, err := regexp.Compile(cmdRule.Pattern); err != nil {
-						regErr = "无效正则表达式：" + err.Error()
+						regErr = "正则表达式无效：" + err.Error()
 					}
 				}
 				ui.Column(c).Key(cmdIdx).FillWidth().Gap(t.Space.N4).Children(func() {
 					ui.Row(c).FillWidth().AlignItems(ui.Center).Gap(t.Space.N6).Children(func() {
-						uikit.FilterChip(c, "匹配", &cmdRule.Mode, []uikit.Option[string]{
+						uikit.Select(c.Key(fmt.Sprintf("cmode-%d", cmdIdx)), &cmdRule.Mode, []uikit.Option[string]{
 							{Value: "exact", Label: "精确匹配"},
 							{Value: "regex", Label: "正则匹配"},
 							{Value: "contains", Label: "模糊匹配"},
-						}, uikit.FilterChipProps{Key: fmt.Sprintf("cmode-%d", cmdIdx)}).
-							Width(t.C.Input.SelectWidth).Shrink(0)
+						}, uikit.SelectProps{Label: "匹配方式"}).
+							Width(120).Shrink(0)
 						uikit.Input(c.Key(fmt.Sprintf("cpat-%d", cmdIdx)), &cmdRule.Pattern, uikit.InputProps{
-							Mono: true, Label: "命令或正则", Placeholder: "rm -rf /", Error: regErr,
+							Mono: true, Label: "匹配内容", Placeholder: "rm -rf /", Error: regErr,
 						}).Grow(1)
-						uikit.Badge(c, "命中拒绝", uikit.BadgeProps{Tone: uikit.ToneDanger})
+						uikit.Badge(c, "命中拦截", uikit.BadgeProps{Tone: uikit.ToneDanger})
 						if len(draft.CmdRules) > 1 {
 							if uikit.Button(c.Key("del-c"), "删除", uikit.ButtonProps{Variant: uikit.ButtonDangerPlain, Size: uikit.SizeSm}).Clicked() {
 								remove = cmdIdx
@@ -336,10 +336,10 @@ func (a *app) mcpPolicyFields(c *ui.Context) {
 				draft.CmdRules = slices.Delete(draft.CmdRules, remove, remove+1)
 				c.Invalidate()
 			}
-			uikit.Text(c, "精确匹配完整命令；模糊匹配命令中包含的文本，区分大小写；正则匹配按表达式判定。", uikit.TextProps{
+			uikit.Text(c, "精确匹配完整命令；正则匹配表达式；模糊匹配包含文本，区分大小写。", uikit.TextProps{
 				Style: uikit.TextCaption, Tone: uikit.ToneSecondary,
 			})
-			uikit.Text(c, "注：保存时校验正则表达式语法；命令策略用于防误操作，不解析脚本语义，也不能阻止已有 ssh.exec 权限直接读写文件。", uikit.TextProps{
+			uikit.Text(c, "命令策略用于防误操作，不解析脚本，也不能限制已授权命令的文件访问。", uikit.TextProps{
 				Style: uikit.TextCaption, Tone: uikit.ToneSecondary,
 			})
 		})
@@ -399,12 +399,12 @@ func (a *app) mcpAuditDrawer(c *ui.Context) {
 			uikit.Text(c, "基本信息", uikit.TextProps{Style: uikit.TextBodyStrong})
 			uikit.KeyValueGrid(c, 2, []uikit.KV{
 				{
-					Key: "Key 名称",
+					Key: "密钥名称",
 					Render: func() {
 						uikit.Text(c, item.KeyName, uikit.TextProps{Style: uikit.TextBodyStrong}).SingleLine().Ellipsis("…")
 					},
 				},
-				{Key: "Key ID", Value: item.KeyID, ValueMono: true},
+				{Key: "密钥标识", Value: item.KeyID, ValueMono: true},
 				{Key: "开始时间", Value: item.StartTime},
 				{Key: "结束时间", Value: item.EndTime},
 				{Key: "操作类型", Value: item.ActionType},
@@ -416,14 +416,13 @@ func (a *app) mcpAuditDrawer(c *ui.Context) {
 				},
 			})
 
-			uikit.Divider(c, uikit.DividerProps{})
-
 			// 2. 目标快照
 			if item.ConnectionID != "" {
+				uikit.Divider(c, uikit.DividerProps{})
 				ui.Row(c).FillWidth().AlignItems(ui.Center).Children(func() {
 					uikit.Text(c, "目标快照", uikit.TextProps{Style: uikit.TextBodyStrong})
 					ui.Spacer(c)
-					uikit.Text(c, "记录于调用时，连接后续修改不影响", uikit.TextProps{Style: uikit.TextCaption, Tone: uikit.ToneTertiary})
+					uikit.Text(c, "保留调用时的连接信息，后续修改不影响", uikit.TextProps{Style: uikit.TextCaption, Tone: uikit.ToneTertiary})
 				})
 				uikit.KeyValueGrid(c, 2, []uikit.KV{
 					{Key: "主机", Value: item.ConnHost + " (" + item.ConnName + ")", ValueMono: true},
@@ -433,15 +432,14 @@ func (a *app) mcpAuditDrawer(c *ui.Context) {
 				})
 			}
 
-			uikit.Divider(c, uikit.DividerProps{})
-
 			// 3. 命令信息 或 文件信息
 			if item.IsCommand {
+				uikit.Divider(c, uikit.DividerProps{})
 				ui.Row(c).FillWidth().AlignItems(ui.Center).Gap(t.Space.N6).Children(func() {
 					uikit.Text(c, "命令信息", uikit.TextProps{Style: uikit.TextBodyStrong})
 					warnIcon := uikit.Icon(c, uikit.IconInfo, uikit.IconProps{Size: uikit.SizeSm, Tone: uikit.ToneWarning})
 					uikit.Tip(c, warnIcon, "命令原文可能包含敏感参数；审计按本地敏感数据管理，不承诺已自动识别全部秘密。")
-					uikit.Text(c, "原文可能含敏感参数（按本地敏感数据保存）", uikit.TextProps{Style: uikit.TextCaption, Tone: uikit.ToneWarning})
+					uikit.Text(c, "命令可能含敏感参数，请妥善保管审计记录", uikit.TextProps{Style: uikit.TextCaption, Tone: uikit.ToneWarning})
 				})
 				if uikit.CodeBlock(c.Key("command-source"), "命令原文", item.CommandText).Copy {
 					mygo.Clipboard.WriteText(item.CommandText)
@@ -451,13 +449,14 @@ func (a *app) mcpAuditDrawer(c *ui.Context) {
 					{Key: "输出与状态", Value: item.OutputStatus},
 				})
 			} else if item.LocalPath != "" || item.RemotePath != "" {
+				uikit.Divider(c, uikit.DividerProps{})
 				uikit.Text(c, "文件信息", uikit.TextProps{Style: uikit.TextBodyStrong})
 				var fileKVs []uikit.KV
 				if item.LocalPath != "" {
 					fileKVs = append(fileKVs, uikit.KV{Key: "本地路径", Value: item.LocalPath, ValueMono: true})
 				}
 				if item.RemotePath != "" {
-					fileKVs = append(fileKVs, uikit.KV{Key: "远程路径", Value: item.RemotePath, ValueMono: true})
+					fileKVs = append(fileKVs, uikit.KV{Key: "远端路径", Value: item.RemotePath, ValueMono: true})
 				}
 				if item.TransferStat != "" {
 					fileKVs = append(fileKVs, uikit.KV{Key: "传输统计", Value: item.TransferStat})
@@ -475,18 +474,16 @@ func (a *app) mcpAuditDrawer(c *ui.Context) {
 				if item.FileBodyOmitted {
 					uikit.Banner(c, "文件正文不写入审计；请求与响应中保留路径、字节数及处理结果。", uikit.BannerProps{Tone: uikit.ToneNeutral})
 				}
-				if uikit.CodeBlock(c.Key("audit-request"), "请求", item.RequestJSON).Copy {
+				if uikit.CodeBlock(c.Key("audit-request"), "请求数据", item.RequestJSON).Copy {
 					mygo.Clipboard.WriteText(item.RequestJSON)
 				}
-				ui.Row(c).FillWidth().AlignItems(ui.Center).Children(func() {
-					uikit.Text(c, "响应", uikit.TextProps{Style: uikit.TextBodyStrong})
-					ui.Spacer(c)
-					if item.IsCommand && item.ResponseSaved && !item.ResponseTruncated {
+				if item.IsCommand && item.ResponseSaved && !item.ResponseTruncated {
+					ui.Row(c).FillWidth().Justify(ui.End).Children(func() {
 						uikit.Segmented(c, &a.mcp.auditResponseTab, uikit.SegmentItems([]string{"输出", "JSON"}), uikit.SegmentedProps{
 							Label: "响应查看方式", Size: uikit.SizeSm,
 						})
-					}
-				})
+					})
+				}
 				if item.ResponseTruncated {
 					uikit.Banner(c, "响应超过审计采集上限，正文未保存；请查看响应摘要中的大小信息。", uikit.BannerProps{Tone: uikit.ToneWarning})
 				}
@@ -510,7 +507,7 @@ func (a *app) mcpAuditDrawer(c *ui.Context) {
 				ui.Row(c).FillWidth().AlignItems(ui.Center).Children(func() {
 					uikit.Text(c, "命中拦截策略", uikit.TextProps{Style: uikit.TextBodyStrong})
 					ui.Spacer(c)
-					uikit.Text(c, "保存判定时规则快照，后续修改不影响", uikit.TextProps{Style: uikit.TextCaption, Tone: uikit.ToneTertiary})
+					uikit.Text(c, "保留判定时的策略规则，后续修改不影响", uikit.TextProps{Style: uikit.TextCaption, Tone: uikit.ToneTertiary})
 				})
 				for i, hit := range item.PolicyHits {
 					ui.Column(c).Key(i).FillWidth().Padding(t.Space.N10).Gap(t.Space.N6).
@@ -756,9 +753,9 @@ func (a *app) pickMCPDirectory(forUpload bool) {
 	if window == nil {
 		return
 	}
-	title := "选择允许下载的本地目标目录"
+	title := "选择下载目标目录"
 	if forUpload {
-		title = "选择允许上传的本地来源目录"
+		title = "选择上传来源目录"
 	}
 	go func() {
 		paths, err := mygo.Dialog.Open(mygo.OpenDialogOptions{Parent: window, Title: title, Directory: true})
@@ -796,14 +793,14 @@ func (a *app) mcpKeyModal(c *ui.Context) {
 	t := theme.Current()
 	draft := &a.mcp.keyModal
 	title := "新增授权密钥"
-	subtitle := "配置用途名称、已保存连接读写/执行权限与本地上传下载目录"
+	subtitle := "设置密钥名称、连接权限与本地目录"
 	if draft.EditingID != "" {
 		title = "编辑授权密钥"
 		subtitle = draft.EditingID
 	}
 	if draft.OneTimeView {
-		title = "授权密钥已生成（仅展示一次）"
-		subtitle = "请立即复制并妥善保存，勾选确认后才可关闭窗口"
+		title = "授权密钥已生成"
+		subtitle = "密钥仅显示一次，请复制保存后勾选确认"
 	}
 
 	uikit.Modal(c.Key("mcp-key-modal"), &draft.Open, uikit.ModalProps{
@@ -816,7 +813,7 @@ func (a *app) mcpKeyModal(c *ui.Context) {
 		Footer: func(parts uikit.ModalParts) {
 			uikit.ModalFooter(c).Children(func() {
 				if draft.OneTimeView {
-					uikit.Text(c, "关闭后不再提供明文查看，丢失需新建并撤销旧 Key", uikit.TextProps{
+					uikit.Text(c, "密钥丢失后，请撤销旧密钥并生成新密钥。", uikit.TextProps{
 						Style: uikit.TextCaption, Tone: uikit.ToneTertiary,
 					}).Grow(1)
 					if uikit.Button(c, "完成并关闭", uikit.ButtonProps{
@@ -827,15 +824,15 @@ func (a *app) mcpKeyModal(c *ui.Context) {
 					}
 					return
 				}
-				uikit.Text(c, "新建保存后将在当前窗口切换至「一次性密钥」视图", uikit.TextProps{
+				uikit.Text(c, "密钥明文仅在创建时显示，请及时复制保存。", uikit.TextProps{
 					Style: uikit.TextCaption, Tone: uikit.ToneTertiary,
 				}).Grow(1)
 				if uikit.Button(c, "取消", uikit.ButtonProps{}).Clicked() {
 					parts.RequestDismiss()
 				}
-				saveLabel := "生成授权密钥"
+				saveLabel := "生成密钥"
 				if draft.EditingID != "" {
-					saveLabel = "保存授权"
+					saveLabel = "保存密钥"
 				}
 				if uikit.Button(c, saveLabel, uikit.ButtonProps{Variant: uikit.ButtonPrimary}).Clicked() {
 					a.submitMCPKeyModal()
@@ -863,24 +860,24 @@ func (a *app) mcpKeyModal(c *ui.Context) {
 				ui.Column(c).FillWidth().Gap(t.Space.N14).Children(func() {
 					// 第 1 段 · 名称
 					ui.Column(c).FillWidth().Gap(t.Space.N6).Children(func() {
-						uikit.Badge(c, "第 1 段 · Key 名称与标识", uikit.BadgeProps{Tone: uikit.ToneAccent})
+						uikit.Badge(c, "第 1 段 · 密钥名称", uikit.BadgeProps{Tone: uikit.ToneAccent})
 						ui.Row(c).FillWidth().AlignItems(ui.Center).Gap(t.Space.N10).Children(func() {
-							uikit.Text(c, "用途名称", uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneSecondary}).Width(64).Shrink(0)
+							uikit.Text(c, "密钥名称", uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneSecondary}).Width(64).Shrink(0)
 							if uikit.Input(c, &draft.Name, uikit.InputProps{
-								Label: "Key 用途名称", Placeholder: "例如：claude-desktop / cursor-agent", Error: draft.NameError,
+								Label: "密钥名称", Placeholder: "例如：claude-desktop", Error: draft.NameError,
 							}).Grow(1).Changed() {
 								draft.NameError = ""
 							}
-							uikit.Text(c, "建议每个客户端独立使用一个 Key", uikit.TextProps{Style: uikit.TextCaption, Tone: uikit.ToneTertiary})
+							uikit.Text(c, "建议每个客户端使用独立密钥", uikit.TextProps{Style: uikit.TextCaption, Tone: uikit.ToneTertiary})
 						})
 					})
 
 					// 第 2 段 · 连接授权矩阵
 					ui.Column(c).FillWidth().Gap(t.Space.N6).Children(func() {
 						ui.Row(c).FillWidth().AlignItems(ui.Center).Gap(t.Space.N8).Children(func() {
-							uikit.Badge(c, "第 2 段 · 连接授权矩阵（默认全关，按连接显式开启）", uikit.BadgeProps{Tone: uikit.ToneAccent})
+							uikit.Badge(c, "第 2 段 · 连接授权", uikit.BadgeProps{Tone: uikit.ToneAccent})
 							ui.Spacer(c)
-							uikit.Text(c, "注：允许能力仍受「拦截策略」中的路径与命令规则约束", uikit.TextProps{
+							uikit.Text(c, "默认不授予权限，启用后仍受拦截策略限制", uikit.TextProps{
 								Style: uikit.TextCaption, Tone: uikit.ToneWarning,
 							})
 						})
@@ -909,21 +906,21 @@ func (a *app) mcpKeyModal(c *ui.Context) {
 
 					// 第 3 段 · 本地目录
 					ui.Column(c).FillWidth().Gap(t.Space.N6).Children(func() {
-						uikit.Badge(c, "第 3 段 · 本地目录范围（固定目录句柄解析，不默认开放本机文件系统）", uikit.BadgeProps{Tone: uikit.ToneAccent})
+						uikit.Badge(c, "第 3 段 · 目录授权", uikit.BadgeProps{Tone: uikit.ToneAccent})
 						ui.Row(c).FillWidth().Gap(t.Space.N10).AlignItems(ui.Stretch).Children(func() {
 							uikit.DirectoryListEditor(c.Key("up-dirs"), draft.UploadDirs, uikit.DirectoryListEditorProps{
-								Title:      "允许上传的本地来源目录",
-								EmptyHint:  "未授权本地上传目录",
-								FooterHint: "不跟随符号链接越界；仍受「文件策略」本地规则限制",
+								Title:      "上传来源目录",
+								EmptyHint:  "尚未添加上传目录",
+								FooterHint: "允许从目录及其子目录上传，仍受文件策略限制。",
 								OnAdd:      func() { a.pickMCPDirectory(true) },
 								OnRemove: func(idx int) {
 									draft.UploadDirs = slices.Delete(draft.UploadDirs, idx, idx+1)
 								},
 							})
 							uikit.DirectoryListEditor(c.Key("down-dirs"), draft.DownloadDirs, uikit.DirectoryListEditorProps{
-								Title:      "允许下载的本地目标目录",
-								EmptyHint:  "未授权本地下载目录",
-								FooterHint: "下载写入通过 .part 原子暂存，完成后提交到目标目录",
+								Title:      "下载目标目录",
+								EmptyHint:  "尚未添加下载目录",
+								FooterHint: "允许向目录及其子目录下载，仍受文件策略限制。",
 								OnAdd:      func() { a.pickMCPDirectory(false) },
 								OnRemove: func(idx int) {
 									draft.DownloadDirs = slices.Delete(draft.DownloadDirs, idx, idx+1)
@@ -933,7 +930,7 @@ func (a *app) mcpKeyModal(c *ui.Context) {
 					})
 				})
 			})
-			uikit.Scrollbars(c, viewport, scroller, &draft.Scroll, uikit.ScrollbarProps{Label: "Key 授权配置滚动条"})
+			uikit.Scrollbars(c, viewport, scroller, &draft.Scroll, uikit.ScrollbarProps{Label: "密钥授权表单滚动条"})
 		})
 	})
 }
@@ -949,11 +946,11 @@ func (a *app) mcpKeyConfirmModal(c *ui.Context) {
 	t := theme.Current()
 	dlg := &a.mcp.keyConfirm
 	isRevoke := dlg.Action == "revoke"
-	title := fmt.Sprintf("停用授权密钥「%s」？", dlg.Name)
+	title := fmt.Sprintf("停用密钥「%s」？", dlg.Name)
 	btnLabel := "停用密钥"
 	variant := uikit.ButtonPrimary
 	if isRevoke {
-		title = fmt.Sprintf("永久撤销授权密钥「%s」？", dlg.Name)
+		title = fmt.Sprintf("撤销密钥「%s」？", dlg.Name)
 		btnLabel = "撤销密钥"
 		variant = uikit.ButtonDanger
 	}
@@ -963,9 +960,9 @@ func (a *app) mcpKeyConfirmModal(c *ui.Context) {
 		Width:    440,
 		Disabled: a.mcpBusy(),
 	}, func(parts uikit.ModalParts) {
-		uikit.Text(c, "• 立即拒绝该 Key 的所有后续 MCP 请求。", uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneSecondary})
+		uikit.Text(c, "• 立即拒绝该密钥的后续 MCP 请求。", uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneSecondary})
 		uikit.Text(c, fmt.Sprintf("• 自动取消 %d 个排队任务，并向关联的执行中任务请求取消。", a.mcpQueuedTasks(dlg.KeyID)), uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneSecondary})
-		uikit.Text(c, "• 历史审计记录与当时的 Key 名称完整保留。", uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneSecondary})
+		uikit.Text(c, "• 保留历史审计记录与当时的密钥名称。", uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneSecondary})
 		if isRevoke {
 			uikit.Banner(c, "若仅需临时暂停访问，请选择「停用密钥」；永久撤销不可恢复。", uikit.BannerProps{
 				Tone: uikit.ToneDanger, Icon: uikit.IconSVG(uikit.IconAlertCircle),
@@ -1022,24 +1019,24 @@ func (a *app) mcpListenModal(c *ui.Context) {
 	t := theme.Current()
 	var host, hostError string
 	uikit.Modal(c.Key("mcp-listen-modal"), &a.mcp.listenModalOpen, uikit.ModalProps{
-		Title:   "编辑 MCP 监听地址配置",
+		Title:   "编辑监听配置",
 		Compact: true,
 		Width:   420,
 	}, func(parts uikit.ModalParts) {
-		uikit.Text(c, "修改 Host 和 Port 后，监听地址显示与客户端配置模板会同步更新。", uikit.TextProps{
+		uikit.Text(c, "仅支持本机监听，保存后同步更新客户端配置。", uikit.TextProps{
 			Style: uikit.TextFootnote, Tone: uikit.ToneSecondary,
 		})
-		uikit.FormRow(c, "Host", uikit.FormRowProps{Align: uikit.RowAlignCenter}, func() ui.Element {
+		uikit.FormRow(c, "监听主机", uikit.FormRowProps{Align: uikit.RowAlignCenter}, func() ui.Element {
 			input := uikit.Input(c, &a.mcp.hostDraft, uikit.InputProps{
-				Label: "监听 Host", Placeholder: "127.0.0.1", Mono: true, DeferStyle: true,
+				Label: "监听主机", Placeholder: "127.0.0.1", Mono: true, DeferStyle: true,
 			})
 			host = strings.TrimSpace(a.mcp.hostDraft)
 			address, err := url.Parse("http://" + net.JoinHostPort(host, "1"))
 			switch {
 			case host == "":
-				hostError = "请输入监听 Host"
+				hostError = "请输入监听主机"
 			case err != nil || address.Hostname() != host:
-				hostError = "Host 只填写 IP 地址或主机名，不包含协议、路径或端口"
+				hostError = "仅填写 IP 地址或主机名，不含协议、路径或端口"
 			case strings.Contains(host, ":") && net.ParseIP(host) == nil:
 				hostError = "请输入有效的 IPv6 地址，或不含端口的主机名"
 			}
@@ -1049,8 +1046,8 @@ func (a *app) mcpListenModal(c *ui.Context) {
 			}
 			return input
 		})
-		uikit.FormRow(c, "Port", uikit.FormRowProps{Align: uikit.RowAlignCenter}, func() ui.Element {
-			return uikit.PortInput(c, &a.mcp.portDraft, uikit.InputProps{Label: "监听 Port", Placeholder: "7801"})
+		uikit.FormRow(c, "监听端口", uikit.FormRowProps{Align: uikit.RowAlignCenter}, func() ui.Element {
+			return uikit.PortInput(c, &a.mcp.portDraft, uikit.InputProps{Label: "监听端口", Placeholder: "7801"})
 		})
 		ui.Row(c).FillWidth().Justify(ui.End).Gap(t.Space.N8).Children(func() {
 			if uikit.Button(c, "取消", uikit.ButtonProps{}).Clicked() {
@@ -1074,7 +1071,7 @@ func (a *app) mcpRetentionModal(c *ui.Context) {
 	}
 	t := theme.Current()
 	uikit.Modal(c.Key("mcp-retention-modal"), &a.mcp.retentionOpen, uikit.ModalProps{
-		Title:   "审计保留策略与清理",
+		Title:   "审计保留设置",
 		Compact: true,
 		Width:   420,
 	}, func(parts uikit.ModalParts) {
@@ -1097,7 +1094,7 @@ func (a *app) mcpRetentionModal(c *ui.Context) {
 			if uikit.Button(c, "关闭", uikit.ButtonProps{}).Clicked() {
 				parts.RequestDismiss()
 			}
-			if uikit.Button(c, "清理已结束历史记录", uikit.ButtonProps{Variant: uikit.ButtonDanger}).Clicked() {
+			if uikit.Button(c, "清理记录", uikit.ButtonProps{Variant: uikit.ButtonDanger}).Clicked() {
 				a.mcp.retentionOpen = false
 				a.pruneMCPBackend()
 			}
@@ -1112,11 +1109,11 @@ func (a *app) mcpClientConfigModal(c *ui.Context) {
 	t := theme.Current()
 	cfg := a.mcpClientConfigJSON()
 	uikit.Modal(c.Key("mcp-client-cfg-modal"), &a.mcp.configModalOpen, uikit.ModalProps{
-		Title:   "复制客户端接入配置",
+		Title:   "客户端配置",
 		Compact: true,
 		Width:   460,
 	}, func(parts uikit.ModalParts) {
-		uikit.Text(c, "已将配置模板复制到系统剪贴板。请将 <YOUR_SECRET_KEY> 替换为你保存的授权密钥：", uikit.TextProps{
+		uikit.Text(c, "配置已复制，请将 <YOUR_SECRET_KEY> 替换为已保存的密钥。", uikit.TextProps{
 			Style: uikit.TextFootnote, Tone: uikit.ToneSecondary,
 		})
 		ui.Box(c).FillWidth().Padding(t.Space.N10).Radius(t.Radius.Control).

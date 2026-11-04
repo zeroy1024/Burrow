@@ -342,7 +342,7 @@ func (a *app) mcpServiceBar(c *ui.Context) {
 			statusText := "运行中"
 			statusTone := uikit.ToneSuccess
 			if !a.mcp.running {
-				statusText = "未开启"
+				statusText = "已关闭"
 				statusTone = uikit.ToneNeutral
 			}
 			uikit.Badge(c, statusText, uikit.BadgeProps{Tone: statusTone, Dot: true, Size: uikit.SizeMd})
@@ -377,9 +377,9 @@ func (a *app) mcpServiceBar(c *ui.Context) {
 					uikit.Text(c, val, uikit.TextProps{Style: uikit.TextBodyStrong, Tone: tone}).FontFeatures("tnum")
 				})
 			}
-			statPair("已运行", a.mcp.uptime, false)
-			statPair("启用 Key", strconv.Itoa(activeKeys), false)
-			statPair("拦截策略", strconv.Itoa(enabledPolicies), false)
+			statPair("运行时长", a.mcp.uptime, false)
+			statPair("启用密钥", strconv.Itoa(activeKeys), false)
+			statPair("启用策略", strconv.Itoa(enabledPolicies), false)
 			statPair("今日调用", strconv.Itoa(a.mcp.todayCalls), false)
 			statPair("今日拦截", strconv.Itoa(a.mcp.todayIntercepts), a.mcp.todayIntercepts > 0)
 
@@ -392,7 +392,7 @@ func (a *app) mcpServiceBar(c *ui.Context) {
 					a.mcp.configModalOpen = true
 				}
 				if uikit.IconButton(c, uikit.IconEdit, uikit.IconButtonProps{
-					Key: "mcp-edit-listen", Label: "编辑监听地址配置",
+					Key: "mcp-edit-listen", Label: "编辑监听配置",
 				}).Clicked() {
 					a.mcp.hostDraft, a.mcp.portDraft = a.mcp.host, a.mcp.port
 					a.mcp.listenModalOpen = true
@@ -433,7 +433,7 @@ func (a *app) mcpMainCardContent(c *ui.Context) {
 			ui.Spacer(c)
 			switch a.mcp.activeTab {
 			case 0:
-				if uikit.Button(c, "新增 Key", uikit.ButtonProps{Variant: uikit.ButtonPrimary, Icon: uikit.IconPlus}).Clicked() {
+				if uikit.Button(c, "新增密钥", uikit.ButtonProps{Variant: uikit.ButtonPrimary, Icon: uikit.IconPlus}).Clicked() {
 					a.openNewMCPKeyModal()
 				}
 			case 1:
@@ -444,7 +444,7 @@ func (a *app) mcpMainCardContent(c *ui.Context) {
 				if uikit.Button(c, "保留最近 "+a.mcp.retentionDays+" 天 · 清理", uikit.ButtonProps{Variant: uikit.ButtonPlain, Size: uikit.SizeSm}).Clicked() {
 					a.mcp.retentionOpen = true
 				}
-				if uikit.IconButton(c, uikit.IconRetry, uikit.IconButtonProps{Key: "audit-refresh", Label: "刷新审计记录", Size: uikit.SizeSm}).Clicked() {
+				if uikit.IconButton(c, uikit.IconRefresh, uikit.IconButtonProps{Key: "audit-refresh", Label: "刷新审计记录", Size: uikit.SizeSm}).Clicked() {
 					a.refreshMCPBackend()
 				}
 			}
@@ -487,10 +487,10 @@ func (a *app) mcpKeysTab(c *ui.Context) {
 				ui.Row(c).FillWidth().Height(t.C.FileList.HeaderHeight).Shrink(0).Padding(0, t.Space.N20).
 					BorderWidth(0, 0, t.Size.Divider, 0).BorderColor(uikit.Color(t.Color.Border.Divider)).
 					AlignItems(ui.Center).Gap(t.Space.N10).Children(func() {
-					uikit.Text(c, "Key 名称 / 前缀", uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneSecondary}).Width(210).Shrink(0)
+					uikit.Text(c, "密钥名称 / 标识", uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneSecondary}).Width(210).Shrink(0)
 					uikit.Text(c, "状态", uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneSecondary}).Width(86).Shrink(0)
-					uikit.Text(c, "已授权连接与能力摘要", uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneSecondary}).Grow(1).MinWidth(0).SingleLine()
-					uikit.Text(c, "本地目录范围", uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneSecondary}).Width(210).Shrink(0)
+					uikit.Text(c, "连接授权", uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneSecondary}).Grow(1).MinWidth(0).SingleLine()
+					uikit.Text(c, "目录授权", uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneSecondary}).Width(210).Shrink(0)
 					uikit.Text(c, "最近使用 / 创建", uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneSecondary}).Width(150).Shrink(0)
 				})
 			},
@@ -573,13 +573,13 @@ func (a *app) mcpKeysTab(c *ui.Context) {
 						})
 						// Col 4: Local dirs
 						ui.Column(c).Width(210).Shrink(0).Gap(t.Space.N2).Children(func() {
-							upText := "未授权本地上传"
+							upText := "上传：未授权"
 							if len(keyItem.UploadDirs) > 0 {
-								upText = "上传 " + keyItem.UploadDirs[0]
+								upText = "上传：" + keyItem.UploadDirs[0]
 							}
-							downText := "未授权本地下载"
+							downText := "下载：未授权"
 							if len(keyItem.DownloadDirs) > 0 {
-								downText = "下载 " + keyItem.DownloadDirs[0]
+								downText = "下载：" + keyItem.DownloadDirs[0]
 							}
 							if revoked {
 								upText, downText = "—", "—"
@@ -664,7 +664,7 @@ func (a *app) mcpPoliciesTab(c *ui.Context) {
 					uikit.FilterChip(c, "适用密钥", &a.mcp.policyKeyFilter, a.mcpKeyOptions(true), uikit.FilterChipProps{Key: "pol-key-filter"})
 					uikit.FilterChip(c, "状态", &a.mcp.policyStateFilter, []uikit.Option[string]{
 						{Value: "all", Label: "全部"},
-						{Value: "enabled", Label: "启用"},
+						{Value: "enabled", Label: "已启用"},
 						{Value: "disabled", Label: "已停用"},
 					}, uikit.FilterChipProps{Key: "pol-state-filter"})
 				})
@@ -674,7 +674,7 @@ func (a *app) mcpPoliciesTab(c *ui.Context) {
 						Background(uikit.Color(t.Color.Surface.Sunken)).Border(t.Size.Hairline, uikit.Color(t.Color.Border.Subtle)).
 						AlignItems(ui.Center).Gap(t.Space.N6).Children(func() {
 						uikit.Icon(c, uikit.IconShield, uikit.IconProps{Size: uikit.SizeSm, Tone: uikit.ToneSecondary})
-						uikit.Text(c, "执行原则：Key 已获连接与能力授权，且未命中任何启用的拦截策略时才允许执行（命中即拒绝，无允许覆盖或优先级）", uikit.TextProps{
+						uikit.Text(c, "执行条件：密钥已授权，且未命中已启用的拦截策略；任一规则命中即拦截。", uikit.TextProps{
 							Style: uikit.TextCaption, Tone: uikit.ToneSecondary,
 						}).SingleLine().Ellipsis("…")
 					})
@@ -763,10 +763,10 @@ func (a *app) mcpPoliciesTab(c *ui.Context) {
 							uikit.Text(c, pol.ConnSub, uikit.TextProps{Style: uikit.TextCaption, Tone: uikit.ToneTertiary}).SingleLine().Ellipsis("…")
 						})
 						ui.Column(c).Width(115).Shrink(0).Gap(t.Space.N2).Children(func() {
-							keyTitle, keySub := "全部 Key", "含后续新建 Key"
+							keyTitle, keySub := "全部密钥", "含后续新增密钥"
 							if !pol.AllKeys {
 								keyTitle = strings.Join(pol.KeyNames, ", ")
-								keySub = fmt.Sprintf("指定 %d 个 Key", len(pol.KeyNames))
+								keySub = fmt.Sprintf("指定 %d 个密钥", len(pol.KeyNames))
 							}
 							uikit.Text(c, keyTitle, uikit.TextProps{Style: uikit.TextFootnote}).SingleLine().Ellipsis("…")
 							uikit.Text(c, keySub, uikit.TextProps{Style: uikit.TextCaption, Tone: uikit.ToneTertiary}).SingleLine().Ellipsis("…")
@@ -789,7 +789,7 @@ func (a *app) mcpPoliciesTab(c *ui.Context) {
 								uikit.Text(c, pol.HitsSummary, uikit.TextProps{Style: uikit.TextCaption, Tone: tone}).SingleLine().Ellipsis("…")
 							})
 							more := uikit.SiderMore(c, row, uikit.SiderMoreProps{
-								Icon: moreIcon, Label: pol.Name + " 菜单",
+								Icon: moreIcon, Label: pol.Name + " 操作菜单",
 							})
 							if uikit.RowMenuOn(c, row, more, entries) {
 								a.mcp.selectedPolicyID = pol.ID
@@ -820,7 +820,7 @@ func (a *app) mcpAuditTab(c *ui.Context) {
 					uikit.FilterChip(c, "目标连接", &a.mcp.auditConnFilter, a.mcpConnectionOptions(-1, true), uikit.FilterChipProps{Key: "aud-conn-filter"})
 					uikit.FilterChip(c, "操作类型", &a.mcp.auditTypeFilter, []uikit.Option[string]{
 						{Value: "all", Label: "全部"},
-						{Value: "目录上传", Label: "目录上传"},
+						{Value: "文件上传", Label: "文件上传"},
 						{Value: "命令执行", Label: "命令执行"},
 						{Value: "文件读取", Label: "文件读取"},
 						{Value: "策略管理", Label: "策略管理"},
@@ -836,7 +836,7 @@ func (a *app) mcpAuditTab(c *ui.Context) {
 						{Value: "all", Label: "全部"},
 						{Value: "intercepted", Label: "被策略拦截"},
 						{Value: "denied", Label: "权限拒绝 / 认证失败"},
-						{Value: "done", Label: "成功"},
+						{Value: "done", Label: "已完成"},
 					}, uikit.FilterChipProps{Key: "aud-res-filter"})
 				})
 				// Table header
@@ -844,7 +844,7 @@ func (a *app) mcpAuditTab(c *ui.Context) {
 					BorderWidth(t.Size.Divider, 0, t.Size.Divider, 0).BorderColor(uikit.Color(t.Color.Border.Divider)).
 					AlignItems(ui.Center).Gap(t.Space.N10).Children(func() {
 					uikit.Text(c, "时间", uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneSecondary}).Width(72).Shrink(0)
-					uikit.Text(c, "Key 名称", uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneSecondary}).Width(148).Shrink(0)
+					uikit.Text(c, "密钥名称", uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneSecondary}).Width(148).Shrink(0)
 					uikit.Text(c, "目标连接", uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneSecondary}).Width(120).Shrink(0)
 					uikit.Text(c, "操作类型", uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneSecondary}).Width(96).Shrink(0)
 					uikit.Text(c, "命令或路径摘要", uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneSecondary}).Grow(1).MinWidth(0).SingleLine()
@@ -894,7 +894,7 @@ func (a *app) mcpAuditTab(c *ui.Context) {
 							icon := uikit.IconDocument
 							if item.IsCommand {
 								icon = uikit.IconTerminal
-							} else if item.ActionType == "目录上传" {
+							} else if item.ActionType == "文件上传" {
 								icon = uikit.IconUpload
 							} else if item.ActionType == "策略管理" {
 								icon = uikit.IconShield

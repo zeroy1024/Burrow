@@ -125,7 +125,7 @@ func StatusPill(c *ui.Context, status Status, options ...StatusPillProps) ui.Ele
 	case StatusDisabled:
 		label, tone = "已停用", ToneWarning
 	case StatusEnabled:
-		label, tone = "启用", ToneSuccess
+		label, tone = "已启用", ToneSuccess
 	case StatusStopping:
 		label, tone = "停止中", ToneWarning
 	case StatusInterrupted:

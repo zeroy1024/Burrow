@@ -15,10 +15,10 @@ import (
 )
 
 var (
-	sessionKeyIcon   = uikit.LineIcon(`<circle cx="8" cy="8" r="5"/><path d="m12 12 9 9m-6-6 3-3m0 6 3-3"/>`)
-	sessionEyeIcon   = uikit.LineIcon(`<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>`)
-	sessionAlertIcon = uikit.LineIcon(`<circle cx="12" cy="12" r="9"/><path d="M12 7v6m0 4h.01"/>`)
-	sessionCheckIcon = uikit.LineIcon(`<circle cx="12" cy="12" r="9"/><path d="m7 12 3 3 7-7"/>`)
+	sessionKeyIcon   = uikit.IconSVG(uikit.IconKey)
+	sessionEyeIcon   = uikit.IconSVG(uikit.IconEye)
+	sessionAlertIcon = uikit.IconSVG(uikit.IconAlertCircle)
+	sessionCheckIcon = uikit.IconSVG(uikit.IconCheckCircle)
 )
 
 func (a *app) hostDialog(c *ui.Context) {

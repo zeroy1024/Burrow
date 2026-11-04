@@ -12,7 +12,7 @@ import (
 	"sshdesk/internal/uikit"
 )
 
-// License texts are copied verbatim from the dependency versions in go.mod.
+// License texts are copied verbatim from the pinned dependency and asset versions.
 //
 //go:embed licenses/mygo.txt
 var mygoLicense string
@@ -59,6 +59,7 @@ var dependencyNotices = []struct{ name, license, text string }{
 	{"MyGo", "MIT", mygoLicense},
 	{"modernc SQLite 及运行依赖", "BSD / MIT", sqliteLicense},
 	{"MCP Go SDK 及运行依赖", "MIT / BSD-3-Clause", mcpLicense},
+	{"Lucide Icons " + uikit.LucideVersion, "ISC / MIT", uikit.LucideLicense},
 	{"golang.org/x/crypto/ssh", "BSD-3-Clause", cryptoLicense},
 	{"go-winio", "MIT", winioLicense},
 	{"PureGo", "Apache-2.0", puregoLicense},

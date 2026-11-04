@@ -282,10 +282,10 @@ func (a *app) applyMCPData(data mcpData) {
 					grants[i].AllowRead, grants[i].AllowWrite, grants[i].AllowExec = g.Read, g.Write, g.Exec
 					var capabilities []string
 					if g.Read {
-						capabilities = append(capabilities, "读")
+						capabilities = append(capabilities, "读取")
 					}
 					if g.Write {
-						capabilities = append(capabilities, "写")
+						capabilities = append(capabilities, "写入")
 					}
 					if g.Exec {
 						capabilities = append(capabilities, "执行")
@@ -328,12 +328,9 @@ func (a *app) applyMCPData(data mcpData) {
 			}
 		}
 		view.ConnSummary = strings.Join(names, ", ")
-		view.ConnSub = fmt.Sprintf("%d 个连接", len(p.ConnectionIDs))
+		view.ConnSub = fmt.Sprintf("指定 %d 个连接", len(p.ConnectionIDs))
 		if p.AllConnections {
-			view.ConnSummary, view.ConnSub = "全部文件连接", "含后续新增连接"
-			if p.Category == "ssh" {
-				view.ConnSummary = "全部 SSH 连接"
-			}
+			view.ConnSummary, view.ConnSub = "全部连接", "含后续新增连接"
 		}
 		if p.Category == "ssh" {
 			for _, r := range p.CommandRules {
@@ -624,7 +621,7 @@ func mcpActionName(value string) string {
 	if strings.HasPrefix(value, "mcp.") {
 		return "协议请求"
 	}
-	return map[string]string{"connections_list": "连接发现", "ssh_exec": "命令执行", "files_list": "目录浏览", "files_stat": "文件信息", "files_read": "文件读取", "files_write": "文件写入", "files_upload": "目录上传", "files_download": "目录下载", "authentication": "认证失败", "tasks_list": "任务列表", "tasks_get": "任务查询", "tasks_cancel": "取消任务"}[value]
+	return map[string]string{"connections_list": "连接发现", "ssh_exec": "命令执行", "files_list": "目录浏览", "files_stat": "文件信息", "files_read": "文件读取", "files_write": "文件写入", "files_upload": "文件上传", "files_download": "文件下载", "authentication": "认证失败", "tasks_list": "任务列表", "tasks_get": "任务查询", "tasks_cancel": "任务取消"}[value]
 }
 
 func mcpActionValue(name string) string {

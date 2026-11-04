@@ -105,7 +105,7 @@ func fileIconAppearance(kind FileKind, name string, options ...FileIconProps) (*
 	case FileKey:
 		icon = IconSVG(IconKey)
 	case FileLink:
-		icon = LineIcon(`<path d="m10 13 4-4m-6 6-2 2a4 4 0 0 1-6-6l4-4a4 4 0 0 1 6 0m4 2 2-2a4 4 0 0 1 6 6l-4 4a4 4 0 0 1-6 0"/>`)
+		icon = IconSVG(IconLink)
 	}
 	if len(options) > 0 && options[0].Selected {
 		ink = t.C.FilePaneFocus.SelTextInactive
