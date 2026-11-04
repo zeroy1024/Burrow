@@ -43,8 +43,9 @@ type mcpFileRule struct {
 }
 
 type mcpCommandRule struct {
-	Mode    string // "exact", "regex", or "contains"
-	Pattern string
+	Mode       string // "command", "exact", "regex", or "contains"
+	Pattern    string
+	IgnoreCase bool // command mode only
 }
 
 type mcpPolicy struct {

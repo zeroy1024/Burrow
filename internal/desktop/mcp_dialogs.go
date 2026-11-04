@@ -12,6 +12,7 @@ import (
 
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
+	"sshdesk/internal/shellcmd"
 	"sshdesk/internal/theme"
 	"sshdesk/internal/uikit"
 )
@@ -47,8 +48,8 @@ func (a *app) loadPolicyIntoDraft(pol *mcpPolicy) {
 	cmdRules := slices.Clone(pol.CmdRules)
 	if len(cmdRules) == 0 {
 		cmdRules = []mcpCommandRule{
-			{Mode: "exact", Pattern: "rm -rf /"},
-			{Mode: "regex", Pattern: `^(mkfs\..*|dd\s+if=|shutdown|reboot).*`},
+			{Mode: "command", Pattern: "rm -rf /"},
+			{Mode: "command", Pattern: "mkfs.*"},
 		}
 	}
 	a.mcp.policyDraft = mcpPolicyDraft{
@@ -83,7 +84,7 @@ func (a *app) openNewMCPPolicyModal() {
 			},
 		},
 		CmdRules: []mcpCommandRule{
-			{Mode: "exact", Pattern: "rm -rf /"},
+			{Mode: "command", Pattern: "rm -rf /"},
 		},
 	}
 }
@@ -105,14 +106,10 @@ func (a *app) mcpPolicyModal(c *ui.Context) {
 		idBadge = "草稿 · v1"
 	}
 
-	regexInvalid := false
+	ruleInvalid := false
 	if draft.CategorySeg == 0 {
 		for _, r := range draft.CmdRules {
-			if r.Mode == "regex" && strings.TrimSpace(r.Pattern) != "" {
-				if _, err := regexp.Compile(r.Pattern); err != nil {
-					regexInvalid = true
-				}
-			}
+			ruleInvalid = ruleInvalid || commandRuleError(r) != ""
 		}
 	}
 
@@ -134,7 +131,7 @@ func (a *app) mcpPolicyModal(c *ui.Context) {
 					parts.RequestDismiss()
 				}
 				saveRequested = uikit.Button(c, "保存策略", uikit.ButtonProps{
-					Variant: uikit.ButtonPrimary, Disabled: regexInvalid || a.mcpBusy(),
+					Variant: uikit.ButtonPrimary, Disabled: ruleInvalid || a.mcpBusy(),
 				}).Clicked()
 			})
 		},
@@ -150,7 +147,7 @@ func (a *app) mcpPolicyModal(c *ui.Context) {
 			})
 		uikit.Scrollbars(c, parts.Panel, scroller, &draft.Scroll, uikit.ScrollbarProps{Label: "策略表单滚动条"})
 	})
-	if (saveRequested || dialog.Submit) && !regexInvalid {
+	if (saveRequested || dialog.Submit) && !ruleInvalid {
 		a.saveMCPPolicyDraft()
 	}
 }
@@ -296,29 +293,25 @@ func (a *app) mcpPolicyFields(c *ui.Context) {
 				uikit.Badge(c, "命令拦截规则", uikit.BadgeProps{Tone: uikit.ToneWarning})
 				ui.Spacer(c)
 				if uikit.Button(c, "+ 添加命令规则", uikit.ButtonProps{Size: uikit.SizeSm}).Clicked() {
-					draft.CmdRules = append(draft.CmdRules, mcpCommandRule{Mode: "exact", Pattern: "shutdown -h now"})
+					draft.CmdRules = append(draft.CmdRules, mcpCommandRule{Mode: "command", Pattern: "shutdown"})
 				}
 			})
 			remove := -1
 			for idx := range draft.CmdRules {
 				cmdIdx := idx
 				cmdRule := &draft.CmdRules[cmdIdx]
-				var regErr string
-				if cmdRule.Mode == "regex" && strings.TrimSpace(cmdRule.Pattern) != "" {
-					if _, err := regexp.Compile(cmdRule.Pattern); err != nil {
-						regErr = "正则表达式无效：" + err.Error()
-					}
-				}
+				ruleErr := commandRuleError(*cmdRule)
 				ui.Column(c).Key(cmdIdx).FillWidth().Gap(t.Space.N4).Children(func() {
 					ui.Row(c).FillWidth().AlignItems(ui.Center).Gap(t.Space.N6).Children(func() {
 						uikit.Select(c.Key(fmt.Sprintf("cmode-%d", cmdIdx)), &cmdRule.Mode, []uikit.Option[string]{
+							{Value: "command", Label: "命令匹配"},
 							{Value: "exact", Label: "精确匹配"},
 							{Value: "regex", Label: "正则匹配"},
 							{Value: "contains", Label: "模糊匹配"},
 						}, uikit.SelectProps{Label: "匹配方式"}).
 							Width(120).Shrink(0)
 						uikit.Input(c.Key(fmt.Sprintf("cpat-%d", cmdIdx)), &cmdRule.Pattern, uikit.InputProps{
-							Mono: true, Label: "匹配内容", Placeholder: "rm -rf /", Error: regErr,
+							Mono: true, Label: "匹配内容", Placeholder: "rm -rf /", Error: ruleErr,
 						}).Grow(1)
 						uikit.Badge(c, "命中拦截", uikit.BadgeProps{Tone: uikit.ToneDanger})
 						if len(draft.CmdRules) > 1 {
@@ -327,8 +320,14 @@ func (a *app) mcpPolicyFields(c *ui.Context) {
 							}
 						}
 					})
-					if regErr != "" {
-						uikit.FieldMessage(c, regErr, uikit.FieldMessageProps{Tone: uikit.ToneDanger})
+					switch {
+					case ruleErr != "":
+						uikit.FieldMessage(c, ruleErr, uikit.FieldMessageProps{Tone: uikit.ToneDanger})
+					case cmdRule.Mode == "contains":
+						uikit.FieldMessage(c, "模糊匹配按子串判定，rm 也会命中 format 等词，建议改用命令匹配。", uikit.FieldMessageProps{Tone: uikit.ToneWarning})
+					}
+					if cmdRule.Mode == "command" {
+						uikit.Checkbox(c.Key(fmt.Sprintf("cicase-%d", cmdIdx)), &cmdRule.IgnoreCase, "参数忽略大小写")
 					}
 				})
 			}
@@ -336,10 +335,10 @@ func (a *app) mcpPolicyFields(c *ui.Context) {
 				draft.CmdRules = slices.Delete(draft.CmdRules, remove, remove+1)
 				c.Invalidate()
 			}
-			uikit.Text(c, "精确匹配完整命令；正则匹配表达式；模糊匹配包含文本，区分大小写。", uikit.TextProps{
+			uikit.Text(c, "命令匹配按命令名和参数判定，可识别 &&、管道、sudo、bash -c、ssh 等组合写法；精确匹配完整命令；正则匹配表达式；模糊匹配包含文本，区分大小写。", uikit.TextProps{
 				Style: uikit.TextCaption, Tone: uikit.ToneSecondary,
 			})
-			uikit.Text(c, "命令策略用于防误操作，不解析脚本，也不能限制已授权命令的文件访问。", uikit.TextProps{
+			uikit.Text(c, "命令策略用于防误操作：无法解析的部分按关键词从严拦截，但不检查脚本文件和解释器（如 python -c）内部的操作，也不能限制已授权命令的文件访问。", uikit.TextProps{
 				Style: uikit.TextCaption, Tone: uikit.ToneSecondary,
 			})
 		})
@@ -1130,4 +1129,23 @@ func (a *app) mcpClientConfigModal(c *ui.Context) {
 			}
 		})
 	})
+}
+
+// commandRuleError is the inline validation for one rule; saving stays
+// disabled while any rule reports one.
+func commandRuleError(r mcpCommandRule) string {
+	if strings.TrimSpace(r.Pattern) == "" {
+		return ""
+	}
+	switch r.Mode {
+	case "regex":
+		if _, err := regexp.Compile(r.Pattern); err != nil {
+			return "正则表达式无效：" + err.Error()
+		}
+	case "command":
+		if _, err := shellcmd.ParseRule(r.Pattern, r.IgnoreCase); err != nil {
+			return err.Error()
+		}
+	}
+	return ""
 }

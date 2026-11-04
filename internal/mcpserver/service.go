@@ -121,9 +121,11 @@ type Failure struct {
 }
 
 // Match is the matched command text, or the canonical path for a file rule.
-// Context is the whitespace-delimited command word containing Text.
+// Context is the whitespace-delimited command word containing Text for text
+// rules. A command rule reports the launchers it ran through (Via), or why it
+// fell back to keyword matching.
 type Match struct {
-	Text, Context string
+	Text, Context, Via, Fallback string
 }
 
 func (e *Failure) Error() string { return e.Message }

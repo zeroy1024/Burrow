@@ -334,7 +334,7 @@ func (a *app) applyMCPData(data mcpData) {
 		}
 		if p.Category == "ssh" {
 			for _, r := range p.CommandRules {
-				view.CmdRules = append(view.CmdRules, mcpCommandRule{Mode: r.Mode, Pattern: r.Pattern})
+				view.CmdRules = append(view.CmdRules, mcpCommandRule{Mode: r.Mode, Pattern: r.Pattern, IgnoreCase: r.IgnoreCase})
 			}
 		} else {
 			for _, r := range p.FileRules {
@@ -348,6 +348,9 @@ func (a *app) applyMCPData(data mcpData) {
 			view.RulePrimary = view.FileRules[0].Path
 		}
 		view.RuleSub = fmt.Sprintf("共 %d 条规则", len(view.CmdRules)+len(view.FileRules))
+		if slices.ContainsFunc(view.CmdRules, func(r mcpCommandRule) bool { return r.Mode == "contains" }) {
+			view.RuleSub += " · 含模糊匹配，可能误报"
+		}
 		a.mcp.policies = append(a.mcp.policies, view)
 	}
 	a.mcp.audits = nil
@@ -549,7 +552,7 @@ func (a *app) saveMCPBackendPolicy() {
 	if draft.CategorySeg == 0 {
 		p.Category = "ssh"
 		for _, r := range draft.CmdRules {
-			p.CommandRules = append(p.CommandRules, store.MCPCommandRule{Mode: r.Mode, Pattern: r.Pattern})
+			p.CommandRules = append(p.CommandRules, store.MCPCommandRule{Mode: r.Mode, Pattern: r.Pattern, IgnoreCase: r.Mode == "command" && r.IgnoreCase})
 		}
 	} else {
 		for _, r := range draft.FileRules {

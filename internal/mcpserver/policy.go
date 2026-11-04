@@ -18,6 +18,7 @@ import (
 	"golang.org/x/text/unicode/norm"
 
 	"sshdesk/internal/fileclient"
+	"sshdesk/internal/shellcmd"
 	"sshdesk/internal/store"
 )
 
@@ -42,8 +43,15 @@ func ValidatePolicy(p store.MCPPolicy) error {
 			if r.Pattern == "" || len(r.Pattern) > 8192 {
 				return fail("invalid_argument", "命令规则为空或超长")
 			}
+			if r.IgnoreCase && r.Mode != "command" {
+				return fail("invalid_argument", "仅命令匹配支持忽略参数大小写")
+			}
 			switch r.Mode {
 			case "exact", "contains":
+			case "command":
+				if _, err := shellcmd.ParseRule(r.Pattern, r.IgnoreCase); err != nil {
+					return fail("invalid_argument", err.Error())
+				}
 			case "regex":
 				if _, err := regexp.Compile(r.Pattern); err != nil {
 					return fmt.Errorf("正则表达式无效：%w", err)
@@ -94,11 +102,48 @@ func (s *Service) CheckCommand(ctx context.Context, keyID, connectionID, command
 	var hits []store.MCPHit
 	var matches []Match
 	var reasons []string
+	var analysis *shellcmd.Analysis
 	for _, p := range policies {
 		if !applies(p, keyID, connectionID, "ssh") {
 			continue
 		}
 		for _, r := range p.CommandRules {
+			rule := r.Mode + ": " + r.Pattern
+			if r.IgnoreCase {
+				rule += "（参数忽略大小写）"
+			}
+			hit := store.MCPHit{PolicyID: p.ID, Name: p.Name, Version: p.Version,
+				Category: p.Category, Rule: rule, Action: "exec"}
+			reason := fmt.Sprintf("策略「%s」的规则 %s", p.Name, rule)
+			if r.Mode == "command" {
+				matcher, err := shellcmd.ParseRule(r.Pattern, r.IgnoreCase)
+				if err != nil {
+					return fail("invalid_policy", "已保存的策略无效，拒绝执行")
+				}
+				// One parse serves every command rule of every policy.
+				if analysis == nil {
+					result := shellcmd.Analyze(command)
+					analysis = &result
+				}
+				ev, ok := matcher.Match(*analysis)
+				if !ok {
+					continue
+				}
+				match := Match{Text: ev.Text, Via: strings.Join(ev.Via, " ▸ "), Fallback: ev.Fallback}
+				if ev.Fallback != "" {
+					reason += fmt.Sprintf(" 按关键词从严命中（%s）：%q", ev.Fallback, clip(ev.Text))
+				} else {
+					reason += fmt.Sprintf(" 命中命令 %q", clip(ev.Text))
+					if match.Via != "" {
+						reason += "（经由 " + match.Via + "）"
+					}
+					if ev.Count > 1 {
+						reason += fmt.Sprintf("，共 %d 处", ev.Count)
+					}
+				}
+				hits, matches, reasons = append(hits, hit), append(matches, match), append(reasons, reason)
+				continue
+			}
 			start, end := -1, -1
 			switch r.Mode {
 			case "exact":
@@ -121,10 +166,7 @@ func (s *Service) CheckCommand(ctx context.Context, keyID, connectionID, command
 			if start < 0 {
 				continue
 			}
-			hit := store.MCPHit{PolicyID: p.ID, Name: p.Name, Version: p.Version,
-				Category: p.Category, Rule: r.Mode + ": " + r.Pattern, Action: "exec"}
 			match := Match{Text: command[start:end], Context: commandWord(command, start, end)}
-			reason := fmt.Sprintf("策略「%s」的规则 %s", p.Name, hit.Rule)
 			switch {
 			case r.Mode == "exact":
 				reason += " 与整条命令完全一致"
