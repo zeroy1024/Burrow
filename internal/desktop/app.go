@@ -77,6 +77,7 @@ type app struct {
 	terminalCapture        terminalCaptureState
 	terminalPreviews       map[*remoteSession]*terminalPreview
 	monitor                monitorState
+	hostFacts              hostFactsState
 	ctx                    context.Context
 	cancel                 context.CancelFunc
 	sshWorkers             sync.WaitGroup
@@ -253,6 +254,9 @@ func Run() (runErr error) {
 	}
 	if err := a.loadAppPreferences(); err != nil {
 		a.terminalError = errors.Join(a.terminalError, err)
+	}
+	if err := a.loadHostFacts(); err != nil {
+		a.persistenceNotice("读取主机基础信息失败", err)
 	}
 	a.restoreWorkspace()
 	if err := a.restoreTransfers(); err != nil {

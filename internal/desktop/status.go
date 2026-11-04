@@ -29,6 +29,7 @@ func (a *app) serverStatus(c *ui.Context) {
 				message = "正在连接，等待服务器状态…"
 			}
 			uikit.Text(c, message, uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneSecondary}).Margin(t.Space.N14, -t.Space.N2, t.Space.N14, -t.Space.N2)
+			a.serverHostFacts(c, session)
 			return
 		}
 		h := session.endpoint
@@ -97,8 +98,10 @@ func (a *app) serverStatus(c *ui.Context) {
 				if metrics.hasProcesses {
 					processes = fmt.Sprint(metrics.processes)
 				}
-				uikit.KeyValue(c, []uikit.KV{{Key: "主机名", Value: monitorText(metrics.hostname)}, {Key: "系统", Value: monitorText(metrics.system)},
-					{Key: "内核", Value: monitorText(metrics.kernel)}, {Key: "运行时间", Value: monitorUptime(metrics.uptime)}, {Key: "进程", Value: processes}})
+				a.serverHostFacts(c, session)
+				uikit.KeyValue(c, []uikit.KV{
+					{Key: "运行时间", Value: monitorUptime(metrics.uptime)}, {Key: "进程", Value: processes},
+				})
 			})
 			if notice != "" {
 				uikit.Text(c, notice, uikit.TextProps{Style: uikit.TextCaption, Tone: uikit.ToneSecondary})
@@ -110,6 +113,39 @@ func (a *app) serverStatus(c *ui.Context) {
 		a.statusVisible = false
 		a.monitor.stop()
 	}
+}
+
+func (a *app) serverHostFacts(c *ui.Context, session *remoteSession) {
+	var facts *linuxHostFacts
+	var pending bool
+	var errorText string
+	if group := session.connection; group != nil {
+		if value, ok := a.hostFacts.values[hostFactsKey(group.plan)]; ok && group.planErr == nil {
+			facts = &value
+		}
+		pending = group.facts.pending && group.connection != nil && group.facts.connection == group.connection
+		errorText = group.facts.errorText
+	}
+	hostname, system, kernel := "—", "—", "—"
+	if facts != nil {
+		hostname, system, kernel = facts.Hostname, facts.OSName, facts.Kernel
+	}
+	t := theme.Current()
+	ui.Column(c).Gap(t.Space.N12).Children(func() {
+		uikit.KeyValue(c, []uikit.KV{
+			{Key: "主机名", Value: hostname}, {Key: "系统", Value: system}, {Key: "内核", Value: kernel},
+		})
+		message := ""
+		if pending {
+			message = "正在更新主机基础信息…"
+		}
+		if errorText != "" {
+			message = "基础信息获取失败：" + errorText
+		}
+		if message != "" {
+			uikit.Text(c, message, uikit.TextProps{Style: uikit.TextCaption, Tone: uikit.ToneSecondary})
+		}
+	})
 }
 
 func monitorMeter(c *ui.Context, label, value string, percent *float64) {

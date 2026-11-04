@@ -240,7 +240,7 @@ func (a *app) catalogHostIcon(c *ui.Context, id hostID) {
 		uikit.ProtocolIcon(c, protocol, uikit.SizeDefault)
 		return
 	}
-	style := systems[h.os]
+	style, _ := a.hostSystem(h)
 	uikit.OsLogo(c, style.name, uikit.SizeDefault)
 }
 

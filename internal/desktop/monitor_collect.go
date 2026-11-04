@@ -6,9 +6,8 @@ import "strings"
 // exclusively, emits NUL-delimited records, and never evaluates file contents.
 // Per-file and process budgets keep an oversized optional section below Exec's
 // output limit without discarding the other metrics.
-const monitorScript = `LC_ALL=C
+const linuxCollectorPrelude = `LC_ALL=C
 export LC_ALL
-printf '__SSH_DESK_MONITOR_V2__\000'
 if ! { IFS= read -r monitor_os < /proc/sys/kernel/ostype; } 2>/dev/null || [ "$monitor_os" != Linux ]; then
   printf 'error\000Linux /proc 不可用\000'
   exit 0
@@ -29,6 +28,9 @@ emit_file() {
   read_file "$2" "$3"
   printf '%s\000%s\000' "$1" "$monitor_body"
 }
+`
+
+const monitorScript = "printf '__SSH_DESK_MONITOR_V2__\\000'\n" + linuxCollectorPrelude + `
 emit_file cpu /proc/stat 65536
 emit_file memory /proc/meminfo 16384
 emit_file network /proc/net/dev 65536
@@ -36,10 +38,7 @@ emit_file route /proc/net/route 65536
 emit_file route6 /proc/net/ipv6_route 65536
 emit_file uptime /proc/uptime 1024
 emit_file load /proc/loadavg 1024
-emit_file hostname /proc/sys/kernel/hostname 4096
-emit_file kernel /proc/sys/kernel/osrelease 4096
 emit_file mounts /proc/self/mountinfo 131072
-emit_file system /etc/os-release 16384
 monitor_count=0
 monitor_bytes=0
 monitor_top=ok
@@ -57,4 +56,8 @@ done
 printf 'processes\000%s\000top\000%s\000' "$monitor_count" "$monitor_top"
 `
 
-var monitorCommand = "exec /bin/sh -c '" + strings.ReplaceAll(monitorScript, "'", "'\\''") + "'"
+func linuxCollectorCommand(script string) string {
+	return "exec /bin/sh -c '" + strings.ReplaceAll(script, "'", "'\\''") + "'"
+}
+
+var monitorCommand = linuxCollectorCommand(monitorScript)

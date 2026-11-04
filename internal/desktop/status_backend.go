@@ -48,20 +48,19 @@ type processMetric struct {
 }
 
 type serverMetrics struct {
-	hostname, system, kernel string
-	cores, processes         int
-	hasProcesses             bool
-	load                     string
-	uptime                   *float64
-	cpu, memory, disk        *float64
-	memoryUsed, memoryTotal  uint64
-	diskUsed, diskTotal      uint64
-	diskDevice, filesystem   string
-	root                     monitorRoot
-	networkInterface         string
-	down, up                 *float64
-	top                      []processMetric
-	unavailable              []string
+	cores, processes        int
+	hasProcesses            bool
+	load                    string
+	uptime                  *float64
+	cpu, memory, disk       *float64
+	memoryUsed, memoryTotal uint64
+	diskUsed, diskTotal     uint64
+	diskDevice, filesystem  string
+	root                    monitorRoot
+	networkInterface        string
+	down, up                *float64
+	top                     []processMetric
+	unavailable             []string
 }
 
 type monitorSample struct {

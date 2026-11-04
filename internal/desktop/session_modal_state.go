@@ -421,8 +421,19 @@ func (a *app) saveSessionDraft(c *ui.Context, d *hostDraft, connect bool) {
 		return
 	}
 	d.saving = true
+	facts := a.draftHostFacts(d)
 	h := a.draftHost(d)
 	initializeSession(&h)
+	factsKey := ""
+	if facts != nil {
+		plan, err := a.captureSSHPlan(h)
+		if err != nil {
+			a.persistenceNotice("保存主机基础信息失败", err)
+			d.saving = false
+			return
+		}
+		factsKey = hostFactsKey(plan)
+	}
 	rollback, release, err := snapshotSessionSecrets(h, d.passwordChanged, d.passphraseChanged)
 	if err != nil {
 		uikit.Toast(c, uikit.ToastProps{Tone: uikit.ToneDanger, Title: "读取原有凭据失败", Detail: err.Error()})
@@ -466,6 +477,9 @@ func (a *app) saveSessionDraft(c *ui.Context, d *hostDraft, connect bool) {
 		if err != nil {
 			a.persistenceNotice("保存会话失败", errors.Join(err, rollback()))
 			return
+		}
+		if facts != nil {
+			a.rememberHostFacts(factsKey, *facts)
 		}
 
 		a.page().query = ""

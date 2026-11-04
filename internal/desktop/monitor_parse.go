@@ -22,24 +22,34 @@ type monitorProcess struct {
 }
 
 func parseMonitorSample(output string) (monitorSample, error) {
+	sections, err := parseLinuxCollectorOutput(output, "__SSH_DESK_MONITOR_V2__")
+	if err != nil {
+		return monitorSample{}, err
+	}
+	return parseMonitorSections(sections), nil
+}
+
+func parseLinuxCollectorOutput(output, marker string) (map[string]string, error) {
 	parts := strings.Split(output, "\x00")
-	if len(parts) < 2 || parts[0] != "__SSH_DESK_MONITOR_V2__" || parts[len(parts)-1] != "" || len(parts)%2 != 0 {
-		return monitorSample{}, errors.New("服务器返回了无法识别的监控数据")
+	if len(parts) < 2 || parts[0] != marker || parts[len(parts)-1] != "" || len(parts)%2 != 0 {
+		return nil, errors.New("服务器返回了无法识别的采集数据")
 	}
 	sections := make(map[string]string, len(parts)/2)
 	for i := 1; i < len(parts)-1; i += 2 {
 		if _, exists := sections[parts[i]]; exists {
-			return monitorSample{}, errors.New("服务器返回了重复的监控记录")
+			return nil, errors.New("服务器返回了重复的采集记录")
 		}
 		sections[parts[i]] = parts[i+1]
 	}
 	if message := sections["error"]; message != "" {
-		return monitorSample{}, errors.New(message)
+		return nil, errors.New(message)
 	}
+	return sections, nil
+}
+
+func parseMonitorSections(sections map[string]string) monitorSample {
 	var sample monitorSample
 	metrics := &sample.metrics
-	metrics.hostname, metrics.kernel = strings.TrimSpace(sections["hostname"]), strings.TrimSpace(sections["kernel"])
-	metrics.system = monitorOSName(sections["system"])
 	metrics.root = parseMonitorRoot(sections["mounts"])
 	metrics.diskDevice, metrics.filesystem = metrics.root.device, metrics.root.filesystem
 	parseMonitorCPU(&sample, sections["cpu"])
@@ -96,8 +106,7 @@ func parseMonitorSample(output string) (monitorSample, error) {
 	}{
 		{"CPU", sample.hasCPU}, {"内存", metrics.memory != nil},
 		{"网络", sample.hasNetwork && metrics.uptime != nil}, {"负载", metrics.load != ""},
-		{"主机名", metrics.hostname != ""}, {"系统", metrics.system != ""},
-		{"内核", metrics.kernel != ""}, {"运行时间", metrics.uptime != nil},
+		{"运行时间", metrics.uptime != nil},
 		{"进程数量", metrics.hasProcesses}, {"进程 Top", sample.processes != nil && len(sample.processes) > 0 && sample.hasCPU && metrics.cores > 0},
 		{"挂载信息", metrics.root.identity != ""},
 	} {
@@ -105,7 +114,7 @@ func parseMonitorSample(output string) (monitorSample, error) {
 			metrics.unavailable = append(metrics.unavailable, item.name)
 		}
 	}
-	return sample, nil
+	return sample
 }
 
 func parseMonitorCPU(sample *monitorSample, text string) {
@@ -218,9 +227,9 @@ func completeMonitorRates(sample, previous *monitorSample) {
 	}
 }
 
-func monitorOSName(text string) string {
+func osReleaseValue(text, key string) string {
 	for _, line := range strings.Split(text, "\n") {
-		value, ok := strings.CutPrefix(line, "PRETTY_NAME=")
+		value, ok := strings.CutPrefix(line, key+"=")
 		if !ok {
 			continue
 		}

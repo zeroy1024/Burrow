@@ -21,6 +21,9 @@ type connectionTestResult struct {
 	startedAt                    time.Time
 	Err                          error
 	NewHost                      bool
+	HostFacts                    *linuxHostFacts
+	HostFactsKey                 string
+	HostFactsErr                 error
 }
 
 type hostKeyChangedError struct{ old, current string }
@@ -75,6 +78,20 @@ func (a *app) prepareConnectionTest(h host, password, passphrase string, passphr
 							}
 						}
 					}
+					if h.protocol == "" || h.protocol == "ssh" {
+						// Keep the test transport alive until Exec has delivered its
+						// result; releasing its final command lease closes the transport.
+						var facts linuxHostFacts
+						release, factsErr := connection.Retain()
+						if factsErr == nil {
+							facts, factsErr = collectLinuxHostFacts(ctx, connection)
+							release()
+						}
+						result.HostFactsErr = factsErr
+						if factsErr == nil {
+							result.HostFacts, result.HostFactsKey = &facts, hostFactsKey(plan)
+						}
+					}
 					connection.Close()
 					connection.Wait()
 				}
@@ -92,6 +109,15 @@ func (a *app) prepareConnectionTest(h host, password, passphrase string, passphr
 			if result.NewHost {
 				result.Summary += " · 已确认主机指纹"
 				result.Detail = result.Fingerprint
+			}
+			if facts := result.HostFacts; facts != nil {
+				result.Detail = strings.TrimSpace(result.Detail + "\n主机名：" + facts.Hostname +
+					"\n系统：" + facts.OSName + "\n内核：" + facts.Kernel)
+			}
+			if result.HostFactsErr != nil {
+				result.Summary += " · 基础信息获取失败"
+				detail := sanitizeConnectionError(result.HostFactsErr.Error(), password, passphrase)
+				result.Detail = strings.TrimSpace(result.Detail + "\n" + detail)
 			}
 		} else {
 			result.Summary = connectionErrorSummary(err)

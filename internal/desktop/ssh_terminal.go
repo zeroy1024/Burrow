@@ -132,6 +132,7 @@ func (a *app) attachSSH(session *remoteSession, run *sshRuntime) {
 	}
 	session.focusPending = a.sshSessionFocused(session)
 	session.output, session.state = nil, connected
+	a.startSSHHostFacts(session.connection)
 	if a.sshSessionFocused(session) {
 		session.focus.Focus()
 	}

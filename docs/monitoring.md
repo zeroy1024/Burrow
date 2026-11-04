@@ -12,10 +12,20 @@
 | 网络 | 所选默认路由接口的收发速率，不是所有网卡的合计 |
 | 进程 Top | 区间 CPU 使用率最高的前 4 个可读进程；单核满载为 100%，多线程可超过 100% |
 | 进程数量 | 当前 SSH 账号可见的进程数量，与 Top 的采集预算独立 |
-| 系统信息 | 主机名、内核、发行版和运行时间 |
+| 系统信息 | 主机名、内核和发行版使用共享的主机基础信息；运行时间实时采集 |
 | 根盘 | 根挂载的设备/文件系统信息；具备可用 SFTP statvfs 能力时显示容量和使用率 |
 
 CPU、网络与进程速率需要两次有效采样建立差分。切换接口、计数回退或进程身份变化时重建相应基线。进程以 PID 和启动时间识别，避免 PID 复用串入旧样本。
+
+## 主机基础信息
+
+SSH 测试连接成功后读取 Linux 主机名、内核以及发行版标识、版本和名称。结果先保留在编辑草稿中，保存会话时写入 SQLite；取消编辑不会修改已保存的信息。每次新建 SSH 连接，在第一个终端就绪后后台刷新并保存一次，同一连接的多个终端共享结果，不依赖监控面板是否打开。
+
+会话图标、系统描述和监控面板共用这份数据。图标按发行版 `ID` 匹配现有资源；未知 Linux 发行版使用通用企鹅。断开连接后仍可查看上次成功的结果；采集时间仅在内部用于判断记录新旧，不在面板显示。运行时间、进程数量以及各项使用率不作为基础信息缓存。
+
+缓存绑定会话 ID、地址、端口、用户和完整跳板路径，修改目标后不会复用原目标的信息；已经连接的终端仍展示其实际连接目标的信息。基础信息独立存储在数据库的 `hostFacts` 记录中，不更新连接配置的修订时间。旧采集结果不能覆盖更新的记录。
+
+采集单次限时 5 秒，失败不影响 SSH 连接，也不清空同一目标已有的成功结果。测试结果和监控面板会显示采集失败原因，数据库读写错误使用现有错误提示。
 
 ## 不可用与权限
 
@@ -35,8 +45,8 @@ Shell 状态栏延迟独立于监控开关：当前可见终端按连接组共�
 
 ## 开发说明
 
-主体读取 `/proc/stat`、`loadavg`、`meminfo`、`net/dev`、路由、`uptime`、进程 stat、主机/内核和 mountinfo；发行版从 `/etc/os-release` 解析字面值。固定 `/bin/sh` 脚本使用 shell 内建，不调用 `ps`、`top`、`df` 等外部采集工具，也不执行服务器返回的文本。
+监控主体读取 `/proc/stat`、`loadavg`、`meminfo`、`net/dev`、路由、`uptime`、进程 stat 和 mountinfo。基础信息单独读取 `/proc/sys/kernel/hostname`、`/proc/sys/kernel/osrelease`，并从 `/etc/os-release` 解析字面值。两者共用固定 `/bin/sh` 采集和记录解析机制，使用 shell 内建，不调用 `ps`、`top`、`df` 等外部采集工具，也不执行服务器返回的文本。
 
 进程原始记录预算为 512 KiB，全部记录留在既有 1 MiB Exec 输出上限内。根盘容量使用短生命周期的独立 SFTP subsystem，不复用文件浏览或传输 client。
 
-源码入口：[monitor_collect.go](../internal/desktop/monitor_collect.go)、[monitor_parse.go](../internal/desktop/monitor_parse.go)、[status_backend.go](../internal/desktop/status_backend.go) 和 [ssh_latency.go](../internal/desktop/ssh_latency.go)。验证边界统一见[已知限制](limitations.md)。
+源码入口：[host_facts.go](../internal/desktop/host_facts.go)、[monitor_collect.go](../internal/desktop/monitor_collect.go)、[monitor_parse.go](../internal/desktop/monitor_parse.go)、[status_backend.go](../internal/desktop/status_backend.go) 和 [ssh_latency.go](../internal/desktop/ssh_latency.go)。验证边界统一见[已知限制](limitations.md)。

@@ -248,7 +248,8 @@ func (a *app) catalogMatches(group *hostGroup, id hostID) bool {
 	if !a.catalogModeMatches(h) {
 		return false
 	}
-	text := h.name + " " + h.user + " " + h.address + " " + systems[h.os].name + " " + group.name
+	style, system := a.hostSystem(h)
+	text := h.name + " " + h.user + " " + h.address + " " + style.name + " " + system + " " + group.name
 	return strings.Contains(strings.ToLower(text), query)
 }
 

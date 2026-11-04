@@ -242,8 +242,9 @@ func (a *app) catalogHostMenu(c *ui.Context, id hostID) []uikit.MenuEntry {
 func (a *app) catalogHostRow(c *ui.Context, slot catalogSlot) ui.Element {
 	t := theme.Current()
 	id, h := hostID(slot.key.id), a.hosts[slot.key.id]
+	_, system := a.hostSystem(h)
 	result := uikit.SiderRow(c, uikit.SiderRowProps{
-		Key: slot.key, Title: h.name, Subtitle: h.user + "@" + h.address, Description: h.system,
+		Key: slot.key, Title: h.name, Subtitle: h.user + "@" + h.address, Description: system,
 		Logo: func() { a.catalogHostIcon(c, id) }, DragValue: hostDrag{id: id, group: slot.group},
 		DeferPresentation: true, Motion: uikit.MotionOverride(a.reduceMotion(c)),
 	})

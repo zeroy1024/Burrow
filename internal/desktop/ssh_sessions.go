@@ -29,6 +29,7 @@ type sshConnectionGroup struct {
 	queue      []*sshConnectionRequest
 	opening    *sshConnectionRequest
 	latency    sshLatencyState
+	facts      hostFactsProbe
 }
 
 type sshConnectionRequest struct {
