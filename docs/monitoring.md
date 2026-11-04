@@ -34,10 +34,10 @@ SSH 测试连接成功后识别平台并读取主机名、系统名称与版本�
 |---|---|---|
 | Linux | `/bin/sh` 读取 `/proc/sys/kernel/hostname`、`osrelease`、`/etc/os-release`，`uname -m` 取架构 | 系统名为 `PRETTY_NAME` |
 | macOS | `/bin/sh` 执行 `sw_vers -productName / -productVersion`、`uname -n / -r / -m` | 系统名如 `macOS 27.2`，内核为 Darwin 版本 |
-| Windows | `powershell.exe -NoProfile -NonInteractive -EncodedCommand`，读取 `Win32_OperatingSystem`、注册表 `CurrentVersion` 与 `OpenSSH\DefaultShell` | 系统名与 `DisplayVersion` 随系统语言；内核为 `Version.UBR`；架构取 `PROCESSOR_ARCHITECTURE`；默认 shell 未设置时为 `cmd` |
+| Windows | `powershell.exe -NoProfile -NonInteractive -EncodedCommand`，经 WMI 读取 `Win32_OperatingSystem`、注册表 `CurrentVersion` 与 `OpenSSH\DefaultShell` | 系统名与 `DisplayVersion` 随系统语言；内核为 `Version.UBR`；架构取 `PROCESSOR_ARCHITECTURE`；默认 shell 未设置时为 `cmd` |
 | 其他系统 | 仅保存 `uname` 结果 | 系统名、主机名与内核版本 |
 
-Windows 脚本兼容 Windows PowerShell 5.1，错误在脚本内捕获并随结果返回，结果以 base64 输出以避开控制台代码页；编码命令约 2.6 KB，低于 cmd.exe 命令行上限。Windows 采集需要启动一次 PowerShell，约 1 秒。结果先保留在编辑草稿中，保存会话时写入 SQLite；取消编辑不会修改已保存的信息。每次新建 SSH 连接，在第一个终端就绪后后台刷新并保存一次，同一连接的多个终端共享结果，不依赖监控面板是否打开。
+Windows 脚本兼容 Windows PowerShell 2.0 及以上（不使用 `Get-CimInstance`、`[ordered]`、`ConvertTo-Json`），错误在脚本内捕获并随结果返回，每个字段以 base64 UTF-8 输出以避开控制台代码页；编码命令约 2.6 KB，低于 cmd.exe 命令行上限。Windows 采集需要启动一次 PowerShell，约 1 秒。结果先保留在编辑草稿中，保存会话时写入 SQLite；取消编辑不会修改已保存的信息。每次新建 SSH 连接，在第一个终端就绪后后台刷新并保存一次，同一连接的多个终端共享结果，不依赖监控面板是否打开。
 
 会话图标、系统描述和监控面板共用这份数据。图标按发行版 `ID` 匹配现有资源；未知 Linux 发行版使用通用企鹅。断开连接后仍可查看上次成功的结果；采集时间仅在内部用于判断记录新旧，不在面板显示。运行时间、进程数量以及各项使用率不作为基础信息缓存。
 

@@ -3,42 +3,45 @@ package hostinfo
 import (
 	"context"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"strings"
 	"time"
 	"unicode/utf16"
+	"unicode/utf8"
 )
 
-const windowsFactsMarker = "__BURROW_WINDOWS_FACTS_V1__"
+const windowsFactsMarker = "__BURROW_WINDOWS_FACTS_V2__"
 
-// windowsFactsScript runs in Windows PowerShell 5.1, which every Win32-OpenSSH
-// host has. It reports failures inside its own output so nothing reaches
-// stderr, and prints base64 so the console code page cannot corrupt localized
-// names. Caption and DisplayVersion follow the system language.
+// windowsFactsScript runs on Windows PowerShell 2.0 and later, so it avoids
+// Get-CimInstance, [ordered] and ConvertTo-Json. It reports failures inside its
+// own output so nothing reaches stderr, and prints each value as base64 UTF-8
+// so the console code page cannot corrupt localized names. Caption and
+// DisplayVersion follow the system language.
 const windowsFactsScript = `$ProgressPreference = 'SilentlyContinue'
 $ErrorActionPreference = 'Stop'
+function Field($name, $value) {
+  $name + '=' + [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes([string]$value))
+}
 try {
-  $os = Get-CimInstance -ClassName Win32_OperatingSystem
+  $os = Get-WmiObject -Class Win32_OperatingSystem
   $cv = Get-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion'
   $openssh = Get-ItemProperty -Path 'HKLM:\SOFTWARE\OpenSSH' -ErrorAction SilentlyContinue
   $arch = $env:PROCESSOR_ARCHITEW6432
   if (-not $arch) { $arch = $env:PROCESSOR_ARCHITECTURE }
-  $facts = [ordered]@{
-    hostname = [System.Net.Dns]::GetHostName()
-    caption = [string]$os.Caption
-    version = [string]$os.Version
-    ubr = [string]$cv.UBR
-    display = [string]$cv.DisplayVersion
-    release = [string]$cv.ReleaseId
-    arch = [string]$arch
-    shell = [string]$openssh.DefaultShell
-  }
+  $fields = @(
+    (Field 'hostname' ([System.Net.Dns]::GetHostName())),
+    (Field 'caption' $os.Caption),
+    (Field 'version' $os.Version),
+    (Field 'ubr' $cv.UBR),
+    (Field 'display' $cv.DisplayVersion),
+    (Field 'release' $cv.ReleaseId),
+    (Field 'arch' $arch),
+    (Field 'shell' $openssh.DefaultShell)
+  )
 } catch {
-  $facts = [ordered]@{ error = $_.Exception.Message }
+  $fields = @(Field 'error' $_.Exception.Message)
 }
-$json = ConvertTo-Json -InputObject $facts -Compress
-[Console]::Out.Write('` + windowsFactsMarker + `' + [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($json)))
+[Console]::Out.Write('` + windowsFactsMarker + `' + ($fields -join ';'))
 `
 
 // -EncodedCommand avoids quoting differences between cmd.exe and PowerShell
@@ -68,33 +71,33 @@ func (windowsCollector) Facts(ctx context.Context, r Runner, _ Detection) (Facts
 func (windowsCollector) NewSampler(Runner) Sampler { return unsupportedSampler{} }
 
 func parseWindowsFacts(output string, collectedAt time.Time) (Facts, error) {
+	invalid := errors.New("服务器返回了无法识别的 Windows 基础信息")
 	_, encoded, found := strings.Cut(output, windowsFactsMarker)
 	if !found {
-		return Facts{}, errors.New("服务器返回了无法识别的 Windows 基础信息")
+		return Facts{}, invalid
 	}
-	data, err := base64.StdEncoding.DecodeString(strings.TrimSpace(encoded))
-	if err != nil {
-		return Facts{}, errors.New("服务器返回了无法识别的 Windows 基础信息")
+	raw := map[string]string{}
+	for _, field := range strings.Split(strings.TrimSpace(encoded), ";") {
+		name, value, ok := strings.Cut(field, "=")
+		data, err := base64.StdEncoding.DecodeString(value)
+		if !ok || err != nil || !utf8.Valid(data) {
+			return Facts{}, invalid
+		}
+		raw[name] = string(data)
 	}
-	var raw struct {
-		Hostname, Caption, Version, UBR, Display, Release, Arch, Shell, Error string
+	if raw["error"] != "" {
+		return Facts{}, errors.New("读取 Windows 基础信息失败：" + raw["error"])
 	}
-	if err := json.Unmarshal(data, &raw); err != nil {
-		return Facts{}, errors.New("服务器返回了无法识别的 Windows 基础信息")
-	}
-	if raw.Error != "" {
-		return Facts{}, errors.New("读取 Windows 基础信息失败：" + raw.Error)
-	}
-	facts := Facts{Platform: Windows, OSID: "windows", OSName: strings.TrimSpace(raw.Caption), Hostname: raw.Hostname,
-		OSVersion: raw.Display, Kernel: raw.Version, Arch: raw.Arch, Shell: windowsShell(raw.Shell), CollectedAt: collectedAt}
+	facts := Facts{Platform: Windows, OSID: "windows", OSName: strings.TrimSpace(raw["caption"]), Hostname: raw["hostname"],
+		OSVersion: raw["display"], Kernel: raw["version"], Arch: raw["arch"], Shell: windowsShell(raw["shell"]), CollectedAt: collectedAt}
 	if facts.OSName == "" {
 		facts.OSName = Windows.DisplayName()
 	}
 	if facts.OSVersion == "" {
-		facts.OSVersion = raw.Release
+		facts.OSVersion = raw["release"]
 	}
-	if raw.UBR != "" && facts.Kernel != "" {
-		facts.Kernel += "." + raw.UBR
+	if raw["ubr"] != "" && facts.Kernel != "" {
+		facts.Kernel += "." + raw["ubr"]
 	}
 	if !facts.Valid() {
 		return Facts{}, errors.New("无法读取 Windows 主机名或系统版本")
