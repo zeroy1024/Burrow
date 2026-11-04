@@ -115,6 +115,15 @@ type Failure struct {
 	Code    string
 	Message string
 	Hits    []store.MCPHit
+	// Matches[i] is the part of the request that triggered Hits[i]. It goes
+	// back to the calling agent only; audit hits stay deduplicated per rule.
+	Matches []Match
+}
+
+// Match is the matched command text, or the canonical path for a file rule.
+// Context is the whitespace-delimited command word containing Text.
+type Match struct {
+	Text, Context string
 }
 
 func (e *Failure) Error() string { return e.Message }
