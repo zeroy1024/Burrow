@@ -153,16 +153,12 @@ func (a *app) paneDragHandle(c *ui.Context, source ui.Element, transfer paneTran
 	a.terminalCapture.pressed = false
 }
 
-func (a *app) tabStripTarget(c *ui.Context, parts uikit.TabsResult, add ui.Element) {
+func (a *app) tabStripTarget(c *ui.Context, parts uikit.TabsResult) {
 	if a.activeSection() != sectionSSH {
 		return
 	}
-	strip := parts.Scroller
+	strip := parts.Root
 	t := theme.Current()
-	animation := a.positionAnimation(ui.Animation{Spring: uikit.Spring(t.C.ReorderMotion.TabDisplace)})
-	// Keep the transition registered outside a drag as well, so yielding and
-	// returning to the original position use the same continuous spring.
-	add.Transition(ui.ElementTransition{Position: true, Animation: &animation})
 	if a.drag != nil && a.drag.afterCancel != nil {
 		return
 	}
@@ -176,7 +172,7 @@ func (a *app) tabStripTarget(c *ui.Context, parts uikit.TabsResult, add ui.Eleme
 	if canExtract {
 		paneWidth = uikit.SessionTabWidth(a.paneTabProps(c, source.session))
 	}
-	index, slotX := a.paneTabInsertion(c, parts, add, paneWidth)
+	index, slotX := a.paneTabInsertion(c, parts, paneWidth)
 	if !over && !released {
 		return
 	}
@@ -188,7 +184,7 @@ func (a *app) tabStripTarget(c *ui.Context, parts uikit.TabsResult, add ui.Eleme
 		strip.Cursor(ui.CursorNotAllowed)
 		return
 	}
-	r := strip.Bounds()
+	r := parts.Scroller.Bounds()
 	var delta float32
 	zone := t.C.DropIndicator.AutoScrollZone
 	step := t.C.DropIndicator.AutoScrollMax * float32(t.C.Desktop.FrameInterval.Seconds())
@@ -264,17 +260,20 @@ func (a *app) tabStripTarget(c *ui.Context, parts uikit.TabsResult, add ui.Eleme
 	}
 }
 
-func (a *app) paneTabInsertion(c *ui.Context, parts uikit.TabsResult, add ui.Element, width float32) (int, float32) {
+func (a *app) paneTabInsertion(c *ui.Context, parts uikit.TabsResult, width float32) (int, float32) {
 	t := theme.Current()
 	index, x := len(a.tabs), parts.Scroller.Bounds().X-a.tabScroll.X
-	slotX, total := x, add.Bounds().W
+	slotX, total := x, float32(0)
 	for i, tab := range a.tabs {
 		w := tab.frame.Bounds(c).W
 		if index == len(a.tabs) && a.pointer.X < x+w/2 {
 			index, slotX = i, x
 		}
 		x += w + t.C.Titlebar.TabsGap
-		total += w + t.C.Titlebar.TabsGap
+		if i > 0 {
+			total += t.C.Titlebar.TabsGap
+		}
+		total += w
 	}
 	if index == len(a.tabs) {
 		slotX = x
@@ -287,7 +286,6 @@ func (a *app) paneTabInsertion(c *ui.Context, parts uikit.TabsResult, add ui.Ele
 				c.Resolve(tab.frame).Left(space)
 			}
 		}
-		add.Left(space)
 	}
 	// Keep the scroll range while the same spring restores the neighbours.
 	// Removing it immediately would clamp scrollX and visibly jump the strip.

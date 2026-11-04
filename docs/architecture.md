@@ -31,7 +31,7 @@ SSH transport 与业务 channel 分离。同一会话分屏在原连接上新建
 
 SSH、文件传输、MCP、设置互斥构建当前页面，页面挂载不拥有业务任务生命周期。切页保留连接、目录历史、终端滚动与传输；关闭设置只清临时 UI，复用窗口生命周期内的稳定句柄。工作区可保存并恢复 SSH、文件或 MCP 的页面选择；设置页仍为临时页面。
 
-普通关闭窗口时，macOS 隐藏同一个原生窗口，Windows/Linux 最小化并保留任务栏入口，后台传输继续。应用退出才统一收敛 worker、保存状态并释放连接。关闭最后标签的行为按偏好单独处理。
+关闭主窗口与应用退出使用同一流程，所有平台都会保存工作区与设置、停止 MCP 服务、暂停并保存传输任务，再关闭会话连接并退出进程。关闭最后标签的行为按偏好单独处理。
 
 传输任务使用独立上下文和协议 client/subsystem。任务按文件标签身份分组，浏览视图关闭或站点配置改变不改向后台任务。执行与保存入口为 [transfer_backend.go](../internal/desktop/transfer_backend.go)、[transfer_store.go](../internal/desktop/transfer_store.go) 和 [workspace_store.go](../internal/desktop/workspace_store.go)。
 

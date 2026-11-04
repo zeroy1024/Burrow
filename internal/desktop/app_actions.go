@@ -35,10 +35,14 @@ func (a *app) translucencyEnabled(c *ui.Context) bool {
 }
 
 func windowVibrancy() mygo.Vibrancy {
-	if runtime.GOOS == "darwin" {
+	switch runtime.GOOS {
+	case "darwin":
 		return mygo.VibrancyUnderWindow
+	case "windows":
+		return mygo.VibrancyMica
+	default:
+		return mygo.VibrancyTitlebar
 	}
-	return mygo.VibrancyTitlebar
 }
 
 func (a *app) syncWindowMaterial() {

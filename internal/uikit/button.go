@@ -1,6 +1,8 @@
 package uikit
 
 import (
+	"runtime"
+
 	"sshdesk/internal/theme"
 
 	"github.com/egoist/mygo/ui"
@@ -126,17 +128,25 @@ func styleIconButton(e ui.Element, t *theme.Theme, variant IconVariant, on bool)
 	if on {
 		bg, ink = Color(p.BgOn), Color(p.IconOn)
 	}
+	hover, pressed := Color(p.BgHover), Color(p.BgPressed)
+	if variant == IconOnWindow {
+		hover = Color(t.Color.State.OnWindow)
+		if runtime.GOOS == "windows" {
+			hover, pressed = Color(t.C.Desktop.RailHover), Color(t.C.Desktop.RailPressed)
+			if on {
+				bg, ink = Color(t.Color.Accent.Tint10), Color(t.Color.Accent.Default)
+				pressed = Color(t.Color.Accent.Tint15)
+			}
+		}
+	}
 	if !e.IsDisabled() {
 		switch {
 		case e.Pressed():
-			bg = Color(p.BgPressed)
+			bg = pressed
 		case e.Hovered():
 			if !on {
-				bg = Color(p.BgHover)
+				bg = hover
 				ink = Color(p.IconHover)
-				if variant == IconOnWindow {
-					bg = Color(t.Color.State.OnWindow)
-				}
 			}
 		}
 	}
