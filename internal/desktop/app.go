@@ -70,7 +70,6 @@ type app struct {
 	persistence            *persistenceWorker
 	dataDirectory          string
 	catalogSaving          bool
-	windowSaving           bool
 	catalogReady           []func()
 	workspaceSave          workspaceSaveState
 	quitReady, quitPending bool
@@ -297,6 +296,7 @@ func Run() (runErr error) {
 		material := windowVibrancy()
 		a.window = mygo.NewWindow(mygo.WindowOptions{
 			Title:                "Burrow",
+			Hidden:               true,
 			Width:                int(t.C.Desktop.WindowWidth),
 			Height:               int(t.C.Desktop.WindowHeight),
 			MinWidth:             int(t.C.Desktop.WindowMinWidth),
@@ -313,46 +313,19 @@ func Run() (runErr error) {
 		a.startMCPBackend()
 		a.syncWindowMaterial()
 		a.window.OnClose(func(e *mygo.CloseEvent) {
-			if a.quitPending {
-				e.PreventDefault()
-				a.window.Hide()
-				return
-			}
-			if a.mcpBusy() || a.credentials.busy || a.terminal.importing || a.savingSession() || a.catalogSaving || a.windowSaving {
-				a.resetQuitAttempt()
-				e.PreventDefault()
-				a.files.notice = &uikit.ToastProps{ID: "save-before-close", Tone: uikit.ToneWarning, Title: "正在保存凭据，完成后再关闭窗口。"}
-				a.window.Invalidate()
-				return
-			}
 			if a.quitReady {
 				return
 			}
 			e.PreventDefault()
-			a.windowSaving = true
-			a.persistBeforeClose(func(err error) {
-				a.windowSaving = false
-				if err != nil {
-					a.resetQuitAttempt()
-					a.persistenceNotice("关闭前保存失败", err)
-					return
-				}
-				for i := range a.pages {
-					a.pages[i].draft.cancelTest()
-				}
-				a.closeSettings()
-				a.monitor.stop()
-				if runtime.GOOS == "darwin" {
-					a.window.Hide()
-				} else {
-					a.window.Minimize()
-				}
-			})
+			mygo.App.Quit()
 		})
 		if stopMenuLocale != nil {
 			stopMenuLocale()
 		}
 		stopMenuLocale = a.installAppMenu()
+		// Windows can build the first frame synchronously when shown. Finish
+		// assigning and setting up a.window before that frame starts UI work.
+		a.window.Show()
 	}
 	mygo.App.WhenReady(openWindow)
 	stopActivate := mygo.App.OnActivate(func(visible bool) {
@@ -368,7 +341,7 @@ func Run() (runErr error) {
 			e.PreventDefault()
 			return
 		}
-		if a.mcpBusy() || a.credentials.busy || a.terminal.importing || a.savingSession() || a.catalogSaving || a.windowSaving || a.files.dialog != nil && a.files.dialog.busy {
+		if a.mcpBusy() || a.credentials.busy || a.terminal.importing || a.savingSession() || a.catalogSaving || a.files.dialog != nil && a.files.dialog.busy {
 			a.resetQuitAttempt()
 			e.PreventDefault()
 			a.files.notice = &uikit.ToastProps{ID: "work-before-quit", Tone: uikit.ToneWarning, Title: "文件或凭据操作进行中，完成后再退出。"}
@@ -426,17 +399,21 @@ func (a *app) view(c *ui.Context) {
 	background := uikit.Color(t.C.Window.Bg)
 	headerBackground, contentBackground := ui.Transparent, ui.Transparent
 	if a.translucencyEnabled(c) && c.Vibrancy() {
-		if runtime.GOOS == "darwin" {
+		switch runtime.GOOS {
+		case "darwin":
 			// Tint the native material once across the whole window, so the
 			// header and content share a continuous background.
 			background = background.Alpha(t.C.Window.TintOpacity)
-		} else {
+		case "windows":
+			// Mica supplies the base color; content cards keep their own fills.
+			background = ui.Transparent
+		default:
 			headerBackground = background.Alpha(t.C.Titlebar.TintOpacity)
 			contentBackground = background
 			background = ui.Transparent
 		}
 	}
-	c.Root().Background(background).Disabled(a.transfers.quitting || a.catalogSaving || a.windowSaving || a.quitPending || a.terminal.importing)
+	c.Root().Background(background).Disabled(a.transfers.quitting || a.catalogSaving || a.quitPending || a.terminal.importing)
 	root := ui.Column(c).Fill()
 	x, y, _ := root.PointerPosition()
 	a.pointer = ui.Point{X: x, Y: y}

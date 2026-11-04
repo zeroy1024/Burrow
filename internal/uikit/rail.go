@@ -1,6 +1,8 @@
 package uikit
 
 import (
+	"runtime"
+
 	"github.com/egoist/mygo/ui"
 	"sshdesk/internal/theme"
 )
@@ -30,7 +32,7 @@ func RailButton(c *ui.Context, props RailButtonProps) ui.Element {
 	if props.Handle != nil {
 		button.Bind(props.Handle)
 	}
-	background := ui.Transparent
+	background, foreground := ui.Transparent, Color(r.Icon)
 	switch {
 	case button.Pressed():
 		background = Color(t.C.Desktop.RailPressed)
@@ -39,7 +41,16 @@ func RailButton(c *ui.Context, props RailButtonProps) ui.Element {
 	case button.Hovered():
 		background = Color(t.C.Desktop.RailHover)
 	}
+	if runtime.GOOS == "windows" && props.Selected {
+		background, foreground = Color(t.Color.Accent.Tint10), Color(t.Color.Accent.Default)
+		if button.Pressed() {
+			background = Color(t.Color.Accent.Tint15)
+		}
+	}
 	button.Background(button.AnimateColor("background", background, Tween(r.Transition)))
+	if runtime.GOOS == "windows" {
+		button.TextColor(button.AnimateColor("icon", foreground, Tween(r.Transition)))
+	}
 	if button.FocusVisible() {
 		Shadow(button, t.Shadow.ControlFocus)
 	}

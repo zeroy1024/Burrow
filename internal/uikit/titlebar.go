@@ -26,7 +26,8 @@ func SessionTabsViewport(c *ui.Context) ui.Element {
 }
 
 func SessionTabsScroll(c *ui.Context, scroll *ui.ScrollState) ui.Element {
-	e := ui.ScrollHorizontal(c).Fill()
+	// Fit the tabs until the viewport must shrink to leave room for the add action.
+	e := ui.ScrollHorizontal(c).FillHeight()
 	if scroll != nil {
 		e.TrackScroll(scroll)
 	}

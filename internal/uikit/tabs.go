@@ -14,14 +14,10 @@ import (
 var sessionTabsFade = shader.MustCompile(`package main
 
 var LeftExtent float
-var RightInset float
 var RightExtent float
 
 func ColorEffect(pos vec2, color vec4) vec4 {
-	right := rectSize().x - RightInset
-	if pos.x >= right {
-		return vec4(0)
-	}
+	right := rectSize().x
 	opacity := float(1)
 	if RightExtent > 0 {
 		opacity *= clamp((right-pos.x)/RightExtent, 0, 1)
@@ -89,10 +85,9 @@ func SessionTab(c *ui.Context, props SessionTabProps) ui.Element {
 	button.AlignItems(ui.Center).Role(ui.RoleTab).Label(props.Title).Selected(props.Selected)
 	selected := ui.Local(button, "uikit.tabs.selected", func() bool { return false })
 	button.Children(func() {
-		// Keep the selected tab clear of the floating action and its fade.
-		inset := t.C.IconButton.Size + t.C.Titlebar.TabsGap + t.Size.FadeExtent
+		// Keep the selected tab clear of the scroller's edge fade.
 		reveal := ui.Box(c).Key("tab-reveal").Absolute().Left(0).Top(0).Bottom(0).
-			Right(-inset).PassThrough().Role(ui.RoleNone)
+			Right(-t.Size.FadeExtent).PassThrough().Role(ui.RoleNone)
 		if props.Selected && !*selected {
 			// Reveal once; subsequent frames must allow manual scrolling.
 			reveal.ScrollIntoView()
@@ -294,7 +289,6 @@ type TabItem struct {
 
 type TabsResult struct {
 	Root, Row, Scroller ui.Element
-	AddSlot             ui.Element
 	Close               int
 	Select              int
 	Add                 bool
@@ -309,7 +303,7 @@ type SessionTabsProps struct {
 	Motion     MotionMode
 	StripInput func(ui.InputEvent) bool
 	// BuildTabs preserves the caller's tab sources. BuildAdd places the action
-	// above the scroller while AddSlot keeps its space at the end of the row.
+	// beside the scroller so it stays visible without following scroll offsets.
 	BuildTabs  func(list ui.Element)
 	BuildAdd   func()
 	AfterBuild func(strip ui.Element)
@@ -323,7 +317,10 @@ func SessionTabs(c *ui.Context, items []TabItem, active *int, options ...Session
 	if len(options) != 0 {
 		props = options[0]
 	}
-	result := TabsResult{Root: SessionTabsViewport(c), Close: -1, Select: -1, Moved: [2]int{-1, -1}}
+	result := TabsResult{
+		Root:  SessionTabsViewport(c).Row().Gap(t.C.Titlebar.TabsGap),
+		Close: -1, Select: -1, Moved: [2]int{-1, -1},
+	}
 	scroll := props.Scroll
 	if scroll == nil {
 		scroll = ui.Local(result.Root, "uikit.tabs.scroll", func() ui.ScrollState { return ui.ScrollState{} })
@@ -337,17 +334,6 @@ func SessionTabs(c *ui.Context, items []TabItem, active *int, options ...Session
 			result.Row = SessionTabsRow(c)
 			middle := ui.Local(result.Row, "uikit.tabs.middle", func() tabMiddleInput { return tabMiddleInput{} })
 			middle.Hits = middle.Hits[:0]
-			previousCount := ui.Local(result.Row, "uikit.tabs.count", func() int { return -1 })
-			revealTail := func(add ui.Element) {
-				count := len(middle.Hits)
-				if *previousCount >= 0 && count > *previousCount && middle.Hits[count-1].Selected {
-					// This follows the selected tab's reveal. Layout resolves the
-					// new content range, including the gap and the whole add button.
-					add.ScrollIntoView()
-				}
-				// A restored strip keeps the selected tab's initial reveal.
-				*previousCount = count
-			}
 			result.Row.Children(func() {
 				if props.BuildTabs != nil {
 					props.BuildTabs(result.Row)
@@ -388,13 +374,6 @@ func SessionTabs(c *ui.Context, items []TabItem, active *int, options ...Session
 						})
 					}
 				}
-				if len(middle.Hits) == 0 {
-					*previousCount = 0
-					return
-				}
-				result.AddSlot = ui.Box(c).Key("add-tab-slot").
-					Size(t.C.IconButton.Size, t.C.IconButton.Size).Shrink(0).PassThrough()
-				revealTail(result.AddSlot)
 			})
 		})
 		middle := ui.Local(result.Row, "uikit.tabs.middle", func() tabMiddleInput { return tabMiddleInput{} })
@@ -460,18 +439,15 @@ func SessionTabs(c *ui.Context, items []TabItem, active *int, options ...Session
 
 func sessionTabsActions(c *ui.Context, parts *TabsResult, scroll *ui.ScrollState, props SessionTabsProps) {
 	t := theme.Current()
-	frame, slot := parts.Root.Bounds(), parts.AddSlot.Bounds()
-	position := max(0, min(slot.X-frame.X, frame.W-t.C.IconButton.Size))
 	maxX, scrollX := scroll.MaxX, scroll.X
 	if maxX > 0 {
 		parts.Scroller.Effect(sessionTabsFade.Effect(shader.Options{Uniforms: map[string]any{
 			"LeftExtent":  min(t.Size.FadeExtent, scrollX),
-			"RightInset":  t.C.IconButton.Size,
 			"RightExtent": min(t.Size.FadeExtent, maxX-scrollX),
 		}}))
 	}
-	ui.Row(c).Key("tab-add-overlay").Absolute().Left(position).Top(0).Bottom(0).
-		Hidden(slot.W == 0).Center().Children(func() {
+	ui.Row(c).Key("tab-add").Size(t.C.IconButton.Size, t.C.IconButton.Size).
+		Shrink(0).Center().Children(func() {
 		if props.BuildAdd != nil {
 			props.BuildAdd()
 			return
@@ -479,12 +455,10 @@ func sessionTabsActions(c *ui.Context, parts *TabsResult, scroll *ui.ScrollState
 		add := IconButton(c, IconPlus, IconButtonProps{Key: "add-tab", Label: "新建选项卡"})
 		parts.Add = add.Clicked()
 	})
-	// Scroll offsets and row widths settle during layout, after the action was
-	// positioned. Refresh its overlay when scrolling, resizing or docking a tab.
+	// Layout updates the scroll range after the view built the edge fades.
 	ui.Box(c).Key("tab-action-layout").Absolute().Fill().PassThrough().Role(ui.RoleNone).
 		DrawOver(func(_ *ui.Painter, _ ui.Rect) {
-			boundsChanged := parts.Root.Bounds() != frame || parts.AddSlot.Bounds() != slot
-			if boundsChanged || scroll.MaxX != maxX || scroll.X != scrollX {
+			if scroll.MaxX != maxX || scroll.X != scrollX {
 				c.Invalidate()
 			}
 		})
