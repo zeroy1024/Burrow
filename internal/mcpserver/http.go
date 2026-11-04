@@ -216,7 +216,11 @@ func (s *Service) Handler(cfg Config) http.Handler {
 			}
 			auditCtx, auditCancel := context.WithTimeout(context.WithoutCancel(r.Context()), 5*time.Second)
 			defer auditCancel()
-			if auditErr := s.Store.MCPBegin(auditCtx, op, nil); auditErr != nil {
+			payload := store.MCPAuditPayload{
+				Request:  json.RawMessage(`{"body_omitted":"认证失败，不记录认证请求正文"}`),
+				Response: json.RawMessage(`{"http_status":401,"data":{"error":{"code":"authentication_failed","message":"认证失败"}}}`),
+			}
+			if auditErr := s.Store.MCPBeginWithPayload(auditCtx, op, payload); auditErr != nil {
 				s.storageFault(auditErr)
 				http.Error(w, "MCP storage unavailable", http.StatusServiceUnavailable)
 				return
@@ -227,7 +231,7 @@ func (s *Service) Handler(cfg Config) http.Handler {
 			return
 		}
 		r.Body = http.MaxBytesReader(w, r.Body, 2*MaxText)
-		transport.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), principal{}, key)))
+		s.auditHTTP(w, r.WithContext(context.WithValue(r.Context(), principal{}, key)), key, transport)
 	})
 }
 

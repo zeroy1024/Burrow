@@ -376,6 +376,10 @@ func mcpInsertOperation(ctx context.Context, tx *sql.Tx, op MCPOperation) error 
 }
 
 func (s *Store) MCPBegin(ctx context.Context, op MCPOperation, task *MCPTask) error {
+	return s.mcpBegin(ctx, op, task, nil)
+}
+
+func (s *Store) mcpBegin(ctx context.Context, op MCPOperation, task *MCPTask, payload *MCPAuditPayload) error {
 	if task != nil {
 		if task.OperationID != op.ID || task.KeyID != op.KeyID || task.ConnectionID != op.ConnectionID {
 			return errors.New("MCP task identity does not match its operation")
@@ -389,6 +393,11 @@ func (s *Store) MCPBegin(ctx context.Context, op MCPOperation, task *MCPTask) er
 	defer tx.Rollback()
 	if err := mcpInsertOperation(ctx, tx, op); err != nil {
 		return err
+	}
+	if payload != nil {
+		if err := writeMCPPayload(ctx, tx, op.ID, *payload); err != nil {
+			return err
+		}
 	}
 	if task != nil {
 		_, err := tx.ExecContext(ctx, `INSERT INTO mcp_tasks(id,operation_id,key_id,connection_id,state,error,done,total,created_at,updated_at)
@@ -482,7 +491,7 @@ func (s *Store) MCPOperations(ctx context.Context, filter MCPOperationFilter) ([
 		args = append(args, filter.ActionPrefix, filter.ActionPrefix)
 	}
 	if filter.ToolsOnly {
-		where = append(where, "key_id<>''", "action<>'authentication'")
+		where = append(where, "key_id<>''", "action<>'authentication'", "substr(action,1,4)<>'mcp.'")
 	}
 	if !filter.Since.IsZero() {
 		where = append(where, "started_at>=?")

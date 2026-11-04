@@ -53,3 +53,13 @@ GOCACHE=/private/tmp/sshdesk-go-build mise exec -- python3 -B -u scripts/mcp-int
 另已通过 `go test -race ./...`、`go vet ./...`、macOS 本机构建、Windows amd64 交叉构建，以及带 `-race -tags=integration` 的 `internal/sshclient` 和 `internal/fileclient` 全部协议集成回归（本轮分别 9.250 秒、34.417 秒）。协议回归额外包含错误 CA/主机名拒绝、FTP 私有目录不可接管既有目录及限权失败的归属信息、稳定部分上传验证与续传、16 个并发被动监听容量。
 
 原生 Windows、各第三方 AI 客户端界面、真实系统钥匙串、其他服务器实现与生产规模未纳入本轮；原生控制使用现有测试 overlay，不表示做过视觉验收。
+
+## 2026-11-04 请求与响应审计增强
+
+增强前的 MCP 功能已提交为 `9bc13ca`。本轮新增 schema v3 的 `mcp_payloads`，保存请求与结构化响应，详情可多行查看和复制命令、stdout/stderr 及 JSON；文件正文与认证信息排除，旧摘要明确区分。
+
+已通过临时 overlay 中的真实本机 HTTP + 官方 SDK + 隔离 SQLite 检查：旧协议初始化、新协议工具发现/ping/调用、未知方法、失败参数、单次工具调用不重复记录、命令输出保留、文件正文省略、认证字段及已知 MCP Key 排除。测试业务适配器使用固定 SSH 输出和本地文件客户端，这项检查不代替真实远端 SSH / FTP 运行验收。
+
+数据库检查覆盖空库、v1、v2、v3 的升级及重开，已有设置保留、请求/响应独立更新、后续摘要不清空正文、显式 JSON null、清理级联及明细写入失败时开始记录回滚。故障注入还验证审计入口失败时自有任务取消通道仍可用，并明确返回 `audit_persisted=false`。
+
+本轮启动原生回归时发现 Mac 锁屏，按用户要求跳过原生窗口及完整 Docker 任务回归，未把之前的 30/30 结果当成本轮验证结果。

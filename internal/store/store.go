@@ -23,6 +23,9 @@ var schema string
 //go:embed mcp_schema.sql
 var mcpSchema string
 
+//go:embed mcp_payload_schema.sql
+var mcpPayloadSchema string
+
 type Store struct {
 	db   *sql.DB
 	lock *os.File
@@ -105,12 +108,18 @@ func (s *Store) initialize(ctx context.Context) error {
 			return fmt.Errorf("create database schema: %w", err)
 		}
 		version = 1
-	} else if (version != 1 && version != 2) || application != applicationID {
+	} else if (version < 1 || version > 3) || application != applicationID {
 		return fmt.Errorf("unsupported Burrow database schema %d (application %x)", version, application)
 	}
 	if version == 1 {
 		if _, err := tx.ExecContext(ctx, mcpSchema); err != nil {
 			return fmt.Errorf("upgrade database schema to version 2: %w", err)
+		}
+		version = 2
+	}
+	if version == 2 {
+		if _, err := tx.ExecContext(ctx, mcpPayloadSchema); err != nil {
+			return fmt.Errorf("upgrade database schema to version 3: %w", err)
 		}
 	}
 	return tx.Commit()

@@ -102,6 +102,7 @@ func capability(name string) string {
 
 func (s *Service) Call(parent context.Context, keyID, name string, raw json.RawMessage) (out map[string]any, callErr error) {
 	out = make(map[string]any)
+	inbound, _ := parent.Value(inboundAuditKey{}).(*inboundAudit)
 	s.mu.Lock()
 	if s.closing {
 		s.mu.Unlock()
@@ -115,15 +116,28 @@ func (s *Service) Call(parent context.Context, keyID, name string, raw json.RawM
 		defer func() { <-s.slots }()
 	default:
 		busy := store.MCPOperation{ID: rand.Text(), KeyID: keyID, Action: name, Status: "failed", ErrorCode: "busy", StartedAt: time.Now().UTC(), FinishedAt: time.Now().UTC()}
+		if inbound != nil {
+			inbound.managed.Store(true)
+			busy.ID, busy.KeyName = inbound.op.ID, inbound.op.KeyName
+		}
 		auditCtx, auditCancel := context.WithTimeout(context.WithoutCancel(parent), 5*time.Second)
 		defer auditCancel()
-		if err := s.Store.MCPBegin(auditCtx, busy, nil); err != nil {
+		var err error
+		if inbound != nil {
+			err = s.Store.MCPFinish(auditCtx, busy)
+		} else {
+			err = s.Store.MCPBegin(auditCtx, busy, nil)
+		}
+		if err != nil {
 			return out, s.storageFault(err)
 		}
 		out["operation_id"] = busy.ID
 		return out, fail("busy", "MCP 同时执行的调用已达到上限")
 	}
 	op := store.MCPOperation{ID: rand.Text(), KeyID: keyID, Action: name, Status: "running", StartedAt: time.Now().UTC(), Timeline: []store.MCPEvent{{Stage: "accepted", At: time.Now().UTC()}}}
+	if inbound != nil {
+		op = inbound.op
+	}
 	out["operation_id"] = op.ID
 	ctx, cancel := context.WithTimeout(parent, 2*time.Minute)
 	ctx = WithOperation(ctx, op.ID, 0)
@@ -146,12 +160,18 @@ func (s *Service) Call(parent context.Context, keyID, name string, raw json.RawM
 	}
 	auditCtx, auditCancel := context.WithTimeout(context.WithoutCancel(parent), 5*time.Second)
 	defer auditCancel()
-	if err := s.Store.MCPBegin(auditCtx, op, nil); err != nil {
+	if inbound == nil {
+		err = s.Store.MCPBegin(auditCtx, op, nil)
+	}
+	if err != nil {
 		if key.State == "active" && strings.HasPrefix(name, "tasks_") {
 			s.storageFault(err)
 			return s.recoveryTool(ctx, key, name, raw, op, out)
 		}
 		return out, s.storageFault(err)
+	}
+	if inbound != nil {
+		inbound.managed.Store(true)
 	}
 	background := false
 	defer func() {
@@ -184,6 +204,12 @@ func (s *Service) Call(parent context.Context, keyID, name string, raw json.RawM
 			return
 		}
 		op.Timeline = append(saved.Timeline, store.MCPEvent{Stage: op.Status, At: op.FinishedAt, Detail: op.Error})
+		if inbound != nil {
+			op.Error = string(redactAuditKey([]byte(op.Error), inbound.secret))
+			for i := range op.Timeline {
+				op.Timeline[i].Detail = string(redactAuditKey([]byte(op.Timeline[i].Detail), inbound.secret))
+			}
+		}
 		if err := s.Store.MCPFinish(finishCtx, op); err != nil {
 			callErr = errors.Join(callErr, s.storageFault(err))
 		}
@@ -210,6 +236,9 @@ func (s *Service) Call(parent context.Context, keyID, name string, raw json.RawM
 	op.Request, err = json.Marshal(requestSummary)
 	if err != nil {
 		return out, err
+	}
+	if inbound != nil {
+		op.Request = redactAuditKey(op.Request, inbound.secret)
 	}
 	s.mu.Lock()
 	active := s.active[op.ID]
@@ -261,6 +290,9 @@ func (s *Service) Call(parent context.Context, keyID, name string, raw json.RawM
 	op.Request, err = json.Marshal(requestSummary)
 	if err != nil {
 		return out, err
+	}
+	if inbound != nil {
+		op.Request = redactAuditKey(op.Request, inbound.secret)
 	}
 	s.mu.Lock()
 	active = s.active[op.ID]

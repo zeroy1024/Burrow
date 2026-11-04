@@ -99,34 +99,43 @@ type mcpPolicyHitSnapshot struct {
 }
 
 type mcpAuditItem struct {
-	FileTotal      int
-	FileCounts     map[string]int
-	ConnectionID   string
-	ID             string
-	Time, Day      string
-	KeyID, KeyName string
-	ConnName       string
-	ConnProtocol   string
-	ConnHost       string
-	ConnPort       string
-	ConnUser       string
-	ActionType     string
-	Summary        string
-	Status         uikit.Status
-	Duration       string
-	StartTime      string
-	EndTime        string
-	IsCommand      bool
-	CommandText    string
-	ExitCodeText   string
-	OutputStatus   string
-	LocalPath      string
-	RemotePath     string
-	TransferStat   string
-	PolicyHit      *mcpPolicyHitSnapshot
-	Task           *mcpAuditTask
-	Timeline       []uikit.TimelineItem
-	Files          []mcpAuditFileItem
+	FileTotal         int
+	FileCounts        map[string]int
+	ConnectionID      string
+	ID                string
+	Time, Day         string
+	KeyID, KeyName    string
+	ConnName          string
+	ConnProtocol      string
+	ConnHost          string
+	ConnPort          string
+	ConnUser          string
+	ActionType        string
+	Summary           string
+	Status            uikit.Status
+	Duration          string
+	StartTime         string
+	EndTime           string
+	IsCommand         bool
+	CommandText       string
+	ExitCodeText      string
+	OutputStatus      string
+	RequestJSON       string
+	ResponseJSON      string
+	Stdout            string
+	Stderr            string
+	ResponseSaved     bool
+	ResponseTruncated bool
+	FileBodyOmitted   bool
+	PayloadSaved      bool
+	DetailLoaded      bool
+	LocalPath         string
+	RemotePath        string
+	TransferStat      string
+	PolicyHit         *mcpPolicyHitSnapshot
+	Task              *mcpAuditTask
+	Timeline          []uikit.TimelineItem
+	Files             []mcpAuditFileItem
 }
 
 type mcpKeyModalDraft struct {
@@ -173,6 +182,7 @@ type mcpPolicyDraft struct {
 }
 
 type mcpUIState struct {
+	auditResponseTab          int
 	detail                    *mcpAuditItem
 	keyPage                   int
 	auditPolicyID             string
@@ -813,6 +823,7 @@ func (a *app) mcpAuditTab(c *ui.Context) {
 						{Value: "命令执行", Label: "命令执行"},
 						{Value: "文件读取", Label: "文件读取"},
 						{Value: "策略管理", Label: "策略管理"},
+						{Value: "协议请求", Label: "协议请求"},
 						{Value: "认证失败", Label: "认证失败"},
 					}, uikit.FilterChipProps{Key: "aud-type-filter"})
 					uikit.FilterChip(c, "时间", &a.mcp.auditTimeFilter, []uikit.Option[string]{

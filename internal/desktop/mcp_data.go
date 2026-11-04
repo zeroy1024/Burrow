@@ -1,6 +1,7 @@
 package desktop
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -19,6 +20,8 @@ import (
 )
 
 type mcpData struct {
+	payload                             *store.MCPAuditPayload
+	detailView                          *mcpAuditItem
 	detail                              *store.MCPOperation
 	detailMissing                       bool
 	fileTotals                          map[string]int
@@ -88,6 +91,8 @@ func (a *app) mcpFilter() store.MCPOperationFilter {
 	if a.mcp.auditTypeFilter != "all" {
 		if a.mcp.auditTypeFilter == "策略管理" {
 			f.ActionPrefix = "policy."
+		} else if a.mcp.auditTypeFilter == "协议请求" {
+			f.ActionPrefix = "mcp."
 		} else {
 			f.Action = mcpActionValue(a.mcp.auditTypeFilter)
 		}
@@ -117,7 +122,7 @@ func (a *app) tickMCPBackend(c *ui.Context) {
 		return
 	}
 	f := a.mcpFilter()
-	signature := fmt.Sprintf("%+v/%s", f, a.mcp.selectedAuditID)
+	signature := fmt.Sprintf("%+v/%s/%t", f, a.mcp.selectedAuditID, a.mcp.auditDrawerOpen)
 	if a.mcp.query != signature {
 		a.mcp.query = signature
 		a.refreshMCPBackend()
@@ -172,6 +177,10 @@ func (a *app) readMCPData(filter store.MCPOperationFilter, detailID string) (mcp
 		}
 	}
 	for _, op := range operations {
+		if op.ID == detailID {
+			selected := op
+			data.detail = &selected
+		}
 		data.files[op.ID], data.fileTotals[op.ID], data.fileStates[op.ID], err = a.store.MCPFileSummary(a.ctx, op.ID, 1000, 0)
 		if err != nil {
 			return data, err
@@ -183,6 +192,26 @@ func (a *app) readMCPData(filter store.MCPOperationFilter, detailID string) (mcp
 			}
 			data.tasks[task.ID] = task
 		}
+	}
+	if detailID != "" {
+		payload, err := a.store.MCPPayload(a.ctx, detailID)
+		if err == nil {
+			data.payload = &payload
+		} else if !errors.Is(err, sql.ErrNoRows) {
+			return data, err
+		}
+	}
+	if data.detail != nil {
+		op := data.detail
+		view, err := mcpAuditView(*op, data.files[op.ID], data.tasks[op.TaskID])
+		if err != nil {
+			return data, err
+		}
+		view.FileTotal, view.FileCounts = data.fileTotals[op.ID], data.fileStates[op.ID]
+		if err := mcpAuditPayloadView(&view, *op, data.payload); err != nil {
+			return data, err
+		}
+		data.detailView = &view
 	}
 	return data, nil
 }
@@ -206,6 +235,9 @@ func (a *app) refreshMCPBackend() {
 	a.mcp.refreshed = time.Now()
 	filter := a.mcpFilter()
 	detailID := a.mcp.selectedAuditID
+	if !a.mcp.auditDrawerOpen {
+		detailID = ""
+	}
 	var data mcpData
 	a.persist(func() error { var err error; data, err = a.readMCPData(filter, detailID); return err }, func(err error) {
 		b.refreshing = false
@@ -323,16 +355,7 @@ func (a *app) applyMCPData(data mcpData) {
 		a.mcp.selectedAuditID = ""
 		a.mcp.auditDrawerOpen = false
 	}
-	if data.detail != nil {
-		op := data.detail
-		view, err := mcpAuditView(*op, data.files[op.ID], data.tasks[op.TaskID])
-		if err != nil {
-			a.persistenceNotice("解析 MCP 审计失败", err)
-			return
-		}
-		view.FileTotal, view.FileCounts = data.fileTotals[op.ID], data.fileStates[op.ID]
-		a.mcp.detail = &view
-	}
+	a.mcp.detail = data.detailView
 	for _, op := range data.operations {
 		view, err := mcpAuditView(op, data.files[op.ID], data.tasks[op.TaskID])
 		if err != nil {
@@ -598,6 +621,9 @@ func (a *app) stopMCPForQuit(done func(error)) {
 }
 
 func mcpActionName(value string) string {
+	if strings.HasPrefix(value, "mcp.") {
+		return "协议请求"
+	}
 	return map[string]string{"connections_list": "连接发现", "ssh_exec": "命令执行", "files_list": "目录浏览", "files_stat": "文件信息", "files_read": "文件读取", "files_write": "文件写入", "files_upload": "目录上传", "files_download": "目录下载", "authentication": "认证失败", "tasks_list": "任务列表", "tasks_get": "任务查询", "tasks_cancel": "取消任务"}[value]
 }
 
@@ -659,6 +685,8 @@ func mcpAuditView(op store.MCPOperation, files []store.MCPFileEvent, task store.
 	}
 	if view.IsCommand {
 		view.Summary = request.Command
+	} else if strings.HasPrefix(op.Action, "mcp.") {
+		view.Summary = strings.TrimPrefix(op.Action, "mcp.")
 	}
 	if !op.FinishedAt.IsZero() {
 		view.EndTime = op.FinishedAt.Local().Format("2006-01-02 15:04:05")
@@ -722,4 +750,71 @@ func mcpAuditView(op store.MCPOperation, files []store.MCPFileEvent, task store.
 		view.TransferStat = transferBytes(task.Done) + " / " + transferBytes(task.Total)
 	}
 	return view, nil
+}
+
+func mcpAuditPayloadView(view *mcpAuditItem, op store.MCPOperation, payload *store.MCPAuditPayload) error {
+	view.DetailLoaded = true
+	pretty := func(value []byte) (string, error) {
+		if len(value) == 0 {
+			return "", nil
+		}
+		var formatted bytes.Buffer
+		if err := json.Indent(&formatted, value, "", "  "); err != nil {
+			return "", err
+		}
+		return formatted.String(), nil
+	}
+	request, response := op.Request, op.Result
+	if payload != nil {
+		view.PayloadSaved = true
+		request, response = payload.Request, payload.Response
+		view.ResponseSaved = payload.Response != nil
+	}
+	var err error
+	view.RequestJSON, err = pretty(request)
+	if err != nil {
+		return err
+	}
+	view.ResponseJSON, err = pretty(response)
+	if err != nil {
+		return err
+	}
+	if view.ResponseSaved {
+		var metadata struct {
+			Truncated bool `json:"capture_truncated"`
+		}
+		if err := json.Unmarshal(response, &metadata); err != nil {
+			return err
+		}
+		view.ResponseTruncated = metadata.Truncated
+	}
+	view.FileBodyOmitted = view.PayloadSaved && (op.Action == "files_read" || op.Action == "files_write")
+	if view.IsCommand && view.CommandText == "" && payload != nil {
+		var envelope map[string]any
+		if err := json.Unmarshal(request, &envelope); err != nil {
+			return err
+		}
+		if params, ok := envelope["params"].(map[string]any); ok {
+			if arguments, ok := params["arguments"].(map[string]any); ok {
+				view.CommandText, _ = arguments["command"].(string)
+			}
+		}
+	}
+	if view.ResponseSaved && view.IsCommand {
+		var envelope struct {
+			Data struct {
+				Result struct {
+					StructuredContent struct {
+						Stdout string `json:"stdout"`
+						Stderr string `json:"stderr"`
+					} `json:"structuredContent"`
+				} `json:"result"`
+			} `json:"data"`
+		}
+		if err := json.Unmarshal(response, &envelope); err != nil {
+			return err
+		}
+		view.Stdout, view.Stderr = envelope.Data.Result.StructuredContent.Stdout, envelope.Data.Result.StructuredContent.Stderr
+	}
+	return nil
 }

@@ -419,17 +419,19 @@ func (a *app) mcpAuditDrawer(c *ui.Context) {
 			uikit.Divider(c, uikit.DividerProps{})
 
 			// 2. 目标快照
-			ui.Row(c).FillWidth().AlignItems(ui.Center).Children(func() {
-				uikit.Text(c, "目标快照", uikit.TextProps{Style: uikit.TextBodyStrong})
-				ui.Spacer(c)
-				uikit.Text(c, "记录于调用时，连接后续修改不影响", uikit.TextProps{Style: uikit.TextCaption, Tone: uikit.ToneTertiary})
-			})
-			uikit.KeyValueGrid(c, 2, []uikit.KV{
-				{Key: "主机", Value: item.ConnHost + " (" + item.ConnName + ")", ValueMono: true},
-				{Key: "端口", Value: item.ConnPort, ValueMono: true},
-				{Key: "账号", Value: item.ConnUser, ValueMono: true},
-				{Key: "协议", Value: item.ConnProtocol},
-			})
+			if item.ConnectionID != "" {
+				ui.Row(c).FillWidth().AlignItems(ui.Center).Children(func() {
+					uikit.Text(c, "目标快照", uikit.TextProps{Style: uikit.TextBodyStrong})
+					ui.Spacer(c)
+					uikit.Text(c, "记录于调用时，连接后续修改不影响", uikit.TextProps{Style: uikit.TextCaption, Tone: uikit.ToneTertiary})
+				})
+				uikit.KeyValueGrid(c, 2, []uikit.KV{
+					{Key: "主机", Value: item.ConnHost + " (" + item.ConnName + ")", ValueMono: true},
+					{Key: "端口", Value: item.ConnPort, ValueMono: true},
+					{Key: "账号", Value: item.ConnUser, ValueMono: true},
+					{Key: "协议", Value: item.ConnProtocol},
+				})
+			}
 
 			uikit.Divider(c, uikit.DividerProps{})
 
@@ -441,8 +443,10 @@ func (a *app) mcpAuditDrawer(c *ui.Context) {
 					uikit.Tip(c, warnIcon, "命令原文可能包含敏感参数；审计按本地敏感数据管理，不承诺已自动识别全部秘密。")
 					uikit.Text(c, "原文可能含敏感参数（按本地敏感数据保存）", uikit.TextProps{Style: uikit.TextCaption, Tone: uikit.ToneWarning})
 				})
+				if uikit.CodeBlock(c.Key("command-source"), "命令原文", item.CommandText).Copy {
+					mygo.Clipboard.WriteText(item.CommandText)
+				}
 				uikit.KeyValue(c, []uikit.KV{
-					{Key: "命令原文", Value: item.CommandText, ValueMono: true},
 					{Key: "退出码", Value: item.ExitCodeText, ValueMono: true},
 					{Key: "输出与状态", Value: item.OutputStatus},
 				})
@@ -459,6 +463,45 @@ func (a *app) mcpAuditDrawer(c *ui.Context) {
 					fileKVs = append(fileKVs, uikit.KV{Key: "传输统计", Value: item.TransferStat})
 				}
 				uikit.KeyValue(c, fileKVs)
+			}
+
+			uikit.Divider(c, uikit.DividerProps{})
+			if !item.DetailLoaded {
+				uikit.Text(c, "正在读取请求与响应…", uikit.TextProps{Style: uikit.TextCaption, Tone: uikit.ToneSecondary})
+			} else {
+				if !item.PayloadSaved {
+					uikit.Banner(c, "该记录未保存完整请求与响应正文，以下仅显示已有摘要。", uikit.BannerProps{Tone: uikit.ToneNeutral})
+				}
+				if item.FileBodyOmitted {
+					uikit.Banner(c, "文件正文不写入审计；请求与响应中保留路径、字节数及处理结果。", uikit.BannerProps{Tone: uikit.ToneNeutral})
+				}
+				if uikit.CodeBlock(c.Key("audit-request"), "请求", item.RequestJSON).Copy {
+					mygo.Clipboard.WriteText(item.RequestJSON)
+				}
+				ui.Row(c).FillWidth().AlignItems(ui.Center).Children(func() {
+					uikit.Text(c, "响应", uikit.TextProps{Style: uikit.TextBodyStrong})
+					ui.Spacer(c)
+					if item.IsCommand && item.ResponseSaved && !item.ResponseTruncated {
+						uikit.Segmented(c, &a.mcp.auditResponseTab, uikit.SegmentItems([]string{"输出", "JSON"}), uikit.SegmentedProps{
+							Label: "响应查看方式", Size: uikit.SizeSm,
+						})
+					}
+				})
+				if item.ResponseTruncated {
+					uikit.Banner(c, "响应超过审计采集上限，正文未保存；请查看响应摘要中的大小信息。", uikit.BannerProps{Tone: uikit.ToneWarning})
+				}
+				if !item.ResponseSaved && item.PayloadSaved {
+					uikit.Text(c, "响应尚未记录；调用可能仍在进行，或在返回前中断。", uikit.TextProps{Style: uikit.TextCaption, Tone: uikit.ToneSecondary})
+				} else if item.IsCommand && item.ResponseSaved && !item.ResponseTruncated && a.mcp.auditResponseTab == 0 {
+					if uikit.CodeBlock(c.Key("audit-stdout"), "标准输出 stdout", item.Stdout).Copy {
+						mygo.Clipboard.WriteText(item.Stdout)
+					}
+					if uikit.CodeBlock(c.Key("audit-stderr"), "标准错误 stderr", item.Stderr).Copy {
+						mygo.Clipboard.WriteText(item.Stderr)
+					}
+				} else if uikit.CodeBlock(c.Key("audit-response"), "响应数据", item.ResponseJSON).Copy {
+					mygo.Clipboard.WriteText(item.ResponseJSON)
+				}
 			}
 
 			// 4. 命中拦截策略快照卡片
