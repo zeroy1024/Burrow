@@ -3,6 +3,7 @@ package desktop
 import (
 	"fmt"
 
+	"sshdesk/internal/hostinfo"
 	"sshdesk/internal/theme"
 	"sshdesk/internal/uikit"
 
@@ -33,16 +34,18 @@ func (a *app) serverStatus(c *ui.Context) {
 			return
 		}
 		h := session.endpoint
-		metrics := serverMetrics{}
+		metrics := hostinfo.Metrics{}
 		var history []float64
+		var disk *float64
+		var diskUsed, diskTotal uint64
 		notice := "正在采集服务器状态…"
 		if a.monitor.session == session {
 			if a.monitor.metrics != nil {
 				metrics, history = *a.monitor.metrics, a.monitor.history
-				if stats := a.monitor.diskStats; stats != nil && a.monitor.diskIdentity == metrics.root.identity {
-					metrics.diskTotal, metrics.diskUsed = stats.Total, stats.Total-stats.Free
-					percent := float64(metrics.diskUsed) / float64(metrics.diskTotal) * 100
-					metrics.disk = &percent
+				if stats := a.monitor.diskStats; stats != nil && a.monitor.diskIdentity == metrics.DiskKey {
+					diskTotal, diskUsed = stats.Total, stats.Total-stats.Free
+					percent := float64(diskUsed) / float64(diskTotal) * 100
+					disk = &percent
 				}
 			}
 			notice = monitorNotice(&a.monitor)
@@ -52,42 +55,42 @@ func (a *app) serverStatus(c *ui.Context) {
 				SingleLine().Ellipsis("…")
 			ui.Column(c).Gap(t.Space.N8).Children(func() {
 				value := "—"
-				if metrics.cpu != nil {
-					value = fmt.Sprintf("%.0f%%", *metrics.cpu)
+				if metrics.CPU != nil {
+					value = fmt.Sprintf("%.0f%%", *metrics.CPU)
 				}
-				monitorMeter(c, "CPU", value, metrics.cpu)
+				monitorMeter(c, "CPU", value, metrics.CPU)
 				uikit.Sparkline(c, history, uikit.SparklineProps{Label: "CPU 使用率趋势"})
 				cores := "—"
-				if metrics.cores > 0 {
-					cores = fmt.Sprint(metrics.cores)
+				if metrics.Cores > 0 {
+					cores = fmt.Sprint(metrics.Cores)
 				}
-				uikit.Text(c, cores+" 核 · 负载 "+monitorText(metrics.load), uikit.TextProps{Style: uikit.TextCaption, Tone: uikit.ToneSecondary})
+				uikit.Text(c, cores+" 核 · 负载 "+monitorText(metrics.Load), uikit.TextProps{Style: uikit.TextCaption, Tone: uikit.ToneSecondary})
 			})
 			memory := "—"
-			if metrics.memory != nil {
-				memory = fmt.Sprintf("%.1f / %.1f GB", float64(metrics.memoryUsed)/1e9, float64(metrics.memoryTotal)/1e9)
+			if metrics.Memory != nil {
+				memory = fmt.Sprintf("%.1f / %.1f GB", float64(metrics.MemoryUsed)/1e9, float64(metrics.MemoryTotal)/1e9)
 			}
-			monitorMeter(c, "内存", memory, metrics.memory)
+			monitorMeter(c, "内存", memory, metrics.Memory)
 			ui.Column(c).Gap(t.Space.N6).Children(func() {
-				disk := "—"
-				if metrics.disk != nil {
-					disk = fmt.Sprintf("%.1f / %.1f GB", float64(metrics.diskUsed)/1e9, float64(metrics.diskTotal)/1e9)
+				value := "—"
+				if disk != nil {
+					value = fmt.Sprintf("%.1f / %.1f GB", float64(diskUsed)/1e9, float64(diskTotal)/1e9)
 				}
-				monitorMeter(c, "磁盘", disk, metrics.disk)
-				uikit.Text(c, monitorText(metrics.diskDevice)+" · "+monitorText(metrics.filesystem), uikit.TextProps{Style: uikit.TextCaption, Tone: uikit.ToneSecondary})
+				monitorMeter(c, "磁盘", value, disk)
+				uikit.Text(c, monitorText(metrics.DiskDevice)+" · "+monitorText(metrics.Filesystem), uikit.TextProps{Style: uikit.TextCaption, Tone: uikit.ToneSecondary})
 			})
 			ui.Column(c).Gap(t.Space.N10).Children(func() {
 				uikit.Text(c, "网络", uikit.TextProps{Style: uikit.TextSmall})
-				uikit.KeyValue(c, []uikit.KV{{Key: "↓ 下行", Value: monitorRate(metrics.down)}, {Key: "↑ 上行", Value: monitorRate(metrics.up)}})
+				uikit.KeyValue(c, []uikit.KV{{Key: "↓ 下行", Value: monitorRate(metrics.Down)}, {Key: "↑ 上行", Value: monitorRate(metrics.Up)}})
 			})
 			uikit.Divider(c)
 			ui.Column(c).Gap(t.Space.N10).Children(func() {
 				uikit.Stat(c, "进程 Top", "CPU")
 				for index := range 4 {
 					name, cpu := "—", "—"
-					if index < len(metrics.top) {
-						process := metrics.top[index]
-						name, cpu = process.name, fmt.Sprintf("%.1f%%", process.cpu)
+					if index < len(metrics.Top) {
+						process := metrics.Top[index]
+						name, cpu = process.Name, fmt.Sprintf("%.1f%%", process.CPU)
 					}
 					uikit.KeyValue(c, []uikit.KV{{Key: name, Value: cpu, Mono: true}})
 				}
@@ -95,12 +98,12 @@ func (a *app) serverStatus(c *ui.Context) {
 			uikit.Divider(c)
 			ui.Column(c).Gap(t.Space.N12).Children(func() {
 				processes := "—"
-				if metrics.hasProcesses {
-					processes = fmt.Sprint(metrics.processes)
+				if metrics.Processes != nil {
+					processes = fmt.Sprint(*metrics.Processes)
 				}
 				a.serverHostFacts(c, session)
 				uikit.KeyValue(c, []uikit.KV{
-					{Key: "运行时间", Value: monitorUptime(metrics.uptime)}, {Key: "进程", Value: processes},
+					{Key: "运行时间", Value: monitorUptime(metrics.Uptime)}, {Key: "进程", Value: processes},
 				})
 			})
 			if notice != "" {
@@ -116,7 +119,7 @@ func (a *app) serverStatus(c *ui.Context) {
 }
 
 func (a *app) serverHostFacts(c *ui.Context, session *remoteSession) {
-	var facts *linuxHostFacts
+	var facts *hostinfo.Facts
 	var pending bool
 	var errorText string
 	if group := session.connection; group != nil {
@@ -126,15 +129,17 @@ func (a *app) serverHostFacts(c *ui.Context, session *remoteSession) {
 		pending = group.facts.pending && group.connection != nil && group.facts.connection == group.connection
 		errorText = group.facts.errorText
 	}
-	hostname, system, kernel := "—", "—", "—"
+	rows := []uikit.KV{{Key: "主机名", Value: "—"}, {Key: "系统", Value: "—"}, {Key: "内核", Value: "—"}, {Key: "架构", Value: "—"}}
 	if facts != nil {
-		hostname, system, kernel = facts.Hostname, facts.OSName, facts.Kernel
+		rows = []uikit.KV{{Key: "主机名", Value: monitorText(facts.Hostname)}, {Key: "系统", Value: facts.OSName},
+			{Key: "内核", Value: monitorText(facts.Kernel)}, {Key: "架构", Value: monitorText(facts.Arch)}}
+		if facts.Platform == hostinfo.Windows {
+			rows = append(rows, uikit.KV{Key: "默认 Shell", Value: monitorText(facts.Shell)})
+		}
 	}
 	t := theme.Current()
 	ui.Column(c).Gap(t.Space.N12).Children(func() {
-		uikit.KeyValue(c, []uikit.KV{
-			{Key: "主机名", Value: hostname}, {Key: "系统", Value: system}, {Key: "内核", Value: kernel},
-		})
+		uikit.KeyValue(c, rows)
 		message := ""
 		if pending {
 			message = "正在更新主机基础信息…"

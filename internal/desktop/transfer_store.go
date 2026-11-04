@@ -418,6 +418,9 @@ func validateTransferEndpoint(endpoint storedSession, files bool) error {
 		if options.KeepAlive < 0 || options.KeepAlive > 3600 {
 			return errors.New("传输Keepalive无效")
 		}
+		if !validPlatformOverride(options.Platform) {
+			return errors.New("传输远端系统无效")
+		}
 	}
 	if options := endpoint.Files; options != nil {
 		if !slices.Contains([]string{"UTF-8", "GBK", "GB18030", "Big5", "Shift_JIS", "EUC-KR", "ISO-8859-1"}, options.Encoding) {

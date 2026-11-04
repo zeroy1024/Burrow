@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/egoist/mygo"
+	"sshdesk/internal/hostinfo"
 )
 
 type sessionConfig struct {
@@ -32,6 +33,8 @@ type sshOptions struct {
 	InitCommand string   `json:"initCommand,omitempty"`
 	TermScheme  string   `json:"termScheme,omitempty"`
 	Env         []string `json:"env,omitempty"`
+	// Platform pins the remote system; empty detects it on connect.
+	Platform string `json:"platform,omitempty"`
 }
 
 type fileOptions struct {
@@ -284,6 +287,9 @@ func validateSessionProfile(h host, byID map[string]host, keyIDs map[string]bool
 		if options.KeepAlive < 0 || options.KeepAlive > 3600 {
 			return errors.New("invalid keepalive interval")
 		}
+		if !validPlatformOverride(options.Platform) {
+			return errors.New("invalid remote platform")
+		}
 		seen := map[string]bool{h.session.ID: true}
 		for next := options.JumpHostID; next != ""; {
 			jump, ok := byID[next]
@@ -306,4 +312,8 @@ func validateSessionProfile(h host, byID map[string]host, keyIDs map[string]bool
 		}
 	}
 	return nil
+}
+
+func validPlatformOverride(platform string) bool {
+	return platform == "" || slices.Contains(hostinfo.Overrides, hostinfo.Platform(platform))
 }

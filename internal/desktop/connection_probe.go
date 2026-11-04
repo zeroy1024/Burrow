@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"sshdesk/internal/fileclient"
+	"sshdesk/internal/hostinfo"
 	"sshdesk/internal/sshclient"
 	"sshdesk/internal/theme"
 )
@@ -21,7 +22,7 @@ type connectionTestResult struct {
 	startedAt                    time.Time
 	Err                          error
 	NewHost                      bool
-	HostFacts                    *linuxHostFacts
+	HostFacts                    *hostinfo.Facts
 	HostFactsKey                 string
 	HostFactsErr                 error
 }
@@ -81,10 +82,10 @@ func (a *app) prepareConnectionTest(h host, password, passphrase string, passphr
 					if h.protocol == "" || h.protocol == "ssh" {
 						// Keep the test transport alive until Exec has delivered its
 						// result; releasing its final command lease closes the transport.
-						var facts linuxHostFacts
+						var facts hostinfo.Facts
 						release, factsErr := connection.Retain()
 						if factsErr == nil {
-							facts, factsErr = collectLinuxHostFacts(ctx, connection)
+							facts, factsErr = hostinfo.Collect(ctx, sshHostRunner{connection}, connection.ServerVersion(), sshPlatform(h))
 							release()
 						}
 						result.HostFactsErr = factsErr
@@ -111,8 +112,12 @@ func (a *app) prepareConnectionTest(h host, password, passphrase string, passphr
 				result.Detail = result.Fingerprint
 			}
 			if facts := result.HostFacts; facts != nil {
-				result.Detail = strings.TrimSpace(result.Detail + "\n主机名：" + facts.Hostname +
-					"\n系统：" + facts.OSName + "\n内核：" + facts.Kernel)
+				for _, line := range [][2]string{{"主机名", facts.Hostname}, {"系统", facts.OSName}, {"内核", facts.Kernel},
+					{"架构", facts.Arch}, {"默认 Shell", facts.Shell}} {
+					if line[1] != "" {
+						result.Detail = strings.TrimSpace(result.Detail + "\n" + line[0] + "：" + line[1])
+					}
+				}
 			}
 			if result.HostFactsErr != nil {
 				result.Summary += " · 基础信息获取失败"
