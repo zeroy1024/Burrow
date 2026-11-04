@@ -89,11 +89,6 @@ func (w *auditResponseWriter) Flush() {
 func auditValue(value any, tool string, request bool) any {
 	switch v := value.(type) {
 	case map[string]any:
-		if method, _ := v["method"].(string); method == "tools/call" {
-			if params, ok := v["params"].(map[string]any); ok {
-				tool, _ = params["name"].(string)
-			}
-		}
 		for key, child := range v {
 			sensitive := strings.ToLower(strings.ReplaceAll(key, "_", ""))
 			credential := sensitive == "authorization" || sensitive == "secretkey" || sensitive == "password" ||
@@ -128,6 +123,24 @@ func auditValue(value any, tool string, request bool) any {
 	return value
 }
 
+func auditRequestValue(value any) any {
+	if batch, ok := value.([]any); ok {
+		for i, message := range batch {
+			batch[i] = auditRequestValue(message)
+		}
+		return batch
+	}
+	tool := ""
+	if message, ok := value.(map[string]any); ok && message["method"] == "tools/call" {
+		if params, ok := message["params"].(map[string]any); ok {
+			tool, _ = params["name"].(string)
+		}
+	}
+	// Only an RPC envelope determines the tool. Nested argument objects cannot
+	// redefine the scope used to omit file text.
+	return auditValue(value, tool, true)
+}
+
 func (s *Service) auditHTTP(w http.ResponseWriter, r *http.Request, key store.MCPKey, next http.Handler) {
 	raw, readErr := io.ReadAll(r.Body)
 	readErr = errors.Join(readErr, r.Body.Close())
@@ -150,7 +163,7 @@ func (s *Service) auditHTTP(w http.ResponseWriter, r *http.Request, key store.MC
 	if !valid {
 		request = map[string]any{"http_method": r.Method, "body_bytes": len(raw), "body_omitted": "请求正文不是有效的 JSON 或超过大小限制"}
 	}
-	requestJSON, err := json.Marshal(auditValue(request, tool, true))
+	requestJSON, err := json.Marshal(auditRequestValue(request))
 	if err != nil {
 		http.Error(w, "MCP audit encoding failed", http.StatusInternalServerError)
 		return

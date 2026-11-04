@@ -505,31 +505,32 @@ func (a *app) mcpAuditDrawer(c *ui.Context) {
 			}
 
 			// 4. 命中拦截策略快照卡片
-			if item.PolicyHit != nil {
-				hit := item.PolicyHit
+			if len(item.PolicyHits) > 0 {
 				uikit.Divider(c, uikit.DividerProps{})
 				ui.Row(c).FillWidth().AlignItems(ui.Center).Children(func() {
 					uikit.Text(c, "命中拦截策略", uikit.TextProps{Style: uikit.TextBodyStrong})
 					ui.Spacer(c)
 					uikit.Text(c, "保存判定时规则快照，后续修改不影响", uikit.TextProps{Style: uikit.TextCaption, Tone: uikit.ToneTertiary})
 				})
-				ui.Column(c).FillWidth().Padding(t.Space.N10).Gap(t.Space.N6).
-					Radius(t.Radius.Control).Background(uikit.Color(t.Color.Warning.Subtle)).
-					Border(t.Size.Hairline, uikit.Color(t.Color.Warning.Default)).Children(func() {
-					ui.Row(c).FillWidth().AlignItems(ui.Center).Gap(t.Space.N8).Children(func() {
-						uikit.Badge(c, hit.Category, uikit.BadgeProps{Tone: uikit.ToneWarning})
-						uikit.Text(c, hit.PolicyName, uikit.TextProps{Style: uikit.TextBodyStrong}).SingleLine().Ellipsis("…")
-						uikit.Text(c, fmt.Sprintf("%s · v%d", hit.PolicyID, hit.Version), uikit.TextProps{
-							Style: uikit.TextMono, Tone: uikit.ToneSecondary,
+				for i, hit := range item.PolicyHits {
+					ui.Column(c).Key(i).FillWidth().Padding(t.Space.N10).Gap(t.Space.N6).
+						Radius(t.Radius.Control).Background(uikit.Color(t.Color.Warning.Subtle)).
+						Border(t.Size.Hairline, uikit.Color(t.Color.Warning.Default)).Children(func() {
+						ui.Row(c).FillWidth().AlignItems(ui.Center).Gap(t.Space.N8).Children(func() {
+							uikit.Badge(c, hit.Category, uikit.BadgeProps{Tone: uikit.ToneWarning})
+							uikit.Text(c, hit.PolicyName, uikit.TextProps{Style: uikit.TextBodyStrong}).SingleLine().Ellipsis("…")
+							uikit.Text(c, fmt.Sprintf("%s · v%d", hit.PolicyID, hit.Version), uikit.TextProps{
+								Style: uikit.TextMono, Tone: uikit.ToneSecondary,
+							})
+							ui.Spacer(c)
+							uikit.Badge(c, hit.HitCountText, uikit.BadgeProps{Tone: uikit.ToneWarning, Dot: true})
 						})
-						ui.Spacer(c)
-						uikit.Badge(c, hit.HitCountText, uikit.BadgeProps{Tone: uikit.ToneWarning, Dot: true})
+						ui.Row(c).FillWidth().AlignItems(ui.Center).Gap(t.Space.N8).Children(func() {
+							uikit.Text(c, "命中规则："+hit.RuleSummary, uikit.TextProps{Style: uikit.TextMono}).Grow(1).MinWidth(0)
+							uikit.Text(c, hit.ForbiddenText, uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneDanger})
+						})
 					})
-					ui.Row(c).FillWidth().AlignItems(ui.Center).Gap(t.Space.N8).Children(func() {
-						uikit.Text(c, "命中规则："+hit.RuleSummary, uikit.TextProps{Style: uikit.TextMono}).Grow(1).MinWidth(0).SingleLine().Ellipsis("…")
-						uikit.Text(c, hit.ForbiddenText, uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneDanger})
-					})
-				})
+				}
 			}
 
 			// 5. 关联任务卡片（含进度条、暂停/继续/取消 与 黄色等待用户确认块）
@@ -559,6 +560,9 @@ func (a *app) mcpAuditDrawer(c *ui.Context) {
 							pauseLabel = "继续"
 							pauseIcon = uikit.IconPlay
 						}
+						if task.CleanupOnly {
+							pauseLabel = "重试清理"
+						}
 						if uikit.Button(c.Key("task-pause"), pauseLabel, uikit.ButtonProps{
 							Size: uikit.SizeSm, Icon: pauseIcon, Disabled: task.CancelRequest,
 						}).Clicked() {
@@ -566,13 +570,16 @@ func (a *app) mcpAuditDrawer(c *ui.Context) {
 							if task.Paused {
 								action = "resume"
 							}
+							if task.CleanupOnly {
+								action = "cancel"
+							}
 							a.controlMCPBackendTask(task.ID, action)
 						}
 						cancelLabel := "取消"
 						if task.CancelRequest {
 							cancelLabel = "已请求取消"
 						}
-						if uikit.Button(c.Key("task-cancel"), cancelLabel, uikit.ButtonProps{
+						if !task.CleanupOnly && uikit.Button(c.Key("task-cancel"), cancelLabel, uikit.ButtonProps{
 							Variant: uikit.ButtonDangerPlain, Size: uikit.SizeSm, Disabled: task.CancelRequest,
 						}).Clicked() {
 							a.controlMCPBackendTask(task.ID, "cancel")
@@ -629,7 +636,7 @@ func (a *app) mcpAuditDrawer(c *ui.Context) {
 					uikit.Text(c, fmt.Sprintf("%d 个文件", item.FileTotal), uikit.TextProps{Style: uikit.TextCaption, Tone: uikit.ToneSecondary})
 				})
 				if a.mcp.auditFilesOpen {
-					cntAll, cntOk, cntBlock, cntFail, cntSkip, cntPend := item.FileTotal, item.FileCounts["completed"], item.FileCounts["intercepted"], item.FileCounts["failed"], item.FileCounts["skipped"], item.FileCounts["running"]+item.FileCounts["pending"]
+					cntAll, cntOk, cntBlock, cntFail, cntSkip, cntPend := item.FileTotal, item.FileCounts["completed"], item.FileCounts["intercepted"], item.FileCounts["failed"], item.FileCounts["skipped"], item.FileCounts["running"]+item.FileCounts["pending"]+item.FileCounts["interrupted"]
 					filterItems := []uikit.SegItem{
 						{Label: "全部", Count: &cntAll},
 						{Label: "成功", Count: &cntOk},
@@ -741,7 +748,7 @@ func (a *app) openEditMCPKeyModal(id string) {
 }
 
 func (a *app) setMCPKeyState(id, state string) {
-	a.setMCPBackendKeyState(id, state)
+	a.setMCPBackendKeyState(id, state, nil)
 }
 
 func (a *app) pickMCPDirectory(forUpload bool) {
@@ -951,9 +958,10 @@ func (a *app) mcpKeyConfirmModal(c *ui.Context) {
 		variant = uikit.ButtonDanger
 	}
 	uikit.Modal(c.Key("mcp-key-confirm"), &dlg.Open, uikit.ModalProps{
-		Title:   title,
-		Compact: true,
-		Width:   440,
+		Title:    title,
+		Compact:  true,
+		Width:    440,
+		Disabled: a.mcpBusy(),
 	}, func(parts uikit.ModalParts) {
 		uikit.Text(c, "• 立即拒绝该 Key 的所有后续 MCP 请求。", uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneSecondary})
 		uikit.Text(c, fmt.Sprintf("• 自动取消 %d 个排队任务，并向关联的执行中任务请求取消。", a.mcpQueuedTasks(dlg.KeyID)), uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneSecondary})
@@ -968,12 +976,15 @@ func (a *app) mcpKeyConfirmModal(c *ui.Context) {
 				parts.RequestDismiss()
 			}
 			if uikit.Button(c, btnLabel, uikit.ButtonProps{Variant: variant}).Clicked() {
+				state := "disabled"
 				if isRevoke {
-					a.setMCPKeyState(dlg.KeyID, "revoked")
-				} else {
-					a.setMCPKeyState(dlg.KeyID, "disabled")
+					state = "revoked"
 				}
-				dlg.Open = false
+				a.setMCPBackendKeyState(dlg.KeyID, state, func(err error) {
+					if err == nil {
+						dlg.Open = false
+					}
+				})
 			}
 		})
 	})

@@ -86,6 +86,8 @@ type MCPOperationFilter struct {
 
 const mcpDateLayout = "2006-01-02T15:04:05.000000000Z"
 
+var ErrMCPKeyRevoked = errors.New("revoked MCP key cannot be reactivated")
+
 func mcpDate(t time.Time) string {
 	if t.IsZero() {
 		return ""
@@ -216,7 +218,7 @@ func (s *Store) MCPUpdateKey(ctx context.Context, key MCPKey) error {
 		return err
 	}
 	if oldState == "revoked" && key.State != "revoked" {
-		return errors.New("revoked MCP key cannot be reactivated")
+		return ErrMCPKeyRevoked
 	}
 	// Authentication touches last_used_at concurrently. A settings edit never
 	// overwrites that timestamp, the creation time, or the immutable secret digest.
@@ -233,6 +235,38 @@ func (s *Store) MCPUpdateKey(ctx context.Context, key MCPKey) error {
 		return err
 	}
 	return tx.Commit()
+}
+
+func (s *Store) MCPSetKeyState(ctx context.Context, id, state string) (MCPKey, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return MCPKey{}, err
+	}
+	defer tx.Rollback()
+	key, err := scanMCPKey(tx.QueryRowContext(ctx, "SELECT "+mcpKeyColumns+" FROM mcp_keys WHERE id=?", id))
+	if err != nil {
+		return MCPKey{}, err
+	}
+	if key.State == "revoked" && state != "revoked" {
+		return MCPKey{}, ErrMCPKeyRevoked
+	}
+	key.State = state
+	if state == "revoked" {
+		key.Grants, key.UploadDirs, key.DownloadDirs = nil, nil, nil
+		_, err = tx.ExecContext(ctx, "UPDATE mcp_keys SET state=?,grants='null',upload_dirs='null',download_dirs='null' WHERE id=?", state, id)
+	} else {
+		_, err = tx.ExecContext(ctx, "UPDATE mcp_keys SET state=? WHERE id=?", state, id)
+	}
+	if err != nil {
+		return MCPKey{}, err
+	}
+	if err := mcpManagement(ctx, tx, "key."+state, key); err != nil {
+		return MCPKey{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return MCPKey{}, err
+	}
+	return key, nil
 }
 
 func (s *Store) MCPTouchKey(ctx context.Context, id string) error {
@@ -750,6 +784,28 @@ func (s *Store) MCPSaveTask(ctx context.Context, task MCPTask) error {
 	return tx.Commit()
 }
 
+// MCPSaveTaskEvent changes a cleanup task without replacing the parent
+// operation's business result, which may still be finishing on another worker.
+func (s *Store) MCPSaveTaskEvent(ctx context.Context, task MCPTask) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if err := mcpSaveTask(ctx, tx, task); err != nil {
+		return err
+	}
+	event, err := json.Marshal(MCPEvent{Stage: task.State, Detail: task.Error, At: task.UpdatedAt})
+	if err != nil {
+		return err
+	}
+	result, err := tx.ExecContext(ctx, `UPDATE mcp_operations SET timeline=json_insert(coalesce(nullif(timeline,'null'),'[]'),'$[#]',json(?)) WHERE id=?`, string(event), task.OperationID)
+	if err := mcpChanged(result, err); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
 func mcpSaveTask(ctx context.Context, tx *sql.Tx, task MCPTask) error {
 	result, err := tx.ExecContext(ctx, `UPDATE mcp_operations SET task_id=? WHERE id=? AND key_id=? AND connection_id=? AND task_id IN (0,?)`,
 		task.ID, task.OperationID, task.KeyID, task.ConnectionID, task.ID)
@@ -795,6 +851,9 @@ func (s *Store) MCPInterrupt(ctx context.Context) error {
 	}
 	_, err = tx.ExecContext(ctx, `UPDATE mcp_tasks SET state='interrupted',error='application stopped before completion; requires manual resume',updated_at=? WHERE state IN ('queued','running','waiting','waiting_user','cancelling','cancel_requested','pausing')`, mcpDate(now))
 	if err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE mcp_tasks SET state='cleanup_pending',error='temporary file cleanup interrupted; requires manual retry',updated_at=? WHERE state='cleaning'`, mcpDate(now)); err != nil {
 		return err
 	}
 	if _, err := tx.ExecContext(ctx, `UPDATE mcp_files SET status='interrupted',error='application stopped before completion' WHERE status IN ('queued','running','started','reading','writing')`); err != nil {

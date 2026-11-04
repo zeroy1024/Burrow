@@ -274,8 +274,12 @@ func (a *app) applyMCPData(data mcpData) {
 		for i := range grants {
 			for _, g := range key.Grants {
 				if g.ConnectionID == grants[i].ConnectionID {
+					if g.EndpointDigest != grants[i].EndpointDigest {
+						grants[i].Warning = "连接信息已变更，原授权已失效；请重新选择权限并保存确认"
+						summary = append(summary, grants[i].Name+"（需重新授权）")
+						continue
+					}
 					grants[i].AllowRead, grants[i].AllowWrite, grants[i].AllowExec = g.Read, g.Write, g.Exec
-					grants[i].EndpointDigest = g.EndpointDigest
 					var capabilities []string
 					if g.Read {
 						capabilities = append(capabilities, "读")
@@ -380,7 +384,7 @@ func (a *app) mcpGrants() []mcpKeyGrant {
 		return grants
 	}
 	for _, c := range a.mcpBackend.connections {
-		grants = append(grants, mcpKeyGrant{ConnectionID: c.ID, Name: c.Name,
+		grants = append(grants, mcpKeyGrant{ConnectionID: c.ID, EndpointDigest: c.Identity, Name: c.Name,
 			Subtitle:      strings.ToUpper(c.Protocol) + " · " + c.User + "@" + c.Host,
 			SupportsFiles: c.Protocol != "ssh", SupportsSSH: c.Protocol == "ssh"})
 	}
@@ -424,6 +428,8 @@ func (a *app) mcpWork(work func() error, done func(error)) {
 		return
 	}
 	if b.busy {
+		a.persistenceNotice("MCP 操作未执行", errors.New("另一个 MCP 管理操作进行中，请稍后重试"))
+		a.refreshMCPBackend()
 		return
 	}
 	b.busy = true
@@ -568,14 +574,8 @@ func (a *app) saveMCPBackendPolicy() {
 	})
 }
 
-func (a *app) setMCPBackendKeyState(id, state string) {
-	for _, key := range a.mcpBackend.keys {
-		if key.ID == id {
-			key.State = state
-			a.mcpWork(func() error { return a.mcpBackend.service.UpdateKey(a.ctx, key) }, nil)
-			return
-		}
-	}
+func (a *app) setMCPBackendKeyState(id, state string, done func(error)) {
+	a.mcpWork(func() error { return a.mcpBackend.service.SetKeyState(a.ctx, id, state) }, done)
 }
 
 func (a *app) toggleMCPBackendPolicy(id string) {
@@ -713,13 +713,12 @@ func mcpAuditView(op store.MCPOperation, files []store.MCPFileEvent, task store.
 	for _, event := range op.Timeline {
 		view.Timeline = append(view.Timeline, uikit.TimelineItem{Stage: event.Stage, Detail: event.Detail, Time: event.At.Local().Format("15:04:05"), Tone: uikit.ToneSecondary})
 	}
-	if len(op.Hits) > 0 {
-		h := op.Hits[0]
+	for i, h := range op.Hits {
 		category := "文件策略"
 		if h.Category == "ssh" {
 			category = "命令策略"
 		}
-		view.PolicyHit = &mcpPolicyHitSnapshot{PolicyID: h.PolicyID, PolicyName: h.Name, Category: category, Version: h.Version, RuleSummary: h.Rule, ForbiddenText: h.Action, HitCountText: fmt.Sprintf("命中 %d 条规则", len(op.Hits))}
+		view.PolicyHits = append(view.PolicyHits, mcpPolicyHitSnapshot{PolicyID: h.PolicyID, PolicyName: h.Name, Category: category, Version: h.Version, RuleSummary: h.Rule, ForbiddenText: h.Action, HitCountText: fmt.Sprintf("第 %d / %d 条命中", i+1, len(op.Hits))})
 	}
 	latest := make(map[string]int)
 	var summaries []store.MCPFileEvent
@@ -733,7 +732,7 @@ func mcpAuditView(op store.MCPOperation, files []store.MCPFileEvent, task store.
 		}
 	}
 	for _, f := range summaries {
-		state := map[string]string{"completed": "ok", "intercepted": "intercepted", "failed": "failed", "skipped": "skipped", "running": "pending", "pending": "pending"}[f.Status]
+		state := map[string]string{"completed": "ok", "intercepted": "intercepted", "failed": "failed", "skipped": "skipped", "running": "pending", "pending": "pending", "interrupted": "pending"}[f.Status]
 		view.Files = append(view.Files, mcpAuditFileItem{Path: f.Path, State: state, Size: transferBytes(f.Bytes), PolicyTag: f.Action})
 	}
 	if task.ID > 0 {
@@ -744,6 +743,13 @@ func mcpAuditView(op store.MCPOperation, files []store.MCPFileEvent, task store.
 		view.Task = &mcpAuditTask{ID: strconv.Itoa(task.ID), Title: view.ActionType + " → " + target.Name,
 			Subtitle: task.State, Transferred: transferBytes(task.Done), Total: transferBytes(task.Total), Fraction: fraction,
 			Paused: task.State == "paused" || task.State == "interrupted" || task.State == "failed" || task.State == "intercepted" || task.State == "partial_intercepted", CancelRequest: task.State == "cancel_requested" || task.State == "cancelled" || task.State == "completed"}
+		if op.Action == "files_write" {
+			view.Task.CleanupOnly = true
+			view.Task.Title = "自有临时文件清理 → " + target.Name
+			view.Task.Subtitle = map[string]string{"cleanup_pending": "等待手动重试清理", "cleaning": "正在清理", "completed": "清理完成"}[task.State]
+			view.Task.Paused = task.State == "cleanup_pending"
+			view.Task.CancelRequest = task.State != "cleanup_pending"
+		}
 		if task.State == "waiting_user" && len(op.Timeline) > 0 {
 			view.Task.WaitingPrompt = "等待用户：" + op.Timeline[len(op.Timeline)-1].Detail
 		}

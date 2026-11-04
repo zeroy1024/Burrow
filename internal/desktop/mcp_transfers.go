@@ -225,9 +225,20 @@ func (a *app) mcpTaskSnapshot(task *transferTask, result error) store.MCPTask {
 			state = "cancel_requested"
 		}
 	}
+	if owner.CleanupOnly {
+		state = "cleanup_pending"
+		if task.run != nil {
+			state = "cleaning"
+		} else if len(task.job.temporary) == 0 {
+			state = "completed"
+		}
+	}
 	message := task.errorText
 	if result != nil && task.state != transferPaused {
 		message = result.Error()
+	}
+	if owner.CleanupOnly && state == "completed" {
+		message = ""
 	}
 	done, total := task.transferred, task.total
 	if task.run != nil {
@@ -245,18 +256,13 @@ func (a *app) mcpTransferChanged(task *transferTask, result error) {
 	if errors.Is(result, context.Canceled) && (task.state == transferQueued || task.state == transferPaused || task.state == transferRunning) {
 		result = nil
 	}
-	if task.state == transferQueued || task.state == transferRunning {
-		task.mcp.Outcome = ""
-	}
-	var failure *mcpserver.Failure
-	if task.run == nil && errors.As(result, &failure) && failure.Code == "intercepted" {
-		task.mcp.Outcome = "intercepted"
-		if task.job.doneBytes > 0 {
-			task.mcp.Outcome = "partial_intercepted"
-		}
-	}
+	setMCPTransferOutcome(task, result)
 	snapshot := a.mcpTaskSnapshot(task, result)
+	cleanupOnly := task.mcp.CleanupOnly
 	a.persist(func() error {
+		if cleanupOnly {
+			return a.store.MCPSaveTaskEvent(a.ctx, snapshot)
+		}
 		if err := a.store.MCPSaveTask(a.ctx, snapshot); err != nil {
 			return err
 		}
@@ -293,8 +299,27 @@ func (a *app) mcpTransferChanged(task *transferTask, result error) {
 	})
 }
 
+func setMCPTransferOutcome(task *transferTask, result error) {
+	if task.mcp == nil {
+		return
+	}
+	if task.state == transferQueued || task.state == transferRunning {
+		task.mcp.Outcome = ""
+	}
+	var failure *mcpserver.Failure
+	if task.run == nil && errors.As(result, &failure) && failure.Code == "intercepted" {
+		task.mcp.Outcome = "intercepted"
+		if task.job.doneBytes > 0 {
+			task.mcp.Outcome = "partial_intercepted"
+		}
+	}
+}
+
 // Restored MCP ownership is never inferred from a file tab or a display name.
 func validMCPTransfer(owner *mcpTransferOwner, task storedTransferTask) bool {
+	if owner.CleanupOnly && (task.SourceRemote || !task.CleanupPending || task.State != transferFailed) {
+		return false
+	}
 	return owner.KeyID != "" && owner.OperationID != "" && owner.ConnectionID != "" &&
 		owner.Identity != "" && filepath.IsAbs(owner.LocalRoot) && !owner.CreatedAt.IsZero() &&
 		(task.SourceRemote || task.SourcePath != "")

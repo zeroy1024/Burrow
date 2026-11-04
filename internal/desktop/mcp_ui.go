@@ -85,6 +85,7 @@ type mcpAuditTask struct {
 	Speed         string
 	Paused        bool
 	CancelRequest bool
+	CleanupOnly   bool
 	WaitingPrompt string
 }
 
@@ -132,7 +133,7 @@ type mcpAuditItem struct {
 	LocalPath         string
 	RemotePath        string
 	TransferStat      string
-	PolicyHit         *mcpPolicyHitSnapshot
+	PolicyHits        []mcpPolicyHitSnapshot
 	Task              *mcpAuditTask
 	Timeline          []uikit.TimelineItem
 	Files             []mcpAuditFileItem

@@ -33,6 +33,7 @@ type mcpDesktop struct {
 type mcpTransferOwner struct {
 	KeyID, OperationID, ConnectionID, Identity, LocalRoot, Conflict string
 	Outcome                                                         string
+	CleanupOnly                                                     bool
 	CreatedAt                                                       time.Time
 }
 
@@ -180,7 +181,16 @@ func (b *mcpDesktop) Exec(ctx context.Context, c mcpserver.Connection, command s
 
 func (b *mcpDesktop) WriteText(ctx context.Context, c mcpserver.Connection, remotePath, text, mode string,
 	check func(context.Context, fileclient.Client, string, bool) error) (result error) {
-	file, err := os.CreateTemp("", "burrow-mcp-text-*")
+	name := path.Base(remotePath)
+	if !transferSafeName(name) {
+		return fs.ErrInvalid
+	}
+	dir, err := os.MkdirTemp("", "burrow-mcp-text-*")
+	if err != nil {
+		return err
+	}
+	defer func() { result = errors.Join(result, os.Remove(dir)) }()
+	file, err := os.OpenFile(filepath.Join(dir, name), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
 	if err != nil {
 		return err
 	}
@@ -198,10 +208,14 @@ func (b *mcpDesktop) WriteText(ctx context.Context, c mcpserver.Connection, remo
 	if err != nil {
 		return err
 	}
-	defer func() { result = errors.Join(result, remote.Close()) }()
+	defer func() {
+		if remote != nil {
+			result = errors.Join(result, remote.Close())
+		}
+	}()
 	batch := &transferBatch{}
 	batch.policy.Store(1)
-	job := &transferJob{sourcePath: file.Name(), targetPath: path.Dir(remotePath), name: path.Base(remotePath),
+	job := &transferJob{sourcePath: file.Name(), targetPath: path.Dir(remotePath), name: name,
 		policy: 1, batch: batch, temporary: make(map[string]struct{}), destinationKey: fmt.Sprintf("%q/%q/%q/%d", c.Runtime.(*fileSession).endpoint.protocol, c.User, c.Host, c.Port),
 		mcpCheck: func(ctx context.Context, source, target fileclient.Client, node *transferNode, destination string) error {
 			entry, err := target.Stat(ctx, destination)
@@ -221,12 +235,65 @@ func (b *mcpDesktop) WriteText(ctx context.Context, c mcpserver.Connection, remo
 		return err
 	}
 	err = b.a.performTransfer(ctx, task, run, job, local, remote, locks)
-	if err != nil {
+	if err != nil && len(job.temporary) > 0 {
+		err = errors.Join(err, remote.Close())
+		remote = nil
+		// Cancellation closes the original protocol client. Cleanup owns a new
+		// bounded connection and can never restart the business write.
 		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
-		defer cancel()
-		err = errors.Join(err, cleanupTransferFiles(cleanupCtx, remote, job))
+		cleanupClient, cleanupErr := b.OpenFiles(cleanupCtx, c)
+		if cleanupErr == nil {
+			cleanupErr = errors.Join(cleanupTransferFiles(cleanupCtx, cleanupClient, job), cleanupClient.Close())
+		}
+		cancel()
+		err = errors.Join(err, cleanupErr)
+		if len(job.temporary) > 0 {
+			err = errors.Join(err, b.keepWriteCleanup(ctx, c, job, dir, err))
+		}
 	}
 	return err
+}
+
+func (b *mcpDesktop) keepWriteCleanup(ctx context.Context, c mcpserver.Connection, job *transferJob, root string, cause error) error {
+	// This is already-owned remote work, so service/key shutdown or the normal
+	// business queue limit must not discard its cleanup journal.
+	saveCtx, cancel := context.WithTimeout(b.a.ctx, 30*time.Second)
+	defer cancel()
+	operationID, _ := mcpserver.OperationID(ctx)
+	op, err := b.a.store.MCPOperation(saveCtx, operationID)
+	if err != nil {
+		return b.service.FailStorage(err)
+	}
+	ready := make(chan error, 1)
+	_, err = mcpOnUI(saveCtx, b, func() (bool, error) {
+		a := b.a
+		a.transfers.nextID++
+		a.transfers.nextBatchID++
+		job.batch.id = a.transfers.nextBatchID
+		owner := &mcpTransferOwner{KeyID: op.KeyID, OperationID: op.ID, ConnectionID: c.ID, Identity: c.Identity,
+			LocalRoot: root, Conflict: "overwrite", CleanupOnly: true, CreatedAt: time.Now().UTC()}
+		task := &transferTask{id: a.transfers.nextID, mcp: owner, job: job,
+			session: a.snapshotTransferSession(c.Runtime.(*fileSession)),
+			state:   transferFailed, cleanupPending: true, errorText: "写入后的临时文件等待清理：" + cause.Error(),
+			sourcePath: job.sourcePath, targetPath: job.targetPath, total: job.total, transferred: job.doneBytes,
+			entry: fileEntry{name: job.name, path: job.sourcePath, size: job.root.entry.Size}}
+		a.transfers.tasks = append(a.transfers.tasks, task)
+		a.persistTransfersDone(func(err error) {
+			ready <- err
+		})
+		return true, nil
+	})
+	if err == nil {
+		select {
+		case err = <-ready:
+		case <-saveCtx.Done():
+			err = saveCtx.Err()
+		}
+	}
+	if err != nil {
+		return b.service.FailStorage(err)
+	}
+	return errors.New("自有临时文件尚未清理，已保存关联清理任务，可在审计详情中重试清理")
 }
 
 func (b *mcpDesktop) Enqueue(ctx context.Context, request mcpserver.TransferRequest) (store.MCPTask, error) {
@@ -361,7 +428,7 @@ func (b *mcpDesktop) Quiesce(ctx context.Context, keyID string, pause bool) erro
 	}
 	_, err = mcpOnUI(ctx, b, func() (bool, error) {
 		for _, t := range slices.Clone(b.a.transfers.tasks) {
-			if t.mcp == nil || keyID != "" && t.mcp.KeyID != keyID || t.state == transferDone {
+			if t.mcp == nil || t.mcp.CleanupOnly || keyID != "" && t.mcp.KeyID != keyID || t.state == transferDone {
 				continue
 			}
 			if keyID != "" && key.State == "active" && mcpTaskAllowed(key, t) {

@@ -361,6 +361,9 @@ func (a *app) restoreTransfers() (err error) {
 			if owner.KeyID != task.mcp.KeyID || owner.OperationID != task.mcp.OperationID || owner.ConnectionID != task.mcp.ConnectionID {
 				return errors.New("MCP 传输归属与队列不一致")
 			}
+			if task.state == transferFailed && (owner.State == "intercepted" || owner.State == "partial_intercepted") {
+				task.mcp.Outcome = owner.State
+			}
 			a.mcpBackend.attachTransfer(task)
 		}
 	}

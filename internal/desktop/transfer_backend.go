@@ -390,6 +390,7 @@ func (a *app) finishTransfer(task *transferTask, run *transferRun, cleanup bool,
 	}
 	a.transfers.displaySpeed = a.transfers.summary().speed
 	a.advanceTransferConflicts()
+	setMCPTransferOutcome(task, err)
 	a.persistTransfers()
 	a.scheduleTransfers()
 	a.finishTransferQuitIfReady()

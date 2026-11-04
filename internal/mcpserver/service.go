@@ -295,6 +295,8 @@ func (s *Service) validateKey(ctx context.Context, key *store.MCPKey) error {
 		}
 		if g.EndpointDigest == "" {
 			g.EndpointDigest = c.Identity
+		} else if g.EndpointDigest != c.Identity {
+			return fail("invalid_argument", "连接信息已变更，请重新确认授权")
 		}
 	}
 	for _, dirs := range [][]string{key.UploadDirs, key.DownloadDirs} {
@@ -327,8 +329,32 @@ func (s *Service) UpdateKey(ctx context.Context, key store.MCPKey) error {
 		return err
 	}
 	if err := s.Store.MCPUpdateKey(ctx, key); err != nil {
+		if errors.Is(err, store.ErrMCPKeyRevoked) {
+			return fail("invalid_argument", "已撤销的密钥不可恢复")
+		}
 		return s.storageFault(err)
 	}
+	return s.keyChanged(ctx, key)
+}
+
+func (s *Service) SetKeyState(ctx context.Context, id, state string) error {
+	if state != "active" && state != "disabled" && state != "revoked" {
+		return fail("invalid_argument", "无效的密钥状态")
+	}
+	key, err := s.Store.MCPSetKeyState(ctx, id, state)
+	if errors.Is(err, sql.ErrNoRows) {
+		return fail("not_found", "密钥已不存在，请刷新后重试")
+	}
+	if errors.Is(err, store.ErrMCPKeyRevoked) {
+		return fail("invalid_argument", "已撤销的密钥不可恢复")
+	}
+	if err != nil {
+		return s.storageFault(err)
+	}
+	return s.keyChanged(ctx, key)
+}
+
+func (s *Service) keyChanged(ctx context.Context, key store.MCPKey) error {
 	// Registered operations are cancelled after the durable change. A request
 	// registers before re-reading its current key, closing the admission race.
 	s.mu.Lock()
