@@ -129,13 +129,18 @@ func (a *app) fileTitleBar(c *ui.Context, shown float32) {
 		})
 		tabs := uikit.SessionTabs(c, nil, nil, uikit.SessionTabsProps{
 			Scroll: &a.fileTabScroll, ScrollKey: "file-session-tabs", Motion: uikit.MotionOverride(a.reduceMotion(c)),
-			BuildTabs: func(list ui.Element) ui.Element {
+			BuildTabs: func(list ui.Element) {
 				var closing *fileSession
 				for index, session := range a.fileSessions {
 					if a.fileTabButton(c, list, index, session) {
 						closing = session
 					}
 				}
+				if closing != nil {
+					a.requestCloseFileTab(slices.Index(a.fileSessions, closing))
+				}
+			},
+			BuildAdd: func() {
 				var menu []uikit.MenuEntry
 				for _, group := range a.catalogGroups() {
 					entry := uikit.MenuEntry{ID: fmt.Sprintf("group-%d", group.id), Label: group.name}
@@ -148,10 +153,6 @@ func (a *app) fileTitleBar(c *ui.Context, shown float32) {
 				}
 				add := uikit.IconButton(c, plusIcon, uikit.IconButtonProps{Key: "新建文件会话", Label: "新建文件会话", Variant: uikit.IconOnWindow})
 				uikit.MenuOn(c, add, menu)
-				if closing != nil {
-					a.requestCloseFileTab(slices.Index(a.fileSessions, closing))
-				}
-				return add
 			},
 		})
 		if tabs.Select >= 0 {

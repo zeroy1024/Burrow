@@ -22,7 +22,6 @@ func (a *app) titleBar(c *ui.Context, shown float32) {
 				Disabled: a.activeSection() == sectionSettings}).
 				OnClick(func() { a.page().sidebarCollapsed = !a.page().sidebarCollapsed })
 		})
-		var add ui.Element
 		tabs := uikit.SessionTabs(c, nil, nil, uikit.SessionTabsProps{
 			Scroll: &a.tabScroll, ScrollKey: "session-tabs", Motion: uikit.MotionOverride(a.reduceMotion(c)),
 			StripInput: func(ev ui.InputEvent) bool {
@@ -32,13 +31,18 @@ func (a *app) titleBar(c *ui.Context, shown float32) {
 				}
 				return false
 			},
-			BuildTabs: func(list ui.Element) ui.Element {
+			BuildTabs: func(list ui.Element) {
 				var pendingAction func()
 				for i, tab := range a.tabs {
 					if action := a.tabButton(c, list, i, tab); action != nil {
 						pendingAction = action
 					}
 				}
+				if pendingAction != nil {
+					pendingAction()
+				}
+			},
+			BuildAdd: func() {
 				var menu []uikit.MenuEntry
 				for _, group := range a.catalogGroups() {
 					entry := uikit.MenuEntry{ID: fmt.Sprintf("group-%d", group.id), Label: group.name}
@@ -52,16 +56,12 @@ func (a *app) titleBar(c *ui.Context, shown float32) {
 					entry.Disabled = len(entry.Children) == 0
 					menu = append(menu, entry)
 				}
-				add = uikit.IconButton(c, plusIcon, uikit.IconButtonProps{Key: "新建会话", Label: "新建会话", Variant: uikit.IconOnWindow})
+				add := uikit.IconButton(c, plusIcon, uikit.IconButtonProps{Key: "新建会话", Label: "新建会话", Variant: uikit.IconOnWindow})
 				uikit.MenuOn(c, add, menu)
-				if pendingAction != nil {
-					pendingAction()
-				}
-				return add
 			},
 		})
 		tabs.Scroller.DrawOver(func(_ *ui.Painter, _ ui.Rect) { a.terminalCapture.strip = tabs.Scroller.Bounds() })
-		a.tabStripTarget(c, tabs, add)
+		a.tabStripTarget(c, tabs, tabs.AddSlot)
 		if tabs.Select >= 0 {
 			a.selectTab(tabs.Select)
 		}

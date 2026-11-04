@@ -42,7 +42,7 @@ func SessionTabsRow(c *ui.Context) ui.Element {
 
 func TitleBarActions(c *ui.Context) ui.Element {
 	p := theme.Current().C.Titlebar
-	return ui.Row(c).Padding(0, p.ActionsPaddingRight).Gap(p.ActionsGap).Shrink(0)
+	return ui.Row(c).PaddingEnd(p.ActionsPaddingRight).Gap(p.ActionsGap).Shrink(0)
 }
 
 func CountTabs(c *ui.Context, selected *int, items []SegItem) ui.Element {
