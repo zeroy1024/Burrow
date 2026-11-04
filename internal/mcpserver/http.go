@@ -305,8 +305,15 @@ func agentHits(failure *Failure) []map[string]any {
 	for i, h := range failure.Hits {
 		hit := map[string]any{"policy_id": h.PolicyID, "policy_name": h.Name, "policy_version": h.Version,
 			"category": h.Category, "rule": h.Rule, "action": h.Action, "matched": failure.Matches[i].Text}
-		if m := failure.Matches[i]; m.Context != "" && m.Context != m.Text {
+		m := failure.Matches[i]
+		if m.Context != "" && m.Context != m.Text {
 			hit["context"] = m.Context
+		}
+		if m.Via != "" {
+			hit["via"] = m.Via
+		}
+		if m.Fallback != "" {
+			hit["fallback"] = m.Fallback
 		}
 		hits = append(hits, hit)
 	}

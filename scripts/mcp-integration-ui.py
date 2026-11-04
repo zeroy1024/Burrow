@@ -314,6 +314,30 @@ class Suite:
                 raise RuntimeError("deleting a policy changed its historical hit snapshot")
         self.case("command policy blocks actual SSH side effects; deleted rule snapshot remains auditable")
 
+        # An agent-style compound command reaches rm only through timeout and a
+        # nested bash -c string. The whole command must be refused before its
+        # first segment runs, while lookalike words and quoted data still run.
+        policy_id = "integration-" + uuid.uuid4().hex
+        folder = "/home/sshdesk/mcp-command-match-" + uuid.uuid4().hex
+        self.remote(server["container"], "install -d -o sshdesk -g sshdesk " + folder)
+        policy = dict(ID=policy_id, Version=1, Name="MCP command match integration", Category="ssh", Enabled=True,
+                      AllKeys=True, ConnectionIDs=[ssh["id"]], CommandRules=[dict(Mode="command", Pattern="rm -rf")])
+        self.action("policy", policy=policy)
+        command = "cd /home/sshdesk && touch " + folder + "/started && timeout 30 bash -lc '\\rm -fr " + folder + "'"
+        denied = self.full.call("ssh_exec", dict(connection_id=ssh["id"], command=command), expect_error=True)
+        if denied["error"]["code"] != "intercepted":
+            raise RuntimeError("command-mode rule did not intercept rm behind timeout and bash -c")
+        if self.remote(server["container"], "test -d " + folder + " && test ! -e " + folder + "/started && printf intact") != "intact":
+            raise RuntimeError("command-mode interception let part of the compound command run")
+        hit = denied["error"]["hits"][0]
+        if hit["rule"] != "command: rm -rf" or hit["via"] != "timeout ▸ bash -c" or hit["matched"] != "\\rm -fr " + folder or not denied["error"].get("hint"):
+            raise RuntimeError("command-mode interception did not explain the matched invocation: " + json.dumps(hit, ensure_ascii=False))
+        allowed = self.full.call("ssh_exec", dict(connection_id=ssh["id"], command="printf 'format %s' --rm && echo 'rm -rf /' >/dev/null"))
+        if allowed["stdout"] != "format --rm" or allowed["exit_code"] != 0:
+            raise RuntimeError("command-mode rule blocked lookalike words or quoted data")
+        self.action("delete_policy", policy_id=policy_id)
+        self.case("command-mode rule blocks rm via timeout/bash -c before any segment runs and reports the path; lookalikes still run")
+
         sftp = self.connection("Docker Plain Key", "sftp")
         folder = "/home/sshdesk/mcp-protected-" + uuid.uuid4().hex
         self.remote(server["container"], "install -d -o sshdesk -g sshdesk " + folder)

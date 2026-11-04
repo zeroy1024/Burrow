@@ -47,6 +47,9 @@ var textLicense string
 //go:embed licenses/jetbrains-mono.txt
 var jetbrainsLicense string
 
+//go:embed licenses/mvdan-sh.txt
+var shLicense string
+
 var burrowIcon = func() *ui.Bitmap {
 	bitmap, err := ui.DecodeBitmap(assets.IconPNG)
 	if err != nil {
@@ -67,6 +70,7 @@ var dependencyNotices = []struct{ name, license, text string }{
 	{"golang.org/x/image", "BSD-3-Clause", imageLicense},
 	{"golang.org/x/net", "BSD-3-Clause", netLicense},
 	{"golang.org/x/text", "BSD-3-Clause", textLicense},
+	{"mvdan.cc/sh", "BSD-3-Clause", shLicense},
 	{"Catppuccin / Dracula / Nord", "MIT", termtheme.Licenses},
 	{"JetBrains Mono", "SIL Open Font License 1.1", jetbrainsLicense},
 }
