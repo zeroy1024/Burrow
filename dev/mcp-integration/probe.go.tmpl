@@ -42,6 +42,14 @@ func mcpIntegrationPath(name string) string {
     return filepath.Join(os.Getenv("SSHDESK_TEST_DIR"),name)
 }
 
+// The driver polls these files, so publish them by rename to avoid empty reads.
+func writeMCPIntegrationFile(name string, data []byte) error {
+    path:=mcpIntegrationPath(name)
+    temp:=path+".tmp"
+    if err:=os.WriteFile(temp,data,0600);err!=nil { return err }
+    return os.Rename(temp,path)
+}
+
 func mcpIntegrationTLSConfig(name string) *tls.Config {
     if name == "MCP FTPS Untrusted" { return nil }
     filename:="ftps-server.json"
@@ -93,7 +101,7 @@ func mcpIntegrationSetup(a *app) error {
     state.Endpoint="http://"+net.JoinHostPort(cfg.Host,strconv.Itoa(port))+"/mcp"
     data,err:=json.Marshal(state)
     if err!=nil { return err }
-    return os.WriteFile(mcpIntegrationPath("mcp-state.json"),data,0600)
+    return writeMCPIntegrationFile("mcp-state.json",data)
 }
 
 func mcpIntegrationCommand() {
@@ -155,7 +163,7 @@ func mcpIntegrationCommand() {
         if err!=nil { response.Error=err.Error() }
         result,encodeErr:=json.Marshal(response)
         if encodeErr!=nil { panic(encodeErr) }
-        if err:=os.WriteFile(mcpIntegrationPath("mcp-action-result.json"),result,0600);err!=nil { panic(err) }
+        if err:=writeMCPIntegrationFile("mcp-action-result.json",result);err!=nil { panic(err) }
         a.window.Update(func(){a.refreshMCPBackend()})
     })
 }
