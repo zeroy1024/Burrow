@@ -50,10 +50,13 @@ func (b *commandOutput) Write(p []byte) (int, error) {
 // cancellation, so a server ignoring channel close cannot accumulate workers.
 func (c *Connection) Exec(ctx context.Context, command string) ([]byte, error) {
 	result, err := c.ExecCommand(ctx, command)
+	// Remote stderr is arbitrary bytes, such as a Windows console code page.
+	// Error text reaches UI and accessibility APIs that require valid UTF-8.
+	diagnostics := strings.ToValidUTF8(strings.TrimSpace(string(result.Stderr)), "\uFFFD")
 	if err != nil && len(result.Stderr) > 0 {
-		err = fmt.Errorf("%w; stderr: %s", err, strings.TrimSpace(string(result.Stderr)))
+		err = fmt.Errorf("%w; stderr: %s", err, diagnostics)
 	} else if err == nil && len(result.Stderr) > 0 {
-		err = fmt.Errorf("SSH command diagnostics: %s", strings.TrimSpace(string(result.Stderr)))
+		err = fmt.Errorf("SSH command diagnostics: %s", diagnostics)
 	}
 	return result.Stdout, err
 }
