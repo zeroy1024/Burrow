@@ -32,8 +32,25 @@ func OsLogo(c *ui.Context, name string, size Size) {
 	glyph := tile * t.C.OsLogo.GlyphSize / t.C.OsLogo.Size
 	ui.Box(c).Size(tile, tile).Shrink(0).Radius(t.C.OsLogo.Radius).
 		Background(Color(t.OSLogoBg(asset.Brand))).Center().PassThrough().Children(func() {
-		ui.Image(c, asset.Icon).Size(glyph, glyph).TextColor(Color(asset.Brand)).PassThrough()
+		ui.Image(c, asset.Icon).Size(glyph, glyph).TextColor(Color(OSLogoInk(asset.Brand))).PassThrough()
 	})
+}
+
+// OSLogoInk is the glyph color for a brand on its tinted tile. Official colors
+// stay unless they lack contrast there, as black Apple on a dark card or yellow
+// Tux on a light one; the glyph then moves toward black or white. Thin logos
+// read darker on dark surfaces, so dark mode asks for more.
+func OSLogoInk(brand color.NRGBA) color.NRGBA {
+	t := theme.Current()
+	tile, minimum, target := t.OSLogoBg(brand), 3.0, color.NRGBA{A: 0xff}
+	if t.IsDark {
+		minimum, target = 4.5, color.NRGBA{R: 0xff, G: 0xff, B: 0xff, A: 0xff}
+	}
+	ink := brand
+	for step := 0; step < 24 && ColorContrast(ink, tile) < minimum; step++ {
+		ink = theme.Mix(ink, target, 0.08)
+	}
+	return ink
 }
 
 type Protocol uint8

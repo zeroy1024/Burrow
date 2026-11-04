@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 
 	"sshdesk/internal/fileclient"
@@ -86,7 +87,7 @@ func factsStyle(f hostinfo.Facts) systemStyle {
 		return systems[windowsSystem]
 	}
 	for _, style := range systems {
-		if strings.ToLower(style.name) == f.OSID {
+		if slices.Contains(style.ids, f.OSID) {
 			return style
 		}
 	}
