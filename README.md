@@ -33,7 +33,7 @@ mise run build
 
 工具链要求、产物位置和验证命令见[开发与构建](docs/development.md)。
 
-Gitea 提供[提交检查](.gitea/workflows/check.yml)与[编译打包](.gitea/workflows/package.yml)两个 CI，统一使用 `ubuntu-latest`；触发规则和 Windows 安装包附件说明见[Gitea CI](docs/development.md#gitea-ci)。
+Gitea 的普通分支推送和 PR 只运行[提交检查](.gitea/workflows/check.yml)；推送 `v*` 发布标签才触发[编译打包](.gitea/workflows/package.yml)，产出 Windows amd64/arm64 的 UPX 安装程序和 macOS ARM64 DMG。runner 要求与附件说明见[Gitea CI](docs/development.md#gitea-ci)。
 
 ## 使用须知
 

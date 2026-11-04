@@ -42,7 +42,9 @@ build/darwin-arm64/burrow-0.1.1-arm64.zip
 build/darwin-arm64/burrow-0.1.1-arm64.dmg
 ```
 
-Windows 使用 MyGo 的 EXE/安装程序构建流程，再生成同时包含 EXE 与 `ghostty-vt.dll` 的便携 ZIP：
+Windows 打包要求主机 PATH 上有 UPX 5.3.0 或更新版本，以支持 Windows ARM64。构建入口会临时编译 [Go 命令代理](../scripts/upx-go/main.go)，在 MyGo 的 Windows `go build` 完成后执行 UPX LZMA 压缩与完整性校验，再由 MyGo 签名并生成安装程序。压缩保留图标和重定位信息，`ghostty-vt.dll` 保持原样；不修改 Go 工具链或 MyGo 源码。构建期间只在子进程 PATH 中启用代理。
+
+本地构建仍生成同时包含压缩后的 EXE 与 `ghostty-vt.dll` 的便携 ZIP：
 
 ```text
 build/windows-amd64/Burrow.exe
@@ -93,22 +95,24 @@ GOCACHE=/private/tmp/sshdesk-go-build mise exec -- go test ./...
 
 ## Gitea CI
 
-两个 workflow 都使用现有的 `ubuntu-latest` runner 标签，在任务容器内准备工具，不修改 runner 宿主机。mise 读取仓库的 `mise.toml`，使用固定的 Go、uv 版本；action 固定到 commit，mise 本体固定为 2026.10.25。
+检查和 Windows 打包使用现有的 `ubuntu-latest` runner，在任务容器内准备工具。macOS DMG 使用 `macos-arm64` 的原生 host runner；需要另行注册带有 `macos-arm64:host` 标签的 Apple Silicon macOS runner，主机需有 Xcode Command Line Tools 和运行 JavaScript actions 所需的 Node。该 runner 尚待配置，在其上线前 macOS 作业会等待匹配的 runner。mise 读取仓库的 `mise.toml`，使用固定的 Go、uv 版本；action 固定到 commit，mise 本体固定为 2026.10.25。
 
 当前 rootless runner 限制容器内的 UID/GID 切换；APT 使用 `APT::Sandbox::User=root`，并将下载缓存放在当前任务的 `RUNNER_TEMP` 下，避免切换到 `_apt` 或访问镜像中 `_apt` 专属目录失败，不增加容器能力或修改宿主机权限。
 
 | Workflow | 触发条件 | 内容 |
 |---|---|---|
-| [提交检查](../.gitea/workflows/check.yml) | push、PR 和手动触发 | 应用及终端扩展的 Go 格式、Python 语法、现有 race 测试、vet、Linux 编译和 Windows 双架构交叉检查 |
-| [编译打包](../.gitea/workflows/package.yml) | main 更新、`v*` 标签和手动触发 | Windows amd64/arm64 的 NSIS EXE 安装程序、便携 ZIP 和 SHA-256 摘要 |
+| [提交检查](../.gitea/workflows/check.yml) | 分支 push、PR 和手动触发；标签 push 不触发 | 应用及终端扩展的 Go 格式、Python 语法、现有 race 测试、vet、Linux 编译和 Windows 双架构交叉检查 |
+| [编译打包](../.gitea/workflows/package.yml) | 仅 `v*` 标签 push | Windows amd64/arm64 的 UPX NSIS 安装程序、macOS ARM64 DMG 和 SHA-256 摘要 |
 
 `pkg-sftp` 保留上游格式，不纳入格式门禁；其独立模块执行 vet 时关闭 `stdmethods`：上游的 `RawPacket.ReadFrom` 和 `RequestPacket.ReadFrom` 接收缓冲区与长度限制，并非 `io.ReaderFrom`，该分析项会误报。其余 vet 分析项保留，应用和终端扩展仍执行完整 vet。原生 UI、视觉验收及需要 Docker 服务的 SSH/FTP 集成测试不在这个基础提交检查中。
 
-打包任务安装 NSIS 并调用同一 `mise run build` 入口。它会检查两个架构的安装程序和 ZIP 均存在、ZIP 完整且包含本次 EXE/DLL，再生成 `SHA256SUMS`。缺少安装程序时任务失败，不能以只生成便携包算作打包完成。
+Windows 打包任务安装 NSIS、7-Zip，并下载固定 UPX 5.3.0 的官方 Linux 主机工具，验证预置 SHA-256 后调用同一 `mise run build` 入口。它会解开两个架构的安装程序，核对其中的 EXE/DLL 与本次构建完全一致，再生成 `SHA256SUMS`。缺少安装程序时任务失败，不能以只生成便携包算作打包完成。
 
-产物按 `burrow-windows-amd64`、`burrow-windows-arm64` 保存为 Actions 附件，保留 14 天；workflow 不创建 Release 或发布到外部仓库。上传使用 Runner 5 的 action 兼容层，需保留默认的 `runner.patch_actions: true`。标签名不会自动修改 `mygo.json` 的版本，创建版本标签前先更新项目版本。
+macOS 继续使用原有 APP 签名、LZMA DMG 和 ZIP 构建流程，不启用 UPX 或文件系统透明压缩。CI 只上传校验通过的 DMG 与摘要。
 
-当前只有 Linux runner，打包 workflow 覆盖 Windows EXE/ZIP；macOS APP/DMG/ZIP 继续在 macOS 构建，MSI 尚未接入。CI 成功不替代 Windows 原生安装、升级、卸载和功能验收。
+产物按 `burrow-windows-amd64`、`burrow-windows-arm64`、`burrow-macos-arm64` 保存为 Actions 附件，分别包含安装程序或 DMG 以及摘要，保留 14 天；本地生成的便携 ZIP 不上传，workflow 不创建 Release 或发布到外部仓库。上传使用 Runner 5 的 action 兼容层，需保留默认的 `runner.patch_actions: true`。标签名不会自动修改 `mygo.json` 的版本，创建版本标签前先更新项目版本。
+
+UPX 内部完整性检查和安装程序内容校验不能替代 Windows 原生启动、DLL 加载、安装、升级、卸载及杀软误报检查。macOS host runner 的 DMG 构建与安装亦需在其上线后验证；MSI 尚未接入。
 
 可在 macOS/Linux 上进行目标编译与静态检查，例如：
 
