@@ -2,6 +2,7 @@ name: 提交检查
 
 on:
   push:
+    branches: ['**']
   pull_request:
   workflow_dispatch:
 
