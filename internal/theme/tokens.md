@@ -1535,8 +1535,8 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `menu.itemHeight` | `{size.control}` | 28px | **derived** 设计稿未画菜单，按浮起层/拖动卡片推导 |
 | `menu.itemRadius` | `{radius.controlSm}` | 6px | **derived** 设计稿未画菜单，按浮起层/拖动卡片推导 |
 | `menu.itemPaddingX` | `{space.8}` | 8px | **derived** 设计稿未画菜单，按浮起层/拖动卡片推导 |
-| `menu.itemHover` | `{color.accent.default}` | #0a84ff | **derived** 设计稿未画菜单，按浮起层/拖动卡片推导 |
-| `menu.itemHoverText` | `{color.text.onAccent}` | #ffffff | **derived** 设计稿未画菜单，按浮起层/拖动卡片推导 |
+| `menu.itemHover` | `{color.state.hover}` | #f7f7f8 | **derived** 设计稿未画菜单，按浮起层/拖动卡片推导 |
+| `menu.itemHoverText` | `{color.text.primary}` | #1d1d1f | **derived** 设计稿未画菜单，按浮起层/拖动卡片推导 |
 | `menu.fontSize` | `{font.size.body}` | 12.5px | **derived** 设计稿未画菜单，按浮起层/拖动卡片推导 |
 | `menu.separator` | `{color.border.subtle}` | #f0f0f2 | **derived** 设计稿未画菜单，按浮起层/拖动卡片推导 |
 

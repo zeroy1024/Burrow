@@ -11,6 +11,7 @@ macOS 运行基线为 13 及以上系统；Windows amd64/arm64 的平台适配�
 - **文件管理**：本地与远程双面板，支持 SFTP、FTP 和 FTPS，以及目录导航、搜索、排序、新建、重命名和删除。
 - **文件传输**：文件和目录上传下载、并发任务、暂停、继续、取消、重试和重名处理；队列按文件标签隔离。
 - **服务器监控**：Linux CPU、内存、网络、进程和系统信息；具备相应 SFTP 能力时显示根盘容量。
+- **本机 MCP**：Streamable HTTP、授权密钥、连接与能力授权、SSH / 文件拦截策略及审计；复用现有连接和传输队列。macOS 已通过真实 SSH/SFTP/FTP/显式及隐式 FTPS 和任务生命周期联调，验证范围见 [MCP 联调说明](dev/mcp-integration/README.md)。
 - **个性化与恢复**：明暗主题、终端配色、字体、光标、快捷键，以及离线恢复工作区和传输任务。
 
 ## 快速开始
@@ -53,5 +54,7 @@ Gitea 提供[提交检查](.gitea/workflows/check.yml)与[编译打包](.gitea/w
 | [终端与配色](docs/terminal-themes.md) | [主题与设计令牌](docs/theme-integration.md) |
 | [文件管理与传输](docs/file-transfer.md) | [共享 UI 组件](docs/uikit.md) |
 | [Linux 监控](docs/monitoring.md) | [历史归档](docs/archive/README.md) |
+
+MCP 的接入、数据边界、工具契约和验证范围见 [MCP Server 功能方案](docs/mcp-server-plan.md)。页面设计交接见 [MCP 页面设计功能清单](docs/mcp-page-design-brief.md)。
 
 阶段计划、整改和历史验收记录保存在[历史归档](docs/archive/README.md)，不作为当前使用说明。

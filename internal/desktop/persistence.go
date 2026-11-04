@@ -3,6 +3,7 @@ package desktop
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"time"
 
 	"github.com/egoist/mygo"
@@ -79,17 +80,30 @@ func (a *app) persistenceNotice(title string, err error) {
 }
 
 func (a *app) persistTransfers() {
+	a.persistTransfersDone(nil)
+}
+
+func (a *app) persistTransfersDone(done func(error)) {
 	if a.store == nil || a.transfers.quitting || a.transfers.storeErr != nil {
+		if done != nil {
+			done(errors.New("传输存储不可用"))
+		}
 		return
 	}
 	saved := a.transferSnapshot()
 	if err := validateTransferQueue(saved); err != nil {
 		a.persistenceNotice("保存传输记录失败", err)
+		if done != nil {
+			done(err)
+		}
 		return
 	}
 	q, err := encodeTransfers(saved)
 	if err != nil {
 		a.persistenceNotice("保存传输记录失败", err)
+		if done != nil {
+			done(err)
+		}
 		return
 	}
 	a.transfers.persistenceRevision++
@@ -104,7 +118,16 @@ func (a *app) persistTransfers() {
 	for i := range q.Tasks {
 		q.Tasks[i].PreserveManifest = active[q.Tasks[i].ID]
 	}
-	a.persist(func() error { return a.store.SaveTransfers(a.ctx, q) }, func(err error) {
+	owners := []store.MCPTask{}
+	for _, task := range a.transfers.tasks {
+		if task.mcp != nil {
+			owners = append(owners, a.mcpTaskSnapshot(task, nil))
+		}
+	}
+	a.persist(func() error { return a.store.SaveTransfersWithMCP(a.ctx, q, owners) }, func(err error) {
+		if done != nil {
+			defer done(err)
+		}
 		if err != nil {
 			a.transfers.writeErr = err
 			a.persistenceNotice("保存传输记录失败", err)
@@ -161,7 +184,13 @@ func (a *app) journalTransfer(taskID int, run *transferRun, job *transferJob) er
 	if m.Root != nil && m.Root.Destination != "" {
 		name = transferBase(!job.sourceRemote, m.Root.Destination)
 	}
-	return a.store.SaveManifest(ctx, taskID, store.Manifest{Root: root, Temporary: temporary, Total: m.Total, Done: m.Done, SourcePath: m.SourcePath, TargetPath: m.TargetPath, EntryName: name})
+	if err := a.store.SaveManifest(ctx, taskID, store.Manifest{Root: root, Temporary: temporary, Total: m.Total, Done: m.Done, SourcePath: m.SourcePath, TargetPath: m.TargetPath, EntryName: name}); err != nil {
+		return err
+	}
+	if run.mcp != nil {
+		return a.store.MCPProgress(ctx, taskID, max(run.bytes.Load(), 0), max(run.total.Load(), 0))
+	}
+	return nil
 }
 
 func (a *app) finishPersistence() error {

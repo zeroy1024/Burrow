@@ -1,0 +1,165 @@
+package desktop
+
+import (
+    "context"
+    "crypto/tls"
+    "crypto/x509"
+    "encoding/json"
+    "errors"
+    "fmt"
+    "net"
+    "os"
+    "path/filepath"
+    "strconv"
+    "time"
+
+    "github.com/egoist/mygo"
+    "sshdesk/internal/mcpserver"
+    "sshdesk/internal/store"
+)
+
+type mcpIntegrationRequest struct {
+    ID string `json:"id"`
+    Action string `json:"action"`
+    Role string `json:"role"`
+    TaskID int `json:"task_id"`
+    OperationID string `json:"operation_id"`
+    Enabled bool `json:"enabled"`
+    Policy store.MCPPolicy `json:"policy"`
+    PolicyID string `json:"policy_id"`
+    ConnectionID string `json:"connection_id"`
+}
+
+type mcpIntegrationKey struct { ID, Secret string }
+type mcpIntegrationState struct {
+    Endpoint string
+    Keys map[string]mcpIntegrationKey
+    Connections []mcpserver.Connection
+}
+
+func mcpIntegrationPath(name string) string {
+    if name=="mcp-state.json" { return filepath.Join(os.Getenv("SSHDESK_INTEGRATION_CONFIG"),name) }
+    return filepath.Join(os.Getenv("SSHDESK_TEST_DIR"),name)
+}
+
+func mcpIntegrationTLSConfig(name string) *tls.Config {
+    if name == "MCP FTPS Untrusted" { return nil }
+    filename:="ftps-server.json"
+    if name=="MCP FTPS Implicit" { filename="ftps-implicit-server.json" }
+    data,err:=os.ReadFile(mcpIntegrationPath(filename))
+    if err!=nil { panic(err) }
+    var metadata struct { CA string `json:"ca"` }
+    if err:=json.Unmarshal(data,&metadata);err!=nil { panic(err) }
+    ca,err:=os.ReadFile(metadata.CA)
+    if err!=nil { panic(err) }
+    pool:=x509.NewCertPool()
+    if !pool.AppendCertsFromPEM(ca) { panic("integration CA is invalid") }
+    // Verification and ServerName remain controlled by the production adapter.
+    return &tls.Config{RootCAs:pool}
+}
+
+func mcpIntegrationSetup(a *app) error {
+    var previous mcpIntegrationState
+    if data,err:=os.ReadFile(mcpIntegrationPath("mcp-state.json"));err==nil {
+        if err:=json.Unmarshal(data,&previous);err!=nil { return err }
+        for _,key:=range previous.Keys {
+            if _,err:=a.store.MCPKey(a.ctx,key.ID);err!=nil { return err }
+        }
+        return nil
+    } else if !errors.Is(err,os.ErrNotExist) { return err }
+    connections,err:=a.mcpBackend.Connections(a.ctx)
+    if err!=nil { return err }
+    local:=mcpIntegrationPath("mcp-local")
+    if err:=os.MkdirAll(local,0700);err!=nil { return err }
+    state:=mcpIntegrationState{Keys:make(map[string]mcpIntegrationKey),Connections:connections}
+    for _,role:=range []string{"full","readonly","other","lifecycle","scope"} {
+        key:=store.MCPKey{Name:"integration-"+role,UploadDirs:[]string{local},DownloadDirs:[]string{local}}
+        for _,c:=range connections {
+            grant:=store.MCPGrant{ConnectionID:c.ID}
+            if c.Protocol=="ssh" { grant.Exec=role!="readonly" } else { grant.Read=true;grant.Write=role!="readonly" }
+            key.Grants=append(key.Grants,grant)
+        }
+        created,secret,err:=a.mcpBackend.service.CreateKey(a.ctx,key)
+        if err!=nil { return err }
+        state.Keys[role]=mcpIntegrationKey{created.ID,secret}
+    }
+    listener,err:=net.Listen("tcp","127.0.0.1:0")
+    if err!=nil { return err }
+    address:=listener.Addr().(*net.TCPAddr)
+    port:=address.Port
+    if err:=listener.Close();err!=nil { return err }
+    cfg:=mcpserver.Config{Host:"127.0.0.1",Port:port,Enabled:true,RetentionDays:30}
+    if err:=a.mcpBackend.service.Configure(a.ctx,cfg);err!=nil { return err }
+    state.Endpoint="http://"+net.JoinHostPort(cfg.Host,strconv.Itoa(port))+"/mcp"
+    data,err:=json.Marshal(state)
+    if err!=nil { return err }
+    return os.WriteFile(mcpIntegrationPath("mcp-state.json"),data,0600)
+}
+
+func mcpIntegrationCommand() {
+    a:=dockerIntegrationApp
+    if a==nil { return }
+    data,err:=os.ReadFile(mcpIntegrationPath("mcp-action.json"))
+    if err!=nil { panic(err) }
+    var request mcpIntegrationRequest
+    if err:=json.Unmarshal(data,&request);err!=nil { panic(err) }
+    a.sshWorkers.Go(func(){
+        ctx,cancel:=context.WithTimeout(a.ctx,30*time.Second)
+        defer cancel()
+        execute:=func() error {
+            if request.Action=="setup" { return mcpIntegrationSetup(a) }
+            if request.Action=="configure" {
+                cfg,_,_,_:=a.mcpBackend.service.Status()
+                cfg.Enabled=request.Enabled
+                return a.mcpBackend.service.Configure(ctx,cfg)
+            }
+            if request.Action=="policy" { return a.mcpBackend.service.SavePolicy(ctx,request.Policy) }
+            if request.Action=="delete_policy" { return a.mcpBackend.service.DeletePolicy(ctx,request.PolicyID) }
+            if request.Action=="pause" || request.Action=="resume" || request.Action=="cancel" {
+                return a.mcpBackend.ControlTask(ctx,request.TaskID,request.Action)
+            }
+            if request.Action=="show" {
+                operation:=request.OperationID
+                if operation=="" {
+                    task,err:=a.store.MCPTask(ctx,request.TaskID)
+                    if err!=nil { return err };operation=task.OperationID
+                }
+                _,err:=mcpOnUI(ctx,a.mcpBackend,func()(bool,error){
+                    a.switchSection(sectionMCP);a.mcp.activeTab=2
+                    a.mcp.selectedAuditID=operation;a.mcp.auditDrawerOpen=true
+                    a.refreshMCPBackend();a.window.Invalidate()
+                    return true,nil
+                })
+                return err
+            }
+            stateData,err:=os.ReadFile(mcpIntegrationPath("mcp-state.json"))
+            if err!=nil { return err }
+            var state mcpIntegrationState
+            if err:=json.Unmarshal(stateData,&state);err!=nil { return err }
+            identity,ok:=state.Keys[request.Role]
+            if !ok { return fmt.Errorf("unknown integration key role") }
+            key,err:=a.store.MCPKey(ctx,identity.ID)
+            if err!=nil { return err }
+            switch request.Action {
+            case "disable":key.State="disabled"
+            case "enable":key.State="active"
+            case "revoke":key.State="revoked"
+            case "shrink":
+                for i:=range key.Grants { if key.Grants[i].ConnectionID==request.ConnectionID {key.Grants[i].Write=false} }
+            default:return fmt.Errorf("unknown integration action")
+            }
+            return a.mcpBackend.service.UpdateKey(ctx,key)
+        }
+        err:=execute()
+        response:=struct{ID string `json:"id"`;OK bool `json:"ok"`;Error string `json:"error,omitempty"`}{ID:request.ID,OK:err==nil}
+        if err!=nil { response.Error=err.Error() }
+        result,encodeErr:=json.Marshal(response)
+        if encodeErr!=nil { panic(encodeErr) }
+        if err:=os.WriteFile(mcpIntegrationPath("mcp-action-result.json"),result,0600);err!=nil { panic(err) }
+        a.window.Update(func(){a.refreshMCPBackend()})
+    })
+}
+
+func mcpIntegrationMenu() *mygo.MenuItem {
+    return &mygo.MenuItem{Label:"MCP integration action",Click:func(*mygo.MenuItem,*mygo.Window){mcpIntegrationCommand()}}
+}

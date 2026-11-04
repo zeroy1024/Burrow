@@ -107,6 +107,12 @@ func (s *Store) ReadTransfers(ctx context.Context) (Transfers, error) {
 }
 
 func (s *Store) SaveTransfers(ctx context.Context, q Transfers) error {
+	return s.SaveTransfersWithMCP(ctx, q, nil)
+}
+
+// SaveTransfersWithMCP commits the recoverable queue and MCP ownership together.
+// A task is not accepted while only its public identity is durable.
+func (s *Store) SaveTransfersWithMCP(ctx context.Context, q Transfers, tasks []MCPTask) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -187,6 +193,14 @@ func (s *Store) SaveTransfers(ctx context.Context, q Transfers) error {
 	}
 	if _, err := tx.ExecContext(ctx, "INSERT INTO transfer_state VALUES(1,?,?) ON CONFLICT(id) DO UPDATE SET next_id=excluded.next_id,next_batch_id=excluded.next_batch_id", q.NextID, q.NextBatchID); err != nil {
 		return err
+	}
+	for _, task := range tasks {
+		if !keep[task.ID] {
+			return errors.New("MCP task has no recoverable transfer row")
+		}
+		if err := mcpSaveTask(ctx, tx, task); err != nil {
+			return err
+		}
 	}
 	return tx.Commit()
 }

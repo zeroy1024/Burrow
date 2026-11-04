@@ -620,6 +620,10 @@ func (c *sftpClient) ResolveDirectory(ctx context.Context, name string) (string,
 	})
 }
 
+func (c *sftpClient) ResolveCanonicalDirectory(ctx context.Context, name string) (string, error) {
+	return c.ResolveDirectory(ctx, name)
+}
+
 func (c *sftpClient) Chmod(ctx context.Context, name string, mode fs.FileMode) error {
 	wire, err := c.wirePath(name)
 	if err != nil {

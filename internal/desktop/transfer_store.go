@@ -45,6 +45,7 @@ type storedTransferConnection struct {
 }
 
 type storedTransferTask struct {
+	MCP            *mcpTransferOwner   `json:"mcp,omitempty"`
 	ID             int                 `json:"id"`
 	Batch          int                 `json:"batch"`
 	Session        int                 `json:"session"`
@@ -67,20 +68,21 @@ type storedTransferTask struct {
 }
 
 type storedTransferNode struct {
-	Source      string                `json:"source"`
-	Destination string                `json:"destination,omitempty"`
-	Temporary   string                `json:"temporary,omitempty"`
-	Entry       fileclient.Entry      `json:"entry"`
-	Committing  bool                  `json:"committing,omitempty"`
-	Staged      *fileclient.Entry     `json:"staged,omitempty"`
-	Partial     *fileclient.Entry     `json:"partial,omitempty"`
-	Checkpoint  *transferCheckpoint   `json:"checkpoint,omitempty"`
-	Digest      string                `json:"digest,omitempty"`
-	Approved    *fileclient.Entry     `json:"approved,omitempty"`
-	Children    []*storedTransferNode `json:"children,omitempty"`
-	Total       int64                 `json:"total"`
-	Done        bool                  `json:"done,omitempty"`
-	Skipped     bool                  `json:"skipped,omitempty"`
+	StageDirectory string                `json:"stageDirectory,omitempty"`
+	Source         string                `json:"source"`
+	Destination    string                `json:"destination,omitempty"`
+	Temporary      string                `json:"temporary,omitempty"`
+	Entry          fileclient.Entry      `json:"entry"`
+	Committing     bool                  `json:"committing,omitempty"`
+	Staged         *fileclient.Entry     `json:"staged,omitempty"`
+	Partial        *fileclient.Entry     `json:"partial,omitempty"`
+	Checkpoint     *transferCheckpoint   `json:"checkpoint,omitempty"`
+	Digest         string                `json:"digest,omitempty"`
+	Approved       *fileclient.Entry     `json:"approved,omitempty"`
+	Children       []*storedTransferNode `json:"children,omitempty"`
+	Total          int64                 `json:"total"`
+	Done           bool                  `json:"done,omitempty"`
+	Skipped        bool                  `json:"skipped,omitempty"`
 }
 
 // prepareTransferQuit leaves the application context alive until every transfer
@@ -188,7 +190,7 @@ func (a *app) transferSnapshot() *storedTransferQueue {
 	for _, task := range a.transfers.tasks {
 		// Completed rows belong to a restorable tab, not a global history.
 		// Keep unfinished checkpoints even when their browser was closed.
-		if task.state == transferDone && (!a.prefs.RestoreSessions || !slices.Contains(a.fileSessions, task.view)) {
+		if task.mcp == nil && task.state == transferDone && (!a.prefs.RestoreSessions || !slices.Contains(a.fileSessions, task.view)) {
 			continue
 		}
 		sessionID := sessions[task.session]
@@ -221,7 +223,7 @@ func (a *app) transferSnapshot() *storedTransferQueue {
 		if task.cleanupPending || task.removeRequested {
 			state = transferFailed
 		}
-		stored := storedTransferTask{ID: task.id, Session: sessionID, Batch: job.batch.id,
+		stored := storedTransferTask{ID: task.id, Session: sessionID, Batch: job.batch.id, MCP: task.mcp,
 			Entry: fileclient.Entry{Name: entry.name, Size: entry.size, Directory: entry.dir, Symlink: entry.symlink,
 				Modified: entry.modified, Owner: entry.owner, Permissions: entry.permissions},
 			State: state, Transferred: task.transferred, Started: task.started, Completed: task.completed,
@@ -243,7 +245,8 @@ func snapshotTransferNode(node *transferNode) *storedTransferNode {
 		return nil
 	}
 	stored := &storedTransferNode{Source: node.source, Destination: node.destination, Temporary: node.temporary,
-		Entry: node.entry, Approved: node.approved, Committing: node.committing,
+		StageDirectory: node.stageDirectory,
+		Entry:          node.entry, Approved: node.approved, Committing: node.committing,
 		Staged: node.staged, Partial: node.partial, Digest: node.digest,
 		Total: node.total, Done: node.done, Skipped: node.skipped}
 	for _, pair := range []struct {
@@ -343,12 +346,26 @@ func (a *app) restoreTransfers() (err error) {
 		if state != transferDone && state != transferFailed {
 			state = transferPaused
 		}
-		q.tasks = append(q.tasks, &transferTask{id: stored.ID, session: sessions[stored.Session], view: owners[stored.Session],
+		task := &transferTask{id: stored.ID, session: sessions[stored.Session], view: owners[stored.Session], mcp: stored.MCP,
 			entry: fileEntry{name: entry.Name, path: stored.SourcePath, size: entry.Size, dir: entry.Directory,
 				symlink: entry.Symlink, modified: entry.Modified, owner: entry.Owner, permissions: entry.Permissions},
 			sourceRemote: stored.SourceRemote, sourcePath: stored.SourcePath, targetPath: stored.TargetPath,
 			state: state, transferred: stored.Transferred, total: stored.Total, started: stored.Started,
-			completed: stored.Completed, errorText: stored.Error, cleanupPending: stored.CleanupPending, job: job, persisted: true})
+			completed: stored.Completed, errorText: stored.Error, cleanupPending: stored.CleanupPending, job: job, persisted: true}
+		q.tasks = append(q.tasks, task)
+		if task.mcp != nil && a.mcpBackend != nil {
+			owner, ownerErr := a.store.MCPTask(a.ctx, task.id)
+			if ownerErr != nil {
+				return ownerErr
+			}
+			if owner.KeyID != task.mcp.KeyID || owner.OperationID != task.mcp.OperationID || owner.ConnectionID != task.mcp.ConnectionID {
+				return errors.New("MCP 传输归属与队列不一致")
+			}
+			if task.state == transferFailed && (owner.State == "intercepted" || owner.State == "partial_intercepted") {
+				task.mcp.Outcome = owner.State
+			}
+			a.mcpBackend.attachTransfer(task)
+		}
 	}
 	q.nextID, q.nextBatchID = saved.NextID, saved.NextBatchID
 	return nil
@@ -359,7 +376,8 @@ func restoreTransferNode(stored *storedTransferNode) *transferNode {
 		return nil
 	}
 	node := &transferNode{source: stored.Source, destination: stored.Destination, temporary: stored.Temporary,
-		entry: stored.Entry, approved: stored.Approved, committing: stored.Committing,
+		stageDirectory: stored.StageDirectory,
+		entry:          stored.Entry, approved: stored.Approved, committing: stored.Committing,
 		staged: stored.Staged, partial: stored.Partial, digest: stored.Digest,
 		total: stored.Total, done: stored.Done, skipped: stored.Skipped}
 	if stored.Checkpoint != nil {
@@ -486,6 +504,9 @@ func validateTransferQueue(saved *storedTransferQueue) error {
 	}
 	ids := map[int]bool{}
 	for _, task := range saved.Tasks {
+		if task.MCP != nil && !validMCPTransfer(task.MCP, task) {
+			return errors.New("MCP 传输身份无效")
+		}
 		if task.ID <= 0 || task.ID > saved.NextID || ids[task.ID] || sessions[task.Session].ID == 0 ||
 			task.State < transferQueued || task.State > transferFailed || task.Transferred < 0 || batches[task.Batch].ID == 0 || task.Policy != batches[task.Batch].Policy ||
 			task.Total < 0 || task.DoneBytes < 0 || task.Entry.Size < 0 || task.Policy < 0 || task.Policy > 3 ||
@@ -610,9 +631,19 @@ func validateTransferNode(node *storedTransferNode, sourceRemote bool, source, d
 			return 0, 0, errors.New("传输目标越过所属目录")
 		}
 	}
+	if node.StageDirectory != "" {
+		if node.Entry.Directory || node.Destination == "" || !validTransferTemporary(targetRemote, node.StageDirectory, node.Destination) || owned[node.StageDirectory] {
+			return 0, 0, errors.New("私有暂存目录越过所属目标")
+		}
+		owned[node.StageDirectory] = true
+	}
 	if node.Temporary != "" {
+		valid := validTransferTemporary(targetRemote, node.Temporary, node.Destination)
+		if node.StageDirectory != "" {
+			valid = node.Temporary == transferJoin(targetRemote, node.StageDirectory, "content")
+		}
 		if node.Entry.Directory || node.Destination == "" || node.Done || node.Skipped ||
-			!validTransferTemporary(targetRemote, node.Temporary, node.Destination) || owned[node.Temporary] {
+			!valid || owned[node.Temporary] {
 			return 0, 0, errors.New("传输部分文件路径无效")
 		}
 		owned[node.Temporary] = true

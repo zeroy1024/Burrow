@@ -58,11 +58,18 @@ const (
 
 type CountProps struct {
 	Style CountStyle
+	Max   int
 }
 
 func Count(c *ui.Context, count int, props CountProps) ui.Element {
 	t := theme.Current()
 	label := strconv.Itoa(count)
+	if props.Max > 0 {
+		label = strconv.Itoa(max(0, count))
+		if count > props.Max {
+			label = strconv.Itoa(props.Max) + "+"
+		}
+	}
 	if props.Style == CountInline {
 		label = "+" + label
 	}
@@ -103,6 +110,26 @@ func StatusPill(c *ui.Context, status Status, options ...StatusPillProps) ui.Ele
 		label, tone = "已完成", ToneSuccess
 	case StatusPaused:
 		label, tone = "已暂停", ToneMuted
+	case StatusIntercepted:
+		label, tone = "被策略拦截", ToneWarning
+	case StatusPartialIntercepted:
+		label, tone = "部分拦截", ToneWarning
+	case StatusPermissionDenied:
+		label, tone = "权限拒绝", ToneDanger
+	case StatusAuthFailed:
+		label, tone = "认证失败", ToneDanger
+	case StatusPartialFailed:
+		label, tone = "部分失败", ToneWarning
+	case StatusRevoked:
+		label, tone = "已撤销", ToneMuted
+	case StatusDisabled:
+		label, tone = "已停用", ToneWarning
+	case StatusEnabled:
+		label, tone = "已启用", ToneSuccess
+	case StatusStopping:
+		label, tone = "停止中", ToneWarning
+	case StatusInterrupted:
+		label, tone = "中断 / 未知", ToneMuted
 	}
 	return Badge(c, label, BadgeProps{Tone: tone, Dot: true, Surface: props.Surface}).Role(ui.RoleStatus).Label(label)
 }

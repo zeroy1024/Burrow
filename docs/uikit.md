@@ -7,7 +7,7 @@
 | 类别 | 主要文件 |
 |---|---|
 | 文字、图标、按钮、状态 | `text.go`、`icon.go`、`button.go`、`badge.go`、`spinner.go` |
-| 输入、选择、表单 | `input.go`、`select.go`、`form.go`、`toggle.go`、`chipinput.go` |
+| 输入、选择、表单 | `input.go`、`select.go`、`multiselect.go`、`form.go`、`toggle.go`、`chipinput.go` |
 | 弹窗、菜单与反馈 | `modal.go`、`popover.go`、`menu.go`、`tooltip.go`、`toast.go` |
 | 导航与工作区 | `rail.go`、`sider.go`、`tabs.go`、`pane.go`、`sidepanel.go` |
 | 文件与表格 | `table.go`、`sortheader.go`、`filepane.go`、`pathbar.go` |
@@ -25,11 +25,23 @@
 
 弹窗、菜单和 Tooltip 组合 SDK 的原生语义与定位能力；快捷键提示与实际事件绑定分开。关闭设置清理临时状态，同时保留需要复用的句柄。
 
+`Modal.Disabled` 禁用整个弹窗；只需阻止关闭且保留内容交互时使用 `DismissDisabled`，例如一次性密钥展示期间仍须允许复制和勾选保存确认。
+
+`Select`、`MultiSelect` 和窗口内菜单统一在选项行末显示选中对勾。`MultiSelect` 从给定选项中多选，已选项在输入框内以可换行标签展示，标签尾部的关闭按钮移除该项；选项弹层允许连续选择，通过点击外部或 Esc 关闭。
+
+下拉与普通菜单选项的悬停、键盘焦点高亮使用中性底色和正文文字色，选中状态通过行尾对勾表示；危险菜单项沿用危险色反馈。
+
+`Count` 的 `Max` 和 `Segmented` 的 `CountMax` 可限制计数展示；MCP 主标签页使用 99 上限，零值显示为 `0`，超出显示 `99+`，其他未配置上限的计数保留完整数字。
+
 ## 表格与滚动
 
 文件 DataTable 基于真实 `ui.List(...).Rows(...)` 虚拟化，路径是选择、定位和源行保活的稳定身份。应用负责目录内容、排序与文件动作，共享 UI 负责显示和输入适配。
 
+`TableViewport` 为 MCP 等自定义表格提供最小内容宽度与双向滚动。表头与数据内容共用视口宽度和最小宽度计算出的明确宽度，不在双向滚动容器内依赖百分比宽度，避免行内容变短后带动总宽度变化。筛选栏和表头保持在数据行上方，通过 `ScrollWith` 与数据行同步横移；分页栏放在视口外。表头与行内容使用相同的总内边距，避免展开详情压缩表格时列宽坍缩或错位。
+
 `Scrollbars` 装饰既有 Scroll/List，不替换滚动节点或业务状态。滚动条位于非滚动 frame，随滚动或鼠标贴边显示；内容未溢出时不绘制。
+
+`CodeBlock` 为完整文本提供有界的只读、选择和复制能力，每块内容只展示一组标题与复制按钮；调用方不重复添加同名标题。内部文本框通过 `TrackScroll` 接入共享 `Scrollbars`，隐藏 SDK 默认滚动条，沿用全局的宽度、颜色和显隐行为。
 
 会话标签栏保留滚轮横移、选择后定位和新增标签尾部加号定位，滚动条始终隐藏。快捷键表随设置页自然滚动，不创建独立内层表格滚动。
 

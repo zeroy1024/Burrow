@@ -344,6 +344,10 @@ func (c *localClient) ResolveDirectory(ctx context.Context, name string) (string
 	return resolved, c.check(ctx)
 }
 
+func (c *localClient) ResolveCanonicalDirectory(ctx context.Context, name string) (string, error) {
+	return c.ResolveDirectory(ctx, name)
+}
+
 func (c *localClient) Chmod(ctx context.Context, name string, mode fs.FileMode) error {
 	name, err := c.path(ctx, name)
 	if err != nil {

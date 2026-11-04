@@ -9,6 +9,7 @@
 | [internal/sshclient](../internal/sshclient/) | SSH 连接、认证、主机信任、Shell/Exec/子系统与连接租约 |
 | [internal/fileclient](../internal/fileclient/) | 本地、SFTP、FTP/FTPS 文件操作及可选能力 |
 | [internal/store](../internal/store/) | SQLite schema、事务、主机信任与一致备份 |
+| [internal/mcpserver](../internal/mcpserver/) | 本机 Streamable HTTP、密钥校验、授权与策略检查、工具和审计入口 |
 | [internal/localfs](../internal/localfs/) | 平台文件规则：私有创建、Windows 句柄重命名与 ACL |
 | [internal/uikit](../internal/uikit/) | 共享展示组件与 UI 状态 |
 | [internal/theme](../internal/theme/) | 应用语义令牌、组件令牌及生成产物 |
@@ -28,7 +29,7 @@ SSH transport 与业务 channel 分离。同一会话分屏在原连接上新建
 
 ## 页面、窗口与任务
 
-SSH、文件传输、设置互斥构建当前页面，页面挂载不拥有业务任务生命周期。切页保留连接、目录历史、终端滚动与传输；关闭设置只清临时 UI，复用窗口生命周期内的稳定句柄。
+SSH、文件传输、MCP、设置互斥构建当前页面，页面挂载不拥有业务任务生命周期。切页保留连接、目录历史、终端滚动与传输；关闭设置只清临时 UI，复用窗口生命周期内的稳定句柄。工作区可保存并恢复 SSH、文件或 MCP 的页面选择；设置页仍为临时页面。
 
 普通关闭窗口时，macOS 隐藏同一个原生窗口，Windows/Linux 最小化并保留任务栏入口，后台传输继续。应用退出才统一收敛 worker、保存状态并释放连接。关闭最后标签的行为按偏好单独处理。
 

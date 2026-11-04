@@ -36,7 +36,12 @@ const (
 	sectionSSH section = iota
 	sectionFiles
 	sectionSettings
+	sectionMCP
 )
+
+func (s section) hasCatalog() bool {
+	return s == sectionSSH || s == sectionFiles
+}
 
 type pageState struct {
 	lastGroup         *hostGroup
@@ -82,7 +87,9 @@ type app struct {
 
 	section            section
 	settingsButton     ui.Handle
-	pages              [sectionSettings + 1]pageState
+	pages              [sectionMCP + 1]pageState
+	mcp                mcpUIState
+	mcpBackend         *mcpDesktop
 	appearance         int
 	theme              *ui.Theme
 	hosts              []host
@@ -219,6 +226,9 @@ func Run() (runErr error) {
 	a := &app{ctx: ctx, cancel: cancel, store: db, dataDirectory: directory, tabs: []*workspaceTab{}}
 	defer func() {
 		a.cancel()
+		if a.mcpBackend != nil && a.mcpBackend.service != nil {
+			runErr = errors.Join(runErr, a.mcpBackend.service.Close())
+		}
 		a.sshWorkers.Wait()
 		runErr = errors.Join(runErr, a.finishPersistence())
 	}()
@@ -227,6 +237,10 @@ func Run() (runErr error) {
 		a.pages[i].sidebarWidth = theme.Current().C.Sider.Width
 	}
 	a.catalogError = a.loadCatalog()
+	a.initMCPUI()
+	if err := a.initMCPBackend(); err != nil {
+		a.persistenceNotice("初始化 MCP 失败", err)
+	}
 	a.terminalError = a.loadTerminalSettings()
 	a.files.ratio = theme.Current().C.FTPSplit.DefaultRatio
 	a.files.activeRemote = true
@@ -292,6 +306,7 @@ func Run() (runErr error) {
 			Content:              ui.View(a.view),
 		})
 		a.windowMaterial = material
+		a.startMCPBackend()
 		a.syncWindowMaterial()
 		a.window.OnClose(func(e *mygo.CloseEvent) {
 			if a.quitPending {
@@ -299,7 +314,7 @@ func Run() (runErr error) {
 				a.window.Hide()
 				return
 			}
-			if a.credentials.busy || a.terminal.importing || a.savingSession() || a.catalogSaving || a.windowSaving {
+			if a.mcpBusy() || a.credentials.busy || a.terminal.importing || a.savingSession() || a.catalogSaving || a.windowSaving {
 				a.resetQuitAttempt()
 				e.PreventDefault()
 				a.files.notice = &uikit.ToastProps{ID: "save-before-close", Tone: uikit.ToneWarning, Title: "正在保存凭据，完成后再关闭窗口。"}
@@ -349,7 +364,7 @@ func Run() (runErr error) {
 			e.PreventDefault()
 			return
 		}
-		if a.credentials.busy || a.terminal.importing || a.savingSession() || a.catalogSaving || a.windowSaving || a.files.dialog != nil && a.files.dialog.busy {
+		if a.mcpBusy() || a.credentials.busy || a.terminal.importing || a.savingSession() || a.catalogSaving || a.windowSaving || a.files.dialog != nil && a.files.dialog.busy {
 			a.resetQuitAttempt()
 			e.PreventDefault()
 			a.files.notice = &uikit.ToastProps{ID: "work-before-quit", Tone: uikit.ToneWarning, Title: "文件或凭据操作进行中，完成后再退出。"}
@@ -369,15 +384,22 @@ func Run() (runErr error) {
 					a.window.Show()
 					return
 				}
-				a.prepareTransferQuit(func(err error) {
-					a.quitPending = false
+				a.stopMCPForQuit(func(err error) {
 					if err != nil {
-						a.persistenceNotice("保存传输记录失败", err)
-						a.window.Show()
+						a.quitPending = false
+						a.persistenceNotice("停止 MCP 服务失败", err)
 						return
 					}
-					a.quitReady = true
-					a.window.Update(func() { mygo.App.Quit() })
+					a.prepareTransferQuit(func(err error) {
+						a.quitPending = false
+						if err != nil {
+							a.persistenceNotice("保存传输记录失败", err)
+							a.window.Show()
+							return
+						}
+						a.quitReady = true
+						a.window.Update(func() { mygo.App.Quit() })
+					})
 				})
 			})
 			return
@@ -394,6 +416,7 @@ func Run() (runErr error) {
 }
 
 func (a *app) view(c *ui.Context) {
+	a.tickMCPBackend(c)
 	t := theme.Current()
 	a.theme = uikit.Install(c)
 	background := uikit.Color(t.C.Window.Bg)
@@ -424,7 +447,7 @@ func (a *app) view(c *ui.Context) {
 	if active == sectionSSH {
 		a.beginWorkspaceFrame(c)
 	}
-	if active != sectionSettings {
+	if active.hasCatalog() {
 		a.beginCatalogFrame(c)
 	}
 	a.enforcePaneMinimum(c)
@@ -448,7 +471,7 @@ func (a *app) view(c *ui.Context) {
 				a.titleBar(c, shown)
 			case sectionFiles:
 				a.fileTitleBar(c, shown)
-			case sectionSettings:
+			case sectionMCP, sectionSettings:
 				uikit.TitleBar(c).FillWidth()
 			}
 		})
@@ -458,6 +481,9 @@ func (a *app) view(c *ui.Context) {
 				switch active {
 				case sectionSSH, sectionFiles:
 					a.workspace(c, shown)
+				case sectionMCP:
+					ui.Box(c).Fill().Padding(0, t.C.Window.Gutter, t.C.Window.Gutter, 0).
+						Children(func() { a.mcpPage(c) })
 				case sectionSettings:
 					ui.Box(c).Fill().Padding(0, t.C.Window.Gutter, t.C.Window.Gutter, 0).
 						Children(func() { a.settingsPage(c) })
@@ -473,7 +499,7 @@ func (a *app) view(c *ui.Context) {
 			a.finishWorkspaceDrag(c)
 			a.dragPreview(c)
 		}
-		if active != sectionSettings {
+		if active.hasCatalog() {
 			a.finishCatalogDrag(c)
 			a.catalogDragPreview(c)
 		}
@@ -483,7 +509,7 @@ func (a *app) view(c *ui.Context) {
 		uikit.Toast(c, uikit.ToastProps{Title: "终端设置", Detail: a.terminalError.Error(), Tone: uikit.ToneDanger})
 		a.terminalError = nil
 	}
-	if active != sectionSettings {
+	if active.hasCatalog() {
 		if a.page().addHostOpen {
 			a.hostDialog(c.Key(pageDialogKey{section: a.section, kind: "host"}))
 		}
@@ -493,6 +519,9 @@ func (a *app) view(c *ui.Context) {
 	}
 	if active == sectionFiles || a.files.conflict != nil {
 		a.fileDialogs(c)
+	}
+	if active == sectionMCP {
+		a.mcpDialogs(c)
 	}
 	a.sshDialogs(c)
 	a.fileSSHLinkDialog(c)
@@ -532,6 +561,12 @@ func (a *app) navigation(c *ui.Context) {
 			sectionFiles,
 			"SFTP / FTP",
 			filesIcon,
+		)
+		a.navigationButton(
+			c,
+			sectionMCP,
+			"MCP",
+			mcpIcon,
 		)
 		ui.Spacer(c).DragWindow()
 		a.navigationButton(

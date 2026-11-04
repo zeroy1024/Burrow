@@ -14,6 +14,7 @@ import (
 
 	"github.com/egoist/mygo"
 	"sshdesk/internal/fileclient"
+	"sshdesk/internal/mcpserver"
 	"sshdesk/internal/sshclient"
 	"sshdesk/internal/uikit"
 )
@@ -135,6 +136,7 @@ func (a *app) openFileClient(ctx context.Context, session *fileSession, complete
 		return nil
 	}
 	request = &sshConnectionRequest{ctx: ctx, group: session.connection, failed: func(err error) { finish(nil, err) }}
+	request.mcpOperationID, request.mcpTaskID = mcpserver.OperationID(ctx)
 	request.ready = func(connection *sshclient.Connection) {
 		encoding := "UTF-8"
 		if h.session.Files != nil {

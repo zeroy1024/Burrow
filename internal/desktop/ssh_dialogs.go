@@ -30,6 +30,8 @@ type sshAnswer struct {
 
 // SSH workers wait here; only the window's main thread owns the prompt queue.
 func (a *app) askSSH(ctx context.Context, prompt *sshPrompt) sshAnswer {
+	a.mcpPromptChanged(ctx, true, prompt.title)
+	defer a.mcpPromptChanged(ctx, false, prompt.title)
 	prompt.ctx, prompt.open, prompt.answer = ctx, true, make(chan sshAnswer, 1)
 	a.window.Update(func() {
 		if ctx.Err() == nil {

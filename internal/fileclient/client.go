@@ -47,8 +47,21 @@ type PrivateStageWriter interface {
 	OpenPrivateWrite(ctx context.Context, name string, offset int64, truncate, create bool) (stream io.WriteCloser, created bool, err error)
 }
 
+// PrivateDirectoryMaker creates a new empty directory and verifies 0700 before
+// callers may write into it. created remains true after a permission failure,
+// allowing cleanup of this call's directory without taking over existing paths.
+type PrivateDirectoryMaker interface {
+	MkdirPrivate(ctx context.Context, name string) (created bool, err error)
+}
+
 type DirectoryResolver interface {
 	ResolveDirectory(context.Context, string) (string, error)
+}
+
+// CanonicalDirectoryResolver resolves filesystem aliases, rather than merely
+// returning a server's logical working directory (for example FTP PWD).
+type CanonicalDirectoryResolver interface {
+	ResolveCanonicalDirectory(context.Context, string) (string, error)
 }
 
 type TreeRemover interface {

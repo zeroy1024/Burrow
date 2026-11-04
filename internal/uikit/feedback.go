@@ -10,14 +10,17 @@ import (
 )
 
 type BannerProps struct {
-	Tone   Tone
-	Icon   *ui.SVG
-	Action string
+	Tone     Tone
+	Icon     *ui.SVG
+	Action   string
+	Actions  []string
+	Trailing func()
 }
 
 type BannerResult struct {
-	Root   ui.Element
-	Action bool
+	Root        ui.Element
+	Action      bool
+	ActionIndex int
 }
 
 func Banner(c *ui.Context, message string, props BannerProps) BannerResult {
@@ -33,8 +36,11 @@ func Banner(c *ui.Context, message string, props BannerProps) BannerResult {
 	case ToneDanger:
 		background, ink, glyph = p.DangerBg, p.DangerText, p.DangerIcon
 	}
-	result := BannerResult{Root: ui.Row(c).FillWidth().Shrink(0).Padding(p.PaddingY, p.PaddingX).
-		Radius(p.Radius).Background(Color(background)).Gap(p.Gap).Role(role).Label(message)}
+	result := BannerResult{
+		Root: ui.Row(c).FillWidth().Shrink(0).Padding(p.PaddingY, p.PaddingX).AlignItems(ui.Center).
+			Radius(p.Radius).Background(Color(background)).Gap(p.Gap).Role(role).Label(message),
+		ActionIndex: -1,
+	}
 	if props.Tone == ToneDanger {
 		// This SDK exposes Status, but no Alert role. Announce a changed error
 		// explicitly instead of misrepresenting an inline banner as a dialog.
@@ -49,8 +55,22 @@ func Banner(c *ui.Context, message string, props BannerProps) BannerResult {
 			ui.Icon(c, props.Icon).Size(p.Icon, p.Icon).TextColor(Color(glyph)).PassThrough()
 		}
 		ui.Text(c, message).FontSize(t.Font.Size.Small).TextColor(Color(ink)).Grow(1).MinWidth(0).PassThrough()
+		for index, label := range props.Actions {
+			if Button(c.Key(label), label, ButtonProps{Size: SizeSm}).Clicked() {
+				result.ActionIndex = index
+				if index == 0 {
+					result.Action = true
+				}
+			}
+		}
 		if props.Action != "" {
 			result.Action = Button(c, props.Action, ButtonProps{Variant: ButtonPlain}).TextColor(Color(ink)).Clicked()
+			if result.Action {
+				result.ActionIndex = 0
+			}
+		}
+		if props.Trailing != nil {
+			props.Trailing()
 		}
 	})
 	return result

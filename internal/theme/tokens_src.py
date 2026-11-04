@@ -306,7 +306,7 @@ COMP={
    'paneHeaderHeight':'size.fileHeader'},
  'progress':{'height':'size.progress','radius':'radius.bar','track':'color.border.subtle','fill':'color.accent.default','fillNeutral':'color.fill.strong','fillPaused':'color.status.paused','fillDone':'color.success.default'},
  'tooltip':{'bg':'color.tooltip.bg','text':'color.tooltip.text','kbd':'color.tooltip.kbd','fontSize':'font.size.footnote','paddingX':'space.8','paddingY':'space.4','radius':'radius.controlSm','shadow':'shadow.tooltip','arrow':'space.4'},
- 'menu':{'bg':'color.surface.raised','radius':'radius.lift','shadow':'shadow.lift','itemHeight':'size.control','itemRadius':'radius.controlSm','itemPaddingX':'space.8','itemHover':'color.accent.default','itemHoverText':'color.text.onAccent','fontSize':'font.size.body','separator':'color.border.subtle'},
+ 'menu':{'bg':'color.surface.raised','radius':'radius.lift','shadow':'shadow.lift','itemHeight':'size.control','itemRadius':'radius.controlSm','itemPaddingX':'space.8','itemHover':'color.state.hover','itemHoverText':'color.text.primary','fontSize':'font.size.body','separator':'color.border.subtle'},
  'floatPill':{'bg':'color.glass.float','blur':'glass.float.blur','saturate':'glass.float.saturate','shadow':'shadow.float','radius':'radius.pill','text':'color.text.strong','fontSize':'font.size.footnote','paddingLeft':'space.8','paddingRight':'space.10','paddingY':'space.4'},
  'dragLift':{'threshold':'motion.drag.threshold','holdDelay':'motion.duration.hold','scale':'motion.drag.liftScale','bg':'color.surface.raised','radius':'radius.lift','shadow':'shadow.lift',
    'stackShadow':'shadow.liftStack','stackOffset':'space.5','stackInset':'space.6','stackBackOpacity':'opacity.liftStackBack','liftDuration':'motion.duration.lift',

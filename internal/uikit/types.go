@@ -58,6 +58,16 @@ const (
 	StatusRunning
 	StatusDone
 	StatusPaused
+	StatusIntercepted
+	StatusPartialIntercepted
+	StatusPermissionDenied
+	StatusAuthFailed
+	StatusPartialFailed
+	StatusRevoked
+	StatusDisabled
+	StatusEnabled
+	StatusStopping
+	StatusInterrupted
 )
 
 type MotionMode uint8

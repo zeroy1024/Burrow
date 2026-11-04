@@ -193,7 +193,9 @@ func validateStoredWorkspace(saved *storedWorkspace, hosts []host, keys []manage
 	if saved.Version != 2 {
 		return errors.New("unsupported workspace version")
 	}
-	if saved.Section != sectionSSH && saved.Section != sectionFiles {
+	switch saved.Section {
+	case sectionSSH, sectionFiles, sectionMCP:
+	default:
 		return errors.New("invalid workspace section")
 	}
 	sshCount, fileCount := len(saved.Tabs), len(saved.FileTabs)

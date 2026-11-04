@@ -87,7 +87,7 @@ func (a *app) enforcePaneMinimum(c *ui.Context) {
 		}
 	}
 	width := minimum.X + t.C.Rail.Width + t.C.Window.Gutter
-	if active != sectionSettings && !a.page().sidebarCollapsed {
+	if active.hasCatalog() && !a.page().sidebarCollapsed {
 		width += a.page().sidebarWidth + t.C.Window.Gutter
 	}
 	if active == sectionSSH && a.statusVisible {

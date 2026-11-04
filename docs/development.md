@@ -15,6 +15,10 @@ mise exec -- go run .
 
 首次运行或构建需要下载固定终端插件的原生 Ghostty VT 库，后续使用缓存。Go 模块名仍为 `sshdesk`，不影响产品名称 Burrow。
 
+## 界面图标
+
+通用界面图标使用固定版本的 Lucide SVG，素材、来源与许可见 [Lucide 素材说明](../internal/uikit/icons/lucide/README.md)。统一通过 `uikit.IconName`、`IconSVG`、`Icon`、`IconButton` 使用，沿用主题的尺寸、颜色和描边设置；业务页面不再单独定义通用 SVG 路径。应用、操作系统与 MCP 品牌标识独立保留。
+
 ## 打包
 
 ```sh

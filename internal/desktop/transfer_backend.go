@@ -25,6 +25,7 @@ import (
 
 	"sshdesk/internal/fileclient"
 	"sshdesk/internal/localfs"
+	"sshdesk/internal/mcpserver"
 
 	"golang.org/x/text/cases"
 	"golang.org/x/text/unicode/norm"
@@ -43,6 +44,7 @@ type transferClientResult struct {
 }
 
 type transferRun struct {
+	mcp            *mcpTransferOwner
 	manifest       atomic.Pointer[transferManifestSnapshot]
 	journal        func() error
 	ctx            context.Context
@@ -58,6 +60,9 @@ type transferRun struct {
 // A job and its manifest have one worker owner at a time. The next attempt only
 // starts after the preceding worker has returned and its UI callback ran.
 type transferJob struct {
+	mcpFailConflict        bool
+	mcpCheck               func(context.Context, fileclient.Client, fileclient.Client, *transferNode, string) error
+	mcpFinish              func(context.Context, *transferNode, error) error
 	sourceRemote           bool
 	sourcePath, targetPath string
 	name, destinationKey   string
@@ -74,6 +79,8 @@ type transferBatch struct {
 }
 
 type transferNode struct {
+	stageDirectory                 string
+	mcpPath, mcpSide, mcpAction    string
 	source, destination, temporary string
 	entry                          fileclient.Entry
 	children                       []*transferNode
@@ -145,8 +152,14 @@ func (a *app) scheduleTransfers() {
 }
 
 func (a *app) startTransfer(task *transferTask, cleanup bool) {
-	ctx, cancel := context.WithCancel(a.ctx)
-	run := &transferRun{ctx: ctx, cancel: cancel, ready: make(chan transferClientResult, 1), awaitingClient: true}
+	base := a.ctx
+	if task.mcp != nil {
+		base = mcpserver.WithOperation(base, task.mcp.OperationID, task.id)
+	}
+	ctx, cancel := context.WithCancel(base)
+	run := &transferRun{ctx: ctx, cancel: cancel, ready: make(chan transferClientResult, 1), awaitingClient: true, mcp: task.mcp}
+	run.bytes.Store(task.transferred)
+	run.total.Store(task.total)
 	task.run, task.speed = run, 0
 	if !cleanup {
 		task.state, task.errorText = transferRunning, ""
@@ -158,6 +171,9 @@ func (a *app) startTransfer(task *transferTask, cleanup bool) {
 	run.manifest.Store(transferManifest(job))
 	run.journal = func() error { return a.journalTransfer(task.id, run, job) }
 	a.persistTransfers()
+	if !cleanup {
+		a.mcpTransferChanged(task, nil)
+	}
 	if job.destinationKey == "" {
 		job.destinationKey = "local"
 		if !job.sourceRemote {
@@ -172,14 +188,34 @@ func (a *app) startTransfer(task *transferTask, cleanup bool) {
 		var remote fileclient.Client
 		var err error
 		var local fileclient.Client
-		if job.sourceRemote {
-			// Anchor the selected destination before authentication or a conflict
-			// can leave time for another process to replace its descendants.
-			local, err = fileclient.OpenLocalRoot(ctx, job.targetPath)
-		} else if !cleanup {
-			// Keep upload reads inside the selected source while authentication
-			// and conflict dialogs run. Remote cleanup does not need the source.
-			local, err = fileclient.OpenLocalSource(ctx, job.sourcePath)
+		if task.mcp != nil && !cleanup {
+			err = a.mcpBackend.preflightTransfer(ctx, task)
+			if err == nil {
+				a.window.Update(func() {
+					if ctx.Err() != nil || task.run != run {
+						return
+					}
+					if !a.mcpBackend.service.Accepting() {
+						run.awaitingClient = false
+						run.ready <- transferClientResult{err: errors.New("MCP 服务已停止")}
+						return
+					}
+					a.requestTransferClient(task, run)
+				})
+			}
+		}
+		if err == nil {
+			if task.mcp != nil && !(cleanup && !job.sourceRemote) {
+				local, err = fileclient.OpenLocalRoot(ctx, task.mcp.LocalRoot)
+			} else if job.sourceRemote {
+				// Anchor the selected destination before authentication or a conflict
+				// can leave time for another process to replace its descendants.
+				local, err = fileclient.OpenLocalRoot(ctx, job.targetPath)
+			} else if !cleanup {
+				// Keep upload reads inside the selected source while authentication
+				// and conflict dialogs run. Remote cleanup does not need the source.
+				local, err = fileclient.OpenLocalSource(ctx, job.sourcePath)
+			}
 		}
 		if err == nil && !(cleanup && job.sourceRemote) {
 			select {
@@ -196,6 +232,9 @@ func (a *app) startTransfer(task *transferTask, cleanup bool) {
 			source, target := local, remote
 			if job.sourceRemote {
 				source, target = remote, local
+			}
+			if task.mcp != nil && !cleanup {
+				source = a.mcpBackend.sourceClient(task, source)
 			}
 			if cleanup {
 				err = cleanupTransferFiles(ctx, target, job)
@@ -228,6 +267,14 @@ func (a *app) startTransfer(task *transferTask, cleanup bool) {
 		run.awaitingClient = false
 		return
 	}
+	if task.mcp != nil && !cleanup {
+		return
+	}
+	a.requestTransferClient(task, run)
+}
+
+func (a *app) requestTransferClient(task *transferTask, run *transferRun) {
+	ctx := run.ctx
 	if task.session.endpoint.protocol == "ftp" && task.session.ftpSecret == "" && sameTransferView(task.view, task.session) {
 		task.session.ftpSecret = task.view.ftpSecret
 	}
@@ -343,9 +390,15 @@ func (a *app) finishTransfer(task *transferTask, run *transferRun, cleanup bool,
 	}
 	a.transfers.displaySpeed = a.transfers.summary().speed
 	a.advanceTransferConflicts()
+	setMCPTransferOutcome(task, err)
 	a.persistTransfers()
 	a.scheduleTransfers()
 	a.finishTransferQuitIfReady()
+	a.mcpTransferChanged(task, err)
+	if task.mcp != nil && task.state == transferDone {
+		a.transfers.tasks = slices.DeleteFunc(a.transfers.tasks, func(t *transferTask) bool { return t == task })
+		a.persistTransfers()
+	}
 }
 
 func (a *app) pauseTransfer(task *transferTask) {
@@ -360,6 +413,7 @@ func (a *app) pauseTransfer(task *transferTask) {
 	}
 	a.advanceTransferConflicts()
 	a.persistTransfers()
+	a.mcpTransferChanged(task, nil)
 }
 
 func (a *app) resumeTransfer(task *transferTask) {
@@ -378,6 +432,7 @@ func (a *app) resumeTransfer(task *transferTask) {
 	}
 	task.state, task.errorText, task.failureNotice = transferQueued, "", false
 	a.persistTransfers()
+	a.mcpTransferChanged(task, nil)
 	a.scheduleTransfers()
 }
 
@@ -400,6 +455,7 @@ func (a *app) cancelTransfer(task *transferTask) {
 	}
 	a.advanceTransferConflicts()
 	a.persistTransfers()
+	a.mcpTransferChanged(task, nil)
 }
 
 func (a *app) performTransfer(ctx context.Context, task *transferTask, run *transferRun, job *transferJob,
@@ -454,8 +510,11 @@ func (a *app) performTransfer(ctx context.Context, task *transferTask, run *tran
 	if err := verifyCompletedTransfers(ctx, target, job.root); err != nil {
 		return err
 	}
-	return a.copyTransferNode(ctx, task, run, job, source, target, job.root,
-		transferJoin(!job.sourceRemote, job.targetPath, job.name), reserve)
+	if err := a.copyTransferNode(ctx, task, run, job, source, target, job.root,
+		transferJoin(!job.sourceRemote, job.targetPath, job.name), reserve); err != nil {
+		return err
+	}
+	return cleanupTransferDirectories(ctx, target, job)
 }
 
 func buildTransferManifest(ctx context.Context, client fileclient.Client, remote bool, source string) (*transferNode, error) {
@@ -512,12 +571,20 @@ func buildTransferManifestAt(ctx context.Context, client fileclient.Client, remo
 
 func (a *app) copyTransferNode(ctx context.Context, task *transferTask, run *transferRun, job *transferJob,
 	source, target fileclient.Client, node *transferNode, proposed string, reserve func(string, bool) error,
-) error {
+) (result error) {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
 	if node.done || node.skipped {
 		return nil
+	}
+	if job.mcpFinish != nil {
+		defer func() { result = errors.Join(result, job.mcpFinish(context.WithoutCancel(ctx), node, result)) }()
+	}
+	if job.mcpCheck != nil {
+		if err := job.mcpCheck(ctx, source, target, node, proposed); err != nil {
+			return err
+		}
 	}
 	fresh, err := source.Stat(ctx, node.source)
 	if err != nil {
@@ -548,6 +615,11 @@ func (a *app) copyTransferNode(ctx context.Context, task *transferTask, run *tra
 	} else if err := reserve(node.destination, node.entry.Directory); err != nil {
 		return err
 	}
+	if job.mcpCheck != nil && node.destination != proposed {
+		if err := job.mcpCheck(ctx, source, target, node, node.destination); err != nil {
+			return err
+		}
+	}
 	if node.entry.Directory {
 		existing, err := target.Stat(ctx, node.destination)
 		if errors.Is(err, fs.ErrNotExist) {
@@ -568,6 +640,7 @@ func (a *app) copyTransferNode(ctx context.Context, task *transferTask, run *tra
 		return nil
 	}
 	var privateWriter fileclient.PrivateStageWriter
+	privateDirectory := false
 	if !job.sourceRemote && node.approved != nil {
 		if !node.approved.ModeKnown {
 			return fmt.Errorf("无法确认已有目标的权限，未执行覆盖：%s", node.destination)
@@ -576,9 +649,28 @@ func (a *app) copyTransferNode(ctx context.Context, task *transferTask, run *tra
 			var supported bool
 			privateWriter, supported = target.(fileclient.PrivateStageWriter)
 			if !supported {
-				return fmt.Errorf("此连接无法在上传前安全创建私有临时文件，未执行受限权限文件的覆盖：%s", node.destination)
+				_, privateDirectory = target.(fileclient.PrivateDirectoryMaker)
+				if !privateDirectory {
+					return fmt.Errorf("此连接无法在上传前安全创建私有临时文件，未执行受限权限文件的覆盖：%s", node.destination)
+				}
 			}
 		}
+	}
+	if node.stageDirectory != "" {
+		entry, err := target.Stat(ctx, node.stageDirectory)
+		if err != nil {
+			return err
+		}
+		if !entry.Directory || entry.Symlink || !entry.ModeKnown || entry.Mode.Perm() != 0700 {
+			return errors.New("私有暂存目录权限已改变，拒绝继续上传")
+		}
+		if node.temporary == "" {
+			node.temporary = transferJoin(!job.sourceRemote, node.stageDirectory, "content")
+			job.temporary[node.temporary] = struct{}{}
+		}
+	}
+	if privateDirectory && node.temporary != "" && node.stageDirectory == "" {
+		return errors.New("旧临时文件不在私有目录中，不能安全覆盖受限目标")
 	}
 	if privateWriter != nil && node.temporary != "" {
 		// Old parts may still have the server's public creation permissions.
@@ -631,6 +723,17 @@ func (a *app) copyTransferNode(ctx context.Context, task *transferTask, run *tra
 			if err := output.Close(); err != nil {
 				return err
 			}
+		} else if privateDirectory {
+			created, err := target.(fileclient.PrivateDirectoryMaker).MkdirPrivate(ctx, temporary)
+			if created {
+				node.stageDirectory = temporary
+				job.temporary[temporary] = struct{}{}
+			}
+			if err != nil {
+				return err
+			}
+			node.temporary = transferJoin(!job.sourceRemote, temporary, "content")
+			job.temporary[node.temporary] = struct{}{}
 		} else {
 			node.temporary = temporary
 			job.temporary[temporary] = struct{}{}
@@ -728,6 +831,11 @@ func (a *app) copyTransferNode(ctx context.Context, task *transferTask, run *tra
 		}
 		if err := ctx.Err(); err != nil {
 			return err
+		}
+		if job.mcpCheck != nil {
+			if err := job.mcpCheck(ctx, source, target, node, node.destination); err != nil {
+				return err
+			}
 		}
 		if err := preserveTransferPermissions(ctx, target, node, current, err == nil); err != nil {
 			return err
@@ -966,6 +1074,13 @@ func discardTransferStage(ctx context.Context, target fileclient.Client, job *tr
 		}
 		delete(job.temporary, node.temporary)
 	}
+	if node.stageDirectory != "" {
+		if err := target.Remove(ctx, node.stageDirectory, true); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return err
+		}
+		delete(job.temporary, node.stageDirectory)
+		node.stageDirectory = ""
+	}
 	node.temporary, node.digest, node.staged = "", "", nil
 	node.partial, node.checkpoint = nil, nil
 	node.committing = false
@@ -1136,6 +1251,9 @@ func (a *app) chooseTransferDestination(ctx context.Context, task *transferTask,
 			return "", nil, false, err
 		}
 		choice := int(job.batch.policy.Load())
+		if choice == 0 && job.mcpFailConflict {
+			return "", nil, false, fs.ErrExist
+		}
 		if choice == 0 {
 			answer, err := a.askTransferConflict(ctx, task, transferDir(remote, candidate),
 				fileEntry{name: transferBase(remote, candidate), size: source.Size, dir: source.Directory})
@@ -1281,18 +1399,24 @@ func transferAbsolute(ctx context.Context, client fileclient.Client, remote bool
 
 func cleanupTransferFiles(ctx context.Context, target fileclient.Client, job *transferJob) error {
 	var failures []error
+	names := make([]string, 0, len(job.temporary))
 	for name := range job.temporary {
+		names = append(names, name)
+	}
+	slices.SortFunc(names, func(a, b string) int { return len(b) - len(a) })
+	for _, name := range names {
 		entry, err := target.Stat(ctx, name)
 		if errors.Is(err, fs.ErrNotExist) {
 			delete(job.temporary, name)
 			clearTransferTemporary(job.root, name)
 			continue
 		}
-		if err == nil && (entry.Directory || entry.Symlink) {
+		privateDirectory := transferPrivateDirectory(job.root, name)
+		if err == nil && (entry.Symlink || entry.Directory != privateDirectory) {
 			err = errors.New("临时文件已被替换，未执行删除")
 		}
 		if err == nil {
-			err = target.Remove(ctx, name, false)
+			err = target.Remove(ctx, name, privateDirectory)
 		}
 		if err != nil {
 			failures = append(failures, fmt.Errorf("%s: %w", name, err))
@@ -1308,6 +1432,9 @@ func clearTransferTemporary(node *transferNode, name string) {
 	if node == nil {
 		return
 	}
+	if node.stageDirectory == name {
+		node.stageDirectory = ""
+	}
 	if node.temporary == name {
 		node.temporary = ""
 		node.staged, node.digest = nil, ""
@@ -1317,6 +1444,47 @@ func clearTransferTemporary(node *transferNode, name string) {
 	for _, child := range node.children {
 		clearTransferTemporary(child, name)
 	}
+}
+
+func transferPrivateDirectory(node *transferNode, name string) bool {
+	if node == nil {
+		return false
+	}
+	if node.stageDirectory == name {
+		return true
+	}
+	for _, child := range node.children {
+		if transferPrivateDirectory(child, name) {
+			return true
+		}
+	}
+	return false
+}
+
+func cleanupTransferDirectories(ctx context.Context, target fileclient.Client, job *transferJob) error {
+	for name := range job.temporary {
+		if !transferPrivateDirectory(job.root, name) {
+			continue
+		}
+		entry, err := target.Stat(ctx, name)
+		if errors.Is(err, fs.ErrNotExist) {
+			delete(job.temporary, name)
+			clearTransferTemporary(job.root, name)
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		if !entry.Directory || entry.Symlink {
+			return errors.New("私有暂存目录已被替换，未执行清理")
+		}
+		if err := target.Remove(ctx, name, true); err != nil {
+			return err
+		}
+		delete(job.temporary, name)
+		clearTransferTemporary(job.root, name)
+	}
+	return nil
 }
 
 func (a *app) askTransferConflict(ctx context.Context, task *transferTask, target string, entry fileEntry) (transferConflictChoice, error) {

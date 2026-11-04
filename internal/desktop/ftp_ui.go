@@ -16,12 +16,12 @@ import (
 )
 
 var (
-	fileLaptopIcon    = uikit.LineIcon(`<rect x="4" y="4" width="16" height="12" rx="1"/><path d="M2 20h20l-2-4H4Z"/>`)
-	fileNewFolderIcon = uikit.LineIcon(`<path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v10H3ZM12 10v6m-3-3h6"/>`)
-	fileRefreshIcon   = uikit.LineIcon(`<path d="M20 8a8 8 0 1 0 0 8M20 3v6h-6"/>`)
-	fileBackIcon      = uikit.LineIcon(`<path d="m14 6-6 6 6 6"/>`)
-	fileForwardIcon   = uikit.LineIcon(`<path d="m10 6 6 6-6 6"/>`)
-	fileSidebarOnIcon = uikit.LineIcon(`<rect x="3" y="4.5" width="18" height="15" rx="3"/><path d="M9 4.5v15"/><path d="M4 6h4v12H4Z" fill="currentColor" stroke="none"/>`)
+	fileLaptopIcon    = uikit.IconSVG(uikit.IconLaptop)
+	fileNewFolderIcon = uikit.IconSVG(uikit.IconFolderPlus)
+	fileRefreshIcon   = uikit.IconSVG(uikit.IconRefresh)
+	fileBackIcon      = uikit.IconSVG(uikit.IconArrowLeft)
+	fileForwardIcon   = uikit.IconSVG(uikit.IconArrowRight)
+	fileSidebarOnIcon = uikit.IconSVG(uikit.IconSidebarClose)
 )
 
 func (a *app) fileWorkspace(c *ui.Context) {

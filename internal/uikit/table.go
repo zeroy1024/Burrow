@@ -77,6 +77,42 @@ type TableResult struct {
 	Open, Menu, Preview, Delete int
 }
 
+type TableViewportProps struct {
+	Label              string
+	MinWidth, PaddingY float32
+	Header             func()
+}
+
+func TableViewport(c *ui.Context, scroll *ui.ScrollState, props TableViewportProps, body func()) ui.Element {
+	t := theme.Current()
+	root := ui.Column(c).Grow(1).MinWidth(0).MinHeight(0).FillWidth()
+	contentWidth := max(props.MinWidth, root.LayoutBounds().W)
+	root.DrawOver(func(_ *ui.Painter, bounds ui.Rect) {
+		if max(props.MinWidth, bounds.W) != contentWidth {
+			c.Invalidate()
+		}
+	})
+	return root.Children(func() {
+		header := ui.Box(c).Key("header").FillWidth().MinWidth(0).Shrink(0).ClipX()
+		viewport := ui.Box(c).Key("body").Grow(1).MinWidth(0).MinHeight(0).FillWidth()
+		var scroller ui.Element
+		viewport.Children(func() {
+			scroller = ui.ScrollBoth(c).Fill().TrackScroll(scroll).Label(props.Label).
+				Children(func() {
+					ui.Column(c).Width(contentWidth).Shrink(0).
+						Padding(props.PaddingY, t.Space.N10).Children(body)
+				})
+			Scrollbars(c, viewport, scroller, scroll, ScrollbarProps{
+				Label: props.Label + "滚动条", Horizontal: true, Vertical: true,
+			})
+		})
+		header.Children(func() {
+			ui.Column(c).Width(contentWidth).Shrink(0).
+				ScrollWith(scroller).Children(props.Header)
+		})
+	})
+}
+
 // DataTable virtualizes rows while keeping selection, ordering and scroll
 // state with its caller. Row builders only describe visible presentation.
 func DataTable(

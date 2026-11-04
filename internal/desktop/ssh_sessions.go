@@ -32,12 +32,14 @@ type sshConnectionGroup struct {
 }
 
 type sshConnectionRequest struct {
-	ctx        context.Context
-	group      *sshConnectionGroup
-	connection *sshclient.Connection
-	release    func()
-	ready      func(*sshclient.Connection)
-	failed     func(error)
+	mcpOperationID string
+	mcpTaskID      int
+	ctx            context.Context
+	group          *sshConnectionGroup
+	connection     *sshclient.Connection
+	release        func()
+	ready          func(*sshclient.Connection)
+	failed         func(error)
 }
 
 type sshRuntime struct {

@@ -177,6 +177,69 @@ func (c *ftpClient) Chmod(ctx context.Context, name string, mode fs.FileMode) er
 	})
 }
 
+func (c *ftpClient) MkdirPrivate(ctx context.Context, name string) (created bool, result error) {
+	wire, err := c.wirePath(name)
+	if err != nil {
+		return false, err
+	}
+	err = c.run(ctx, func(opCtx context.Context) error {
+		var err error
+		wire, err = c.absolutePath(wire)
+		if err != nil {
+			return err
+		}
+		if _, _, err = c.command(257, "MKD %s", wire); err != nil {
+			return err
+		}
+		created = true
+		if _, _, err = c.command(200, "SITE CHMOD 0700 %s", wire); err != nil {
+			return fmt.Errorf("restrict FTP staging directory: %w", err)
+		}
+		parent, base := path.Split(wire)
+		entries, err := c.readDirectory(opCtx, parent)
+		if err != nil {
+			return err
+		}
+		decoded, err := c.codec.decode(base)
+		if err != nil {
+			return err
+		}
+		entry, err := c.directoryEntry(wire, decoded, entries)
+		if err != nil {
+			return err
+		}
+		if !entry.ModeKnown {
+			// MLSD may omit unix.mode. Reuse the exact-name reconciliation for
+			// a parent LIST; a DOS listing still cannot prove private Unix mode.
+			if _, _, err := c.command(250, "CWD %s", parent); err != nil {
+				return err
+			}
+			listed, err := c.readListing(opCtx, "LIST", "-a", false)
+			if err != nil {
+				return err
+			}
+			names, err := c.listNames(opCtx, parent)
+			if err != nil {
+				return err
+			}
+			entries, err = reconcileFTPNames(listed, names)
+			if err != nil {
+				return err
+			}
+			entry, err = c.directoryEntry(wire, decoded, entries)
+			if err != nil {
+				return err
+			}
+		}
+		if !entry.Directory || entry.Symlink || !entry.ModeKnown || entry.Mode.Perm() != 0700 ||
+			entry.Mode&(fs.ModeSetuid|fs.ModeSetgid|fs.ModeSticky) != 0 {
+			return errors.New("FTP server did not confirm a private 0700 staging directory")
+		}
+		return nil
+	})
+	return created, err
+}
+
 func (c *ftpClient) ResolveDirectory(ctx context.Context, name string) (string, error) {
 	wire, err := c.wirePath(name)
 	if err != nil {

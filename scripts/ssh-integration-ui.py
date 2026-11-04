@@ -1163,7 +1163,7 @@ class Driver:
 
 
 @contextmanager
-def native_window(repo, bundle, env, config_root, run_dir, phase):
+def native_window(repo, bundle, env, config_root, run_dir, phase, ready_label="Docker Password", ready_role="listItem", expect_crash=False):
     log_path = run_dir / ("native-app-" + str(phase) + ".log")
     status_path = config_root / "app-exit-status"
     status_path.write_text("pending")
@@ -1193,7 +1193,7 @@ def native_window(repo, bundle, env, config_root, run_dir, phase):
                 driver = Driver(connection, Path(env["SSHDESK_TEST_DIR"]), config_root)
                 try:
                     driver.wait("native window", lambda: driver.call("windows").get("windows"))
-                    driver.wait("native view", lambda: driver.node("Docker Password", "listItem"))
+                    driver.wait("native view", lambda: driver.node(ready_label, ready_role))
                     driver.menu("Focus window")
                     driver.wait("focused native window", lambda: any(w.get("focused") for w in driver.call("windows").get("windows", [])))
                     yield driver
@@ -1212,7 +1212,11 @@ def native_window(repo, bundle, env, config_root, run_dir, phase):
                     raise
                 finally:
                     driver.reader.close()
-            if app.wait(timeout=15) != 0 or status_path.read_text() != "ok":
+            exit_code = app.wait(timeout=15)
+            if expect_crash:
+                if status_path.read_text() == "ok":
+                    raise RuntimeError("expected crash completed as a normal shutdown")
+            elif exit_code != 0 or status_path.read_text() != "ok":
                 raise RuntimeError("native application did not complete cleanly; log: " + str(log_path))
             if "WARNING: DATA RACE" in log_path.read_text():
                 raise RuntimeError("Go race detector reported a native integration race; log: " + str(log_path))
