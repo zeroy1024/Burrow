@@ -8,8 +8,8 @@
 | 层 | 数量 | 说明 |
 |---|---|---|
 | palette（primitives） | 282 | 原始色值与刻度，其中 50 个为推导值（derived） |
-| semantic（每个主题一份） | 467 | Light = 当前设计；Dark 覆盖其中 110 个（全部 derived） |
-| component | 1046 | 只引用 semantic；换主题时自动跟随 |
+| semantic（每个主题一份） | 477 | Light = 当前设计；Dark 覆盖其中 111 个（全部 derived） |
+| component | 1063 | 只引用 semantic；换主题时自动跟随 |
 
 ## 1. 三层结构与引用规则
 
@@ -64,7 +64,7 @@ siderItem.nameColor             ← component，只能引用 semantic
 
 - 设计稿没画：`color.state.pressed`（按下）、`size.dropLine`（MyGo `ListState.Reorder` 插入线 2px）、组件 `menu.*`（按浮起层/拖动卡片推导）、`button.bgHover/bgPressed`、`iconButton.bgHover`。
 - tab 拖动、窗格拖动没有单独设计：`reorderMotion.tabDisplace / paneDisplace / paneDrop` 沿用 sider 拖动的弹簧参数。
-- 整个 Dark 主题（110 项覆盖 + `palette.graphite / darkTint / whiteA / blackA / inkDark`）。
+- 整个 Dark 主题（111 项覆盖 + `palette.graphite / darkTint / whiteA / blackA / inkDark`）。
 - FTP v3 danger 红色、原生文件面板补充尺寸与演示传输吞吐标记为 **derived**。侧栏旧连接状态与会话选中 token 已标 `deprecated`，保留生成供已有主题兼容，新组件不得引用；独立的 `siderItem.bgActive` 只表示目录条目的原生焦点反馈。
 - 同一含义在稿子里出现过两个值时，取主稿：旧 sider 会话选中兼容 token 保留 `common.css` 的 `#efeff1`（`sider-drag.html` 里是 `#f2f2f4`）；新目录焦点反馈 `bgActive` 跟随 `color.state.selectedAccent`。图标线宽用 `icons.js` 默认 1.75（拖动稿用 1.7）。
 - 已知限制：深色下部分深色品牌 logo（CentOS、Debian 的深色字形）对比度偏低，实现时可以给 OS glyph 加一个 `Mix(brand, white, .35)` 提亮。
@@ -574,7 +574,8 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `color.fill.quieter` | rgba(0,0,0,0.04) | rgba(255,255,255,0.06) | 玻璃上的面包屑 |
 | `color.fill.placeholder` | rgba(0,0,0,0.035) | rgba(255,255,255,0.06) | 拖动占位 |
 | `color.fill.placeholderEdge` | rgba(0,0,0,0.05) | rgba(255,255,255,0.08) |  |
-| `color.fill.strong` | #1d1d1f | #f5f5f7 | 资源条填充 |
+| `color.fill.strong` | #1d1d1f | #f5f5f7 | 中性进度条填充 |
+| `color.fill.shimmer` | #fafafb | #3a3a3d | 骨架占位流光高光 |
 | `color.fill.quietHover` | rgba(0,0,0,0.08) | rgba(255,255,255,0.12) | 传输胶囊悬停 |
 | `color.fill.skeleton` | #ececef | #444448 |  |
 | `color.traffic.close` | #ff5f57 | ＝ |  |
@@ -737,9 +738,12 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `size.terminalContentBottom` | 50px | ＝ |  |
 | `size.emptyPaneTitleSize` | 15px | ＝ |  |
 | `size.statsHeaderHeight` | 44px | ＝ |  |
-| `size.statsChartHeight` | 34px | ＝ |  |
+| `size.statsChartHeight` | 44px | ＝ | CPU 趋势图 |
 | `size.statsChartStroke` | 1.3px | ＝ |  |
-| `size.statsSectionGap` | 20px | ＝ |  |
+| `size.statsSectionGap` | 18px | ＝ |  |
+| `size.statsNetChartHeight` | 20px | ＝ | 网络上下行迷你趋势 |
+| `size.statsValueLarge` | 28px | ＝ | CPU 主数字 |
+| `size.statsSkeletonLine` | 10px | ＝ | 进程 Top 骨架条 |
 | `size.emptyPaneIcon` | 32px | ＝ |  |
 | `size.bellIcon` | 13px | ＝ |  |
 | `size.catalogRowHeight` | 40px | ＝ |  |
@@ -826,6 +830,8 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `size.latencyWarn` | 150 | ＝ |  |
 | `size.latencyBad` | 400 | ＝ |  |
 | `size.tableNameMinWidth` | 160px | ＝ |  |
+| `size.sparklineDotRadius` | 2.5px | ＝ | 趋势图末点 |
+| `size.sparklineHaloRadius` | 5px | ＝ | 趋势图末点光圈 |
 | `size.meterWarnRatio` | 0.7 | ＝ |  |
 | `size.meterCriticalRatio` | 0.9 | ＝ |  |
 
@@ -926,6 +932,7 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `opacity.liftStackBack` | 0.8 | ＝ |  |
 | `opacity.hidden` | 0 | ＝ |  |
 | `opacity.osTint` | 0.09 | 0.18 | OS logo 底 = 品牌色 9% 混入卡片色 |
+| `opacity.liveBeatScale` | 1.35 | ＝ | 实时状态点跳动起始缩放 |
 | `opacity.dragRotation` | -1 | ＝ |  |
 | `opacity.dragPreview` | 0.9 | ＝ |  |
 | `opacity.previewHeader` | 0.96 | ＝ |  |
@@ -940,7 +947,8 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `opacity.modalEnterScale` | 0.96 | ＝ |  |
 | `opacity.modalExitScale` | 0.98 | ＝ |  |
 | `opacity.collapseContentFadeFactor` | 1.6 | ＝ |  |
-| `opacity.sparklineFill` | 0.1 | ＝ |  |
+| `opacity.sparklineFill` | 0.2 | ＝ | 趋势图渐变填充顶部不透明度 |
+| `opacity.sparklineHalo` | 0.18 | ＝ |  |
 
 ### motion
 | token | Light | Dark（derived） | 用途 |
@@ -955,6 +963,8 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `motion.duration.drop` | 320ms | ＝ | 落位 |
 | `motion.duration.autoExpand` | 500ms | ＝ | 悬停自动展开 |
 | `motion.duration.flash` | 600ms | ＝ | 落位闪光 |
+| `motion.duration.shimmer` | 1400ms | ＝ | 骨架占位流光一周 |
+| `motion.duration.liveBeat` | 900ms | ＝ | 实时状态点每次采样的跳动 |
 | `motion.duration.frameInterval` | 16ms | ＝ |  |
 | `motion.duration.zoom` | 240ms | ＝ |  |
 | `motion.duration.paneEnter` | 220ms | ＝ |  |
@@ -1501,11 +1511,11 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `progress.radius` | `{radius.bar}` | 3px |  |
 | `progress.track` | `{color.border.subtle}` | #f0f0f2 | 卡片内分隔线（sider footer、状态栏、进度轨道） |
 | `progress.fill` | `{color.accent.default}` | #0a84ff | 主强调色 #0a84ff |
-| `progress.fillNeutral` | `{color.fill.strong}` | #1d1d1f | 资源条填充 |
+| `progress.fillNeutral` | `{color.fill.strong}` | #1d1d1f | 中性进度条填充 |
 | `progress.fillPaused` | `{color.status.paused}` | #c7c7cc | 暂停进度 |
 | `progress.fillDone` | `{color.success.default}` | #30c45a | 在线点、完成进度 |
 | `progress.heightMeter` | `{size.meterHeight}` | 4px |  |
-| `progress.meterFill` | `{color.fill.strong}` | #1d1d1f | 资源条填充 |
+| `progress.meterFill` | `{color.accent.default}` | #0a84ff | 主强调色 #0a84ff |
 | `progress.meterWarnAt` | `{size.meterWarnRatio}` | 0.7 |  |
 | `progress.meterCritAt` | `{size.meterCriticalRatio}` | 0.9 |  |
 | `progress.fillError` | `{color.danger.default}` | #ff3b30 | 失败圆点、失败图标 |
@@ -1708,9 +1718,22 @@ siderItem.nameColor             ← component，只能引用 semantic
 | token | 引用 | Light 值 | 说明 |
 |---|---|---|---|
 | `stats.headerHeight` | `{size.statsHeaderHeight}` | 44px |  |
-| `stats.chartHeight` | `{size.statsChartHeight}` | 34px |  |
+| `stats.chartHeight` | `{size.statsChartHeight}` | 44px | CPU 趋势图 |
 | `stats.chartStroke` | `{size.statsChartStroke}` | 1.3px |  |
-| `stats.sectionGap` | `{size.statsSectionGap}` | 20px |  |
+| `stats.sectionGap` | `{size.statsSectionGap}` | 18px |  |
+| `stats.netChartHeight` | `{size.statsNetChartHeight}` | 20px | 网络上下行迷你趋势 |
+| `stats.valueLarge` | `{size.statsValueLarge}` | 28px | CPU 主数字 |
+| `stats.hostBg` | `{color.surface.sunken}` | #f4f4f5 | 搜索框 |
+| `stats.hostRadius` | `{radius.card}` | 10px |  |
+| `stats.processBar` | `{color.accent.tint10}` | rgba(10,132,255,0.1) | 新输出徽章 / 闪光 |
+| `stats.processRadius` | `{radius.controlSm}` | 6px |  |
+| `stats.skeleton` | `{color.border.subtle}` | #f0f0f2 | 卡片内分隔线（sider footer、状态栏、进度轨道） |
+| `stats.shimmer` | `{color.fill.shimmer}` | #fafafb | 骨架占位流光高光 |
+| `stats.shimmerPeriod` | `{motion.duration.shimmer}` | 1400ms | 骨架占位流光一周 |
+| `stats.skeletonLine` | `{size.statsSkeletonLine}` | 10px | 进程 Top 骨架条 |
+| `stats.beatDuration` | `{motion.duration.liveBeat}` | 900ms | 实时状态点每次采样的跳动 |
+| `stats.beatScale` | `{opacity.liveBeatScale}` | 1.35 | 实时状态点跳动起始缩放 |
+| `stats.beatEasing` | `{motion.easing.out}` | cubic-bezier(0,0,0.58,1) |  |
 
 ### catalog
 | token | 引用 | Light 值 | 说明 |
@@ -2240,7 +2263,11 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `sparkline.height` | `{size.sparklineHeight}` | 34px |  |
 | `sparkline.stroke` | `{size.sparklineStroke}` | 1.5px |  |
 | `sparkline.line` | `{color.accent.default}` | #0a84ff | 主强调色 #0a84ff |
-| `sparkline.fillAlpha` | `{opacity.sparklineFill}` | 0.1 |  |
+| `sparkline.fillAlpha` | `{opacity.sparklineFill}` | 0.2 | 趋势图渐变填充顶部不透明度 |
+| `sparkline.grid` | `{color.border.divider}` | #f2f2f4 | 头部底线、表头底线 |
+| `sparkline.dotRadius` | `{size.sparklineDotRadius}` | 2.5px | 趋势图末点 |
+| `sparkline.haloRadius` | `{size.sparklineHaloRadius}` | 5px | 趋势图末点光圈 |
+| `sparkline.haloAlpha` | `{opacity.sparklineHalo}` | 0.18 |  |
 
 ### keyValue
 | token | 引用 | Light 值 | 说明 |

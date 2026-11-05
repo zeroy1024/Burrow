@@ -16,7 +16,30 @@ import (
 const (
 	monitorInterval     = 2 * time.Second
 	monitorDiskInterval = 10 * time.Second
+	// monitorSamples is the trend window: about two minutes at monitorInterval.
+	monitorSamples = 60
 )
+
+// monitorHistory keeps recent rates for the trend charts: CPU in percent,
+// network in bytes per second. A sample without a value adds nothing.
+type monitorHistory struct{ cpu, down, up []float64 }
+
+func (h *monitorHistory) add(metrics hostinfo.Metrics) {
+	h.cpu = appendMonitorSample(h.cpu, metrics.CPU)
+	h.down = appendMonitorSample(h.down, metrics.Down)
+	h.up = appendMonitorSample(h.up, metrics.Up)
+}
+
+func appendMonitorSample(samples []float64, value *float64) []float64 {
+	if value == nil {
+		return samples
+	}
+	samples = append(samples, *value)
+	if len(samples) > monitorSamples {
+		samples = append([]float64(nil), samples[len(samples)-monitorSamples:]...)
+	}
+	return samples
+}
 
 type monitorState struct {
 	session    *remoteSession
@@ -32,7 +55,7 @@ type monitorState struct {
 	pending         bool
 	next            time.Time
 	metrics         *hostinfo.Metrics
-	history         []float64
+	history         monitorHistory
 	errorText       string
 	updatedAt       time.Time
 	diskPending     bool
@@ -106,7 +129,7 @@ func (a *app) updateMonitorSample(c *ui.Context) {
 	connection, sampler, generation, lifetime := m.connection, m.sampler, m.generation, m.ctx
 	release, err := connection.Retain()
 	if err != nil {
-		m.metrics, m.history = nil, nil
+		m.metrics, m.history = nil, monitorHistory{}
 		m.errorText = err.Error()
 		m.next = c.Now().Add(monitorInterval)
 		c.After(monitorInterval)
@@ -125,22 +148,17 @@ func (a *app) updateMonitorSample(c *ui.Context) {
 			m.pending = false
 			m.next = time.Now().Add(monitorInterval)
 			if errors.Is(err, hostinfo.ErrUnsupported) {
-				m.unsupported, m.metrics, m.history = true, nil, nil
+				m.unsupported, m.metrics, m.history = true, nil, monitorHistory{}
 				return
 			}
 			if err != nil {
-				m.metrics, m.history = nil, nil
+				m.metrics, m.history = nil, monitorHistory{}
 				m.errorText = err.Error()
 				return
 			}
 			m.metrics = &metrics
 			m.errorText, m.updatedAt = "", time.Now()
-			if metrics.CPU != nil {
-				m.history = append(m.history, *metrics.CPU/100)
-				if len(m.history) > 30 {
-					m.history = append([]float64(nil), m.history[len(m.history)-30:]...)
-				}
-			}
+			m.history.add(metrics)
 		})
 	})
 }
@@ -190,15 +208,14 @@ func (a *app) updateMonitorDisk(c *ui.Context) {
 	})
 }
 
+// monitorNotice explains failed or missing metrics. Collection progress and
+// unsupported platforms show in the panel's host indicator instead.
 func monitorNotice(m *monitorState) string {
-	if m.unsupported {
-		return m.platform.DisplayName() + " 暂不支持监控"
-	}
 	if m.errorText != "" {
 		return "监控采集失败：" + m.errorText
 	}
 	if m.metrics == nil {
-		return "正在采集服务器状态…"
+		return ""
 	}
 	unavailable := append([]string(nil), m.metrics.Unavailable...)
 	if m.diskError != "" {
@@ -217,25 +234,32 @@ func monitorText(value string) string {
 	return value
 }
 
-func monitorRate(value *float64) string {
-	if value == nil {
-		return "—"
-	}
-	for _, unit := range []struct {
+// monitorRate splits a byte rate into its number and unit, which the panel
+// sets in different sizes.
+func monitorRate(value float64) (number, unit string) {
+	for _, step := range []struct {
 		size float64
 		name string
 	}{{1e9, "GB/s"}, {1e6, "MB/s"}, {1e3, "KB/s"}} {
-		if *value >= unit.size {
-			return fmt.Sprintf("%.1f %s", *value/unit.size, unit.name)
+		if value >= step.size {
+			return fmt.Sprintf("%.1f", value/step.size), step.name
 		}
 	}
-	return fmt.Sprintf("%.0f B/s", *value)
+	return fmt.Sprintf("%.0f", value), "B/s"
 }
 
-func monitorUptime(value *float64) string {
+// monitorUptime drops the minutes when brief and the host has been up a day.
+func monitorUptime(value *float64, brief bool) string {
 	if value == nil {
 		return "—"
 	}
 	minutes := int64(*value) / 60
-	return fmt.Sprintf("%d 天 %d 小时 %d 分钟", minutes/1440, minutes/60%24, minutes%60)
+	days, hours := minutes/1440, minutes/60%24
+	if brief && days > 0 {
+		return fmt.Sprintf("%d 天 %d 小时", days, hours)
+	}
+	if brief {
+		return fmt.Sprintf("%d 小时 %d 分", hours, minutes%60)
+	}
+	return fmt.Sprintf("%d 天 %d 小时 %d 分", days, hours, minutes%60)
 }

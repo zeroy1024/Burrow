@@ -618,7 +618,8 @@ type ColorsFill struct {
 	Quieter         color.NRGBA // 玻璃上的面包屑
 	Placeholder     color.NRGBA // 拖动占位
 	PlaceholderEdge color.NRGBA
-	Strong          color.NRGBA // 资源条填充
+	Strong          color.NRGBA // 中性进度条填充
+	Shimmer         color.NRGBA // 骨架占位流光高光
 	QuietHover      color.NRGBA // 传输胶囊悬停
 	Skeleton        color.NRGBA
 }
@@ -841,9 +842,12 @@ type Sizes struct {
 	TerminalContentBottom   float32
 	EmptyPaneTitleSize      float32
 	StatsHeaderHeight       float32
-	StatsChartHeight        float32
+	StatsChartHeight        float32 // CPU 趋势图
 	StatsChartStroke        float32
 	StatsSectionGap         float32
+	StatsNetChartHeight     float32 // 网络上下行迷你趋势
+	StatsValueLarge         float32 // CPU 主数字
+	StatsSkeletonLine       float32 // 进程 Top 骨架条
 	EmptyPaneIcon           float32
 	BellIcon                float32
 	CatalogRowHeight        float32
@@ -930,6 +934,8 @@ type Sizes struct {
 	LatencyWarn             float32
 	LatencyBad              float32
 	TableNameMinWidth       float32
+	SparklineDotRadius      float32 // 趋势图末点
+	SparklineHaloRadius     float32 // 趋势图末点光圈
 	MeterWarnRatio          float32
 	MeterCriticalRatio      float32
 }
@@ -1070,6 +1076,7 @@ type Opacities struct {
 	LiftStackBack             float32
 	Hidden                    float32
 	OsTint                    float32 // OS logo 底 = 品牌色 9% 混入卡片色
+	LiveBeatScale             float32 // 实时状态点跳动起始缩放
 	DragRotation              float32
 	DragPreview               float32
 	PreviewHeader             float32
@@ -1084,7 +1091,8 @@ type Opacities struct {
 	ModalEnterScale           float32
 	ModalExitScale            float32
 	CollapseContentFadeFactor float32
-	SparklineFill             float32
+	SparklineFill             float32 // 趋势图渐变填充顶部不透明度
+	SparklineHalo             float32
 }
 
 // MotionDuration groups tokens.
@@ -1099,6 +1107,8 @@ type MotionDuration struct {
 	Drop              time.Duration // 落位
 	AutoExpand        time.Duration // 悬停自动展开
 	Flash             time.Duration // 落位闪光
+	Shimmer           time.Duration // 骨架占位流光一周
+	LiveBeat          time.Duration // 实时状态点每次采样的跳动
 	FrameInterval     time.Duration
 	Zoom              time.Duration
 	PaneEnter         time.Duration
@@ -1678,7 +1688,7 @@ type ProgressTokens struct {
 	FillPaused  color.NRGBA // ← color.status.paused
 	FillDone    color.NRGBA // ← color.success.default
 	HeightMeter float32     // ← size.meterHeight
-	MeterFill   color.NRGBA // ← color.fill.strong
+	MeterFill   color.NRGBA // ← color.accent.default
 	MeterWarnAt float32     // ← size.meterWarnRatio
 	MeterCritAt float32     // ← size.meterCriticalRatio
 	FillError   color.NRGBA // ← color.danger.default
@@ -1880,10 +1890,23 @@ type DialogTokens struct {
 
 // StatsTokens groups tokens.
 type StatsTokens struct {
-	HeaderHeight float32 // ← size.statsHeaderHeight
-	ChartHeight  float32 // ← size.statsChartHeight
-	ChartStroke  float32 // ← size.statsChartStroke
-	SectionGap   float32 // ← size.statsSectionGap
+	HeaderHeight   float32       // ← size.statsHeaderHeight
+	ChartHeight    float32       // ← size.statsChartHeight
+	ChartStroke    float32       // ← size.statsChartStroke
+	SectionGap     float32       // ← size.statsSectionGap
+	NetChartHeight float32       // ← size.statsNetChartHeight
+	ValueLarge     float32       // ← size.statsValueLarge
+	HostBg         color.NRGBA   // ← color.surface.sunken
+	HostRadius     float32       // ← radius.card
+	ProcessBar     color.NRGBA   // ← color.accent.tint10
+	ProcessRadius  float32       // ← radius.controlSm
+	Skeleton       color.NRGBA   // ← color.border.subtle
+	Shimmer        color.NRGBA   // ← color.fill.shimmer
+	ShimmerPeriod  time.Duration // ← motion.duration.shimmer
+	SkeletonLine   float32       // ← size.statsSkeletonLine
+	BeatDuration   time.Duration // ← motion.duration.liveBeat
+	BeatScale      float32       // ← opacity.liveBeatScale
+	BeatEasing     Bezier        // ← motion.easing.out
 }
 
 // CatalogTokens groups tokens.
@@ -2410,10 +2433,14 @@ type PanelTokens struct {
 
 // SparklineTokens groups tokens.
 type SparklineTokens struct {
-	Height    float32     // ← size.sparklineHeight
-	Stroke    float32     // ← size.sparklineStroke
-	Line      color.NRGBA // ← color.accent.default
-	FillAlpha float32     // ← opacity.sparklineFill
+	Height     float32     // ← size.sparklineHeight
+	Stroke     float32     // ← size.sparklineStroke
+	Line       color.NRGBA // ← color.accent.default
+	FillAlpha  float32     // ← opacity.sparklineFill
+	Grid       color.NRGBA // ← color.border.divider
+	DotRadius  float32     // ← size.sparklineDotRadius
+	HaloRadius float32     // ← size.sparklineHaloRadius
+	HaloAlpha  float32     // ← opacity.sparklineHalo
 }
 
 // KeyValueTokens groups tokens.
@@ -3039,6 +3066,7 @@ func lightSemantic() Semantic {
 				Placeholder:     Palette.Black.A035,
 				PlaceholderEdge: Palette.Black.A05,
 				Strong:          Palette.Gray.N900,
+				Shimmer:         Palette.Gray.N40,
 				QuietHover:      Palette.Black.A08,
 				Skeleton:        Palette.Gray.N175,
 			},
@@ -3214,9 +3242,12 @@ func lightSemantic() Semantic {
 			TerminalContentBottom:   50,
 			EmptyPaneTitleSize:      15,
 			StatsHeaderHeight:       44,
-			StatsChartHeight:        34,
+			StatsChartHeight:        44,
 			StatsChartStroke:        1.3,
-			StatsSectionGap:         20,
+			StatsSectionGap:         18,
+			StatsNetChartHeight:     20,
+			StatsValueLarge:         28,
+			StatsSkeletonLine:       10,
 			EmptyPaneIcon:           32,
 			BellIcon:                13,
 			CatalogRowHeight:        40,
@@ -3303,6 +3334,8 @@ func lightSemantic() Semantic {
 			LatencyWarn:             150,
 			LatencyBad:              400,
 			TableNameMinWidth:       160,
+			SparklineDotRadius:      2.5,
+			SparklineHaloRadius:     5,
 			MeterWarnRatio:          0.7,
 			MeterCriticalRatio:      0.9,
 		},
@@ -3411,6 +3444,7 @@ func lightSemantic() Semantic {
 			LiftStackBack:             Palette.Ratio.N0_8,
 			Hidden:                    Palette.Ratio.N0,
 			OsTint:                    Palette.Ratio.N0_09,
+			LiveBeatScale:             1.35,
 			DragRotation:              -1,
 			DragPreview:               0.9,
 			PreviewHeader:             0.96,
@@ -3425,7 +3459,8 @@ func lightSemantic() Semantic {
 			ModalEnterScale:           0.96,
 			ModalExitScale:            0.98,
 			CollapseContentFadeFactor: 1.6,
-			SparklineFill:             0.1,
+			SparklineFill:             0.2,
+			SparklineHalo:             0.18,
 		},
 		Motion: Motion{
 			Duration: MotionDuration{
@@ -3439,6 +3474,8 @@ func lightSemantic() Semantic {
 				Drop:              Palette.Duration.N320,
 				AutoExpand:        Palette.Duration.N500,
 				Flash:             Palette.Duration.N600,
+				Shimmer:           1400 * time.Millisecond,
+				LiveBeat:          900 * time.Millisecond,
 				FrameInterval:     16 * time.Millisecond,
 				Zoom:              240 * time.Millisecond,
 				PaneEnter:         220 * time.Millisecond,
@@ -3566,6 +3603,7 @@ func darkOverrides(s *Semantic) {
 	s.Shadow.GlassHighlight = Shadow{{X: 0, Y: 0.5, Blur: 0, Spread: 0, Color: Palette.WhiteA.A10, Inset: true}}
 	s.Opacity.PaneUnfocusedContent = Palette.Ratio.N0_45
 	s.Opacity.OsTint = Palette.Ratio.N0_18
+	s.Color.Fill.Shimmer = Palette.Graphite.N600
 	s.Color.State.TabHover = Palette.WhiteA.A10
 	s.Color.State.RailHover = Palette.WhiteA.A06
 	s.Color.State.RailPressed = Palette.WhiteA.A12
@@ -4063,7 +4101,7 @@ func buildComponents(s *Semantic) Components {
 			FillPaused:  s.Color.Status.Paused,
 			FillDone:    s.Color.Success.Default,
 			HeightMeter: s.Size.MeterHeight,
-			MeterFill:   s.Color.Fill.Strong,
+			MeterFill:   s.Color.Accent.Default,
 			MeterWarnAt: s.Size.MeterWarnRatio,
 			MeterCritAt: s.Size.MeterCriticalRatio,
 			FillError:   s.Color.Danger.Default,
@@ -4243,10 +4281,23 @@ func buildComponents(s *Semantic) Components {
 			ViewportInset: s.Space.N20,
 		},
 		Stats: StatsTokens{
-			HeaderHeight: s.Size.StatsHeaderHeight,
-			ChartHeight:  s.Size.StatsChartHeight,
-			ChartStroke:  s.Size.StatsChartStroke,
-			SectionGap:   s.Size.StatsSectionGap,
+			HeaderHeight:   s.Size.StatsHeaderHeight,
+			ChartHeight:    s.Size.StatsChartHeight,
+			ChartStroke:    s.Size.StatsChartStroke,
+			SectionGap:     s.Size.StatsSectionGap,
+			NetChartHeight: s.Size.StatsNetChartHeight,
+			ValueLarge:     s.Size.StatsValueLarge,
+			HostBg:         s.Color.Surface.Sunken,
+			HostRadius:     s.Radius.Card,
+			ProcessBar:     s.Color.Accent.Tint10,
+			ProcessRadius:  s.Radius.ControlSm,
+			Skeleton:       s.Color.Border.Subtle,
+			Shimmer:        s.Color.Fill.Shimmer,
+			ShimmerPeriod:  s.Motion.Duration.Shimmer,
+			SkeletonLine:   s.Size.StatsSkeletonLine,
+			BeatDuration:   s.Motion.Duration.LiveBeat,
+			BeatScale:      s.Opacity.LiveBeatScale,
+			BeatEasing:     s.Motion.Easing.Out,
 		},
 		Catalog: CatalogTokens{
 			RowHeight:    s.Size.CatalogRowHeight,
@@ -4715,10 +4766,14 @@ func buildComponents(s *Semantic) Components {
 			Caption:      s.Color.Text.Tertiary,
 		},
 		Sparkline: SparklineTokens{
-			Height:    s.Size.SparklineHeight,
-			Stroke:    s.Size.SparklineStroke,
-			Line:      s.Color.Accent.Default,
-			FillAlpha: s.Opacity.SparklineFill,
+			Height:     s.Size.SparklineHeight,
+			Stroke:     s.Size.SparklineStroke,
+			Line:       s.Color.Accent.Default,
+			FillAlpha:  s.Opacity.SparklineFill,
+			Grid:       s.Color.Border.Divider,
+			DotRadius:  s.Size.SparklineDotRadius,
+			HaloRadius: s.Size.SparklineHaloRadius,
+			HaloAlpha:  s.Opacity.SparklineHalo,
 		},
 		KeyValue: KeyValueTokens{
 			RowHeight: s.Size.KeyValueRow,

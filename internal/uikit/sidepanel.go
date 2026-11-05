@@ -84,6 +84,14 @@ func SidePanel(c *ui.Context, props SidePanelProps, body func()) SidePanelResult
 			*props.Open = false
 		}
 		result.Viewport = SidePanelViewport(c)
+		if props.Footer == nil {
+			// The panel sits in a Card, and without a footer the viewport reaches
+			// its bottom corners. Only the innermost clip draws rounded corners
+			// (outer clips cut rectangles), so the viewport rounds them itself or
+			// the bottom fade covers the card's.
+			card := t.C.Card.Radius
+			result.Viewport.Radius(0, 0, card, card)
+		}
 		result.Viewport.Children(func() {
 			content := ui.Scroll(c).Fill().MinHeight(0).TrackScroll(scroll).Padding(0, padding)
 			content.Children(body)
