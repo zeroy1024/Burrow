@@ -94,23 +94,23 @@ type remoteSession struct {
 
 func demoHosts() []host {
 	hosts := []host{
-		{name: "prod-web-01", user: "root", address: "10.0.1.12", os: 0,
+		{name: "prod-web-01", user: "root", address: "192.0.2.10", os: 0,
 			latency: 18, system: "Ubuntu 22.04.4", uptime: "41 天 6 小时", cpu: 23, memory: 41, disk: 57},
-		{name: "prod-web-02", user: "root", address: "10.0.1.13", os: 0,
+		{name: "prod-web-02", user: "root", address: "192.0.2.11", os: 0,
 			latency: 21, system: "Ubuntu 22.04.4", uptime: "28 天 3 小时", cpu: 16, memory: 35, disk: 43},
-		{name: "prod-db-master", user: "admin", address: "10.0.2.5", os: 1,
+		{name: "prod-db-master", user: "admin", address: "192.0.2.12", os: 1,
 			latency: 9, system: "Debian 12", uptime: "64 天 2 小时", cpu: 12, memory: 62, disk: 71},
-		{name: "cdn-origin", user: "deploy", address: "10.0.3.8", os: 2,
+		{name: "cdn-origin", user: "deploy", address: "192.0.2.13", os: 2,
 			latency: 32, system: "CentOS Stream 9", uptime: "17 天 4 小时", cpu: 8, memory: 24, disk: 38},
-		{name: "staging-api", user: "ubuntu", address: "172.16.4.21", os: 0,
+		{name: "staging-api", user: "ubuntu", address: "192.0.2.14", os: 0,
 			latency: 46, system: "Ubuntu 24.04", uptime: "12 天 4 小时", cpu: 31, memory: 27, disk: 32},
-		{name: "bastion", user: "ops", address: "bastion.example.com", os: 3,
+		{name: "bastion", user: "ops", address: "192.0.2.15", os: 3,
 			latency: 12, system: "Alpine Linux 3.21", uptime: "23 天 8 小时", cpu: 4, memory: 18, disk: 22},
-		{name: "qa-runner", user: "ci", address: "172.16.1.40", os: 4,
+		{name: "qa-runner", user: "ci", address: "192.0.2.16", os: 4,
 			latency: 28, system: "Fedora 42", uptime: "3 天 1 小时", cpu: 38, memory: 48, disk: 44},
-		{name: "nas.home", user: "zero", address: "192.168.1.10", os: 5,
+		{name: "nas.home", user: "zero", address: "192.0.2.17", os: 5,
 			latency: 2, system: "Linux 6.6", uptime: "78 天 9 小时", cpu: 6, memory: 32, disk: 68},
-		{name: "vps-tokyo", user: "root", address: "45.77.12.9", os: 6,
+		{name: "vps-tokyo", user: "root", address: "192.0.2.18", os: 6,
 			latency: 54, system: "Arch Linux", uptime: "9 天 5 小时", cpu: 11, memory: 29, disk: 35},
 	}
 	for i := range hosts {

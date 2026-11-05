@@ -54,7 +54,6 @@ func runREADMEGallery() error {
 	}
 	a.hosts, a.groups = demoHosts(), demoGroups()
 	for i := range a.hosts {
-		a.hosts[i].address = fmt.Sprintf("192.0.2.%d", 10+i)
 		a.hosts[i].user = "deploy"
 		initializeSession(&a.hosts[i])
 	}

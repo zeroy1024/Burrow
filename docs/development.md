@@ -177,4 +177,4 @@ mise exec -- go test -race -tags=integration ./... -count=1 -timeout=180s
 
 ## 修改入口
 
-代码职责见[架构与生命周期](architecture.md)。主题修改使用[生成流程](theme-integration.md#修改与生成)，不要手改派生文件；本地依赖修改先阅读各自的 `FORK.md`。文档只描述当前行为，阶段验证另存[历史归档](archive/README.md)。
+代码职责见[架构与生命周期](architecture.md)。主题修改使用[生成流程](theme-integration.md#修改与生成)，不要手改派生文件；本地依赖修改先阅读各自的 `FORK.md`。文档描述当前行为，验证结果应注明实际运行的提交、环境和范围，规则见[验证范围](limitations.md#验证如何解读)。
