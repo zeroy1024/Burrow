@@ -8,8 +8,8 @@
 | 层 | 数量 | 说明 |
 |---|---|---|
 | palette（primitives） | 282 | 原始色值与刻度，其中 50 个为推导值（derived） |
-| semantic（每个主题一份） | 477 | Light = 当前设计；Dark 覆盖其中 111 个（全部 derived） |
-| component | 1063 | 只引用 semantic；换主题时自动跟随 |
+| semantic（每个主题一份） | 478 | Light = 当前设计；Dark 覆盖其中 111 个（全部 derived） |
+| component | 1071 | 只引用 semantic；换主题时自动跟随 |
 
 ## 1. 三层结构与引用规则
 
@@ -812,6 +812,7 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `size.settingsSelect` | 220px | ＝ |  |
 | `size.settingsNumber` | 64px | ＝ |  |
 | `size.settingsScrollback` | 96px | ＝ |  |
+| `size.settingsShortcut` | 176px | ＝ |  |
 | `size.keycap` | 18px | ＝ |  |
 | `size.buttonLarge` | 32px | ＝ |  |
 | `size.badgeSmall` | 18px | ＝ |  |
@@ -2121,8 +2122,6 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `settings.rowLabel` | `{color.text.primary}` | #1d1d1f |  |
 | `settings.rowDescSize` | `{font.size.footnote}` | 11.5px | 分组头、副标题、状态栏 |
 | `settings.rowDesc` | `{color.text.secondary}` | #8e8e93 | 次要文字、主机副标题、状态栏 |
-| `settings.groupFootnoteSize` | `{font.size.footnote}` | 11.5px | 分组头、副标题、状态栏 |
-| `settings.groupFootnote` | `{color.text.tertiary}` | #a1a1a6 | 关闭 ×、kbd、caption |
 | `settings.fadeHeight` | `{size.settingsFadeHeight}` | 40px |  |
 | `settings.enterY` | `{space.8}` | 8px |  |
 | `settings.exitY` | `{space.4}` | 4px |  |
@@ -2135,6 +2134,7 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `settings.selectWidth` | `{size.settingsSelect}` | 220px |  |
 | `settings.numberWidth` | `{size.settingsNumber}` | 64px |  |
 | `settings.scrollbackWidth` | `{size.settingsScrollback}` | 96px |  |
+| `settings.rowGap` | `{space.16}` | 16px |  |
 
 ### schemeCard
 | token | 引用 | Light 值 | 说明 |
@@ -2181,6 +2181,23 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `accentSwatch.ringGap` | `{size.accentRingGap}` | 2px |  |
 | `accentSwatch.ringWidth` | `{size.accentRing}` | 1.5px |  |
 | `accentSwatch.ringInset` | `{color.surface.card}` | #ffffff | 内容卡片 / sider / FTP 面板 |
+
+### shortcutField
+| token | 引用 | Light 值 | 说明 |
+|---|---|---|---|
+| `shortcutField.width` | `{size.settingsShortcut}` | 176px |  |
+| `shortcutField.keyGap` | `{space.4}` | 4px |  |
+| `shortcutField.keyText` | `{color.text.secondary}` | #8e8e93 | 次要文字、主机副标题、状态栏 |
+| `shortcutField.prompt` | `{color.text.accent}` | #0a6fd6 | 蓝色文字（徽章、提示、高亮分组） |
+| `shortcutField.controlGap` | `{space.8}` | 8px |  |
+
+### helpTip
+| token | 引用 | Light 值 | 说明 |
+|---|---|---|---|
+| `helpTip.size` | `{size.iconSm}` | 14px |  |
+| `helpTip.gap` | `{space.4}` | 4px |  |
+| `helpTip.icon` | `{color.text.tertiary}` | #a1a1a6 | 关闭 ×、kbd、caption |
+| `helpTip.iconHover` | `{color.text.secondary}` | #8e8e93 | 次要文字、主机副标题、状态栏 |
 
 ### kbd
 | token | 引用 | Light 值 | 说明 |

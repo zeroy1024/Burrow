@@ -145,12 +145,12 @@ func (a *app) credentialGroup(c *ui.Context, title string, actions, content func
 	uikit.SettingsGroup(c, uikit.SettingsGroupProps{Title: localize(c, title), HeaderRow: true, Actions: actions}, content)
 }
 
-func (a *app) credentialRow(c *ui.Context, label, description string, control func()) {
-	if !a.settingMatches(label, description) {
+func (a *app) credentialRow(c *ui.Context, label, help string, control func()) {
+	if !a.settingMatches(label, help) {
 		return
 	}
 	uikit.SettingsRow(c, uikit.SettingsRowProps{
-		Gap: theme.Current().Space.N12, Title: localize(c, label), Detail: localize(c, description), Control: control,
+		Gap: theme.Current().Space.N12, Title: localize(c, label), Help: localize(c, help), Control: control,
 	})
 }
 
