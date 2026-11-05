@@ -86,9 +86,10 @@ func (a *app) startSSHSession(session *remoteSession, refresh bool) {
 		if errors.Is(err, errSSHConnectCanceled) {
 			session.state = disconnected
 			showSSHMessage(session, err.Error())
-			return
+		} else {
+			showSSHMessage(session, "连接失败："+err.Error())
 		}
-		showSSHMessage(session, "连接失败："+err.Error())
+		showReconnectHint(session, false)
 	}
 	request.ready = func(connection *sshclient.Connection) {
 		channelCtx, cancelChannel := context.WithCancel(ctx)
@@ -109,6 +110,7 @@ func (a *app) startSSHSession(session *remoteSession, refresh bool) {
 				if session.ssh == run && ctx.Err() == nil && session.state != connectionFailed {
 					session.state = connectionFailed
 					showSSHMessage(session, err.Error())
+					showReconnectHint(session, false)
 				}
 			})
 		}

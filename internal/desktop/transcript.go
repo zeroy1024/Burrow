@@ -12,6 +12,23 @@ import (
 	"sshdesk/internal/uikit"
 )
 
+// reconnectHint ends the output of a pane that has no shell, as a shell ends
+// its output with a prompt: Enter connects. A live terminal gets the same
+// hint fed into it (showReconnectHint).
+func reconnectHint(c *ui.Context, session *remoteSession) []terminalLine {
+	if !session.awaitingConnect() {
+		return nil
+	}
+	if len(session.transcript) == 0 && len(session.output) == 0 {
+		h := session.endpoint
+		return []terminalLine{
+			{{Text: localize(c, "会话已恢复，尚未连接。")}},
+			{{Text: fmt.Sprintf(localize(c, "按 Enter 连接 %s"), fmt.Sprintf("%s@%s:%d", h.user, h.address, h.port)), Dim: true}},
+		}
+	}
+	return []terminalLine{{{Text: localize(c, "按 Enter 重新连接"), Dim: true}}}
+}
+
 func demoTranscript(h host) []terminalLine {
 	green := terminalIndexed(2)
 	blue := terminalIndexed(4)
@@ -189,6 +206,21 @@ func (a *app) terminalLines(c *ui.Context, session *remoteSession, focused bool)
 		for _, line := range session.output {
 			lineView(line)
 		}
+		if hint := reconnectHint(c, session); len(hint) > 0 {
+			for _, line := range hint[:len(hint)-1] {
+				lineView(line)
+			}
+			// The last hint line takes the cursor, as a shell prompt does.
+			ui.Row(c).FillWidth().MinWidth(0).AlignItems(ui.End).Children(func() {
+				paragraph := ui.RichText(c).MinWidth(0).Shrink(1).FixedLineHeight(prefs.LineHeight)
+				selection := selected[paragraph.ID()]
+				paragraph.Children(func() {
+					ui.RichText(c, terminalSpans(hint[len(hint)-1], scheme, prefs, selection.Start, selection.End)...)
+				})
+				a.terminalCursor(c, session, focused, " ")
+			})
+			return
+		}
 		if session.state != connected {
 			return
 		}
@@ -252,6 +284,9 @@ func (a *app) terminalDragContents(
 					lineView(line)
 				}
 				for _, line := range session.output {
+					lineView(line)
+				}
+				for _, line := range reconnectHint(c, session) {
 					lineView(line)
 				}
 				if session.state != connected {

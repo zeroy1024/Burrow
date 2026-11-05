@@ -15,11 +15,11 @@ type terminalScrollState struct {
 	scrollbarState
 }
 
-func terminalScrollbar(c *ui.Context, frame, output ui.Element, state *terminalScrollState, background color.NRGBA) {
+func terminalScrollbar(c *ui.Context, frame, output ui.Element, state *terminalScrollState, background color.NRGBA, input func(ui.InputEvent) bool) {
 	t := theme.Current()
 	uikit.Scrollbars(c, frame, output, &state.offset, uikit.ScrollbarProps{
 		Label: "终端滚动条", State: &state.scrollbarState,
 		Top: t.C.Pane.HeaderHeight, Bottom: t.C.StatusBar.HeightPane,
-		Color: terminalScrollbarColor(background),
+		Color: terminalScrollbarColor(background), Input: input,
 	})
 }
