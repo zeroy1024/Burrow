@@ -8,8 +8,8 @@
 | 层 | 数量 | 说明 |
 |---|---|---|
 | palette（primitives） | 282 | 原始色值与刻度，其中 50 个为推导值（derived） |
-| semantic（每个主题一份） | 498 | Light = 当前设计；Dark 覆盖其中 111 个（全部 derived） |
-| component | 1112 | 只引用 semantic；换主题时自动跟随 |
+| semantic（每个主题一份） | 499 | Light = 当前设计；Dark 覆盖其中 111 个（全部 derived） |
+| component | 1113 | 只引用 semantic；换主题时自动跟随 |
 
 ## 1. 三层结构与引用规则
 
@@ -1004,6 +1004,7 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `motion.duration.fast` | 120ms | ＝ |  |
 | `motion.duration.base` | 160ms | ＝ |  |
 | `motion.duration.autoHide` | 3000ms | ＝ |  |
+| `motion.duration.scrollGesture` | 300ms | ＝ | 同一滚动手势相邻事件的最大间隔 |
 | `motion.easing.out` | cubic-bezier(0,0,0.58,1) | ＝ |  |
 | `motion.easing.pane` | cubic-bezier(0.2,0.8,0.2,1) | ＝ |  |
 | `motion.easing.search` | cubic-bezier(0.42,0,0.58,1) | ＝ |  |
@@ -1719,6 +1720,7 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `scrollbar.endInset` | `{space.2}` | 2px |  |
 | `scrollbar.revealZone` | `{size.scrollbarRevealZone}` | 24px |  |
 | `scrollbar.color` | `{color.status.scrollbar}` | rgba(0,0,0,0.32) |  |
+| `scrollbar.gestureGap` | `{motion.duration.scrollGesture}` | 300ms | 同一滚动手势相邻事件的最大间隔 |
 
 ### dialog
 | token | 引用 | Light 值 | 说明 |

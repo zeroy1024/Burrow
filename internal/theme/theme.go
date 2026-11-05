@@ -1148,6 +1148,7 @@ type MotionDuration struct {
 	Fast              time.Duration
 	Base              time.Duration
 	AutoHide          time.Duration
+	ScrollGesture     time.Duration // 同一滚动手势相邻事件的最大间隔
 }
 
 // MotionEasing groups tokens.
@@ -1892,6 +1893,7 @@ type ScrollbarTokens struct {
 	EndInset     float32       // ← space.2
 	RevealZone   float32       // ← size.scrollbarRevealZone
 	Color        color.NRGBA   // ← color.status.scrollbar
+	GestureGap   time.Duration // ← motion.duration.scrollGesture
 }
 
 // DialogTokens groups tokens.
@@ -3610,6 +3612,7 @@ func lightSemantic() Semantic {
 				Fast:              Palette.Duration.N120,
 				Base:              Palette.Duration.N160,
 				AutoHide:          3000 * time.Millisecond,
+				ScrollGesture:     300 * time.Millisecond,
 			},
 			Easing: MotionEasing{
 				Out:    Palette.Easing.EaseOut,
@@ -4382,6 +4385,7 @@ func buildComponents(s *Semantic) Components {
 			EndInset:     s.Space.N2,
 			RevealZone:   s.Size.ScrollbarRevealZone,
 			Color:        s.Color.Status.Scrollbar,
+			GestureGap:   s.Motion.Duration.ScrollGesture,
 		},
 		Dialog: DialogTokens{
 			HostWidth:     s.Size.HostDialogWidth,
