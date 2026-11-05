@@ -810,20 +810,58 @@ func mcpAuditPayloadView(view *mcpAuditItem, op store.MCPOperation, payload *sto
 		}
 	}
 	if view.ResponseSaved && view.IsCommand {
+		type toolResult struct {
+			StructuredContent struct {
+				Stdout string `json:"stdout"`
+				Stderr string `json:"stderr"`
+				Error  struct {
+					Hits []struct {
+						PolicyID string `json:"policy_id"`
+						Version  int    `json:"policy_version"`
+						Rule     string `json:"rule"`
+						Action   string `json:"action"`
+						Matched  string `json:"matched"`
+						Context  string `json:"context"`
+						Via      string `json:"via"`
+						Fallback string `json:"fallback"`
+					} `json:"hits"`
+				} `json:"error"`
+			} `json:"structuredContent"`
+		}
 		var envelope struct {
 			Data struct {
-				Result struct {
-					StructuredContent struct {
-						Stdout string `json:"stdout"`
-						Stderr string `json:"stderr"`
-					} `json:"structuredContent"`
-				} `json:"result"`
+				Result    *toolResult `json:"result"`
+				SSEEvents []struct {
+					Result *toolResult `json:"result"`
+				} `json:"sse_events"`
 			} `json:"data"`
 		}
 		if err := json.Unmarshal(response, &envelope); err != nil {
 			return err
 		}
-		view.Stdout, view.Stderr = envelope.Data.Result.StructuredContent.Stdout, envelope.Data.Result.StructuredContent.Stderr
+		applyResult := func(result *toolResult) {
+			if result == nil {
+				return
+			}
+			content := result.StructuredContent
+			view.Stdout, view.Stderr = content.Stdout, content.Stderr
+			for _, evidence := range content.Error.Hits {
+				for i := range view.PolicyHits {
+					hit := &view.PolicyHits[i]
+					if hit.PolicyID != evidence.PolicyID || hit.Version != evidence.Version ||
+						hit.RuleSummary != evidence.Rule || hit.ForbiddenText != evidence.Action {
+						continue
+					}
+					hit.MatchSaved = true
+					hit.MatchText, hit.MatchContext = evidence.Matched, evidence.Context
+					hit.MatchVia, hit.MatchFallback = evidence.Via, evidence.Fallback
+				}
+			}
+		}
+		applyResult(envelope.Data.Result)
+		for _, event := range envelope.Data.SSEEvents {
+			applyResult(event.Result)
+		}
 	}
 	return nil
 }

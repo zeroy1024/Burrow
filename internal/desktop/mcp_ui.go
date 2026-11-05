@@ -98,6 +98,11 @@ type mcpPolicyHitSnapshot struct {
 	RuleSummary   string
 	ForbiddenText string
 	HitCountText  string
+	MatchSaved    bool
+	MatchText     string
+	MatchContext  string
+	MatchVia      string
+	MatchFallback string
 }
 
 type mcpAuditItem struct {

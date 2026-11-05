@@ -125,7 +125,8 @@ type Failure struct {
 	Message string
 	Hits    []store.MCPHit
 	// Matches[i] is the part of the request that triggered Hits[i]. It goes
-	// back to the calling agent only; audit hits stay deduplicated per rule.
+	// back to the calling agent and is retained in the captured response;
+	// audit hits stay deduplicated per rule.
 	Matches []Match
 }
 

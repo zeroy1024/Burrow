@@ -3,12 +3,12 @@ package shellcmd
 import (
 	"errors"
 	"fmt"
-	"path"
 	"regexp"
 	"slices"
 	"strings"
 
 	"mvdan.cc/sh/v3/expand"
+	"mvdan.cc/sh/v3/pattern"
 	"mvdan.cc/sh/v3/syntax"
 )
 
@@ -71,14 +71,19 @@ func ParseRule(pattern string, ignoreCase bool) (Rule, error) {
 		return Rule{}, errors.New("命令规则缺少命令名")
 	}
 	r.keywords = append(r.keywords, keyword(r.program, true))
+	optionsDone := false
 	for _, token := range tokens[1:] {
+		if !optionsDone && token == "--" {
+			optionsDone = true
+			continue
+		}
 		if ignoreCase {
 			token = strings.ToLower(token)
 		}
 		switch {
-		case len(token) > 2 && strings.HasPrefix(token, "--"):
+		case !optionsDone && len(token) > 2 && strings.HasPrefix(token, "--"):
 			r.long = append(r.long, token)
-		case len(token) > 1 && token[0] == '-' && token[1] != '-':
+		case !optionsDone && len(token) > 1 && token[0] == '-' && token[1] != '-':
 			r.short = append(r.short, token)
 		default:
 			r.positional = append(r.positional, token)
@@ -136,21 +141,31 @@ func (r Rule) matchKeywords(text string) bool {
 }
 
 func (r Rule) matchCall(call Call) bool {
-	if !slices.ContainsFunc(call.names, r.matchProgram) {
+	if !r.matchProgram(call) {
 		return false
 	}
 	var values []string
+	var options []string
 	letters := map[rune]bool{}
+	optionsDone := false
 	for _, arg := range call.Args[1:] {
 		// An expansion's value is unknown here; it does not satisfy a condition.
 		if arg.Dynamic {
 			continue
 		}
 		v := arg.Value
+		if !optionsDone && v == "--" {
+			optionsDone = true
+			continue
+		}
 		if r.ignoreCase {
 			v = strings.ToLower(v)
 		}
 		values = append(values, v)
+		if optionsDone {
+			continue
+		}
+		options = append(options, v)
 		if shortCluster(v) {
 			for _, letter := range v[1:] {
 				letters[letter] = true
@@ -167,12 +182,12 @@ func (r Rule) matchCall(call Call) bool {
 		return false
 	}
 	for _, long := range r.long {
-		if !slices.ContainsFunc(values, func(v string) bool { return v == long || strings.HasPrefix(v, long+"=") }) {
+		if !slices.ContainsFunc(options, func(v string) bool { return v == long || strings.HasPrefix(v, long+"=") }) {
 			return false
 		}
 	}
 	for _, short := range r.short {
-		if slices.Contains(values, short) {
+		if slices.Contains(options, short) {
 			continue
 		}
 		if !shortCluster(short) {
@@ -189,12 +204,26 @@ func (r Rule) matchCall(call Call) bool {
 
 // matchProgram compares a normalized program name. A command name that is
 // itself a glob (/bin/r?) matches when it could expand to the rule's program.
-func (r Rule) matchProgram(name string) bool {
-	if strings.ContainsAny(name, "*?[") {
-		matched, err := path.Match(name, r.program)
-		return matched || err != nil
+func (r Rule) matchProgram(call Call) bool {
+	if slices.ContainsFunc(call.names, func(name string) bool { return wildcard(r.program, name) }) {
+		return true
 	}
-	return wildcard(r.program, name)
+	// Only the request's unquoted metacharacters can expand on the remote
+	// shell. Rule wildcards are handled separately by the literal comparison.
+	glob := strings.ToLower(call.Args[0].glob)
+	if i := strings.LastIndexByte(glob, '/'); i >= 0 {
+		glob = glob[i+1:]
+	}
+	glob = strings.TrimSuffix(glob, ".exe")
+	if !pattern.HasMeta(glob, 0) {
+		return false
+	}
+	expr, err := pattern.Regexp(glob, pattern.EntireString|pattern.NoGlobStar)
+	if err != nil {
+		// An invalid glob remains literal, as with the shell's '[' command.
+		return false
+	}
+	return regexp.MustCompile(expr).MatchString(r.program)
 }
 
 func shortCluster(v string) bool {

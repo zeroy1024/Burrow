@@ -27,6 +27,8 @@ type Arg struct {
 	// only known on the remote host.
 	Dynamic bool
 	raw     string
+	// glob keeps shell quoting and escapes, independently of the literal value.
+	glob string
 	// tail is the literal basename after the last '/' of a dynamic word, as in
 	// "$HOME/bin/tool", which still names the program.
 	tail string
@@ -261,19 +263,41 @@ func words(src string, list []*syntax.Word) []Arg {
 	for _, w := range list {
 		raw := span(src, w)
 		if dynamic(w) {
-			args = append(args, Arg{Dynamic: true, raw: raw, tail: literalTail(w)})
+			tail, glob := literalTail(w)
+			args = append(args, Arg{Dynamic: true, raw: raw, tail: tail, glob: glob})
 			continue
 		}
-		fields, err := expand.Fields(nil, w)
-		if err != nil {
-			args = append(args, Arg{Dynamic: true, raw: raw})
-			continue
-		}
-		for _, field := range fields {
-			args = append(args, Arg{Value: field, raw: raw})
+		// Expand braces before removing quotes so each resulting argument keeps
+		// its own glob pattern, including mixed quoted and unquoted characters.
+		word := *w
+		syntax.SplitBraces(&word)
+		start := len(args)
+		for field, err := range expand.BracesSeq(nil, &word) {
+			if err != nil {
+				args = append(args[:start], Arg{Dynamic: true, raw: raw})
+				break
+			}
+			arg, err := staticArg(field, raw)
+			if err != nil {
+				args = append(args[:start], Arg{Dynamic: true, raw: raw})
+				break
+			}
+			args = append(args, arg)
 		}
 	}
 	return args
+}
+
+func staticArg(w *syntax.Word, raw string) (Arg, error) {
+	value, err := expand.Literal(nil, w)
+	if err != nil {
+		return Arg{}, err
+	}
+	glob, err := expand.Pattern(nil, w)
+	if err != nil {
+		return Arg{}, err
+	}
+	return Arg{Value: value, raw: raw, glob: glob}, nil
 }
 
 func dynamic(w *syntax.Word) bool {
@@ -288,26 +312,37 @@ func dynamic(w *syntax.Word) bool {
 	return found
 }
 
-func literalTail(w *syntax.Word) string {
+func literalTail(w *syntax.Word) (string, string) {
 	parts := w.Parts
 	if len(parts) == 0 {
-		return ""
+		return "", ""
 	}
-	if quoted, ok := parts[len(parts)-1].(*syntax.DblQuoted); ok {
+	quoted, ok := parts[len(parts)-1].(*syntax.DblQuoted)
+	if ok {
 		parts = quoted.Parts
 	}
 	if len(parts) < 2 {
-		return ""
+		return "", ""
 	}
 	lit, ok := parts[len(parts)-1].(*syntax.Lit)
 	if !ok {
-		return ""
+		return "", ""
 	}
 	i := strings.LastIndexAny(lit.Value, `/\`)
 	if i < 0 || i == len(lit.Value)-1 {
-		return ""
+		return "", ""
 	}
-	return lit.Value[i+1:]
+	tail := *lit
+	tail.Value = lit.Value[i+1:]
+	word := &syntax.Word{Parts: []syntax.WordPart{&tail}}
+	if quoted != nil {
+		word.Parts = []syntax.WordPart{&syntax.DblQuoted{Parts: word.Parts}}
+	}
+	arg, err := staticArg(word, "")
+	if err != nil {
+		return "", ""
+	}
+	return arg.Value, arg.glob
 }
 
 func span(src string, node syntax.Node) string {

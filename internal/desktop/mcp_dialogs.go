@@ -522,6 +522,27 @@ func (a *app) mcpAuditDrawer(c *ui.Context) {
 							uikit.Text(c, "命中规则："+hit.RuleSummary, uikit.TextProps{Style: uikit.TextMono}).Grow(1).MinWidth(0)
 							uikit.Text(c, hit.ForbiddenText, uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneDanger})
 						})
+						if hit.MatchSaved {
+							basis := "文本匹配"
+							if strings.HasPrefix(hit.RuleSummary, "command: ") {
+								basis = "命令匹配"
+							}
+							if hit.MatchFallback != "" {
+								basis = "关键词保守拒绝：" + hit.MatchFallback
+							}
+							uikit.Text(c, "判定依据："+basis, uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneSecondary})
+							if hit.MatchVia != "" {
+								uikit.Text(c, "经由："+hit.MatchVia, uikit.TextProps{Style: uikit.TextMono, Tone: uikit.ToneSecondary})
+							}
+							if uikit.CodeBlock(c.Key("matched"), "触发片段", hit.MatchText).Copy {
+								mygo.Clipboard.WriteText(hit.MatchText)
+							}
+							if hit.MatchContext != "" && hit.MatchContext != hit.MatchText {
+								if uikit.CodeBlock(c.Key("match-context"), "所在文本", hit.MatchContext).Copy {
+									mygo.Clipboard.WriteText(hit.MatchContext)
+								}
+							}
+						}
 					})
 				}
 			}
