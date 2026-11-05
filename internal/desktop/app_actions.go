@@ -216,6 +216,17 @@ func (a *app) appShortcuts(c *ui.Context) {
 			}
 		})
 	}
+	// Reconnecting only revives a session; it never drops a live one.
+	if a.actionPressed(c, "session.reconnect") {
+		if a.section == sectionFiles {
+			if session := a.currentFileSession(); session != nil && session.state != connected && session.state != connecting {
+				a.reconnectFileSession(session)
+			}
+		} else if tab := a.currentTab(); a.section == sectionSSH && tab != nil && tab.focused.awaitingConnect() {
+			session := tab.focused
+			run(func() { a.connectSession(session) })
+		}
+	}
 	if a.actionPressed(c, "sidebar.toggle") {
 		a.page().sidebarCollapsed = !a.page().sidebarCollapsed
 	}

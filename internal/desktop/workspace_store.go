@@ -184,6 +184,10 @@ func (a *app) restoreWorkspaceTabs(saved *storedWorkspace) {
 		a.fileSessions = append(a.fileSessions, session)
 	}
 	a.activeTab, a.activeFile, a.section = saved.ActiveSSH, saved.ActiveFile, saved.Section
+	if len(a.tabs) > 0 {
+		// Let Enter reach the active pane's connect prompt without a click first.
+		a.tabs[a.activeTab].focused.focusPending = true
+	}
 }
 
 func validateStoredWorkspace(saved *storedWorkspace, hosts []host, keys []managedKey) error {
