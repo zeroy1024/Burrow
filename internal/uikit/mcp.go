@@ -265,7 +265,7 @@ type PermissionMatrixRow struct {
 // used in the Secret Key authorization modal.
 func PermissionMatrix(c *ui.Context, rows []PermissionMatrixRow, onToggle func(index int, capability string, enabled bool)) ui.Element {
 	t := theme.Current()
-	colW := float32(118)
+	colW := t.C.Mcp.PermissionColumn
 	return ui.Column(c).FillWidth().Gap(t.Space.N6).Children(func() {
 		ui.Row(c).FillWidth().Height(t.Size.ControlSm).Padding(0, t.Space.N12).
 			Radius(t.Radius.ControlSm).Background(Color(t.Color.Surface.Sunken)).
@@ -395,9 +395,7 @@ type DirectoryListEditorProps struct {
 // DirectoryListEditor renders a bounded local directory allowlist card with add/remove actions.
 func DirectoryListEditor(c *ui.Context, paths []string, props DirectoryListEditorProps) ui.Element {
 	t := theme.Current()
-	return ui.Column(c).Grow(1).Basis(0).MinWidth(0).Padding(t.Space.N10).Gap(t.Space.N6).
-		Radius(t.Radius.Control).Background(Color(t.Color.Surface.Sunken)).
-		Border(t.Size.Hairline, Color(t.Color.Border.Subtle)).Children(func() {
+	return Inset(c).Grow(1).Basis(0).MinWidth(0).Gap(t.Space.N6).Children(func() {
 		ui.Row(c).FillWidth().AlignItems(ui.Center).Gap(t.Space.N6).Children(func() {
 			ui.Text(c, props.Title).Grow(1).MinWidth(0).FontSize(t.Font.Size.Footnote).
 				FontWeight(t.Font.Weight.Semibold).TextColor(Color(t.Color.Text.Primary)).SingleLine()
@@ -407,24 +405,20 @@ func DirectoryListEditor(c *ui.Context, paths []string, props DirectoryListEdito
 			}
 		})
 		if len(paths) == 0 {
-			ui.Box(c).FillWidth().Padding(t.Space.N8).Radius(t.Radius.ControlSm).
-				Background(Color(t.Color.Surface.Card)).Border(t.Size.Hairline, Color(t.Color.Border.Subtle)).
-				Children(func() {
-					Text(c, props.EmptyHint, TextProps{Style: TextCaption, Tone: ToneTertiary})
-				})
+			Inset(c, InsetProps{Raised: true, Compact: true}).FillWidth().Children(func() {
+				Text(c, props.EmptyHint, TextProps{Style: TextCaption, Tone: ToneTertiary})
+			})
 		} else {
 			for idx, dir := range paths {
 				removeIdx := idx
 				dirPath := dir
-				ui.Row(c).Key(dirPath).FillWidth().MinHeight(t.C.Button.HeightSm+2*t.Space.N4).Shrink(0).
-					Padding(t.Space.N4, t.Space.N8).
-					Radius(t.Radius.ControlSm).Background(Color(t.Color.Surface.Card)).
-					Border(t.Size.Hairline, Color(t.Color.Border.Subtle)).AlignItems(ui.Center).Gap(t.Space.N6).Children(func() {
-					ui.Text(c, dirPath).Grow(1).MinWidth(0).Font(strings.Join(t.Font.Family.Mono, ", ")).
-						FontSize(t.Font.Size.Footnote).TextColor(Color(t.Color.Text.Primary)).SingleLine().Ellipsis("…")
-					if Button(c.Key("rm"), "移除", ButtonProps{Variant: ButtonDangerPlain, Size: SizeSm}).Clicked() && props.OnRemove != nil {
-						props.OnRemove(removeIdx)
-					}
+				Inset(c, InsetProps{Raised: true, Compact: true}).Key(dirPath).FillWidth().Shrink(0).Children(func() {
+					ui.Row(c).FillWidth().Gap(t.Space.N6).Children(func() {
+						Text(c, dirPath, TextProps{Style: TextMono}).Grow(1).MinWidth(0).SingleLine().Ellipsis("…")
+						if Button(c.Key("rm"), "移除", ButtonProps{Variant: ButtonDangerPlain, Size: SizeSm}).Clicked() && props.OnRemove != nil {
+							props.OnRemove(removeIdx)
+						}
+					})
 				})
 			}
 		}
@@ -456,21 +450,9 @@ func OneTimeSecretCard(c *ui.Context, props OneTimeSecretProps) ui.Element {
 				props.OnCopySecret()
 			}
 		})
-		ui.Column(c).FillWidth().Gap(t.Space.N4).Children(func() {
-			ui.Row(c).FillWidth().AlignItems(ui.Center).Children(func() {
-				Text(c, "客户端配置（请替换密钥占位符）", TextProps{Style: TextFootnote, Tone: ToneSecondary})
-				ui.Spacer(c)
-				if Button(c.Key("copy-cfg"), "复制配置", ButtonProps{Size: SizeSm, Icon: IconCopy}).Clicked() && props.OnCopyConfig != nil {
-					props.OnCopyConfig()
-				}
-			})
-			ui.Box(c).FillWidth().Padding(t.Space.N10).Radius(t.Radius.Control).
-				Background(Color(t.Color.Surface.Sunken)).Border(t.Size.Hairline, Color(t.Color.Border.Subtle)).
-				Children(func() {
-					ui.Text(c, props.ConfigJSON).Font(strings.Join(t.Font.Family.Mono, ", ")).
-						FontSize(t.Font.Size.Caption).TextColor(Color(t.Color.Text.Primary))
-				})
-		})
+		if CodeBlock(c.Key("config"), "客户端配置（请替换密钥占位符）", props.ConfigJSON).Copy && props.OnCopyConfig != nil {
+			props.OnCopyConfig()
+		}
 		if props.Confirmed != nil {
 			Checkbox(c, props.Confirmed, "我已复制并妥善保存密钥")
 		}

@@ -51,11 +51,6 @@ func Popover(c *ui.Context, anchor ui.Element, open *bool, props PopoverProps, b
 	})
 }
 
-func ClosePopover(c *ui.Context, open *bool) {
-	*open = false
-	c.Invalidate()
-}
-
 func StylePopover(panel ui.Element) ui.Element {
 	t := theme.Current()
 	return Shadow(panel.Radius(t.C.Popover.Radius).Background(Color(t.C.Popover.Bg)), t.C.Popover.Shadow)

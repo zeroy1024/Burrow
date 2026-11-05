@@ -382,10 +382,11 @@ func (a *app) terminalPreview(c *ui.Context) {
 	scheme := termtheme.Current()
 	prefs := a.terminal.prefs
 	colors := uikit.ResolveTerminalColors(scheme, prefs.Background)
-	ui.Column(c).FillWidth().Radius(t.C.Settings.GroupRadius).Border(t.C.Settings.GroupBorderWidth, uikit.Color(t.C.Settings.GroupBorder)).Clip().Children(func() {
+	uikit.SettingsGroupBody(c).Clip().Children(func() {
 		ui.Row(c).FillWidth().Padding(t.Space.N10, t.Space.N14).Background(uikit.Color(t.Color.Surface.Card)).Children(func() {
-			uikit.Text(c, localize(c, "预览"), uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneMuted}).FontWeight(t.Font.Weight.Semibold).Grow(1)
-			uikit.Text(c, localize(c, fmt.Sprintf("%s · %s %.1f / %.0f · %s", scheme.Name, prefs.FontFamily[0], prefs.FontSize, prefs.LineHeight, localize(c, []string{"块状光标", "竖线光标", "下划线光标"}[prefs.CursorShape]))), uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneTertiary})
+			uikit.SettingsGroupTitle(c, localize(c, "预览"), func() {
+				uikit.Text(c, localize(c, fmt.Sprintf("%s · %s %.1f / %.0f · %s", scheme.Name, prefs.FontFamily[0], prefs.FontSize, prefs.LineHeight, localize(c, []string{"块状光标", "竖线光标", "下划线光标"}[prefs.CursorShape]))), uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneTertiary})
+			})
 		})
 		ui.Column(c).FillWidth().Padding(t.Space.N14).Background(uikit.Color(colors.Background)).
 			TextColor(uikit.Color(colors.Foreground)).SelectionColor(uikit.Color(colors.Selection)).
@@ -429,17 +430,16 @@ func terminalPreviewLines() []terminalLine {
 func (a *app) terminalColorSettings(c *ui.Context) {
 	t := theme.Current()
 	if a.settingMatches("配色方案", "方案 跟随应用明暗 固定一种 配色 浅色外观时 深色外观时") {
-		ui.Column(c).FillWidth().Gap(t.C.Settings.GroupTitleGap).Children(func() {
-			ui.Row(c).FillWidth().AlignItems(ui.Center).Children(func() {
-				uikit.Text(c, localize(c, "配色方案"), uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneSecondary}).FontWeight(t.C.Settings.GroupTitleWeight).Grow(1)
-				uikit.Button(c, localize(c, "导入配色…"), uikit.ButtonProps{Size: uikit.SizeSm, Disabled: a.terminal.importing}).OnClick(a.chooseTerminalTheme)
-			})
-			uikit.SettingsGroupBody(c).Children(func() {
-				uikit.SettingsRow(c, uikit.SettingsRowProps{Gap: t.Space.N12}).MinHeight(0).Children(func() {
-					ui.Column(c).Grow(1).Gap(t.Space.N4).Children(func() {
-						uikit.Text(c, localize(c, "方案"), uikit.TextProps{}).FontSize(t.C.Settings.RowLabelSize)
-						uikit.Text(c, localize(c, "跟随：按应用当前明暗，在下方两种配色间自动切换"), uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneTertiary})
-					})
+		uikit.SettingsGroup(c, uikit.SettingsGroupProps{
+			Title:    localize(c, "配色方案"),
+			Footnote: localize(c, "点击卡片：按配色自身明暗放进浅色或深色槽位。导入支持 Ghostty 主题格式。"),
+			Actions: func() {
+				uikit.Button(c, localize(c, "导入配色…"), uikit.ButtonProps{Disabled: a.terminal.importing}).OnClick(a.chooseTerminalTheme)
+			},
+		}, func() {
+			uikit.SettingsRow(c, uikit.SettingsRowProps{
+				Gap: t.Space.N16, Title: localize(c, "方案"), Detail: localize(c, "跟随：按应用当前明暗，在下方两种配色间自动切换"),
+				Control: func() {
 					index := 0
 					if a.terminal.mode.Kind == termtheme.FixedScheme {
 						index = 1
@@ -453,20 +453,19 @@ func (a *app) terminalColorSettings(c *ui.Context) {
 							}
 						})
 					})
-				})
-				a.schemeGrid(c)
-				if a.terminal.mode.Kind == termtheme.FollowApp {
-					a.schemeSelectRow(c, "浅色外观时", &a.terminal.followLight)
-					a.schemeSelectRow(c, "深色外观时", &a.terminal.followDark)
-				} else {
-					selected := a.terminal.mode.Name
-					a.schemeSelectRow(c, "配色", &selected)
-					if selected != a.terminal.mode.Name {
-						a.changeTerminalSettings(func() { a.terminal.mode = termtheme.Fixed(selected) })
-					}
-				}
+				},
 			})
-			uikit.Text(c, localize(c, "点击卡片：按配色自身明暗放进浅色或深色槽位。导入支持 Ghostty 主题格式。"), uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneTertiary})
+			a.schemeGrid(c)
+			if a.terminal.mode.Kind == termtheme.FollowApp {
+				a.schemeSelectRow(c, "浅色外观时", &a.terminal.followLight)
+				a.schemeSelectRow(c, "深色外观时", &a.terminal.followDark)
+			} else {
+				selected := a.terminal.mode.Name
+				a.schemeSelectRow(c, "配色", &selected)
+				if selected != a.terminal.mode.Name {
+					a.changeTerminalSettings(func() { a.terminal.mode = termtheme.Fixed(selected) })
+				}
+			}
 		})
 	}
 	a.settingsGroup(c, "背景", "", []settingField{{"终端背景", "配色自带：任何外观都用配色的背景色。与卡片一致：用卡片底色", func() {
@@ -477,14 +476,14 @@ func (a *app) terminalColorSettings(c *ui.Context) {
 }
 
 func (a *app) schemeSelectRow(c *ui.Context, label string, value *string) {
-	t := theme.Current()
-	uikit.SettingsRow(c, uikit.SettingsRowProps{}).
-		BorderWidth(t.Size.Divider, 0, 0, 0).BorderColor(uikit.Color(t.C.Settings.RowDivider)).AlignItems(ui.Center).Children(func() {
-		uikit.Text(c, localize(c, label), uikit.TextProps{}).FontSize(t.C.Settings.RowLabelSize).Grow(1)
-		selected := *value
-		if a.settingsSchemeSelect(c, label, &selected) {
-			a.changeTerminalSettings(func() { *value = selected })
-		}
+	uikit.SettingsRow(c, uikit.SettingsRowProps{
+		Key: label, Gap: theme.Current().Space.N16, Divider: true, Title: localize(c, label),
+		Control: func() {
+			selected := *value
+			if a.settingsSchemeSelect(c, label, &selected) {
+				a.changeTerminalSettings(func() { *value = selected })
+			}
+		},
 	})
 }
 

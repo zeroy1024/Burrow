@@ -156,7 +156,7 @@ func (a *app) fileConflictModal(c *ui.Context) {
 	result := uikit.Modal(c.Key(conflict), &open, uikit.ModalProps{
 		Compact: true, Width: t.C.Dialog.HostWidth, Title: "目标中已存在同名项目", Motion: uikit.MotionOverride(a.reduceMotion(c)),
 	}, func(parts uikit.ModalParts) {
-		uikit.Text(c, entry.name, uikit.TextProps{Style: uikit.TextBodyStrong}).FontSize(t.Font.Size.BodyLg).FontWeight(t.Font.Weight.Medium)
+		uikit.Text(c, entry.name, uikit.TextProps{Style: uikit.TextHeadline})
 		uikit.Text(c, "目标："+path.Join(conflict.target, entry.name), uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneSecondary})
 		uikit.Checkbox(c, &conflict.applyAll, "对所有重名项应用此选择")
 		ui.Row(c).Justify(ui.End).Gap(t.Space.N8).Children(func() {

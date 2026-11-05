@@ -8,8 +8,8 @@
 | 层 | 数量 | 说明 |
 |---|---|---|
 | palette（primitives） | 282 | 原始色值与刻度，其中 50 个为推导值（derived） |
-| semantic（每个主题一份） | 477 | Light = 当前设计；Dark 覆盖其中 111 个（全部 derived） |
-| component | 1063 | 只引用 semantic；换主题时自动跟随 |
+| semantic（每个主题一份） | 497 | Light = 当前设计；Dark 覆盖其中 111 个（全部 derived） |
+| component | 1104 | 只引用 semantic；换主题时自动跟随 |
 
 ## 1. 三层结构与引用规则
 
@@ -834,6 +834,26 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `size.sparklineHaloRadius` | 5px | ＝ | 趋势图末点光圈 |
 | `size.meterWarnRatio` | 0.7 | ＝ |  |
 | `size.meterCriticalRatio` | 0.9 | ＝ |  |
+| `size.mcpTableMinWidth` | 1024px | ＝ |  |
+| `size.mcpNameColumn` | 210px | ＝ |  |
+| `size.mcpBadgeColumn` | 86px | ＝ |  |
+| `size.mcpScopeColumn` | 130px | ＝ |  |
+| `size.mcpTimeColumn` | 150px | ＝ |  |
+| `size.mcpKeysColumn` | 115px | ＝ |  |
+| `size.mcpAuditTimeColumn` | 72px | ＝ |  |
+| `size.mcpAuditKeyColumn` | 148px | ＝ |  |
+| `size.mcpAuditConnectionColumn` | 120px | ＝ |  |
+| `size.mcpAuditActionColumn` | 96px | ＝ |  |
+| `size.mcpAuditStatusColumn` | 104px | ＝ |  |
+| `size.mcpAuditDurationColumn` | 56px | ＝ |  |
+| `size.mcpPolicyModal` | 720px | ＝ |  |
+| `size.mcpKeyModal` | 680px | ＝ |  |
+| `size.mcpDialog` | 440px | ＝ |  |
+| `size.mcpDrawerMinWidth` | 340px | ＝ |  |
+| `size.mcpDrawerWidth` | 500px | ＝ |  |
+| `size.mcpMainMinWidth` | 360px | ＝ |  |
+| `size.mcpRuleModeWidth` | 120px | ＝ | 命令规则匹配方式选择框 |
+| `size.mcpPermissionColumn` | 118px | ＝ | 连接授权矩阵能力列 |
 
 ### font
 | token | Light | Dark（derived） | 用途 |
@@ -1878,8 +1898,6 @@ siderItem.nameColor             ← component，只能引用 semantic
 ### transferRow
 | token | 引用 | Light 值 | 说明 |
 |---|---|---|---|
-| `transferRow.iconTile` | `{size.control}` | 28px |  |
-| `transferRow.iconRadius` | `{radius.control}` | 7px |  |
 | `transferRow.upBg` | `{color.accent.subtle}` | #eaf3fe | 浅蓝底（上传、运行中、提示） |
 | `transferRow.upIcon` | `{color.accent.default}` | #0a84ff | 主强调色 #0a84ff |
 | `transferRow.downBg` | `{color.surface.control}` | #f2f2f4 | 中性控件底：图标按钮 bg、分段控件、中性徽章、队列图标 |
@@ -1995,7 +2013,6 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `modal.headerPaddingLeft` | `{space.24}` | 24px |  |
 | `modal.headerGap` | `{space.12}` | 12px |  |
 | `modal.iconTile` | `{size.modalIconTile}` | 32px |  |
-| `modal.iconTileRadius` | `{radius.railButton}` | 8px |  |
 | `modal.titleSize` | `{font.size.title}` | 15px | 大标题（sider-drag 版 sider 标题） |
 | `modal.titleWeight` | `{font.weight.semibold}` | 600 |  |
 | `modal.subtitleSize` | `{font.size.footnote}` | 11.5px | 分组头、副标题、状态栏 |
@@ -2354,3 +2371,59 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `paneFooter.text` | `{color.text.secondary}` | #8e8e93 | 次要文字、主机副标题、状态栏 |
 | `paneFooter.font` | `{font.size.footnote}` | 11.5px | 分组头、副标题、状态栏 |
 | `paneFooter.divider` | `{color.border.divider}` | #f2f2f4 | 头部底线、表头底线 |
+
+### mcp
+| token | 引用 | Light 值 | 说明 |
+|---|---|---|---|
+| `mcp.tableMinWidth` | `{size.mcpTableMinWidth}` | 1024px |  |
+| `mcp.keyName` | `{size.mcpNameColumn}` | 210px |  |
+| `mcp.keyState` | `{size.mcpBadgeColumn}` | 86px |  |
+| `mcp.keyDirs` | `{size.mcpNameColumn}` | 210px |  |
+| `mcp.keyUsed` | `{size.mcpTimeColumn}` | 150px |  |
+| `mcp.policyName` | `{size.mcpNameColumn}` | 210px |  |
+| `mcp.policyCategory` | `{size.mcpBadgeColumn}` | 86px |  |
+| `mcp.policyConnections` | `{size.mcpScopeColumn}` | 130px |  |
+| `mcp.policyKeys` | `{size.mcpKeysColumn}` | 115px |  |
+| `mcp.policyState` | `{size.mcpScopeColumn}` | 130px |  |
+| `mcp.auditTime` | `{size.mcpAuditTimeColumn}` | 72px |  |
+| `mcp.auditKey` | `{size.mcpAuditKeyColumn}` | 148px |  |
+| `mcp.auditConnection` | `{size.mcpAuditConnectionColumn}` | 120px |  |
+| `mcp.auditAction` | `{size.mcpAuditActionColumn}` | 96px |  |
+| `mcp.auditStatus` | `{size.mcpAuditStatusColumn}` | 104px |  |
+| `mcp.auditDuration` | `{size.mcpAuditDurationColumn}` | 56px |  |
+| `mcp.policyModalWidth` | `{size.mcpPolicyModal}` | 720px |  |
+| `mcp.keyModalWidth` | `{size.mcpKeyModal}` | 680px |  |
+| `mcp.dialogWidth` | `{size.mcpDialog}` | 440px |  |
+| `mcp.drawerMinWidth` | `{size.mcpDrawerMinWidth}` | 340px |  |
+| `mcp.drawerWidth` | `{size.mcpDrawerWidth}` | 500px |  |
+| `mcp.mainMinWidth` | `{size.mcpMainMinWidth}` | 360px |  |
+| `mcp.ruleModeWidth` | `{size.mcpRuleModeWidth}` | 120px | 命令规则匹配方式选择框 |
+| `mcp.permissionColumn` | `{size.mcpPermissionColumn}` | 118px | 连接授权矩阵能力列 |
+
+### inset
+| token | 引用 | Light 值 | 说明 |
+|---|---|---|---|
+| `inset.padding` | `{space.10}` | 10px |  |
+| `inset.radius` | `{radius.control}` | 7px |  |
+| `inset.borderWidth` | `{size.hairline}` | 0.5px | 0.5px 描边 |
+| `inset.compactPaddingX` | `{space.8}` | 8px |  |
+| `inset.compactPaddingY` | `{space.6}` | 6px |  |
+| `inset.compactRadius` | `{radius.controlSm}` | 6px |  |
+| `inset.bg` | `{color.surface.sunken}` | #f4f4f5 | 搜索框 |
+| `inset.border` | `{color.border.subtle}` | #f0f0f2 | 卡片内分隔线（sider footer、状态栏、进度轨道） |
+| `inset.raisedBg` | `{color.surface.card}` | #ffffff | 内容卡片 / sider / FTP 面板 |
+| `inset.warningBg` | `{color.warning.subtle}` | #fdf3e3 |  |
+| `inset.warningBorder` | `{color.warning.default}` | #f5a623 | 连接中 |
+| `inset.dangerBg` | `{color.danger.subtle}` | #fdecec | 失败图标底、失败徽章底 |
+| `inset.dangerBorder` | `{color.danger.default}` | #ff3b30 | 失败圆点、失败图标 |
+
+### iconTile
+| token | 引用 | Light 值 | 说明 |
+|---|---|---|---|
+| `iconTile.sizeSm` | `{size.controlSm}` | 24px |  |
+| `iconTile.radiusSm` | `{radius.controlSm}` | 6px |  |
+| `iconTile.size` | `{size.control}` | 28px |  |
+| `iconTile.radius` | `{radius.control}` | 7px |  |
+| `iconTile.sizeLg` | `{size.modalIconTile}` | 32px |  |
+| `iconTile.radiusLg` | `{radius.railButton}` | 8px |  |
+| `iconTile.bg` | `{color.surface.control}` | #f2f2f4 | 中性控件底：图标按钮 bg、分段控件、中性徽章、队列图标 |

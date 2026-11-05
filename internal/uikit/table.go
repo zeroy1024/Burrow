@@ -100,7 +100,7 @@ func TableViewport(c *ui.Context, scroll *ui.ScrollState, props TableViewportPro
 			scroller = ui.ScrollBoth(c).Fill().TrackScroll(scroll).Label(props.Label).
 				Children(func() {
 					ui.Column(c).Width(contentWidth).Shrink(0).
-						Padding(props.PaddingY, t.Space.N10).Children(body)
+						Padding(props.PaddingY, tableViewportInset(t)).Children(body)
 				})
 			Scrollbars(c, viewport, scroller, scroll, ScrollbarProps{
 				Label: props.Label + "滚动条", Horizontal: true, Vertical: true,
@@ -111,6 +111,51 @@ func TableViewport(c *ui.Context, scroll *ui.ScrollState, props TableViewportPro
 				ScrollWith(scroller).Children(props.Header)
 		})
 	})
+}
+
+// tableViewportInset is the side padding TableViewport keeps around its rows.
+func tableViewportInset(t *theme.Theme) float32 { return t.Space.N10 }
+
+// TableToolbar holds a TableViewport table's filters above its column header.
+func TableToolbar(c *ui.Context) ui.Element {
+	t := theme.Current()
+	return ui.Column(c).FillWidth().Shrink(0).Padding(t.Space.N8, t.Space.N14).Gap(t.Space.N8).
+		BorderWidth(0, 0, t.Size.Divider, 0).BorderColor(Color(t.C.FileList.HeaderBorder))
+}
+
+// TableHeaderRow titles the columns of a TableViewport table. Its rows are
+// ListRow{Table: true} with a TableCell per column, so each width is written
+// once and the header and rows share the same padding and gaps.
+func TableHeaderRow(c *ui.Context, columns []Column) ui.Element {
+	t := theme.Current()
+	p := t.C.FileList
+	return ui.Row(c).FillWidth().Height(p.HeaderHeight).Shrink(0).Role(ui.RoleRow).
+		Padding(0, tableViewportInset(t)+p.RowPaddingX).Gap(p.ColumnGap).
+		BorderWidth(0, 0, t.Size.Divider, 0).BorderColor(Color(p.HeaderBorder)).Children(func() {
+		for _, column := range columns {
+			TableCell(c, column).Role(ui.RoleColumnHeader).Label(column.Title).Children(func() {
+				ui.Text(c, column.Title).FontSize(p.HeaderSize).TextColor(Color(p.HeaderText)).SingleLine().Ellipsis("…")
+			})
+		}
+	})
+}
+
+// TableCell contains one cell of a TableViewport row: its column's width, or
+// the remaining width when the column has none. Stacked lines share one gap.
+func TableCell(c *ui.Context, column Column) ui.Element {
+	cell := ui.Column(c).Key(column.ID).Gap(theme.Current().Space.N2)
+	if column.Width > 0 {
+		cell.Width(column.Width).Shrink(0)
+	} else {
+		cell.Grow(1).MinWidth(0)
+	}
+	switch column.Align {
+	case AlignEnd:
+		cell.AlignItems(ui.End)
+	case AlignCenter:
+		cell.AlignItems(ui.Center)
+	}
+	return cell
 }
 
 // DataTable virtualizes rows while keeping selection, ordering and scroll

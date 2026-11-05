@@ -626,27 +626,7 @@ func (a *app) sidebarResizeHandle(c *ui.Context, shown float32) {
 	}
 	// The transparent resize target covers the gap above both cards.
 	edge := uikit.SidebarDivider(c, label, a.page().sidebarWidth*shown, shown)
-	var delta float32
-	dx, _, dragging := edge.Dragged()
-	if dragging {
-		edge.Focus()
-		delta = dx
-	}
-	if edge.Shortcut(0, ui.KeyLeft) {
-		delta -= t.C.Desktop.SiderKeyboardStep
-	}
-	if edge.Shortcut(0, ui.KeyRight) {
-		delta += t.C.Desktop.SiderKeyboardStep
-	}
-	if delta != 0 {
-		a.page().sidebarWidth = min(max(a.page().sidebarWidth+delta, t.C.Desktop.SiderMinWidth), t.C.Desktop.SiderMaxWidth)
-	}
-	edge.Range(float64(t.C.Desktop.SiderMinWidth), float64(t.C.Desktop.SiderMaxWidth), float64(a.page().sidebarWidth))
-	visible := float32(0)
-	if edge.Hovered() || dragging || edge.FocusVisible() {
-		visible = 1
-	}
-	uikit.StyleSidebarDivider(c, edge, visible, dragging)
+	uikit.ResizeGutter(c, edge, &a.page().sidebarWidth, t.C.Desktop.SiderMinWidth, t.C.Desktop.SiderMaxWidth, false)
 }
 
 func (a *app) resetQuitAttempt() {

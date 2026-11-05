@@ -175,18 +175,18 @@ func (a *app) sessionDraftHeader(c *ui.Context, d *hostDraft) {
 	p := t.C.Modal
 	ui.Row(c).FillWidth().Shrink(0).Padding(p.HeaderPaddingTop, p.HeaderPaddingRight, p.HeaderPaddingBottom, p.HeaderPaddingLeft).
 		Gap(p.HeaderGap).AlignItems(ui.Center).Children(func() {
-		ui.Box(c).Size(p.IconTile, p.IconTile).Shrink(0).Radius(p.IconTileRadius).Background(uikit.Color(t.Color.Surface.Control)).Center().Children(func() {
+		uikit.IconTile(c, uikit.IconTileProps{Size: uikit.SizeLg}, func() {
 			if d.files {
 				protocol := theme.Current().C.ProtocolIcon
 				icon, fg, bg := folderLockIcon, protocol.SftpGlyph, protocol.SftpBg
 				if d.protocol == "FTP" {
 					icon, fg, bg = folderIcon, protocol.FtpGlyph, protocol.FtpBg
 				}
-				ui.Box(c).Key("protocol-header-" + d.protocol).Fill().Radius(p.IconTileRadius).Background(uikit.Color(bg)).Center().
+				ui.Box(c).Key("protocol-header-" + d.protocol).Fill().Radius(t.C.IconTile.RadiusLg).Background(uikit.Color(bg)).Center().
 					Transition(ui.ElementTransition{Duration: p.Fade, Enter: &ui.Motion{}, Exit: &ui.Motion{}}).
 					Children(func() { uikit.Icon(c, icon, uikit.IconProps{}).TextColor(uikit.Color(fg)) })
 			} else if style, ok := a.draftSystemStyle(d); ok {
-				ui.Box(c).Fill().Radius(p.IconTileRadius).Background(uikit.Color(t.OSLogoBg(style.color))).Center().Children(func() {
+				ui.Box(c).Fill().Radius(t.C.IconTile.RadiusLg).Background(uikit.Color(t.OSLogoBg(style.color))).Center().Children(func() {
 					ui.Image(c, style.icon).Size(t.C.OsLogo.GlyphSize, t.C.OsLogo.GlyphSize).TextColor(uikit.Color(uikit.OSLogoInk(style.color)))
 				})
 			} else {

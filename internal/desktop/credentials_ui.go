@@ -44,7 +44,7 @@ func (a *app) keySettings(c *ui.Context) {
 				}
 			}
 			row.Children(func() {
-				ui.Box(c).Size(t.C.Modal.IconTile, t.C.Modal.IconTile).Radius(t.C.Modal.IconTileRadius).Background(uikit.Color(t.Color.Surface.Control)).AlignItems(ui.Center).Justify(ui.Center).Children(func() {
+				uikit.IconTile(c, uikit.IconTileProps{Size: uikit.SizeLg}, func() {
 					uikit.Icon(c, uikit.IconKey, uikit.IconProps{Tone: uikit.ToneMuted})
 				})
 				ui.Column(c).Grow(1).MinWidth(0).Gap(t.Space.N3).Children(func() {
@@ -142,7 +142,7 @@ func (a *app) credentialGroup(c *ui.Context, title string, actions, content func
 			return
 		}
 	}
-	uikit.SettingsGroup(c, uikit.SettingsGroupProps{Title: localize(c, title), HeaderRow: true, Actions: actions}, content)
+	uikit.SettingsGroup(c, uikit.SettingsGroupProps{Title: localize(c, title), Actions: actions}, content)
 }
 
 func (a *app) credentialRow(c *ui.Context, label, description string, control func()) {

@@ -45,8 +45,7 @@ func (a *app) shortcutBinding(id string) string {
 
 func (a *app) shortcutSettings(c *ui.Context) {
 	t := theme.Current()
-	ui.Row(c).FillWidth().AlignItems(ui.Center).Children(func() {
-		uikit.Text(c, localize(c, "快捷键"), uikit.TextProps{Style: uikit.TextSmall}).FontWeight(t.C.Settings.GroupTitleWeight).Grow(1)
+	uikit.SettingsGroupTitle(c, localize(c, "快捷键"), func() {
 		uikit.Button(c, localize(c, "全部恢复默认"), uikit.ButtonProps{}).OnClick(func() {
 			a.prefs.Keymap = map[string]string{}
 			a.settingsUI.recording, a.settingsUI.pendingBinding, a.settingsUI.conflictAction = "", "", ""

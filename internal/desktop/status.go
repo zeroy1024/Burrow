@@ -158,12 +158,12 @@ func (a *app) statusHost(c *ui.Context, session *remoteSession, facts *hostinfo.
 		uikit.OsLogo(c, style.name, uikit.SizeDefault)
 		ui.Column(c).Grow(1).MinWidth(0).Gap(t.Space.N1).PassThrough().Children(func() {
 			ui.Row(c).FillWidth().Gap(t.Space.N6).AlignItems(ui.Center).PassThrough().Children(func() {
-				ui.Text(c, session.endpoint.name).FontSize(t.Font.Size.BodyLg).FontWeight(t.Font.Weight.Semibold).
+				uikit.Text(c, session.endpoint.name, uikit.TextProps{Style: uikit.TextHeadline}).
 					SingleLine().Ellipsis("…").Grow(1).MinWidth(0).PassThrough()
 				statusLiveBadge(c, live)
 			})
 			if system != "" {
-				ui.Text(c, system).FontSize(t.Font.Size.Caption).TextColor(uikit.Color(t.Color.Text.Secondary)).
+				uikit.Text(c, system, uikit.TextProps{Style: uikit.TextCaption, Tone: uikit.ToneSecondary}).
 					SingleLine().Ellipsis("…").PassThrough()
 			}
 		})
@@ -192,8 +192,7 @@ func statusLiveBadge(c *ui.Context, live statusLive) {
 			}
 			p.Fill(ui.Rect{X: cx - dot, Y: cy - dot, W: 2 * dot, H: 2 * dot}, uikit.Color(live.ink), dot)
 		})
-		ui.Text(c, live.label).FontSize(t.Font.Size.Caption2).FontWeight(t.Font.Weight.Medium).
-			TextColor(uikit.Color(t.Color.Text.Secondary)).SingleLine().PassThrough()
+		uikit.Text(c, live.label, uikit.TextProps{Style: uikit.TextCaption2, Tone: uikit.ToneSecondary}).SingleLine().PassThrough()
 	})
 }
 
@@ -203,20 +202,17 @@ func statusHeading(c *ui.Context, label, meta string) {
 	ui.Row(c).FillWidth().Gap(t.Space.N8).AlignItems(ui.Baseline).Children(func() {
 		statusLabel(c, label)
 		ui.Spacer(c)
-		ui.Text(c, meta).FontSize(t.Font.Size.Caption).TextColor(uikit.Color(t.Color.Text.Tertiary)).FontFeatures("tnum").
+		uikit.Text(c, meta, uikit.TextProps{Style: uikit.TextCaption, Tone: uikit.ToneTertiary}).FontFeatures("tnum").
 			SingleLine().Ellipsis("…").MinWidth(0)
 	})
 }
 
 func statusLabel(c *ui.Context, label string) ui.Element {
-	t := theme.Current()
-	return ui.Text(c, label).FontSize(t.Font.Size.Small).FontWeight(t.Font.Weight.Medium).
-		TextColor(uikit.Color(t.Color.Text.Secondary)).SingleLine().Shrink(0)
+	return uikit.Text(c, label, uikit.TextProps{Style: uikit.TextLabel, Tone: uikit.ToneSecondary}).SingleLine().Shrink(0)
 }
 
 func statusCaption(c *ui.Context, text string) ui.Element {
-	t := theme.Current()
-	return ui.Text(c, text).FontSize(t.Font.Size.Caption2).TextColor(uikit.Color(t.Color.Text.Tertiary)).FontFeatures("tnum").SingleLine()
+	return uikit.Text(c, text, uikit.TextProps{Style: uikit.TextCaption2, Tone: uikit.ToneTertiary}).FontFeatures("tnum").SingleLine()
 }
 
 // statusFigure sets a value with a smaller unit after it.
@@ -288,12 +284,11 @@ func statusCPU(c *ui.Context, metrics hostinfo.Metrics, samples []float64, sampl
 			load, high := statusLoad(metrics)
 			ui.Column(c).Shrink(0).Gap(t.Space.N2).AlignItems(ui.End).Description("1、5、15 分钟平均负载").Children(func() {
 				statusCaption(c, "负载 1 · 5 · 15")
-				ink := t.Color.Text.Strong
+				tone := uikit.ToneNeutral
 				if high {
-					ink = t.Color.Warning.TextStrong
+					tone = uikit.ToneWarning
 				}
-				ui.Text(c, load).Font(strings.Join(t.Font.Family.Mono, ", ")).FontSize(t.Font.Size.Caption).
-					TextColor(uikit.Color(ink)).SingleLine()
+				uikit.Text(c, load, uikit.TextProps{Style: uikit.TextCaption, Tone: tone, Mono: true}).SingleLine()
 			})
 		})
 		if len(samples) == 0 {
@@ -365,8 +360,7 @@ func statusResource(c *ui.Context, label, mount string, percent *float64, usage,
 		ui.Row(c).FillWidth().Gap(t.Space.N4).AlignItems(ui.Baseline).Children(func() {
 			statusLabel(c, label)
 			if mount != "" {
-				ui.Text(c, mount).Font(strings.Join(t.Font.Family.Mono, ", ")).FontSize(t.Font.Size.Caption2).
-					TextColor(uikit.Color(t.Color.Text.Tertiary)).SingleLine()
+				uikit.Text(c, mount, uikit.TextProps{Style: uikit.TextCaption2, Tone: uikit.ToneTertiary, Mono: true}).SingleLine()
 			}
 			ui.Spacer(c)
 			if percent == nil {
@@ -382,11 +376,11 @@ func statusResource(c *ui.Context, label, mount string, percent *float64, usage,
 			uikit.Meter(c, *percent, 0, 100, uikit.MeterProps{Label: label, Value: usage})
 		}
 		ui.Row(c).FillWidth().Gap(t.Space.N8).Children(func() {
-			ui.Text(c, usage).FontSize(t.Font.Size.Caption).TextColor(uikit.Color(t.Color.Text.Secondary)).
+			uikit.Text(c, usage, uikit.TextProps{Style: uikit.TextCaption, Tone: uikit.ToneSecondary}).
 				FontFeatures("tnum").SingleLine().Shrink(0)
 			ui.Spacer(c)
 			if detail != "" {
-				ui.Text(c, detail).FontSize(t.Font.Size.Caption).TextColor(uikit.Color(t.Color.Text.Tertiary)).
+				uikit.Text(c, detail, uikit.TextProps{Style: uikit.TextCaption, Tone: uikit.ToneTertiary}).
 					FontFeatures("tnum").SingleLine().Ellipsis("…").MinWidth(0)
 			}
 		})
@@ -428,7 +422,7 @@ func statusNetwork(c *ui.Context, metrics hostinfo.Metrics, history monitorHisto
 func statusRate(c *ui.Context, label string, value *float64, samples []float64, top float64, shimmer bool) {
 	t := theme.Current()
 	ui.Column(c).Grow(1).Basis(0).MinWidth(0).Gap(t.Space.N3).Children(func() {
-		ui.Text(c, label).FontSize(t.Font.Size.Caption).TextColor(uikit.Color(t.Color.Text.Secondary)).SingleLine()
+		uikit.Text(c, label, uikit.TextProps{Style: uikit.TextCaption, Tone: uikit.ToneSecondary}).SingleLine()
 		if value == nil {
 			statusFigure(c, "—", "", t.Font.Size.Title, 0, t.Font.Weight.Semibold, uikit.ToneTertiary)
 			statusPlaceholder(c, t.C.Stats.NetChartHeight, shimmer)
@@ -483,9 +477,9 @@ func statusProcesses(c *ui.Context, metrics hostinfo.Metrics, shimmer bool) {
 // statusProcess draws a Top row over a bar of its share of one core.
 func statusProcess(c *ui.Context, key int, name, value string, share float32, active bool) {
 	t := theme.Current()
-	ink, weight := t.Color.Text.Tertiary, t.Font.Weight.Regular
+	style, tone := uikit.TextSmall, uikit.ToneTertiary
 	if active {
-		ink, weight = t.Color.Text.Primary, t.Font.Weight.Medium
+		style, tone = uikit.TextLabel, uikit.ToneNeutral
 	}
 	ui.Row(c).Key(key).FillWidth().Height(t.C.KeyValue.RowHeight).Gap(t.Space.N8).AlignItems(ui.Center).
 		Draw(func(p *ui.Painter, r ui.Rect) {
@@ -496,10 +490,8 @@ func statusProcess(c *ui.Context, key int, name, value string, share float32, ac
 			inset := t.Space.N6
 			p.Fill(ui.Rect{X: r.X - inset, Y: r.Y, W: (r.W + 2*inset) * share, H: r.H}, uikit.Color(t.C.Stats.ProcessBar), t.C.Stats.ProcessRadius)
 		}).Children(func() {
-		ui.Text(c, name).Font(strings.Join(t.Font.Family.Mono, ", ")).FontSize(t.Font.Size.Footnote).
-			TextColor(uikit.Color(ink)).SingleLine().Ellipsis("…").Grow(1).MinWidth(0)
-		ui.Text(c, value).FontSize(t.Font.Size.Small).FontWeight(weight).TextColor(uikit.Color(ink)).
-			FontFeatures("tnum").SingleLine().Shrink(0)
+		uikit.Text(c, name, uikit.TextProps{Style: uikit.TextMono, Tone: tone}).SingleLine().Ellipsis("…").Grow(1).MinWidth(0)
+		uikit.Text(c, value, uikit.TextProps{Style: style, Tone: tone}).FontFeatures("tnum").SingleLine().Shrink(0)
 	})
 }
 
@@ -507,40 +499,32 @@ func statusProcess(c *ui.Context, key int, name, value string, share float32, ac
 // connection; uptime is live and only given while sampling.
 func statusFacts(c *ui.Context, open *bool, facts *hostinfo.Facts, message string, uptime *float64) {
 	t := theme.Current()
-	p := t.C.Collapse
-	ui.Column(c).FillWidth().Children(func() {
-		parts := ui.CollapsibleBase(c, open)
-		parts.Trigger.FillWidth().Gap(t.Space.N4).AlignItems(ui.Center).Label("系统").Children(func() {
-			statusLabel(c, "系统").PassThrough()
-			ui.Spacer(c).PassThrough()
-			if uptime != nil {
-				ui.Text(c, "运行 "+monitorUptime(uptime, true)).FontSize(t.Font.Size.Caption).
-					TextColor(uikit.Color(t.Color.Text.Tertiary)).FontFeatures("tnum").SingleLine().PassThrough()
-			}
-			ui.Icon(c, uikit.IconSVG(uikit.IconChevronDown)).Size(p.Chevron, p.Chevron).
-				Rotate(-p.ChevronRotate * (1 - parts.Progress())).TextColor(uikit.Color(t.Color.Text.Tertiary)).PassThrough()
-		})
-		parts.Panel(func() {
-			hostname, kernel, arch := "—", "—", "—"
-			if facts != nil {
-				hostname, kernel, arch = monitorText(facts.Hostname), monitorText(facts.Kernel), monitorText(facts.Arch)
-			}
-			ui.Column(c).FillWidth().Gap(t.Space.N10).Padding(t.Space.N10, 0, 0, 0).Children(func() {
-				statusFact(c, "主机名", hostname, true)
-				statusFact(c, "内核", kernel, true)
-				ui.Row(c).FillWidth().Gap(t.Space.N16).Children(func() {
-					statusFact(c, "架构", arch, true).Shrink(0)
-					if uptime != nil {
-						statusFact(c, "运行时间", monitorUptime(uptime, false), false)
-					}
-				})
-				if facts != nil && facts.Platform == hostinfo.Windows {
-					statusFact(c, "默认 Shell", monitorText(facts.Shell), true)
-				}
-				if message != "" {
-					uikit.Text(c, message, uikit.TextProps{Style: uikit.TextCaption, Tone: uikit.ToneSecondary})
+	meta := ""
+	if uptime != nil {
+		meta = "运行 " + monitorUptime(uptime, true)
+	}
+	uikit.Disclosure(c, open, uikit.DisclosureProps{
+		Title: "系统", TitleStyle: uikit.TextLabel, TitleTone: uikit.ToneSecondary, Meta: meta,
+	}, func() {
+		hostname, kernel, arch := "—", "—", "—"
+		if facts != nil {
+			hostname, kernel, arch = monitorText(facts.Hostname), monitorText(facts.Kernel), monitorText(facts.Arch)
+		}
+		ui.Column(c).FillWidth().Gap(t.Space.N10).Children(func() {
+			statusFact(c, "主机名", hostname, true)
+			statusFact(c, "内核", kernel, true)
+			ui.Row(c).FillWidth().Gap(t.Space.N16).Children(func() {
+				statusFact(c, "架构", arch, true).Shrink(0)
+				if uptime != nil {
+					statusFact(c, "运行时间", monitorUptime(uptime, false), false)
 				}
 			})
+			if facts != nil && facts.Platform == hostinfo.Windows {
+				statusFact(c, "默认 Shell", monitorText(facts.Shell), true)
+			}
+			if message != "" {
+				uikit.Text(c, message, uikit.TextProps{Style: uikit.TextCaption, Tone: uikit.ToneSecondary})
+			}
 		})
 	})
 }
@@ -550,9 +534,10 @@ func statusFact(c *ui.Context, label, value string, mono bool) ui.Element {
 	t := theme.Current()
 	return ui.Column(c).MinWidth(0).Gap(t.Space.N1).Children(func() {
 		statusCaption(c, label)
-		text := ui.Text(c, value).FontSize(t.Font.Size.Small).TextColor(uikit.Color(t.Color.Text.Primary))
+		style := uikit.TextSmall
 		if mono {
-			text.Font(strings.Join(t.Font.Family.Mono, ", ")).FontSize(t.Font.Size.Footnote)
+			style = uikit.TextMono
 		}
+		uikit.Text(c, value, uikit.TextProps{Style: style})
 	})
 }

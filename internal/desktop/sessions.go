@@ -174,7 +174,7 @@ func (a *app) deleteGroupDialog(c *ui.Context) {
 func draftField(c *ui.Context, label string, value *string) {
 	t := theme.Current()
 	ui.Column(c).Gap(t.Space.N6).Children(func() {
-		ui.Text(c, label).FontSize(t.Font.Size.Small)
+		uikit.Text(c, label, uikit.TextProps{Style: uikit.TextSmall})
 		uikit.Input(c, value, uikit.InputProps{}).Label(label).FillWidth()
 	})
 }

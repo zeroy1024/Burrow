@@ -75,7 +75,7 @@ func (a *app) sshDialogs(c *ui.Context) {
 		uikit.Text(c, p.address, uikit.TextProps{Style: uikit.TextSmall})
 		if p.fingerprint != "" {
 			uikit.Text(c, "首次连接此服务器。请与服务器管理员核对主机密钥指纹后再信任。", uikit.TextProps{Style: uikit.TextSmall})
-			ui.Text(c, fmt.Sprintf("%s\n%s", p.keyType, p.fingerprint)).FontSize(t.Font.Size.Small).Selectable()
+			uikit.Text(c, fmt.Sprintf("%s\n%s", p.keyType, p.fingerprint), uikit.TextProps{Style: uikit.TextMono}).Selectable()
 		} else {
 			if p.echo {
 				uikit.Input(c, &p.secret, uikit.InputProps{Label: p.title, Mono: true}).FillWidth().AutoFocus()

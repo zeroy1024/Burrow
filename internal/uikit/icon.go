@@ -1,6 +1,8 @@
 package uikit
 
 import (
+	"image/color"
+
 	"sshdesk/internal/theme"
 
 	"github.com/egoist/mygo/ui"
@@ -100,4 +102,29 @@ func IconButton[T IconSource](c *ui.Context, icon T, props IconButtonProps) ui.E
 		}
 	})
 	return StyleDisabled(button, props.Disabled)
+}
+
+type IconTileProps struct {
+	// Size picks the tile: SizeSm beside a line of text, SizeLg beside a
+	// title; other sizes suit a list row.
+	Size Size
+	// Background replaces the neutral fill, for a status or brand color.
+	Background color.NRGBA
+}
+
+// IconTile sets a glyph, or a logo the caller builds, on a rounded fill.
+func IconTile(c *ui.Context, props IconTileProps, glyph func()) ui.Element {
+	p := theme.Current().C.IconTile
+	size, radius := p.Size, p.Radius
+	switch props.Size {
+	case SizeXs, SizeSm:
+		size, radius = p.SizeSm, p.RadiusSm
+	case SizeLg:
+		size, radius = p.SizeLg, p.RadiusLg
+	}
+	background := p.Bg
+	if props.Background.A != 0 {
+		background = props.Background
+	}
+	return ui.Box(c).Size(size, size).Shrink(0).Radius(radius).Background(Color(background)).Center().Children(glyph)
 }

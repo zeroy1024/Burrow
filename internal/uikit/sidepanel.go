@@ -9,18 +9,6 @@ func SidePanelBody(c *ui.Context) ui.Element {
 	return ui.Column(c).Width(theme.Current().Size.StatsPanel).FillHeight()
 }
 
-type SidePanelHeaderParts struct {
-	Root, Close ui.Element
-}
-
-func SidePanelHeader(c *ui.Context, title, closeLabel string, closeIcon *ui.SVG) SidePanelHeaderParts {
-	t := theme.Current()
-	header := PaneHeader(c, HeaderProps{Density: DensityTitle, Title: title, Close: true, CloseLabel: closeLabel})
-	header.Root.Height(t.C.Stats.HeaderHeight).Padding(0, t.Space.N14)
-	header.CloseButton.Size(t.C.IconButton.SizeXs, t.C.IconButton.SizeSm)
-	return SidePanelHeaderParts{Root: header.Root, Close: header.CloseButton}
-}
-
 func SidePanelViewport(c *ui.Context) ui.Element {
 	return ui.Box(c).Key("status-viewport").Grow(1).MinHeight(0).Clip()
 }
