@@ -68,7 +68,8 @@ type DisclosureProps struct {
 	TitleStyle TextStyle
 	TitleTone  Tone
 	// Meta sits at the trailing end of the header, before the arrow.
-	Meta string
+	Meta   string
+	Motion MotionMode
 }
 
 // Disclosure is a collapsible section within a panel or drawer: a header
@@ -78,6 +79,14 @@ func Disclosure(c *ui.Context, open *bool, props DisclosureProps, body func()) u
 	p := t.C.Collapse
 	return ui.Column(c).FillWidth().Children(func() {
 		parts := ui.CollapsibleBase(c, open)
+		reduced := MotionReduced(c, props.Motion)
+		progress := parts.Progress()
+		if reduced {
+			progress = 0
+			if *open {
+				progress = 1
+			}
+		}
 		trigger := parts.Trigger.FillWidth().Gap(t.Space.N4).Radius(t.Radius.ControlSm).FocusRing(false).Label(props.Title)
 		if trigger.FocusVisible() {
 			Shadow(trigger, t.C.Button.FocusShadow)
@@ -89,10 +98,18 @@ func Disclosure(c *ui.Context, open *bool, props DisclosureProps, body func()) u
 				Text(c, props.Meta, TextProps{Style: TextCaption, Tone: ToneTertiary}).FontFeatures("tnum").SingleLine().PassThrough()
 			}
 			ui.Icon(c, IconSVG(IconChevronDown)).Size(p.Chevron, p.Chevron).
-				Rotate(-p.ChevronRotate * (1 - parts.Progress())).TextColor(Color(p.ChevronColor)).PassThrough()
+				Rotate(-p.ChevronRotate * (1 - progress)).TextColor(Color(p.ChevronColor)).PassThrough()
 		})
-		parts.Panel(func() {
+		panel := func() {
 			ui.Column(c).FillWidth().Padding(t.Space.N10, 0, 0, 0).Children(body)
-		})
+		}
+		// The SDK's panel only honors the system motion preference.
+		if reduced {
+			if *open {
+				panel()
+			}
+			return
+		}
+		parts.Panel(panel)
 	})
 }

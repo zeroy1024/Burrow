@@ -611,6 +611,7 @@ func (a *app) mcpAuditDrawer(c *ui.Context) {
 				uikit.Divider(c, uikit.DividerProps{})
 				uikit.Disclosure(c.Key("audit-files"), &a.mcp.auditFilesOpen, uikit.DisclosureProps{
 					Title: "逐文件明细", TitleStyle: uikit.TextBodyStrong, Meta: fmt.Sprintf("%d 个文件", item.FileTotal),
+					Motion: uikit.MotionOverride(a.reduceMotion(c)),
 				}, func() {
 					ui.Column(c).FillWidth().Gap(t.Space.N12).Children(func() {
 						cntAll, cntOk, cntBlock, cntFail, cntSkip, cntPend := item.FileTotal, item.FileCounts["completed"], item.FileCounts["intercepted"], item.FileCounts["failed"], item.FileCounts["skipped"], item.FileCounts["running"]+item.FileCounts["pending"]+item.FileCounts["interrupted"]

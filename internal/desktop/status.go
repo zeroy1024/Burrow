@@ -46,12 +46,12 @@ func (a *app) serverStatus(c *ui.Context) {
 				live, empty := statusOffline(session)
 				a.statusHost(c, session, facts, live)
 				uikit.EmptyState(c, empty)
-				statusFacts(c, &a.statusFactsOpen, facts, factsMessage, nil)
+				a.statusFacts(c, &a.statusFactsOpen, facts, factsMessage, nil)
 			case m.session == session && m.unsupported:
 				a.statusHost(c, session, facts, statusLive{label: "未监控", ink: t.Color.Text.Quaternary})
 				uikit.EmptyState(c, uikit.EmptyProps{IconName: uikit.IconActivity, Title: m.platform.DisplayName() + " 暂不支持监控",
 					Detail: "目前只有 Linux 提供监控指标，基础信息仍可查看"})
-				statusFacts(c, &a.statusFactsOpen, facts, factsMessage, nil)
+				a.statusFacts(c, &a.statusFactsOpen, facts, factsMessage, nil)
 			default:
 				metrics := hostinfo.Metrics{}
 				var history monitorHistory
@@ -92,7 +92,7 @@ func (a *app) serverStatus(c *ui.Context) {
 				statusResources(c, metrics, disk, diskUsed, diskTotal, shimmer("内存"), diskShimmer)
 				statusNetwork(c, metrics, history, shimmer("网络"))
 				statusProcesses(c, metrics, shimmer("进程 Top"))
-				statusFacts(c, &a.statusFactsOpen, facts, factsMessage, metrics.Uptime)
+				a.statusFacts(c, &a.statusFactsOpen, facts, factsMessage, metrics.Uptime)
 			}
 			ui.Box(c).Height(t.Space.N8)
 		})
@@ -497,7 +497,13 @@ func statusProcess(c *ui.Context, key int, name, value string, share float32, ac
 
 // statusFacts shows the host's basic information, which outlives the
 // connection; uptime is live and only given while sampling.
-func statusFacts(c *ui.Context, open *bool, facts *hostinfo.Facts, message string, uptime *float64) {
+func (a *app) statusFacts(
+	c *ui.Context,
+	open *bool,
+	facts *hostinfo.Facts,
+	message string,
+	uptime *float64,
+) {
 	t := theme.Current()
 	meta := ""
 	if uptime != nil {
@@ -505,6 +511,7 @@ func statusFacts(c *ui.Context, open *bool, facts *hostinfo.Facts, message strin
 	}
 	uikit.Disclosure(c, open, uikit.DisclosureProps{
 		Title: "系统", TitleStyle: uikit.TextLabel, TitleTone: uikit.ToneSecondary, Meta: meta,
+		Motion: uikit.MotionOverride(a.reduceMotion(c)),
 	}, func() {
 		hostname, kernel, arch := "—", "—", "—"
 		if facts != nil {
