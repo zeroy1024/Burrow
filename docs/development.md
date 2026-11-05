@@ -101,9 +101,18 @@ GOCACHE=/private/tmp/sshdesk-go-build mise exec -- go test ./...
 
 [提交检查](../.github/workflows/check.yml)在分支 push、PR 和手动触发时运行，使用托管 `ubuntu-24.04`。检查范围沿用 Gitea：Go 格式、Python 语法、根模块与终端扩展的已有 race 测试和 vet、Linux 编译、Windows 双架构交叉编译；另检查第三方许可汇总，并使用固定版本、校验 SHA-256 的 Gitleaks 扫描工作文件和检出仓库的全部历史引用。检出保留完整历史且不持久化凭据；工作流仅授予 `contents: read`，使用普通 `pull_request`，无需提供自定义仓库 Secret。
 
-[编译打包](../.github/workflows/package.yml)仅由 `v*` 标签触发，并要求标签与 `mygo.json` 一致，例如版本 `0.1.1` 对应 `v0.1.1`。Windows 使用 `ubuntu-24.04` 交叉构建 amd64/arm64 的 UPX NSIS 安装程序；macOS 使用带 `self-hosted`、`macOS`、`ARM64`、`burrow-release` 标签的受控 Apple Silicon runner 构建 ARM64 DMG。安装程序校验包括 EXE、DLL 和两个许可文件，macOS 校验 APP 内许可资源及 DMG。各附件附有 `SHA256SUMS`，保留 14 天；工作流不创建或更新 GitHub Release。
+[编译打包](../.github/workflows/package.yml)仅由 `v*` 标签触发，并要求标签与 `mygo.json` 一致，例如版本 `0.1.1` 对应 `v0.1.1`。Windows 使用托管 `ubuntu-24.04` 交叉构建 amd64/arm64 的 UPX NSIS 安装程序；macOS 使用托管 Apple Silicon `macos-15` 构建 ARM64 DMG。安装程序校验包括 EXE、DLL 和两个许可文件，macOS 校验 APP 内许可资源及 DMG。各附件附有 `SHA256SUMS`，保留 14 天；工作流不创建或更新 GitHub Release。
 
-macOS 发布 runner 需另行注册，提供 Xcode Command Line Tools、Node、Python 3 和同一固定签名身份，并在其登录用户上下文中完成 codesign 授权。作业先运行 `scripts/setup-macos-signing.py --check`，身份缺失会明确失败；不生成替代身份或回退临时签名。仅将该 runner 用于本仓库受信的发布标签，不分配给 fork PR 检查；在 GitHub 限制 `v*` 标签创建权限。私钥保留在发布机钥匙串，配置步骤见[macOS 签名与解锁](macos-signing.md)。runner 尚未配置时，该作业会等待匹配的 runner，不代表打包成功。
+GitHub 不需要注册自托管 runner。macOS 打包需要在仓库的 **Settings → Secrets and variables → Actions** 配置两项 Secret：
+
+| Secret | 内容 |
+|---|---|
+| `MACOS_CERTIFICATE_BASE64` | 当前固定签名证书及其私钥导出的加密 PKCS#12（`.p12`）文件，转为 Base64 |
+| `MACOS_CERTIFICATE_PASSWORD` | 该 `.p12` 文件的导出口令 |
+
+从本机钥匙串导出原签名身份，不重新生成证书；导出与保管要求见[macOS 签名与解锁](macos-signing.md)。将 Base64 内容和口令分别填入 Secret，不提交到代码或日志。提供这两项 Secret 会将加密私钥交给 GitHub 及其构建任务，应由维护者明确配置；普通分支与 PR 检查不需要它们。
+
+标签任务将签名身份导入 `$RUNNER_TEMP` 下的临时钥匙串，使用随机的临时钥匙串口令，并运行 `scripts/setup-macos-signing.py --check` 核对证书与 `mygo.json` 中的固定身份。Secret 缺失或身份不匹配会明确失败，不生成替代身份或回退临时签名。托管虚拟机在任务结束后销毁，签名材料不上传为附件。应在 GitHub 限制 `v*` 标签创建权限。临时钥匙串方式参考 [GitHub 官方说明](https://docs.github.com/en/actions/how-tos/deploy/deploy-to-third-party-platforms/sign-xcode-applications)。
 
 Actions 均固定到提交 SHA，工具链沿用 `mise.toml`；APT 使用托管 Ubuntu runner 的 `sudo`，不复用 Gitea 的 rootless 容器设置。原生窗口、协议 Docker 联调、Windows 安装/升级/卸载、签名和公证状态需要单独验收，不能从工作流成功推断。
 

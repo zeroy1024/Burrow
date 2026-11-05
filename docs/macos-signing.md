@@ -23,7 +23,7 @@ python3 scripts/setup-macos-signing.py --check
 
 macOS 首次使用新私钥时可能显示 codesign 的系统授权窗口。由用户本人在系统窗口中输入钥匙串密码并选择始终允许；密码不应发送到聊天、命令行或脚本。此授权仅用于新签名私钥，不需要允许所有应用读取业务凭据。
 
-使用「钥匙串访问」导出并妥善备份该证书和私钥的加密 PKCS#12 文件。CI runner 和其他发布构建机必须导入同一身份。普通用户只安装签好的应用，不需要导入发布私钥。
+使用「钥匙串访问」导出并妥善备份该证书和私钥的加密 PKCS#12 文件。CI runner 和其他发布构建机必须导入同一身份。GitHub 使用托管 `macos-15` runner，由维护者在仓库配置加密 PKCS#12 的 Base64 和导出口令两项 Secret，任务中导入临时钥匙串；步骤见 [GitHub CI](development.md#github-ci)。Gitea 的 host runner 则预先导入身份并完成 codesign 授权。普通用户只安装签好的应用，不需要导入发布私钥。
 
 ## 正式版与开发版
 

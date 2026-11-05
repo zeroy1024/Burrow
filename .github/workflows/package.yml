@@ -118,8 +118,11 @@ jobs:
 
   macos:
     name: macOS ARM64 DMG
-    runs-on: [self-hosted, macOS, ARM64, burrow-release]
+    runs-on: macos-15
     timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
     env:
       GOFLAGS: -mod=readonly
       GOTOOLCHAIN: local
@@ -128,9 +131,6 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
-
-      - name: 检查固定签名身份
-        run: python3 scripts/setup-macos-signing.py --check
 
       - name: 核对版本标签与许可
         run: |
@@ -144,6 +144,30 @@ jobs:
               raise SystemExit("Tag must match the version in mygo.json")
           PYTAG
           python3 scripts/licenses.py --check
+
+      - name: 导入固定签名身份
+        env:
+          MACOS_CERTIFICATE_BASE64: ${{ secrets.MACOS_CERTIFICATE_BASE64 }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+        run: |
+          : "${MACOS_CERTIFICATE_BASE64:?Configure the MACOS_CERTIFICATE_BASE64 repository secret}"
+          : "${MACOS_CERTIFICATE_PASSWORD:?Configure the MACOS_CERTIFICATE_PASSWORD repository secret}"
+          umask 077
+          burrow_certificate="$RUNNER_TEMP/burrow-signing.p12"
+          burrow_keychain="$RUNNER_TEMP/burrow-signing.keychain-db"
+          burrow_keychain_password="$(openssl rand -base64 32)"
+          echo "::add-mask::$burrow_keychain_password"
+          printf '%s' "$MACOS_CERTIFICATE_BASE64" | base64 --decode > "$burrow_certificate"
+          security create-keychain -p "$burrow_keychain_password" "$burrow_keychain"
+          security set-keychain-settings -lut 21600 "$burrow_keychain"
+          security unlock-keychain -p "$burrow_keychain_password" "$burrow_keychain"
+          security import "$burrow_certificate" -k "$burrow_keychain" \
+            -f pkcs12 -P "$MACOS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s \
+            -k "$burrow_keychain_password" "$burrow_keychain"
+          security list-keychains -d user -s "$burrow_keychain"
+          security default-keychain -d user -s "$burrow_keychain"
+          python3 scripts/setup-macos-signing.py --check
 
       - name: 准备项目工具链
         uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5
