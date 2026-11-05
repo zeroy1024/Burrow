@@ -36,12 +36,17 @@ func (a *app) keySettings(c *ui.Context) {
 				if a.credentials.flashAt.IsZero() {
 					a.credentials.flashAt = c.Now()
 				}
-				elapsed := c.Now().Sub(a.credentials.flashAt)
-				if elapsed < t.Motion.Duration.Flash {
+				started := a.credentials.flashAt
+				row.Draw(func(p *ui.Painter, rect ui.Rect) {
+					elapsed := p.Now().Sub(started)
+					if elapsed >= t.Motion.Duration.Flash {
+						return
+					}
 					alpha := 1 - float32(elapsed)/float32(t.Motion.Duration.Flash)
-					row.Background(uikit.Color(theme.WithAlpha(t.Color.Accent.Default, float64(alpha)*float64(t.Color.Accent.Tint10.A)/255)))
-					c.AnimationFrame()
-				}
+					ink := theme.WithAlpha(t.Color.Accent.Default, float64(alpha)*float64(t.Color.Accent.Tint10.A)/255)
+					p.Fill(rect, uikit.Color(ink), 0)
+					p.AnimationFrame()
+				})
 			}
 			row.Children(func() {
 				uikit.IconTile(c, uikit.IconTileProps{Size: uikit.SizeLg}, func() {

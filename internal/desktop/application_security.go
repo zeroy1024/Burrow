@@ -253,7 +253,10 @@ func (a *app) applicationSecuritySettings(c *ui.Context) {
 	fields := []settingField{
 		{"打开应用时需要解锁", "", "开启后，每次启动 Burrow 都需要输入解锁密码。", func() {
 			selected := on
-			if uikit.Switch(c, &selected, uikit.ToggleProps{Label: localize(c, "打开应用时需要解锁"), Disabled: a.credentials.busy || a.catalogSaving || a.security.changing}).Changed() {
+			if uikit.Switch(c, &selected, uikit.ToggleProps{
+				Label: localize(c, "打开应用时需要解锁"), Disabled: a.credentials.busy || a.catalogSaving || a.security.changing,
+				Motion: uikit.MotionOverride(a.reduceMotion(c)),
+			}).Changed() {
 				kind := "enable"
 				if on {
 					kind = "disable"

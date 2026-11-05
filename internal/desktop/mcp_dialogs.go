@@ -175,7 +175,9 @@ func (a *app) mcpPolicyFields(c *ui.Context) {
 					Label: "策略名称", Placeholder: "例如：生产配置保护", Error: draft.NameError,
 				}).Grow(1)
 				uikit.Text(c, "启用", uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneSecondary})
-				uikit.Switch(c, &draft.Enabled, uikit.ToggleProps{Label: "启用该策略"})
+				uikit.Switch(c, &draft.Enabled, uikit.ToggleProps{
+					Label: "启用该策略", Motion: uikit.MotionOverride(a.reduceMotion(c)),
+				})
 			})
 			if name.Changed() && draft.NameError != "" {
 				draft.NameError = ""
@@ -579,6 +581,7 @@ func (a *app) mcpAuditDrawer(c *ui.Context) {
 					}
 					uikit.Progress(c, uikit.ProgressProps{
 						Value: task.Fraction, Tone: progTone, Label: "任务传输进度",
+						Motion: uikit.MotionOverride(a.reduceMotion(c)),
 					}).FillWidth()
 					ui.Row(c).FillWidth().AlignItems(ui.Center).Children(func() {
 						uikit.Text(c, fmt.Sprintf("%s / %s   %d%%", task.Transferred, task.Total, int(task.Fraction*100)), uikit.TextProps{

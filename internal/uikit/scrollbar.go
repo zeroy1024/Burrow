@@ -70,6 +70,7 @@ func Scrollbars(c *ui.Context, host, scroller ui.Element, offset *ui.ScrollState
 		return false
 	})
 	frame, bounds := host.LayoutBounds(), scroller.LayoutBounds()
+	scrollerHandle := offset.Handle
 	maxX, maxY := offset.MaxX, offset.MaxY
 	positionX, positionY := offset.X, offset.Y
 	host.Children(func() {
@@ -77,7 +78,12 @@ func Scrollbars(c *ui.Context, host, scroller ui.Element, offset *ui.ScrollState
 		// drag hit boxes, fades). Refresh once after layout measures a new range.
 		ui.Box(c).Key("scrollbar-layout").Absolute().Fill().PassThrough().Role(ui.RoleNone).
 			DrawOver(func(_ *ui.Painter, _ ui.Rect) {
-				if scroller.LayoutBounds() != bounds || offset.MaxX != maxX || offset.MaxY != maxY ||
+				// Exit copies still paint, but their live scroller has been unmounted.
+				current := c.Resolve(scrollerHandle)
+				if !current.Valid() {
+					return
+				}
+				if current.LayoutBounds() != bounds || offset.MaxX != maxX || offset.MaxY != maxY ||
 					offset.X != positionX || offset.Y != positionY {
 					c.Invalidate()
 				}

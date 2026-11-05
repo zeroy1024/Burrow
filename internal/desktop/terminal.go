@@ -167,7 +167,7 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 			session.columns = max(1, int((rect.W-2*p.ContentSide)/a.cellWidth))
 			session.rows = max(1, int((rect.H-topPadding-bottomPadding)/prefs.LineHeight))
 		}
-	} else {
+	} else if !session.closing {
 		c.After(p.FrameInterval)
 	}
 	pane.OnClick(func() { a.focusSession(tab, session) })

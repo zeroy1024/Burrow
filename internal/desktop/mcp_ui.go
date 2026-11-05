@@ -319,7 +319,9 @@ func (a *app) mcpServiceBar(c *ui.Context) {
 	t := theme.Current()
 	uikit.Card(c).Key("mcp-service-bar").FillWidth().Shrink(0).Padding(t.Space.N10, t.Space.N16).Children(func() {
 		ui.Row(c).FillWidth().AlignItems(ui.Center).Gap(t.Space.N14).Children(func() {
-			sw := uikit.Switch(c, &a.mcp.running, uikit.ToggleProps{Label: "启用 MCP 服务"})
+			sw := uikit.Switch(c, &a.mcp.running, uikit.ToggleProps{
+				Label: "启用 MCP 服务", Motion: uikit.MotionOverride(a.reduceMotion(c)),
+			})
 			if sw.Changed() {
 				a.configureMCPBackend()
 			}

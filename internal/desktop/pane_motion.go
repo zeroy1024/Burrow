@@ -56,10 +56,11 @@ func (a *app) updatePaneClosures(c *ui.Context) {
 			if session.closeStarted.IsZero() {
 				session.closeStarted = c.Now()
 			}
-			if c.Now().Sub(session.closeStarted) >= t.C.Desktop.PaneCloseDuration {
+			remaining := t.C.Desktop.PaneCloseDuration - c.Now().Sub(session.closeStarted)
+			if remaining <= 0 {
 				a.removePane(tab, session)
 			} else {
-				c.AnimationFrame()
+				c.After(remaining)
 			}
 		}
 	}
@@ -167,14 +168,14 @@ func (a *app) paneMotion(c *ui.Context, pane ui.Element, tab *workspaceTab, sess
 	} else if !session.revealing && a.reduceMotion(c) && !tab.zoomStarted.IsZero() {
 		alpha *= min(1, float32(c.Now().Sub(tab.zoomStarted))/float32(t.C.Desktop.ZoomDuration))
 	}
+	pose := ui.Pose{}
 	if session.closing {
-		progress := min(1, float32(c.Now().Sub(session.closeStarted))/float32(t.C.Desktop.PaneCloseDuration))
-		alpha *= 1 - progress
+		pose.Fade = 1
 		if !a.reduceMotion(c) {
-			scale := 1 - (1-t.C.Desktop.PaneCloseScale)*progress
-			pane.Scale(scale, scale)
+			pose.Scale = t.C.Desktop.PaneCloseScale
 		}
 	}
+	pane.AnimatePose(pose, uikit.Tween(t.C.Desktop.PaneCloseDuration))
 	pane.Opacity(alpha)
 	if tab.maximized && tab.focused != session && tab.zoomMix >= 1 {
 		pane.Hidden(true)
@@ -190,28 +191,26 @@ func paneReveal(c *ui.Context, card ui.Element, session *remoteSession) {
 		return
 	}
 	t := theme.Current()
-	p := t.C.PaneReveal
-	progress := float32(0)
-	if !session.revealStarted.IsZero() {
-		progress = min(1, float32(c.Now().Sub(session.revealStarted))/float32(p.Duration))
-		if progress == 1 {
-			session.revealing = false
-			return
-		}
-	}
-	blur := p.Blur * (1 - uikit.Easing(p.Easing)(progress))
+	reveal := t.C.PaneReveal
 	card.Children(func() {
 		ui.Box(c).Key("drop-reveal").Absolute().Top(0).Right(0).Bottom(0).Left(0).
-			Radius(t.C.Pane.Radius).Material(glass.Blur{Radius: blur}).PassThrough()
+			PassThrough().Draw(func(p *ui.Painter, rect ui.Rect) {
+			// The final-size pane content is already painted beneath this overlay.
+			if session.revealStarted.IsZero() {
+				session.revealStarted = p.Now()
+			}
+			progress := min(1, float32(p.Now().Sub(session.revealStarted))/float32(reveal.Duration))
+			if progress == 1 {
+				session.revealing = false
+				c.Invalidate()
+				return
+			}
+			blur := reveal.Blur * (1 - uikit.Easing(reveal.Easing)(progress))
+			radius := t.C.Pane.Radius
+			glass.Blur{Radius: blur}.PaintMaterial(p, rect, [4]float32{radius, radius, radius, radius})
+			p.AnimationFrame()
+		})
 	})
-	card.DrawOver(func(painter *ui.Painter, _ ui.Rect) {
-		// Start after the final-size content has been painted once, including empty terminals.
-		if session.revealStarted.IsZero() {
-			session.revealStarted = painter.Now()
-			c.Invalidate()
-		}
-	})
-	c.AnimationFrame()
 }
 
 func (a *app) terminalDivider(c *ui.Context, split splitPlacement) {

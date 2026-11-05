@@ -40,9 +40,10 @@ func CopyField(c *ui.Context, value string, props CopyFieldProps) CopyFieldResul
 		root.FillWidth()
 	}
 	copiedAt := ui.Local(root, "uikit.copyfield.at", func() time.Time { return time.Time{} })
-	copied := !copiedAt.IsZero() && c.Now().Sub(*copiedAt) < 1500*time.Millisecond
+	const copiedDuration = 1500 * time.Millisecond
+	copied := !copiedAt.IsZero() && c.Now().Sub(*copiedAt) < copiedDuration
 	if copied {
-		c.AnimationFrame()
+		c.After(copiedDuration - c.Now().Sub(*copiedAt))
 	}
 	if root.Hovered() {
 		root.Background(Color(t.Color.State.Hover))

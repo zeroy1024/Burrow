@@ -309,7 +309,7 @@ func (a *app) catalogDragPreview(c *ui.Context) {
 	} else {
 		animation := a.catalogLandingAnimation()
 		if d.phase == catalogCanceling {
-			animation = ui.Animation{Spring: uikit.Spring(t.C.ReorderMotion.Cancel)}
+			animation = a.positionAnimation(ui.Animation{Spring: uikit.Spring(t.C.ReorderMotion.Cancel)})
 		}
 		animation.Spring.Velocity = d.velocityY
 		ghost.Left(d.settleBase.X).Top(d.settleBase.Y).Width(d.settleBase.W).
