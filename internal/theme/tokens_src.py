@@ -954,3 +954,8 @@ COMP['iconTile']={
  'sizeLg':'size.modalIconTile','radiusLg':'radius.railButton',
  'bg':'color.surface.control',
 }
+
+# Events of one scroll gesture, momentum included, arrive within this gap; a
+# contained scroller keeps a gesture it took until the gap passes.
+SEM['motion']['duration']['scrollGesture']=MS(300,'同一滚动手势相邻事件的最大间隔')
+COMP['scrollbar']['gestureGap']='motion.duration.scrollGesture'
