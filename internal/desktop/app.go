@@ -122,6 +122,7 @@ type app struct {
 	catalogError       error
 	statusScroll       ui.ScrollState
 	statusScrollbar    scrollbarState
+	statusFactsOpen    bool
 	fileSessions       []*fileSession
 	fileTabScroll      ui.ScrollState
 	activeFile         int
@@ -226,7 +227,7 @@ func Run() (runErr error) {
 		return fmt.Errorf("打开应用数据库：%w", err)
 	}
 
-	a := &app{ctx: ctx, cancel: cancel, store: db, dataDirectory: directory, tabs: []*workspaceTab{}}
+	a := &app{ctx: ctx, cancel: cancel, store: db, dataDirectory: directory, tabs: []*workspaceTab{}, statusFactsOpen: true}
 	defer func() {
 		a.cancel()
 		if a.mcpBackend != nil && a.mcpBackend.service != nil {

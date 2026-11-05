@@ -125,7 +125,7 @@ SEM={
   'success':{'default':C(P('green.500'),'在线点、完成进度'),'text':C(P('green.700')),'subtle':C(P('green.50')),'halo':C(P('greenA.a14'),'在线点 3px 光圈'),'onGlass':C(P('greenA.a15'))},
   'warning':{'default':C(P('amber.500'),'连接中'),'text':C(P('amber.600'),'连接中文字 / 响铃'),'textStrong':C(P('amber.700')),'subtle':C(P('amber.50')),'tint14':C(P('amberA.a14'),'响铃徽章底'),'halo':C(P('amberA.a18'))},
   'status':{'offline':C(P('gray.350'),'离线点'),'paused':C(P('gray.400'),'暂停进度')},
-  'fill':{'quiet':C(P('black.a05'),'⌘N 芯片、玻璃上徽章'),'quieter':C(P('black.a04'),'玻璃上的面包屑'),'placeholder':C(P('black.a035'),'拖动占位'),'placeholderEdge':C(P('black.a05')),'strong':C(P('gray.900'),'资源条填充')},
+  'fill':{'quiet':C(P('black.a05'),'⌘N 芯片、玻璃上徽章'),'quieter':C(P('black.a04'),'玻璃上的面包屑'),'placeholder':C(P('black.a035'),'拖动占位'),'placeholderEdge':C(P('black.a05')),'strong':C(P('gray.900'),'中性进度条填充')},
   'traffic':{'close':C(P('traffic.red')),'minimize':C(P('traffic.yellow')),'zoom':C(P('traffic.green')),'edge':C(P('black.a15'))},
   'tooltip':{'bg':C(P('ink.a92')),'text':C(P('gray.0')),'kbd':C(P('white.a60'))},
   'glass':{'titleTab':C(P('white.a85'),'标题栏选中 tab'),'float':C(P('white.a70'),'悬浮胶囊（回到底部）'),'bar':C(P('white.a42'),'v4 玻璃栏（无渐隐时）'),'highlight':C(P('white.a90'),'玻璃顶部内高光')},
@@ -344,9 +344,16 @@ SEM['size'].update({
  'tabDragHandleInset':D(30), 'tabTitleOffset':D(-1.5), 'tabCountOffset':D(-.5),
  'scrollbarMinThumb':D(24), 'scrollbarRevealZone':D(24),
  'terminalContentBottom':D(50), 'emptyPaneTitleSize':D(15),
- 'statsHeaderHeight':D(44), 'statsChartHeight':D(34),
- 'statsChartStroke':D(1.3), 'statsSectionGap':D(20),
+ 'statsHeaderHeight':D(44), 'statsChartHeight':D(44,'CPU 趋势图'),
+ 'statsChartStroke':D(1.3), 'statsSectionGap':D(18),
+ 'statsNetChartHeight':D(20,'网络上下行迷你趋势'), 'statsValueLarge':D(28,'CPU 主数字'),
+ 'statsSkeletonLine':D(10,'进程 Top 骨架条'),
 })
+SEM['color']['fill']['shimmer']=C(P('gray.40'),'骨架占位流光高光')
+DARK['color.fill.shimmer']=P('graphite.600')
+SEM['motion']['duration']['shimmer']=MS(1400,'骨架占位流光一周')
+SEM['motion']['duration']['liveBeat']=MS(900,'实时状态点每次采样的跳动')
+SEM['opacity']['liveBeatScale']=N(1.35,'实时状态点跳动起始缩放')
 SEM['opacity'].update({
  'dragRotation':N(-1), 'dragPreview':N(.9), 'previewHeader':N(.96),
  'paneCloseScale':N(.97), 'dropEdgeRatio':N(.3), 'paneActionTint':N(.9),
@@ -412,6 +419,12 @@ COMP['dialog']={
 COMP['stats']={
  'headerHeight':'size.statsHeaderHeight','chartHeight':'size.statsChartHeight',
  'chartStroke':'size.statsChartStroke','sectionGap':'size.statsSectionGap',
+ 'netChartHeight':'size.statsNetChartHeight','valueLarge':'size.statsValueLarge',
+ 'hostBg':'color.surface.sunken','hostRadius':'radius.card',
+ 'processBar':'color.accent.tint10','processRadius':'radius.controlSm',
+ 'skeleton':'color.border.subtle','shimmer':'color.fill.shimmer','shimmerPeriod':'motion.duration.shimmer',
+ 'skeletonLine':'size.statsSkeletonLine',
+ 'beatDuration':'motion.duration.liveBeat','beatScale':'opacity.liveBeatScale','beatEasing':'motion.easing.out',
 }
 COMP['tab'].update({
  'contentHeight':'size.tabContentHeight','stripHeight':'size.tabStripHeight',
@@ -817,9 +830,10 @@ SEM['size'].update({
  'emptyMaxWidth':D(220), 'keyValueRow':D(P('size.22')), 'sparklineHeight':D(P('size.34')),
  'sparklineStroke':D(P('size.1_5')), 'meterHeight':D(P('size.4')), 'iconXs':D(P('size.12')),
  'segmentedItem':D(P('size.24')), 'latencyWarn':N(150), 'latencyBad':N(400),
- 'tableNameMinWidth':D(160),
+ 'tableNameMinWidth':D(160), 'sparklineDotRadius':D(2.5,'趋势图末点'), 'sparklineHaloRadius':D(5,'趋势图末点光圈'),
 })
-SEM['opacity']['sparklineFill']=N(.10)
+SEM['opacity']['sparklineFill']=N(.20,'趋势图渐变填充顶部不透明度')
+SEM['opacity']['sparklineHalo']=N(.18)
 SEM['size'].update({'meterWarnRatio':N(.70),'meterCriticalRatio':N(.90)})
 SEM['motion']['duration'].update({'fast':MS(P('duration.120')), 'base':MS(P('duration.160')), 'autoHide':MS(3000)})
 SEM['color']['accent'].update({'hover':C(P('blue.600')), 'pressed':C(P('blue.700'))})
@@ -870,7 +884,8 @@ COMP['panel']={
  'width':'size.statsPanel','headerHeight':'size.panelHeader','paddingX':'space.14','sectionGap':'space.8',
  'divider':'color.border.divider','statLabel':'color.text.primary','statValue':'color.text.secondary','caption':'color.text.tertiary',
 }
-COMP['sparkline']={'height':'size.sparklineHeight','stroke':'size.sparklineStroke','line':'color.accent.default','fillAlpha':'opacity.sparklineFill'}
+COMP['sparkline']={'height':'size.sparklineHeight','stroke':'size.sparklineStroke','line':'color.accent.default','fillAlpha':'opacity.sparklineFill',
+ 'grid':'color.border.divider','dotRadius':'size.sparklineDotRadius','haloRadius':'size.sparklineHaloRadius','haloAlpha':'opacity.sparklineHalo'}
 COMP['keyValue']={'rowHeight':'size.keyValueRow','key':'color.text.secondary','value':'color.text.primary','valueDim':'color.text.tertiary','font':'font.size.footnote'}
 COMP['emptyState']={
  'iconTile':'size.titlebar','iconRadius':'radius.window','iconBg':'color.surface.control','icon':'color.text.secondary',
@@ -886,7 +901,7 @@ COMP['latency']={'warnMs':'size.latencyWarn','badMs':'size.latencyBad','normal':
 COMP['listRow']={'height':'size.listRow','radius':'radius.controlSm','paddingX':'space.8','gap':'space.9','meta':'color.text.secondary'}
 COMP['breadcrumb']['iconSize']='size.iconXs'
 COMP['fileList'].update({'headerBg':'color.surface.card','columnGap':'space.16','nameMinWidth':'size.tableNameMinWidth'})
-COMP['progress'].update({'heightMeter':'size.meterHeight','meterFill':'color.fill.strong','meterWarnAt':'size.meterWarnRatio','meterCritAt':'size.meterCriticalRatio','fillError':'color.danger.default'})
+COMP['progress'].update({'heightMeter':'size.meterHeight','meterFill':'color.accent.default','meterWarnAt':'size.meterWarnRatio','meterCritAt':'size.meterCriticalRatio','fillError':'color.danger.default'})
 COMP['paneHeader']={
  'heightCompact':'size.paneHeader','heightToolbar':'size.fileHeader','heightTitle':'size.panelHeader',
  'titleFont':'font.size.bodyLg','titleWeight':'font.weight.semibold','paddingLeft':'space.14','paddingRight':'space.8','gap':'space.7',
