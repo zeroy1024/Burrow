@@ -1,0 +1,308 @@
+package desktop
+
+import (
+	"context"
+	"fmt"
+	"math"
+	"os"
+	"path/filepath"
+	"time"
+
+	"github.com/egoist/mygo"
+	"github.com/egoist/mygo/ui"
+	"sshdesk/internal/hostinfo"
+	"sshdesk/internal/store"
+	"sshdesk/internal/uikit"
+)
+
+// This file is compiled only through the README gallery overlay.
+func runREADMEGallery() error {
+	root := filepath.Dir(os.Args[0])
+	directory := filepath.Join(root, "..", "..", "..", "gallery-data")
+	if err := os.MkdirAll(directory, 0700); err != nil {
+		return err
+	}
+	mygo.App.SetName("Burrow Gallery")
+	mygo.App.SetPath(mygo.PathUserData, directory)
+	mygo.App.SetPath(mygo.PathCache, filepath.Join(directory, "cache"))
+	mygo.App.SetPath(mygo.PathLogs, filepath.Join(directory, "logs"))
+	mygo.App.SetLanguages("zh-Hans", "en")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	db, err := store.Open(ctx, filepath.Join(directory, "burrow.db"))
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+	a := &app{ctx: ctx, cancel: cancel, store: db, dataDirectory: directory, statusVisible: true}
+	a.persistence = newPersistenceWorker(func() *mygo.Window { return a.window })
+	defer a.finishPersistence()
+	if err := a.loadTerminalSettings(); err != nil {
+		return err
+	}
+	if err := a.loadAppPreferences(); err != nil {
+		return err
+	}
+	a.security = applicationSecurityState{ready: true, initialized: true}
+	a.prefs.ReduceMotion = "on"
+	a.prefs.Translucency = false
+	a.terminal.prefs.CursorBlink = false
+	a.terminal.prefs.FontSize = 13
+	a.terminal.prefs.LineHeight = 21
+	for i := range a.pages {
+		a.pages[i].sidebarWidth = 236
+	}
+	a.hosts, a.groups = demoHosts(), demoGroups()
+	for i := range a.hosts {
+		a.hosts[i].address = fmt.Sprintf("192.0.2.%d", 10+i)
+		a.hosts[i].user = "deploy"
+		initializeSession(&a.hosts[i])
+	}
+	a.hosts[0].system = "Ubuntu 24.04 LTS"
+	a.hosts[7].name, a.hosts[7].user = "home-lab", "ops"
+	a.hosts[8].name = "edge-tokyo"
+	for _, group := range a.groups {
+		group.stableID = newSessionID()
+	}
+	for i := range 4 {
+		h := a.hosts[i]
+		h.protocol = "sftp"
+		h.session.ID = newSessionID()
+		a.groups[3].hosts = append(a.groups[3].hosts, hostID(len(a.hosts)))
+		a.hosts = append(a.hosts, h)
+	}
+	a.galleryTerminals()
+	a.galleryFiles()
+	a.galleryMCP()
+	stopTheme := mygo.Theme.OnUpdated(func() { a.syncAppearance() })
+	defer stopTheme()
+	mygo.Theme.SetSource(mygo.ThemeDark)
+	mygo.App.WhenReady(func() {
+		a.syncAppearance()
+		a.window = mygo.NewWindow(mygo.WindowOptions{
+			Title: "Burrow", Width: 1424, Height: 900,
+			MinWidth: 1180, MinHeight: 760,
+			TitleBarStyle: mygo.TitleBarHidden, TitleBarHeight: 44,
+			TrafficLightPosition: &mygo.Point{X: 20, Y: 22},
+			Content:              ui.View(a.view),
+		})
+		var scene = "ssh-dark"
+		choose := func(name string, section section, source mygo.ThemeSource) func(*mygo.MenuItem, *mygo.Window) {
+			return func(*mygo.MenuItem, *mygo.Window) {
+				scene = name
+				a.section = section
+				a.settingsUI.open = false
+				mygo.Theme.SetSource(source)
+				a.syncAppearance()
+				a.window.Invalidate()
+			}
+		}
+		mygo.App.SetMenu(mygo.NewMenu([]*mygo.MenuItem{
+			{Label: "Burrow Gallery", Submenu: []*mygo.MenuItem{{Role: mygo.RoleQuit}}},
+			{Label: "展示场景", Submenu: []*mygo.MenuItem{
+				{Label: "SSH · 深色", Accelerator: "CmdOrCtrl+1", Click: choose("ssh-dark", sectionSSH, mygo.ThemeDark)},
+				{Label: "SSH · 浅色", Accelerator: "CmdOrCtrl+2", Click: choose("ssh-light", sectionSSH, mygo.ThemeLight)},
+				{Label: "文件传输", Accelerator: "CmdOrCtrl+3", Click: choose("files", sectionFiles, mygo.ThemeLight)},
+				{Label: "MCP 审计", Accelerator: "CmdOrCtrl+4", Click: choose("mcp", sectionMCP, mygo.ThemeLight)},
+				mygo.Separator(),
+				{Label: "保存当前展示图", Accelerator: "CmdOrCtrl+Shift+S", Click: func(*mygo.MenuItem, *mygo.Window) {
+					data, err := a.window.CapturePage()
+					if err == nil {
+						output := filepath.Join(galleryScreenshotDirectory, scene+".png")
+						err = os.WriteFile(output, data, 0644)
+					}
+					if err != nil {
+						fmt.Fprintln(os.Stderr, "Gallery capture:", err)
+					}
+				}},
+			}},
+		}))
+		a.window.Show()
+	})
+	return mygo.App.Run()
+}
+
+func (a *app) galleryTerminals() {
+	newSession := func(id int) *remoteSession {
+		h := a.hosts[id]
+		return &remoteSession{
+			id: id + 1, host: hostID(id), endpoint: h, config: h.session, state: connected,
+			connection: &sshConnectionGroup{id: id + 1, endpoint: h},
+			transcript: demoTranscript(h), columns: 100, rows: 30,
+		}
+	}
+	left, right := newSession(0), newSession(2)
+	left.transcript = galleryLines([]string{
+		"$ cd /srv/atlas-api",
+		"$ git pull --ff-only",
+		"Already up to date.",
+		"", "$ docker compose ps",
+		"NAME           STATUS             PORTS",
+		"atlas-api      Up 14 days         8080/tcp",
+		"atlas-worker   Up 14 days         —",
+		"atlas-redis    Up 28 days         6379/tcp",
+		"", "$ curl -s localhost:8080/health | jq",
+		"{", "  \"status\": \"healthy\",", "  \"version\": \"1.8.2\",", "  \"uptime\": \"14d 06h 32m\"", "}",
+		"", "$ docker compose logs --tail 4 api",
+		"09:41:20  INFO  GET /api/projects  200  12ms",
+		"09:41:21  INFO  GET /api/releases  200   8ms",
+		"09:41:22  INFO  worker heartbeat  healthy",
+		"09:41:23  INFO  GET /health       200   1ms",
+	})
+	right.transcript = galleryLines([]string{
+		"$ psql -d atlas -c 'SELECT version();'",
+		"PostgreSQL 17.2 on x86_64-pc-linux-gnu",
+		"", "$ pg_isready",
+		"/var/run/postgresql:5432 - accepting connections",
+		"", "$ df -h / /data",
+		"Filesystem     Size  Used Avail Use%",
+		"/dev/vda1      120G   38G   82G  32%",
+		"/dev/vdb1      500G  214G  286G  43%",
+		"", "$ systemctl status postgresql --no-pager",
+		"● postgresql.service - PostgreSQL database",
+		"   Loaded: loaded; enabled",
+		"   Active: active (running) since Oct 22",
+		"   Memory: 1.8G",
+		"", "$ ls /data/backups/",
+		"atlas-2026-11-03.dump  atlas-2026-11-04.dump",
+		"atlas-2026-11-05.dump  latest.dump",
+	})
+	staging := newSession(4)
+	a.tabs = []*workspaceTab{
+		{
+			id: 1, focused: left,
+			root: &terminalLayout{
+				first: &terminalLayout{session: left}, second: &terminalLayout{session: right}, ratio: .53,
+			},
+		},
+		{id: 2, root: &terminalLayout{session: staging}, focused: staging},
+	}
+	a.nextTab, a.nextSession = 2, 9
+	cpu, memory, uptime, down, up, processes := 23.0, 41.0, 1225920.0, 4200000.0, 840000.0, 146
+	a.monitor = monitorState{
+		session: left,
+		metrics: &hostinfo.Metrics{
+			CPU: &cpu, Memory: &memory, Uptime: &uptime, Down: &down, Up: &up, Cores: 8,
+			Load: "0.82 / 0.64 / 0.51", MemoryUsed: 6600000000, MemoryTotal: 16000000000,
+			Processes: &processes,
+			Top: []hostinfo.Process{
+				{Name: "postgres", CPU: 12.4}, {Name: "atlas-api", CPU: 6.8}, {Name: "redis-server", CPU: 2.1},
+			},
+			DiskKey: "/", DiskDevice: "/dev/vda1", Filesystem: "ext4",
+		},
+		diskIdentity: "/", diskStats: &hostinfo.Usage{Total: 120000000000, Free: 68400000000},
+	}
+	for i := range 60 {
+		a.monitor.history.cpu = append(a.monitor.history.cpu, 22+7*math.Sin(float64(i)/4)+3*math.Sin(float64(i)/1.7))
+		a.monitor.history.down = append(a.monitor.history.down, 3800000+1800000*math.Sin(float64(i)/6))
+		a.monitor.history.up = append(a.monitor.history.up, 600000+300000*math.Sin(float64(i)/5))
+	}
+	a.hostFacts.values = map[string]hostinfo.Facts{
+		hostFactsKey(left.connection.plan): {
+			Platform: hostinfo.Linux, Hostname: "prod-web-01", OSID: "ubuntu", OSVersion: "24.04",
+			OSName: "Ubuntu 24.04 LTS", Kernel: "6.8.0-48-generic", Arch: "x86_64", CollectedAt: time.Now(),
+		},
+	}
+}
+
+func galleryLines(text []string) []terminalLine {
+	lines := []terminalLine{}
+	for _, value := range text {
+		span := terminalSpan{Text: value}
+		if len(value) > 0 && value[0] == '$' {
+			span.Foreground, span.Bold = terminalIndexed(4), true
+		}
+		lines = append(lines, terminalLine{span})
+	}
+	return lines
+}
+
+func (a *app) galleryFiles() {
+	a.files = fileWorkspaceState{localOpen: true, activeRemote: true, ratio: .49, localPaths: map[string]string{}}
+	h := a.hosts[9]
+	s := &fileSession{id: 1, host: 9, endpoint: h, config: h.session, restoreID: newSessionID(), state: connected,
+		local: newFilePane(false), remote: newFilePane(true), connectedAt: time.Now().Add(-14 * time.Minute)}
+	s.local.path, s.remote.path = "/Users/demo/Projects/atlas", "/srv/atlas-api"
+	names := []string{
+		"config", "public", "releases", "scripts", "src", ".env.example",
+		"compose.yaml", "Dockerfile", "README.md", "atlas-api-1.8.2.tar.gz",
+	}
+	for _, pane := range []*filePaneState{s.local, s.remote} {
+		pane.history, pane.historyIndex = []string{pane.path}, 0
+		for i, name := range names {
+			entry := fileEntry{name: name, path: filepath.Join(pane.path, name), dir: i < 5,
+				size: int64(1200 + i*981), modified: time.Date(2026, 11, 5, 9, 40-i, 0, 0, time.Local),
+				permissions: "-rw-r--r--", owner: "deploy"}
+			if entry.dir {
+				entry.permissions = "drwxr-xr-x"
+			}
+			if i == 9 {
+				entry.size = 48234496
+			}
+			pane.directories[pane.path] = append(pane.directories[pane.path], entry)
+		}
+	}
+	a.fileSessions = []*fileSession{s}
+	a.nextFileSession = 1
+	a.transfers.dockHeight = 220
+	a.transfers.tasks = []*transferTask{
+		{
+			id: 1, session: s, view: s, entry: fileEntry{name: "atlas-api-1.8.2.tar.gz"},
+			sourcePath: s.local.path + "/atlas-api-1.8.2.tar.gz", targetPath: s.remote.path + "/releases",
+			state: transferRunning, transferred: 31457280, total: 48234496, speed: 8400000,
+		},
+		{
+			id: 2, session: s, view: s, entry: fileEntry{name: "media-assets.zip"},
+			sourcePath: s.local.path + "/media-assets.zip", targetPath: s.remote.path + "/public",
+			state: transferPaused, transferred: 12582912, total: 104857600,
+		},
+		{
+			id: 3, session: s, view: s, entry: fileEntry{name: "compose.yaml"},
+			sourcePath: s.local.path + "/compose.yaml", targetPath: s.remote.path,
+			state: transferDone, transferred: 2840, total: 2840,
+			started:   time.Date(2026, 11, 5, 9, 40, 10, 0, time.Local),
+			completed: time.Date(2026, 11, 5, 9, 40, 11, 0, time.Local),
+		},
+	}
+}
+
+func (a *app) galleryMCP() {
+	a.initMCPUI()
+	a.mcp.running, a.mcp.uptime = true, "2 小时 18 分钟"
+	a.mcp.todayCalls, a.mcp.todayIntercepts = 128, 3
+	a.mcp.keys = []mcpSecretKey{
+		{
+			ID: "gallery-editor", Name: "Editor · 开发助手", Prefix: "burrow_demo_…", State: "active",
+			GrantsSummary: "2 个连接 · 读取 / 执行", PolicyHint: "生产目录保护",
+			CreatedAt: "2026-11-01", LastUsed: "刚刚",
+		},
+		{
+			ID: "gallery-ops", Name: "Ops · 发布检查", Prefix: "burrow_demo_…", State: "active",
+			GrantsSummary: "1 个连接 · 只读", PolicyHint: "生产目录保护",
+			CreatedAt: "2026-11-02", LastUsed: "5 分钟前",
+		},
+	}
+	a.mcp.policies = []mcpPolicy{
+		{
+			ID: "gallery-protect", Name: "生产目录保护", Description: "限制配置与备份目录的写入",
+			Enabled: true, Category: "files", ConnSummary: "生产环境",
+			KeyNames:    []string{"Editor · 开发助手", "Ops · 发布检查"},
+			RulePrimary: "/etc · /data/backups", RuleSub: "禁止写入与删除", HitsSummary: "今日 3 次",
+		},
+	}
+	for i, summary := range []string{"检查 API 健康状态", "读取服务配置", "查看部署目录", "保护备份目录", "查询最近的应用日志", "读取数据库连接状态"} {
+		item := mcpAuditItem{ID: fmt.Sprintf("gallery-%d", i), Time: fmt.Sprintf("09:%02d:24", 41-i*3), Day: "今天",
+			KeyID: "gallery-editor", KeyName: "Editor · 开发助手", ConnName: "prod-web-01", ConnProtocol: "SSH",
+			ConnHost: "192.0.2.10", ConnPort: "22", ConnUser: "deploy", ActionType: "SSH 命令", Summary: summary,
+			Status: uikit.StatusDone, Duration: "24 ms", IsCommand: true, CommandText: "curl -s localhost:8080/health",
+			ExitCodeText: "0", Stdout: "{\"status\":\"healthy\",\"version\":\"1.8.2\"}", DetailLoaded: true,
+			OutputStatus: "已完成", ResponseSaved: true, PayloadSaved: true}
+		item.StartTime, item.EndTime = "2026-11-05 09:41:24", "2026-11-05 09:41:24"
+		item.RequestJSON = "{\n  \"connection\": \"prod-web-01\",\n  \"command\": \"curl -s localhost:8080/health\"\n}"
+		if i == 3 {
+			item.Status, item.ActionType = uikit.StatusIntercepted, "删除文件"
+		}
+		a.mcp.audits = append(a.mcp.audits, item)
+	}
+	a.mcp.auditTotal, a.mcp.auditFiltered = len(a.mcp.audits), len(a.mcp.audits)
+}
