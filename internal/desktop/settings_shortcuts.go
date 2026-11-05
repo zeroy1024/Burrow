@@ -59,7 +59,7 @@ func (a *app) shortcutSettings(c *ui.Context) {
 		return
 	}
 	ui.Row(c).Key("shortcut-toolbar").FillWidth().Justify(ui.End).Children(func() {
-		uikit.Button(c, localize(c, "全部恢复默认"), uikit.ButtonProps{Size: uikit.SizeSm, Disabled: len(a.prefs.Keymap) == 0}).OnClick(func() {
+		uikit.Button(c, localize(c, "全部恢复默认"), uikit.ButtonProps{Disabled: len(a.prefs.Keymap) == 0}).OnClick(func() {
 			a.prefs.Keymap = map[string]string{}
 			a.settingsUI.recording, a.settingsUI.pendingBinding, a.settingsUI.conflictAction = "", "", ""
 			a.preferencesChanged()
@@ -102,8 +102,8 @@ func (a *app) shortcutRow(c *ui.Context, action shortcutAction, divider bool) {
 				if conflict == "" {
 					return
 				}
-				ui.Row(c).Gap(t.C.ShortcutField.ControlGap).AlignItems(ui.Center).Children(func() {
-					uikit.Text(c, conflict, uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneDanger}).MinWidth(0)
+				ui.Row(c).FillWidth().Gap(t.C.ShortcutField.ControlGap).Children(func() {
+					uikit.FieldMessage(c, conflict, uikit.FieldMessageProps{Tone: uikit.ToneDanger}).Grow(1)
 					uikit.Button(c, localize(c, "替换"), uikit.ButtonProps{Size: uikit.SizeSm}).OnClick(func() {
 						a.prefs.Keymap[a.settingsUI.conflictAction] = ""
 						a.storeShortcut(action.id, a.settingsUI.pendingBinding)

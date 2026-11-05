@@ -61,3 +61,38 @@ func Section(c *ui.Context, open *bool, contentHeight *float32, props SectionPro
 	})
 	return trigger
 }
+
+type DisclosureProps struct {
+	Title string
+	// TitleStyle and TitleTone match the headings around the disclosure.
+	TitleStyle TextStyle
+	TitleTone  Tone
+	// Meta sits at the trailing end of the header, before the arrow.
+	Meta string
+}
+
+// Disclosure is a collapsible section within a panel or drawer: a header
+// with the title, optional meta and an arrow that turns as body opens below.
+func Disclosure(c *ui.Context, open *bool, props DisclosureProps, body func()) ui.Element {
+	t := theme.Current()
+	p := t.C.Collapse
+	return ui.Column(c).FillWidth().Children(func() {
+		parts := ui.CollapsibleBase(c, open)
+		trigger := parts.Trigger.FillWidth().Gap(t.Space.N4).Radius(t.Radius.ControlSm).FocusRing(false).Label(props.Title)
+		if trigger.FocusVisible() {
+			Shadow(trigger, t.C.Button.FocusShadow)
+		}
+		trigger.Children(func() {
+			Text(c, props.Title, TextProps{Style: props.TitleStyle, Tone: props.TitleTone}).SingleLine().PassThrough()
+			ui.Spacer(c).PassThrough()
+			if props.Meta != "" {
+				Text(c, props.Meta, TextProps{Style: TextCaption, Tone: ToneTertiary}).FontFeatures("tnum").SingleLine().PassThrough()
+			}
+			ui.Icon(c, IconSVG(IconChevronDown)).Size(p.Chevron, p.Chevron).
+				Rotate(-p.ChevronRotate * (1 - parts.Progress())).TextColor(Color(p.ChevronColor)).PassThrough()
+		})
+		parts.Panel(func() {
+			ui.Column(c).FillWidth().Padding(t.Space.N10, 0, 0, 0).Children(body)
+		})
+	})
+}

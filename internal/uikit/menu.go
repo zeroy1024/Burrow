@@ -5,8 +5,8 @@ import (
 	"sshdesk/internal/theme"
 )
 
-// MenuEntry is shared by the system context menu and the in-window menu.
-// Callbacks are menu commands; they are never retained in component-local state.
+// MenuEntry is one item of an in-window menu. Callbacks are menu commands;
+// they are never retained in component-local state.
 type MenuEntry struct {
 	ID          string
 	Label       string
@@ -22,43 +22,6 @@ type MenuEntry struct {
 	Separator   bool
 	Children    []MenuEntry
 	OnChoose    func()
-}
-
-func NativeMenu(menu *ui.Menu, entries []MenuEntry) {
-	nativeMenu(menu, entries, false)
-}
-
-func nativeMenu(menu *ui.Menu, entries []MenuEntry, disabled bool) {
-	for _, entry := range entries {
-		if entry.Separator {
-			menu.Separator()
-			continue
-		}
-		var item *ui.MenuItem
-		if len(entry.Children) != 0 {
-			item = menu.Submenu(entry.Label, func(sub *ui.Menu) { nativeMenu(sub, entry.Children, disabled || entry.Disabled) })
-		} else {
-			item = menu.Item(entry.Label)
-		}
-		item.Disabled(disabled || entry.Disabled)
-		if entry.Checked != nil {
-			if entry.Radio {
-				item.Radio(*entry.Checked)
-			} else {
-				item.Checked(*entry.Checked)
-			}
-		}
-		if entry.ShortcutKey != ui.KeyUnknown {
-			item.Shortcut(entry.Modifiers, entry.ShortcutKey)
-		}
-		if item.Chosen() && entry.OnChoose != nil {
-			entry.OnChoose()
-		}
-	}
-}
-
-func RowMenu(row ui.Element, entries []MenuEntry) ui.Element {
-	return row.ContextMenu(func(menu *ui.Menu) { NativeMenu(menu, entries) })
 }
 
 // RowMenuOn shares one popup and renderer between a row's context gesture and
@@ -80,10 +43,6 @@ func ContextMenuOn(c *ui.Context, row ui.Element, entries []MenuEntry, targets .
 		true,
 		targets...,
 	)
-}
-
-func MenuButton[T IconSource](c *ui.Context, icon T, label string, entries []MenuEntry) ui.Element {
-	return MenuOn(c, IconButton(c, icon, IconButtonProps{Label: label}), entries)
 }
 
 // MenuOn adds a token-styled menu to an existing, independently styled trigger.

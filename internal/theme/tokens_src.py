@@ -598,7 +598,6 @@ COMP['transferDock']={
  'progressWidth':'size.transferProgressWidth','compactBreakpoint':'size.fileCompactWidth',
 }
 COMP['transferRow']={
- 'iconTile':'size.control','iconRadius':'radius.control',
  'upBg':'color.accent.subtle','upIcon':'color.accent.default',
  'downBg':'color.surface.control','downIcon':'color.text.muted',
  'doneBg':'color.success.subtle','doneIcon':'color.success.text',
@@ -740,7 +739,7 @@ COMP['modal']={
  'width':'size.modal','radius':'radius.window','bg':'color.surface.card','shadow':'shadow.modal','scrim':'color.scrim',
  'topRatio':'size.modalTopRatio','topMin':'size.modalTopMin','bottomMargin':'space.24',
  'headerPaddingTop':'space.18','headerPaddingRight':'space.16','headerPaddingBottom':'space.14','headerPaddingLeft':'space.24',
- 'headerGap':'space.12','iconTile':'size.modalIconTile','iconTileRadius':'radius.railButton',
+ 'headerGap':'space.12','iconTile':'size.modalIconTile',
  'titleSize':'font.size.title','titleWeight':'font.weight.semibold','subtitleSize':'font.size.footnote','subtitle':'color.text.secondary',
  'bodyPaddingX':'space.24','divider':'color.border.divider',
  'footerPaddingTop':'space.14','footerPaddingRight':'space.16','footerPaddingBottom':'space.16','footerPaddingLeft':'space.24',
@@ -915,3 +914,43 @@ COMP['paneFooter']={'height':'size.paneStatusBar','paddingX':'space.14','gap':'s
 COMP['filePaneFocus'].update({'borderFocused':'color.accent.default','borderWidthFocused':'size.focusRing'})
 SEM['motion']['drag'].update({'standardScale':N(1.02),'standardRotation':N(-.6)})
 COMP['dragLift'].update({'standardScale':'motion.drag.standardScale','standardRotation':'motion.drag.standardRotation'})
+
+# MCP management page. Each table's header and rows share these column widths;
+# its compact dialogs share one width.
+SEM['size'].update({
+ 'mcpTableMinWidth':D(1024),'mcpNameColumn':D(210),'mcpBadgeColumn':D(86),'mcpScopeColumn':D(130),
+ 'mcpTimeColumn':D(150),'mcpKeysColumn':D(115),'mcpAuditTimeColumn':D(72),'mcpAuditKeyColumn':D(148),
+ 'mcpAuditConnectionColumn':D(120),'mcpAuditActionColumn':D(96),'mcpAuditStatusColumn':D(104),'mcpAuditDurationColumn':D(56),
+ 'mcpPolicyModal':D(720),'mcpKeyModal':D(680),'mcpDialog':D(440),
+ 'mcpDrawerMinWidth':D(340),'mcpDrawerWidth':D(500),'mcpMainMinWidth':D(360),
+ 'mcpRuleModeWidth':D(120,'命令规则匹配方式选择框'),'mcpPermissionColumn':D(118,'连接授权矩阵能力列'),
+})
+COMP['mcp']={
+ 'tableMinWidth':'size.mcpTableMinWidth',
+ 'keyName':'size.mcpNameColumn','keyState':'size.mcpBadgeColumn','keyDirs':'size.mcpNameColumn','keyUsed':'size.mcpTimeColumn',
+ 'policyName':'size.mcpNameColumn','policyCategory':'size.mcpBadgeColumn','policyConnections':'size.mcpScopeColumn',
+ 'policyKeys':'size.mcpKeysColumn','policyState':'size.mcpScopeColumn',
+ 'auditTime':'size.mcpAuditTimeColumn','auditKey':'size.mcpAuditKeyColumn','auditConnection':'size.mcpAuditConnectionColumn',
+ 'auditAction':'size.mcpAuditActionColumn','auditStatus':'size.mcpAuditStatusColumn','auditDuration':'size.mcpAuditDurationColumn',
+ 'policyModalWidth':'size.mcpPolicyModal','keyModalWidth':'size.mcpKeyModal','dialogWidth':'size.mcpDialog',
+ 'drawerMinWidth':'size.mcpDrawerMinWidth','drawerWidth':'size.mcpDrawerWidth','mainMinWidth':'size.mcpMainMinWidth',
+ 'ruleModeWidth':'size.mcpRuleModeWidth','permissionColumn':'size.mcpPermissionColumn',
+}
+
+# Bordered panels set into dialog and card bodies: rules, tasks, hit records.
+COMP['inset']={
+ 'padding':'space.10','radius':'radius.control','borderWidth':'size.hairline',
+ 'compactPaddingX':'space.8','compactPaddingY':'space.6','compactRadius':'radius.controlSm',
+ 'bg':'color.surface.sunken','border':'color.border.subtle','raisedBg':'color.surface.card',
+ 'warningBg':'color.warning.subtle','warningBorder':'color.warning.default',
+ 'dangerBg':'color.danger.subtle','dangerBorder':'color.danger.default',
+}
+
+# A glyph or logo on a rounded fill: beside a line of text, in a list row, or
+# beside a title.
+COMP['iconTile']={
+ 'sizeSm':'size.controlSm','radiusSm':'radius.controlSm',
+ 'size':'size.control','radius':'radius.control',
+ 'sizeLg':'size.modalIconTile','radiusLg':'radius.railButton',
+ 'bg':'color.surface.control',
+}

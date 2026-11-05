@@ -229,8 +229,7 @@ func ModalHeader(c *ui.Context, props ModalProps) ui.Element {
 	p := t.C.Modal
 	return ui.Row(c).FillWidth().Gap(p.HeaderGap).AlignItems(ui.Center).Children(func() {
 		if props.Icon != nil {
-			ui.Box(c).Size(p.IconTile, p.IconTile).Radius(p.IconTileRadius).
-				Background(Color(t.Color.Surface.Control)).Center().Children(func() {
+			IconTile(c, IconTileProps{Size: SizeLg}, func() {
 				ui.Icon(c, props.Icon).Size(t.Size.Icon, t.Size.Icon).PassThrough()
 			})
 		}

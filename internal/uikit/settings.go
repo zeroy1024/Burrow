@@ -48,39 +48,42 @@ func ShortcutField(c *ui.Context, props ShortcutFieldProps) ui.Element {
 }
 
 type SettingsGroupProps struct {
-	Key       any
-	Title     string
-	Help      string
-	HeaderRow bool
-	Actions   func()
+	Key     any
+	Title   string
+	Help    string
+	Actions func()
 }
 
 func SettingsGroup(c *ui.Context, props SettingsGroupProps, content func()) ui.Element {
-	t := theme.Current()
-	p := t.C.Settings
+	p := theme.Current().C.Settings
 	group := ui.Column(c).FillWidth().Gap(p.GroupTitleGap)
 	if props.Key != nil {
 		group.Key(props.Key)
 	}
 	group.Children(func() {
-		heading := func() ui.Element {
-			return SettingsLabel(c, props.Help, func() {
-				ui.Text(c, props.Title).FontSize(p.GroupTitleSize).FontWeight(p.GroupTitleWeight).TextColor(Color(p.GroupTitle))
-			})
-		}
-		if props.HeaderRow {
-			ui.Row(c).FillWidth().AlignItems(ui.Center).Gap(t.Space.N8).Children(func() {
-				heading().Grow(1)
-				if props.Actions != nil {
-					props.Actions()
-				}
-			})
-		} else {
-			heading()
-		}
+		SettingsGroupTitle(c, props.Title, props.Help, props.Actions)
 		SettingsGroupBody(c).Children(content)
 	})
 	return group
+}
+
+// SettingsGroupTitle heads a settings group: its title with any help, and
+// any actions at its trailing end.
+func SettingsGroupTitle(c *ui.Context, title, help string, actions func()) ui.Element {
+	t := theme.Current()
+	p := t.C.Settings
+	heading := func() ui.Element {
+		return SettingsLabel(c, help, func() {
+			ui.Text(c, title).FontSize(p.GroupTitleSize).FontWeight(p.GroupTitleWeight).TextColor(Color(p.GroupTitle))
+		})
+	}
+	if actions == nil {
+		return heading()
+	}
+	return ui.Row(c).FillWidth().AlignItems(ui.Center).Gap(t.Space.N8).Children(func() {
+		heading().Grow(1)
+		actions()
+	})
 }
 
 func SettingsGroupBody(c *ui.Context) ui.Element {

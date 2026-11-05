@@ -284,10 +284,6 @@ func MiddlePath(text string, width float32, font ui.Font) string {
 	return MiddleText(text[:separator], width-suffixWidth, font) + suffix
 }
 
-func PaneBadge(c *ui.Context, n int, focused bool, surface *theme.Theme) ui.Element {
-	return PaneShortcut(c, ShortcutDisplay(fmt.Sprintf("Cmd+%d", n)), focused, surface)
-}
-
 func ConnectionDot(c *ui.Context, state ConnState, size float32) {
 	t := theme.Current()
 	ink, halo := Color(t.C.ConnectionIndicator.Offline), Color(t.C.ConnectionIndicator.Offline)

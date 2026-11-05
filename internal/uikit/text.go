@@ -19,11 +19,16 @@ const (
 	TextCaption
 	TextMono
 	TextNumeric
+	// TextLabel names a figure or a group in a dense panel.
+	TextLabel
+	TextCaption2
 )
 
 type TextProps struct {
 	Style TextStyle
 	Tone  Tone
+	// Mono sets the style's size in the monospaced UI family.
+	Mono bool
 }
 
 // TextFont shares the typography with rich-text slots and measured labels.
@@ -43,6 +48,10 @@ func TextFont(style TextStyle) ui.Font {
 		size = t.Font.Size.Footnote
 	case TextCaption:
 		size = t.Font.Size.Caption
+	case TextLabel:
+		size, weight = t.Font.Size.Small, t.Font.Weight.Medium
+	case TextCaption2:
+		size = t.Font.Size.Caption2
 	}
 	family := t.Font.Family.Ui
 	if style == TextMono {
@@ -54,8 +63,8 @@ func TextFont(style TextStyle) ui.Font {
 func Text(c *ui.Context, text string, props TextProps) ui.Element {
 	font := TextFont(props.Style)
 	e := ui.Text(c, text).FontSize(font.Size).FontWeight(font.Weight).TextColor(ToneColor(props.Tone))
-	if props.Style == TextMono {
-		e.Font(font.Family)
+	if props.Style == TextMono || props.Mono {
+		e.Font(strings.Join(theme.Current().Font.Family.Mono, ", "))
 	}
 	if props.Style == TextNumeric {
 		e.FontFeatures("tnum")
