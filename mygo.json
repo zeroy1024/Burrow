@@ -2,7 +2,7 @@
   "name": "Burrow",
   "slug": "burrow",
   "identifier": "dev.burrow.app",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "icon": "assets/icon.png",
   "out": "build",
   "resources": ["LICENSE", "THIRD_PARTY_NOTICES.md"],

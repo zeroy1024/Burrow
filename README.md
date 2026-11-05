@@ -58,7 +58,7 @@
 
 ## 获取与运行
 
-Burrow 当前处于 **0.x 开发预览阶段**。安装包发布入口为 [GitHub Releases](https://github.com/zeroy1024/Burrow/releases)；首次发布准备期间，可按下面的步骤从源码运行。
+Burrow 当前处于 **0.x 开发预览阶段**。安装包与版本说明见 [GitHub Releases](https://github.com/zeroy1024/Burrow/releases)，也可按下面的步骤从源码运行。
 
 | 平台 | 当前状态 |
 |---|---|
