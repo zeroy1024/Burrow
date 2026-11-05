@@ -59,6 +59,9 @@ func (a *app) initMCPBackend() error {
 }
 
 func (a *app) startMCPBackend() {
+	if !a.businessReady() {
+		return
+	}
 	if a.mcpBackend == nil || a.mcpBackend.service == nil {
 		return
 	}

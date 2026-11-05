@@ -54,6 +54,8 @@ build/windows-amd64/burrow-0.1.1-windows-amd64.zip
 
 Windows 本机构建时，MyGo 会准备所需 NSIS；从 macOS/Linux 交叉打包安装程序需要主机提供 `makensis`。缺少 NSIS 时仍生成 EXE 与便携 ZIP，并明确报告未生成安装程序，不将它算作安装包验证通过。安装程序名称为 `burrow-setup-0.1.1-amd64.exe`，ARM64 对应目录及文件名使用 `arm64`。
 
+macOS 正式包使用 [mygo.json](../mygo.json) 中固定的自签名身份，公有证书位于 [assets/signing/burrow-local.pem](../assets/signing/burrow-local.pem)，私钥由用户默认钥匙串管理。首次使用新私钥时，macOS 可能要求本人授权系统 codesign。完整打包会先执行身份检查；缺少原私钥时明确失败，不自动生成另一张证书或退回临时签名。其他构建机需导入同一签名身份。操作步骤见[macOS 签名与解锁](macos-signing.md)。
+
 仅构建应用包：
 
 ```sh

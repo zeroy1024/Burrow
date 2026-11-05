@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	_ "modernc.org/sqlite"
 	"sshdesk/internal/localfs"
@@ -25,6 +26,9 @@ var mcpSchema string
 
 //go:embed mcp_payload_schema.sql
 var mcpPayloadSchema string
+
+//go:embed vault_schema.sql
+var vaultSchema string
 
 type Store struct {
 	db   *sql.DB
@@ -75,6 +79,19 @@ func Open(ctx context.Context, name string) (*Store, error) {
 	db.SetConnMaxLifetime(0)
 	db.SetConnMaxIdleTime(0)
 	s := &Store{db: db, lock: lock}
+	var originalVersion, originalApplication int
+	if err := db.QueryRowContext(ctx, "PRAGMA user_version").Scan(&originalVersion); err != nil {
+		return nil, errors.Join(err, db.Close())
+	}
+	if err := db.QueryRowContext(ctx, "PRAGMA application_id").Scan(&originalApplication); err != nil {
+		return nil, errors.Join(err, db.Close())
+	}
+	if originalVersion >= 1 && originalVersion <= 3 && originalApplication == 0x42525731 {
+		backup := name + ".before-vault-" + time.Now().UTC().Format("20060102T150405.000000000") + ".bak"
+		if err := s.Backup(ctx, backup); err != nil {
+			return nil, errors.Join(fmt.Errorf("backup before vault upgrade: %w", err), db.Close())
+		}
+	}
 	if err := s.initialize(ctx); err != nil {
 		return nil, errors.Join(err, db.Close())
 	}
@@ -96,6 +113,7 @@ func (s *Store) initialize(ctx context.Context) error {
 		return err
 	}
 	const applicationID = 0x42525731 // BRW1
+	fresh := version == 0 && application == 0
 	if version == 0 && application == 0 {
 		var tables int
 		if err := tx.QueryRowContext(ctx, "SELECT count(*) FROM sqlite_schema WHERE name NOT LIKE 'sqlite_%'").Scan(&tables); err != nil {
@@ -108,7 +126,7 @@ func (s *Store) initialize(ctx context.Context) error {
 			return fmt.Errorf("create database schema: %w", err)
 		}
 		version = 1
-	} else if (version < 1 || version > 3) || application != applicationID {
+	} else if (version < 1 || version > 4) || application != applicationID {
 		return fmt.Errorf("unsupported Burrow database schema %d (application %x)", version, application)
 	}
 	if version == 1 {
@@ -120,6 +138,19 @@ func (s *Store) initialize(ctx context.Context) error {
 	if version == 2 {
 		if _, err := tx.ExecContext(ctx, mcpPayloadSchema); err != nil {
 			return fmt.Errorf("upgrade database schema to version 3: %w", err)
+		}
+		version = 3
+	}
+	if version == 3 {
+		if _, err := tx.ExecContext(ctx, vaultSchema); err != nil {
+			return fmt.Errorf("upgrade database schema to version 4: %w", err)
+		}
+		state := "pending_migration"
+		if fresh {
+			state = "pending_init"
+		}
+		if _, err := tx.ExecContext(ctx, "INSERT INTO vault_meta VALUES(1,?,?)", state, "{}"); err != nil {
+			return err
 		}
 	}
 	return tx.Commit()

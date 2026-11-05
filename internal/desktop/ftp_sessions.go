@@ -262,7 +262,12 @@ func (a *app) deleteFileSite(id hostID, done func(error)) {
 	}
 	previousWorkspace := a.savedWorkspace
 	a.savedWorkspace = a.workspaceSnapshot()
-	a.commitCatalogMoveAsync(func() {
+	changes, err := a.vault.Prepare(nil, []string{sessionCredentialKey(deleted.session.ID)})
+	if err != nil {
+		done(err)
+		return
+	}
+	a.commitCatalogSecretsAsync(changes, func() {
 		a.hosts = slices.Delete(a.hosts, int(id), int(id)+1)
 		for _, group := range a.groups {
 			group.hosts = slices.DeleteFunc(group.hosts, func(candidate hostID) bool { return candidate == id })
@@ -351,9 +356,6 @@ func (a *app) deleteFileSite(id hostID, done func(error)) {
 			if candidate.section != sectionFiles && candidate.host > id {
 				a.closedTabs[i].host--
 			}
-		}
-		if err := deleteSessionCredentials(deleted.session.ID); err != nil {
-			a.files.notice = &uikit.ToastProps{ID: "会话已移除，但钥匙串清理失败：" + err.Error(), Tone: uikit.ToneDanger, Title: "会话已移除，但钥匙串清理失败", Detail: err.Error()}
 		}
 		done(nil)
 	})

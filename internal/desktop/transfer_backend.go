@@ -117,6 +117,9 @@ func transferFraction(task *transferTask) float32 {
 }
 
 func (a *app) scheduleTransfers() {
+	if !a.businessReady() {
+		return
+	}
 	if a.ctx.Err() != nil || a.transfers.quitting || a.transfers.storeErr != nil || a.transfers.writeErr != nil {
 		return
 	}

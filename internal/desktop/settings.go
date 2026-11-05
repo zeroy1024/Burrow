@@ -187,7 +187,7 @@ func (a *app) settingsCategoryHasMatch(index int) bool {
 		"关于 版本 开源许可 MyGo Catppuccin JetBrains Mono",
 	}
 	english := []string{"language system startup restore sessions close last tab active connection confirmation", "app theme light dark system accent preview reduce motion window translucency global background blur macOS", "color scheme follow app fixed light dark terminal background font size line height cursor style blink scrollback", "default local directory concurrent transfers name conflict", "keyboard shortcuts new close reopen select tabs previous next sidebar terminal file mode split search current page settings", "private key import generate ssh-agent saved passwords add to agent credentials", "about version open source license MyGo Catppuccin JetBrains Mono"}
-	return a.settingMatches(settingsCategories[index].label, texts[index]+english[index])
+	return (index == 5 && a.securitySettingsMatch()) || a.settingMatches(settingsCategories[index].label, texts[index]+english[index])
 }
 
 func (a *app) settingsText(c *ui.Context, text string, props uikit.TextProps, size float32) {

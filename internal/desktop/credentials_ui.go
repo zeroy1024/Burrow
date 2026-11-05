@@ -17,6 +17,7 @@ import (
 func (a *app) keySettings(c *ui.Context) {
 	t := theme.Current()
 	p := t.C.Settings
+	a.applicationSecuritySettings(c)
 	a.credentialGroup(c, "私钥", func() {
 		uikit.Button(c, localize(c, "导入…"), uikit.ButtonProps{Disabled: a.credentials.busy}).OnClick(a.choosePrivateKey)
 		uikit.Button(c, localize(c, "生成…"), uikit.ButtonProps{Disabled: a.credentials.busy}).OnClick(a.beginKeyGeneration)
@@ -27,7 +28,7 @@ func (a *app) keySettings(c *ui.Context) {
 		for _, key := range a.keys {
 			key := key
 			query := strings.ToLower(strings.TrimSpace(a.settingsUI.query))
-			if query != "" && !strings.Contains(strings.ToLower(localize(c, "私钥")+" "+localize(c, "密钥与凭据")+" "+key.Name+" "+key.Type+" "+key.Fingerprint+" "+key.Path), query) {
+			if query != "" && !strings.Contains(strings.ToLower(localize(c, "私钥")+" "+localize(c, "密钥与凭据")+" "+key.Name+" "+key.Type+" "+key.Fingerprint+" "), query) {
 				continue
 			}
 			row := uikit.SettingsRow(c, uikit.SettingsRowProps{Key: key.ID, Gap: t.Space.N12})
@@ -56,10 +57,7 @@ func (a *app) keySettings(c *ui.Context) {
 							OnClick(func() { mygo.Clipboard.WriteText(key.Fingerprint) })
 						uikit.Tip(c, fingerprint, localize(c, "复制指纹"))
 					})
-					uikit.MiddleLabel(c, key.Path, uikit.MiddleLabelProps{
-						Font:  ui.Font{Family: strings.Join(t.Font.Family.Mono, ", "), Size: t.Font.Size.Footnote, Weight: t.Font.Weight.Regular},
-						Color: uikit.Color(t.Color.Text.Secondary), Path: true,
-					}).FillWidth()
+					uikit.Text(c, localize(c, "已加密托管"), uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneSecondary})
 					uikit.Text(c, localize(c, fmt.Sprintf(localize(c, "被 %d 个会话使用"), a.keyUseCount(key.ID))), uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneSecondary})
 				})
 				uikit.MenuOn(c, uikit.IconButton(c, moreIcon, uikit.IconButtonProps{Label: localize(c, "密钥操作"), Disabled: a.credentials.busy}), a.managedKeyMenu(c, key))
@@ -114,7 +112,7 @@ func (a *app) keySettings(c *ui.Context) {
 		}
 	}
 	a.credentialGroup(c, "已保存的密码", nil, func() {
-		a.credentialRow(c, fmt.Sprintf(localize(c, "%d 个会话保存了密码"), count), "密码和私钥口令保存在系统钥匙串中", func() {
+		a.credentialRow(c, fmt.Sprintf(localize(c, "%d 个会话保存了密码"), count), "密码和私钥口令加密保存在本机", func() {
 			uikit.Button(c, localize(c, "全部清除…"), uikit.ButtonProps{Variant: uikit.ButtonDangerPlain, Disabled: count == 0 || a.credentials.busy}).OnClick(func() { a.credentials.draft = &credentialDraft{kind: "clear-passwords"} })
 		})
 	})
@@ -133,7 +131,7 @@ func (a *app) credentialGroup(c *ui.Context, title string, actions, content func
 		case "私钥":
 			description = "private keys import generate 导入 生成"
 			for _, key := range a.keys {
-				description += key.Name + key.Type + key.Fingerprint + key.Path
+				description += key.Name + key.Type + key.Fingerprint
 			}
 		case "ssh-agent":
 			description = "ssh-agent add refresh 添加到 agent 使用私钥连接成功后添加到 ssh-agent 已连接 刷新"
@@ -167,7 +165,7 @@ func (a *app) managedKeyMenu(c *ui.Context, key managedKey) []uikit.MenuEntry {
 			a.credentials.draft = &credentialDraft{kind: "rename", keyID: key.ID, name: key.Name}
 		}},
 		{ID: "copy-public", Label: localize(c, "复制公钥"), Icon: uikit.IconCopy, OnChoose: func() { a.copyManagedPublicKey(key) }},
-		{ID: "reveal", Label: localize(c, "在文件管理器中显示"), Icon: uikit.IconFolder, OnChoose: func() { mygo.Shell.ShowItemInFolder(key.Path) }},
+		{ID: "export", Label: localize(c, "导出私钥…"), Icon: uikit.IconFolder, OnChoose: func() { a.exportManagedKey(key) }},
 		{ID: "before-delete", Separator: true},
 		{ID: "delete", Label: localize(c, label), Icon: uikit.IconTrash, Disabled: used > 0, Danger: true, OnChoose: func() {
 			a.credentials.draft = &credentialDraft{kind: "delete", keyID: key.ID, name: key.Name}
@@ -194,7 +192,7 @@ func (a *app) credentialDialogs(c *ui.Context) {
 	case "rename":
 		title, action = "重命名密钥", "保存"
 	case "delete":
-		title, action = "删除密钥", "移到废纸篓"
+		title, action = "删除密钥", "删除"
 	case "clear-passwords":
 		title, action = "清除已保存的密码", "全部清除"
 	}
@@ -222,9 +220,9 @@ func (a *app) credentialDialogs(c *ui.Context) {
 		initial := ui.Local(parts.Panel, "uikit.credentials.initial", func() credentialFormValues { return current })
 		parts.SetDirty(current != *initial || d.passphrase != "")
 		if d.kind == "delete" {
-			uikit.Text(c, localize(c, fmt.Sprintf(localize(c, "确认将「%s」的私钥移到系统废纸篓？"), d.name)), uikit.TextProps{})
+			uikit.Text(c, localize(c, fmt.Sprintf(localize(c, "确认删除「%s」的托管私钥？此操作无法撤销。"), d.name)), uikit.TextProps{})
 		} else if d.kind == "clear-passwords" {
-			uikit.Text(c, localize(c, "清除系统钥匙串中的全部会话密码。下次连接时需要重新输入。"), uikit.TextProps{})
+			uikit.Text(c, localize(c, "清除已保存的全部会话密码。下次连接时需要重新输入。"), uikit.TextProps{})
 		} else {
 			credentialField(c, "名称", func() ui.Element {
 				return uikit.Input(c, &d.name, uikit.InputProps{}).Label(localize(c, "密钥名称")).AutoFocus().FillWidth()
@@ -243,7 +241,7 @@ func (a *app) credentialDialogs(c *ui.Context) {
 				credentialField(c, "口令", func() ui.Element {
 					return uikit.PasswordInput(c, &d.passphrase, uikit.InputProps{Label: localize(c, "私钥口令"), Mono: true}).Input.FillWidth()
 				})
-				uikit.Checkbox(c, &d.remember, localize(c, "将口令保存在系统钥匙串"))
+				uikit.Checkbox(c, &d.remember, localize(c, "加密保存私钥口令"))
 			}
 		}
 		if d.errorText != "" {
@@ -307,19 +305,12 @@ func (a *app) deleteManagedKey(d *credentialDraft) {
 		d.errorText = err.Error()
 		return
 	}
-	index := slices.IndexFunc(a.keys, func(candidate managedKey) bool { return candidate.ID == key.ID })
-	previous := slices.Clone(a.keys)
-	previousWorkspace := a.savedWorkspace
-	a.savedWorkspace = a.workspaceSnapshot()
-	a.keys = slices.Delete(a.keys, index, index+1)
-	a.saveCatalogAsync(func(err error) {
-		if err != nil {
-			a.keys = previous
-			a.savedWorkspace = previousWorkspace
-			d.errorText = "保存凭据目录：" + err.Error()
-			return
+	a.credentialWork(func(ctx context.Context) credentialResult {
+		if err := ctx.Err(); err != nil {
+			return credentialResult{err: err}
 		}
-		a.credentialWork(func(ctx context.Context) credentialResult { return trashManagedKey(ctx, key, index) })
+		changes, err := a.vault.Prepare(nil, []string{key.SecretID, "key/" + key.ID + "/passphrase"})
+		return credentialResult{deletedID: key.ID, changes: changes, notice: "托管私钥已删除", err: err}
 	})
 }
 
@@ -330,5 +321,5 @@ func (a *app) clearCredentialPasswords() {
 			ids = append(ids, h.session.ID)
 		}
 	}
-	a.credentialWork(func(ctx context.Context) credentialResult { return clearStoredPasswords(ctx, ids) })
+	a.credentialWork(func(ctx context.Context) credentialResult { return a.clearStoredPasswords(ctx, ids) })
 }

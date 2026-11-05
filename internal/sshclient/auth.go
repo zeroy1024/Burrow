@@ -19,6 +19,9 @@ func authentication(ctx context.Context, cfg Config) (ssh.AuthMethod, net.Conn, 
 	case "password":
 		return ssh.Password(cfg.Password), nil, nil
 	case "key":
+		if cfg.Signer != nil {
+			return ssh.PublicKeys(cfg.Signer), nil, nil
+		}
 		keyPath := cfg.KeyPath
 		if strings.HasPrefix(keyPath, "~/") {
 			home, err := os.UserHomeDir()

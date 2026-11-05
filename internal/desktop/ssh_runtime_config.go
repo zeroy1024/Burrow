@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"os"
 	"os/user"
 	"slices"
 	"strconv"
@@ -13,8 +12,8 @@ import (
 	"time"
 
 	"sshdesk/internal/sshclient"
+	"sshdesk/internal/vault"
 
-	"github.com/egoist/mygo"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/knownhosts"
 )
@@ -124,7 +123,7 @@ func (a *app) dialSSHPlan(ctx context.Context, plan sshDialPlan, override sshSec
 			return nil, context.DeadlineExceeded
 		}
 		connection, err = sshclient.Dial(ctx, cfg)
-		cfg.Password, cfg.Passphrase = "", ""
+		cfg.Password, cfg.Passphrase, cfg.Signer = "", "", nil
 		setupErr := setupCtx.Err()
 		cancelSetup()
 		if err != nil {
@@ -185,7 +184,7 @@ func (a *app) sshRuntimeConfig(ctx context.Context, step sshDialStep, override s
 				cfg.Password = secret
 				return cfg, nil
 			}
-			if !errors.Is(err, mygo.ErrSecretNotFound) {
+			if !errors.Is(err, vault.ErrNotFound) {
 				return cfg, fmt.Errorf("读取会话密码：%w", err)
 			}
 		}
@@ -198,13 +197,12 @@ func (a *app) sshRuntimeConfig(ctx context.Context, step sshDialStep, override s
 		}
 		cfg.Password = answer.secret
 	case "key":
-		cfg.KeyPath = step.key.Path
-		data, err := os.ReadFile(cfg.KeyPath)
+		data, err := a.vault.Get(ctx, step.key.SecretID)
 		if err != nil {
 			return cfg, fmt.Errorf("读取私钥：%w", err)
 		}
-		_, err = ssh.ParsePrivateKey(data)
-		clear(data)
+		defer clear(data)
+		cfg.Signer, err = ssh.ParsePrivateKey(data)
 		var encrypted *ssh.PassphraseMissingError
 		if err == nil {
 			return cfg, nil
@@ -215,8 +213,8 @@ func (a *app) sshRuntimeConfig(ctx context.Context, step sshDialStep, override s
 		if override.passphrase != nil {
 			cfg.Passphrase = *override.passphrase
 		} else {
-			secret, err := credentialStore().Get("key/" + step.key.ID + "/passphrase")
-			if err != nil && !errors.Is(err, mygo.ErrSecretNotFound) {
+			secret, err := a.vault.Get(ctx, "key/"+step.key.ID+"/passphrase")
+			if err != nil && !errors.Is(err, vault.ErrNotFound) {
 				return cfg, fmt.Errorf("读取私钥口令：%w", err)
 			}
 			cfg.Passphrase = string(secret)
@@ -231,6 +229,11 @@ func (a *app) sshRuntimeConfig(ctx context.Context, step sshDialStep, override s
 				return cfg, errSSHConnectCanceled
 			}
 			cfg.Passphrase = answer.secret
+		}
+		cfg.Signer, err = ssh.ParsePrivateKeyWithPassphrase(data, []byte(cfg.Passphrase))
+		cfg.Passphrase = ""
+		if err != nil {
+			return cfg, fmt.Errorf("解析私钥：%w", err)
 		}
 	case "agent":
 	default:

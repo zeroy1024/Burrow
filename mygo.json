@@ -7,6 +7,8 @@
   "out": "build",
   "macos": {
     "icon": "assets/AppIcon.icns",
-    "minimumSystemVersion": "13.0"
+    "minimumSystemVersion": "13.0",
+    "signingIdentity": "ABFE3215F20C9AEBF0814D52BACD7762076D4AF0",
+    "entitlements": "assets/macos.entitlements.plist"
   }
 }
