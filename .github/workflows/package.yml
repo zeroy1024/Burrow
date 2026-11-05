@@ -1,11 +1,21 @@
 name: 编译打包
+run-name: 打包 ${{ inputs.tag || github.ref_name }}
 
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 已存在的版本标签，例如 v0.1.2
+        required: true
+        type: string
 
 permissions:
   contents: read
+
+env:
+  BURROW_RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
 
 jobs:
   windows:
@@ -24,6 +34,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.tag) || github.ref }}
 
       - name: 安装打包依赖
         run: |
@@ -58,7 +69,7 @@ jobs:
           from pathlib import Path
 
           version = json.loads(Path("mygo.json").read_text(encoding="utf-8"))["version"]
-          if os.environ["GITHUB_REF_NAME"] != f"v{version}":
+          if os.environ["BURROW_RELEASE_TAG"] != f"v{version}":
               raise SystemExit("Tag must match the version in mygo.json")
           PYTAG
           python3 scripts/licenses.py --check
@@ -88,7 +99,7 @@ jobs:
               if not installer.is_file() or installer.stat().st_size == 0:
                   raise SystemExit(f"Missing or empty installer: {installer}")
               with tempfile.TemporaryDirectory(prefix=f"burrow-installer-{arch}-") as directory:
-                  subprocess.run(["7zz", "x", "-y", f"-o{directory}", str(installer)], check=True)
+                  subprocess.run(["7z", "x", "-y", f"-o{directory}", str(installer)], check=True)
                   for filename in (f"{config['name']}.exe", "ghostty-vt.dll", "LICENSE", "THIRD_PARTY_NOTICES.md"):
                       if (Path(directory) / filename).read_bytes() != (output / filename).read_bytes():
                           raise SystemExit(f"Installed runtime differs: {filename}")
@@ -131,6 +142,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.tag) || github.ref }}
 
       - name: 核对版本标签与许可
         run: |
@@ -140,7 +152,7 @@ jobs:
           from pathlib import Path
 
           version = json.loads(Path("mygo.json").read_text(encoding="utf-8"))["version"]
-          if os.environ["GITHUB_REF_NAME"] != f"v{version}":
+          if os.environ["BURROW_RELEASE_TAG"] != f"v{version}":
               raise SystemExit("Tag must match the version in mygo.json")
           PYTAG
           python3 scripts/licenses.py --check
