@@ -60,6 +60,8 @@ Windows 本机构建时，MyGo 会准备所需 NSIS；从 macOS/Linux 交叉打�
 mise exec -- go tool mygo build -skip-dmg
 ```
 
+`mygo.json` 的资源列表将根目录 `LICENSE` 与完整 `THIRD_PARTY_NOTICES.md` 一并安装到应用资源目录：macOS 为 `.app/Contents/Resources/`，Windows/Linux 为可执行文件所在目录。新增或更新依赖许可后先运行 `python3 scripts/licenses.py`，再构建；GitHub CI 会校验汇总内容以及打包资源。
+
 DMG 使用 [assets/dmg/background.tiff](../assets/dmg/background.tiff) 的浅色背景和 Applications 快捷方式，支持拖拽安装；ZIP 保留应用包结构及资源信息。发布版本时需同时核对 `mygo.json` 与 [settings_licenses.go](../internal/desktop/settings_licenses.go) 的版本显示。
 
 ## 已有检查
@@ -92,6 +94,29 @@ GOCACHE=/private/tmp/sshdesk-go-build mise exec -- go test ./...
 ```
 
 检查通过只说明本次实际运行的范围。协议、原生窗口和视觉验证的区别见[验证范围](limitations.md#验证如何解读)。
+
+## GitHub CI
+
+[提交检查](../.github/workflows/check.yml)在分支 push、PR 和手动触发时运行，使用托管 `ubuntu-24.04`。检查范围沿用 Gitea：Go 格式、Python 语法、根模块与终端扩展的已有 race 测试和 vet、Linux 编译、Windows 双架构交叉编译；另检查第三方许可汇总，并使用固定版本、校验 SHA-256 的 Gitleaks 扫描工作文件和检出仓库的全部历史引用。检出保留完整历史且不持久化凭据；工作流仅授予 `contents: read`，使用普通 `pull_request`，无需提供自定义仓库 Secret。
+
+[编译打包](../.github/workflows/package.yml)仅由 `v*` 标签触发，并要求标签与 `mygo.json` 一致，例如版本 `0.1.1` 对应 `v0.1.1`。Windows 使用 `ubuntu-24.04` 交叉构建 amd64/arm64 的 UPX NSIS 安装程序；macOS 使用 Apple Silicon `macos-15` 构建 ARM64 DMG。安装程序校验包括 EXE、DLL 和两个许可文件，macOS 校验 APP 内许可资源及 DMG。各附件附有 `SHA256SUMS`，保留 14 天；工作流不创建或更新 GitHub Release。
+
+Actions 均固定到提交 SHA，工具链沿用 `mise.toml`；APT 使用托管 Ubuntu runner 的 `sudo`，不复用 Gitea 的 rootless 容器设置。原生窗口、协议 Docker 联调、Windows 安装/升级/卸载、签名和公证状态需要单独验收，不能从工作流成功推断。
+
+### 公开与发布前检查
+
+- 更新 `mygo.json` 和关于页的版本号，生成并检查第三方声明：`python3 scripts/licenses.py --check`。
+- 使用 Gitleaks 8.30.1 或兼容版本在本地扫描计划公开的提交历史和工作文件；额外检查所有本地 refs，确认不会带出 stash、内部快照或未准备公开的分支。扫描结果留在仓库外并开启完整脱敏。
+
+  ```sh
+  gitleaks git --log-opts='HEAD --full-history' --redact=100 --no-banner .
+  gitleaks git --log-opts='--all --full-history' --redact=100 --no-banner .
+  gitleaks dir --redact=100 --no-banner .
+  ```
+
+- 人工确认截图、二进制素材、提交作者邮箱、历史提交消息和诊断材料的公开范围。正则扫描不能证明这些内容无敏感信息；SQLite、私钥、钥匙串内容和原始 MCP 审计不得作为问题附件公开。
+- 在 GitHub 启用私密漏洞报告、Secret scanning / Push protection，并为主分支配置所需检查；这些是仓库设置，不由本地文件自动启用。
+- 首次只推选定分支及必要标签，避免 `--mirror` 把内部 refs 一并公开。确认 GitHub 检查及产物校验通过后，再人工整理 Release 附件和版本说明，注明实际平台验收及签名状态。
 
 ## Gitea CI
 

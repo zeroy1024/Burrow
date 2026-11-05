@@ -6,13 +6,13 @@
 
 | 系统 / 架构 | 构建与产物 | 原生验证状态 |
 |---|---|---|
-| macOS arm64 | APP、DMG、ZIP；系统基线为 macOS 13；发布标签 CI 上传 DMG | 已有测试/race、静态检查及标准打包；CI 的 `macos-arm64` host runner 尚待配置 |
+| macOS arm64 | APP、DMG、ZIP；系统基线为 macOS 13；发布标签 CI 上传 DMG | 已有测试/race、静态检查及标准打包；GitHub `macos-15` 工作流尚待远端运行，Gitea host runner 尚待配置 |
 | macOS amd64 | 同一构建入口保留该目标 | 本次未在 Intel 机器运行 |
 | Windows amd64 / arm64 | 发布标签 CI 生成 UPX 压缩后的 NSIS 安装程序，包含对应 `ghostty-vt.dll`；本地入口保留便携 ZIP | 尚无 Windows 原生运行结果；最低系统版本、UPX 运行兼容性及杀软情况待原生验证确认 |
 | Linux amd64 | 已有目标编译检查；构建入口复用 MyGo | 未验证发行版依赖、X11/Wayland、系统凭据及桌面交互 |
 | Linux arm64 | 构建入口可选择 | 本次未验证 |
 
-构建方式与产物位置见[开发与构建](development.md)。Windows 打包主机需要 UPX 5.3.0 或更新版本；本机构建由 MyGo 准备 NSIS，交叉构建安装程序需主机提供 `makensis`。发布标签工作流分别使用 `ubuntu-latest` 和 `macos-arm64`，macOS runner 按 `macos-arm64:host` 标签另行配置。Gitea 的实际标签触发和附件上传仍需在 workflow 提交后验收。
+构建方式与产物位置见[开发与构建](development.md)。Windows 打包主机需要 UPX 5.3.0 或更新版本；本机构建由 MyGo 准备 NSIS，交叉构建安装程序需主机提供 `makensis`。GitHub 标签工作流使用托管的 `ubuntu-24.04` 和 Apple Silicon `macos-15`；Gitea 继续使用 `ubuntu-latest` 与另行配置的 `macos-arm64:host`。工作流配置存在不表示标签触发、附件上传或原生运行已经通过，远端结果需分别记录。
 
 ## 已接入的平台差异
 

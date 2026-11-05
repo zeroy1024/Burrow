@@ -12,10 +12,19 @@ import (
 	"sshdesk/internal/uikit"
 )
 
-// License texts are copied verbatim from the pinned dependency and asset versions.
+// License texts retain the upstream copyright notices for bundled dependencies and assets.
 //
 //go:embed licenses/mygo.txt
 var mygoLicense string
+
+//go:embed licenses/ghostty.txt
+var ghosttyLicense string
+
+//go:embed licenses/sftp.txt
+var sftpLicense string
+
+//go:embed licenses/go.txt
+var goLicense string
 
 //go:embed licenses/sqlite.txt
 var sqliteLicense string
@@ -57,8 +66,11 @@ var burrowIcon = func() *ui.Bitmap {
 
 var dependencyNotices = []struct{ name, license, text string }{
 	{"MyGo", "MIT", mygoLicense},
+	{"Ghostty VT 及原生依赖", "MIT / Apache-2.0 / BSD-3-Clause / Unicode-3.0", ghosttyLicense},
+	{"pkg/sftp 及 kr/fs", "BSD-2-Clause / BSD-3-Clause", sftpLicense},
+	{"Go 标准库 / golang.org/x/sys", "BSD-3-Clause", goLicense},
 	{"modernc SQLite 及运行依赖", "BSD / MIT", sqliteLicense},
-	{"MCP Go SDK 及运行依赖", "MIT / BSD-3-Clause", mcpLicense},
+	{"MCP Go SDK 及运行依赖", "Apache-2.0 / MIT / BSD-3-Clause", mcpLicense},
 	{"Lucide Icons " + uikit.LucideVersion, "ISC / MIT", uikit.LucideLicense},
 	{"golang.org/x/crypto/ssh", "BSD-3-Clause", cryptoLicense},
 	{"go-winio", "MIT", winioLicense},

@@ -33,7 +33,7 @@ mise run build
 
 工具链要求、产物位置和验证命令见[开发与构建](docs/development.md)。
 
-Gitea 的普通分支推送和 PR 只运行[提交检查](.gitea/workflows/check.yml)；推送 `v*` 发布标签才触发[编译打包](.gitea/workflows/package.yml)，产出 Windows amd64/arm64 的 UPX 安装程序和 macOS ARM64 DMG。runner 要求与附件说明见[Gitea CI](docs/development.md#gitea-ci)。
+GitHub 的普通分支推送和 PR 运行[提交检查](.github/workflows/check.yml)，包括敏感信息扫描、许可汇总校验、现有测试和跨平台编译；推送与项目版本一致的 `v*` 标签才触发[编译打包](.github/workflows/package.yml)，产出 Windows amd64/arm64 的 UPX 安装程序、macOS ARM64 DMG 和 SHA-256 摘要。工作流保存 14 天的 Actions 附件，不自动创建 Release。配置与发布前检查见 [GitHub CI](docs/development.md#github-ci)；原有 Gitea 工作流继续保留。
 
 ## 使用须知
 
@@ -58,3 +58,9 @@ Gitea 的普通分支推送和 PR 只运行[提交检查](.gitea/workflows/check
 MCP 的接入、数据边界、工具契约和验证范围见 [MCP Server 功能方案](docs/mcp-server-plan.md)。页面设计交接见 [MCP 页面设计功能清单](docs/mcp-page-design-brief.md)。
 
 阶段计划、整改和历史验收记录保存在[历史归档](docs/archive/README.md)，不作为当前使用说明。
+
+## 许可与参与
+
+Burrow 自有代码使用 [MIT 许可证](LICENSE)。依赖、原生库、字体、图标与配色保留各自许可，完整文本见[第三方声明](THIRD_PARTY_NOTICES.md)，并随原生应用分发。
+
+贡献流程见 [CONTRIBUTING.md](CONTRIBUTING.md)；漏洞请按 [SECURITY.md](SECURITY.md) 私密报告，不在公开 Issue 中提交凭据或未修复漏洞的利用细节。

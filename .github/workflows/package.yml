@@ -1,0 +1,184 @@
+name: 编译打包
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    name: Windows 双架构 UPX 安装程序
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    env:
+      GOFLAGS: -mod=readonly
+      GOTOOLCHAIN: local
+      CGO_ENABLED: '0'
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: 安装打包依赖
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ca-certificates curl nsis 7zip xz-utils
+
+      - name: 准备 UPX 5.3.0
+        run: |
+          case "$(uname -m)" in
+            x86_64)
+              burrow_upx_arch=amd64
+              burrow_upx_sha256=79cea8a50b6fa102d10c7b79a419cd77dead3cc2d78661de2dc5e5815dc505c1
+              ;;
+            aarch64)
+              burrow_upx_arch=arm64
+              burrow_upx_sha256=2a4afa860ac7aa6968f88df7841823746e5d00ba56affdf9342c2f5254fb776f
+              ;;
+            *) echo "Unsupported UPX host architecture: $(uname -m)" >&2; exit 1 ;;
+          esac
+          burrow_upx_name="upx-5.3.0-${burrow_upx_arch}_linux"
+          burrow_upx_archive="$RUNNER_TEMP/$burrow_upx_name.tar.xz"
+          curl --fail --location --output "$burrow_upx_archive" "https://github.com/upx/upx/releases/download/v5.3.0/$burrow_upx_name.tar.xz"
+          printf '%s  %s\n' "$burrow_upx_sha256" "$burrow_upx_archive" | sha256sum --check --strict
+          tar -xJf "$burrow_upx_archive" -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/$burrow_upx_name" >> "$GITHUB_PATH"
+
+      - name: 核对版本标签与许可
+        run: |
+          python3 - <<'PYTAG'
+          import json
+          import os
+          from pathlib import Path
+
+          version = json.loads(Path("mygo.json").read_text(encoding="utf-8"))["version"]
+          if os.environ["GITHUB_REF_NAME"] != f"v{version}":
+              raise SystemExit("Tag must match the version in mygo.json")
+          PYTAG
+          python3 scripts/licenses.py --check
+
+      - name: 准备项目工具链
+        uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5
+        with:
+          version: 2026.10.25
+          cache: false
+
+      - name: 构建 Windows 产物
+        run: mise run build -- --platform windows/amd64,windows/arm64
+
+      - name: 校验安装程序内容与摘要
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+          import subprocess
+          import tempfile
+
+          config = json.loads(Path("mygo.json").read_text(encoding="utf-8"))
+          for arch in ("amd64", "arm64"):
+              output = Path(config["out"]) / f"windows-{arch}"
+              installer = output / f"{config['slug']}-setup-{config['version']}-{arch}.exe"
+              if not installer.is_file() or installer.stat().st_size == 0:
+                  raise SystemExit(f"Missing or empty installer: {installer}")
+              with tempfile.TemporaryDirectory(prefix=f"burrow-installer-{arch}-") as directory:
+                  subprocess.run(["7zz", "x", "-y", f"-o{directory}", str(installer)], check=True)
+                  for filename in (f"{config['name']}.exe", "ghostty-vt.dll", "LICENSE", "THIRD_PARTY_NOTICES.md"):
+                      if (Path(directory) / filename).read_bytes() != (output / filename).read_bytes():
+                          raise SystemExit(f"Installed runtime differs: {filename}")
+              digest = hashlib.sha256(installer.read_bytes()).hexdigest()
+              (output / "SHA256SUMS").write_text(f"{digest}  {installer.name}\n", encoding="utf-8")
+          PY
+
+      - name: 保存 Windows x64 产物
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: burrow-windows-amd64
+          path: |
+            build/windows-amd64/*-setup-*.exe
+            build/windows-amd64/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: 保存 Windows ARM64 产物
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: burrow-windows-arm64
+          path: |
+            build/windows-arm64/*-setup-*.exe
+            build/windows-arm64/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 14
+
+  macos:
+    name: macOS ARM64 DMG
+    runs-on: macos-15
+    timeout-minutes: 45
+    env:
+      GOFLAGS: -mod=readonly
+      GOTOOLCHAIN: local
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: 核对版本标签与许可
+        run: |
+          python3 - <<'PYTAG'
+          import json
+          import os
+          from pathlib import Path
+
+          version = json.loads(Path("mygo.json").read_text(encoding="utf-8"))["version"]
+          if os.environ["GITHUB_REF_NAME"] != f"v{version}":
+              raise SystemExit("Tag must match the version in mygo.json")
+          PYTAG
+          python3 scripts/licenses.py --check
+
+      - name: 准备项目工具链
+        uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5
+        with:
+          version: 2026.10.25
+          cache: false
+
+      - name: 构建 macOS DMG
+        run: mise run build -- --platform darwin/arm64
+
+      - name: 校验 DMG 与摘要
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+          import subprocess
+
+          config = json.loads(Path("mygo.json").read_text(encoding="utf-8"))
+          output = Path(config["out"]) / "darwin-arm64"
+          resources = output / f"{config['name']}.app" / "Contents" / "Resources"
+          for filename in ("LICENSE", "THIRD_PARTY_NOTICES.md"):
+              if (resources / filename).read_bytes() != Path(filename).read_bytes():
+                  raise SystemExit(f"Bundled license differs: {filename}")
+          dmg = output / f"{config['slug']}-{config['version']}-arm64.dmg"
+          if not dmg.is_file() or dmg.stat().st_size == 0:
+              raise SystemExit(f"Missing or empty DMG: {dmg}")
+          subprocess.run(["hdiutil", "verify", str(dmg)], check=True)
+          digest = hashlib.sha256(dmg.read_bytes()).hexdigest()
+          (output / "SHA256SUMS").write_text(f"{digest}  {dmg.name}\n", encoding="utf-8")
+          PY
+
+      - name: 保存 macOS DMG
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: burrow-macos-arm64
+          path: |
+            build/darwin-arm64/*.dmg
+            build/darwin-arm64/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 14

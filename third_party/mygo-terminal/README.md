@@ -6,7 +6,7 @@ view that runs the user's shell, or any program, in a pseudo-terminal, with
 at run time with no cgo.
 
 ```go
-import "github.com/egoist/mygo/plugins/terminal"
+import "github.com/egoist/mygo/sshdesk-terminal"
 
 term, err := terminal.New(terminal.Options{})
 // ...
@@ -15,8 +15,9 @@ mygo.NewWindow(mygo.WindowOptions{Title: "Terminal", Content: ui.View(func(c *ui
 })})
 ```
 
-See [the documentation](../../docs/plugins/terminal.md), and
-`examples/terminal` for an app.
+This is Burrow's local terminal fork of MyGo v0.7.3. See Burrow's
+[terminal documentation](../../docs/terminal-themes.md) and the
+[upstream project](https://github.com/egoist/mygo) for background.
 
 `go generate` here builds libghostty-vt for every platform with Zig, from
 the commit of Ghostty in `internal/libbuild`, into `build/`, and writes

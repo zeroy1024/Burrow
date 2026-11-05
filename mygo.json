@@ -5,6 +5,7 @@
   "version": "0.1.1",
   "icon": "assets/icon.png",
   "out": "build",
+  "resources": ["LICENSE", "THIRD_PARTY_NOTICES.md"],
   "macos": {
     "icon": "assets/AppIcon.icns",
     "minimumSystemVersion": "13.0"

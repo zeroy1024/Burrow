@@ -24,12 +24,15 @@
 | [主题与设计令牌](theme-integration.md) | 令牌来源、生成流程和明暗外观接入 |
 | [共享 UI 组件](uikit.md) | 组件职责、状态归属、滚动、拖放和终端容器 |
 | [联调与原生 E2E](../dev/ssh-integration/README.md) | 本机 SSH / FTP 夹具、协议测试及原生驱动 |
+| [参与贡献](../CONTRIBUTING.md) | 修改范围、验证、文档与依赖许可维护 |
+| [安全政策](../SECURITY.md) | 漏洞私密报告与诊断数据边界 |
+| [第三方声明](../THIRD_PARTY_NOTICES.md) | 随应用分发的依赖及素材许可全文 |
 
-## 功能方案（未实现）
+## MCP 设计与工具契约
 
 | 文档 | 内容 |
 |---|---|
-| [MCP Server 功能方案](mcp-server-plan.md) | 独立页面、Secret Key 认证授权、拦截策略、SSH / 文件工具、审计、任务生命周期与分阶段验收 |
+| [MCP Server 功能方案](mcp-server-plan.md) | 已接入功能、认证授权、工具与审计契约、验证记录及后续范围 |
 | [MCP 页面设计功能清单](mcp-page-design-brief.md) | designer agent 交接清单：服务区、Key、SSH / 文件策略、审计、任务详情与全部页面状态 |
 
 ## 文档维护

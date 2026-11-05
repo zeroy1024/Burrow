@@ -3,3 +3,11 @@
 /build/
 .DS_Store
 mygo_windows_*.syso
+.env
+.env.*
+/burrow.db
+/burrow.db-wal
+/burrow.db-shm
+/burrow.db.lock
+/keys/
+__pycache__/
