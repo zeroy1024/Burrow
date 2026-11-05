@@ -22,6 +22,13 @@ func Tip(c *ui.Context, anchor ui.Element, label string, shortcuts ...string) ui
 		description += " " + shortcut
 	}
 	anchor.Description(description)
+	attachTip(c, anchor, label, shortcut)
+	return anchor
+}
+
+// attachTip shows label, with any shortcut, above anchor while the pointer
+// is over it.
+func attachTip(c *ui.Context, anchor ui.Element, label, shortcut string) {
 	ui.TooltipBase(c, anchor, func(tip ui.Element) {
 		StyleTooltip(tip).AttachTo(anchor, ui.AnchorTop, ui.AnchorBottom).
 			Margin(0, 0, theme.Current().C.Tooltip.Offset, 0).Children(func() {
@@ -33,25 +40,20 @@ func Tip(c *ui.Context, anchor ui.Element, label string, shortcuts ...string) ui
 			})
 		})
 	})
-	return anchor
 }
 
 // HelpTip is the question mark after a settings label. Its hint shows only
-// while the pointer is over it: it takes neither clicks nor the focus, and
-// assistive technology reads the hint as its description.
+// while the pointer is over it: it takes neither clicks nor the focus. The
+// hint also names the icon, since assistive technology skips an unnamed icon
+// as decoration.
 func HelpTip(c *ui.Context, hint string) ui.Element {
-	t := theme.Current()
-	p := t.C.HelpTip
-	icon := ui.Icon(c, IconSVG(IconHelp)).Size(p.Size, p.Size).Shrink(0).Description(hint)
+	p := theme.Current().C.HelpTip
+	icon := ui.Icon(c, IconSVG(IconHelp)).Size(p.Size, p.Size).Shrink(0).Label(hint)
 	ink := p.Icon
 	if icon.Hovered() {
 		ink = p.IconHover
 	}
 	icon.TextColor(Color(ink))
-	ui.TooltipBase(c, icon, func(tip ui.Element) {
-		StyleTooltip(tip).AttachTo(icon, ui.AnchorTop, ui.AnchorBottom).Margin(0, 0, t.C.Tooltip.Offset, 0).Children(func() {
-			ui.Text(c, hint).PassThrough()
-		})
-	})
+	attachTip(c, icon, hint, "")
 	return icon
 }
