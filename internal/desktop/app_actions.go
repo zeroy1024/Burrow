@@ -253,6 +253,9 @@ func (a *app) installAppMenu() func() {
 	settings := &mygo.MenuItem{
 		Label: localizeTag(mygo.App.Locale(), "设置…"),
 		Click: func(*mygo.MenuItem, *mygo.Window) {
+			if !a.businessReady() || a.security.dialog != nil {
+				return
+			}
 			// Native menu callbacks do not pass through the UI modal scope.
 			if a.page().addHostOpen || a.page().groupDialogOpen || a.files.dialog != nil ||
 				a.files.conflict != nil || a.credentials.draft != nil || a.closeRequest != nil || a.closeFileRequest != nil || a.closePaneRequest != nil {
@@ -266,6 +269,9 @@ func (a *app) installAppMenu() func() {
 	}
 	cycle := func(direction int) func(*mygo.MenuItem, *mygo.Window) {
 		return func(*mygo.MenuItem, *mygo.Window) {
+			if !a.businessReady() || a.security.dialog != nil {
+				return
+			}
 			// AppKit handles Control-Tab before the native view's keyDown.
 			// Menu accelerators need their own guard for the UI's modal scope.
 			switch {

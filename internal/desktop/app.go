@@ -15,6 +15,7 @@ import (
 	"sshdesk/internal/termtheme"
 	"sshdesk/internal/theme"
 	"sshdesk/internal/uikit"
+	"sshdesk/internal/vault"
 
 	"github.com/egoist/mygo"
 	nativeterm "github.com/egoist/mygo/sshdesk-terminal"
@@ -66,6 +67,8 @@ type pageState struct {
 }
 
 type app struct {
+	vault                  *vault.Manager
+	security               applicationSecurityState
 	store                  *store.Store
 	persistence            *persistenceWorker
 	dataDirectory          string
@@ -230,43 +233,27 @@ func Run() (runErr error) {
 			runErr = errors.Join(runErr, a.mcpBackend.service.Close())
 		}
 		a.sshWorkers.Wait()
+		if a.vault != nil {
+			a.vault.Close()
+		}
+		a.clearSecurityInputs()
 		runErr = errors.Join(runErr, a.finishPersistence())
 	}()
 	a.persistence = newPersistenceWorker(func() *mygo.Window { return a.window })
 	for i := range a.pages {
 		a.pages[i].sidebarWidth = theme.Current().C.Sider.Width
 	}
-	a.catalogError = a.loadCatalog()
-	a.initMCPUI()
-	if err := a.initMCPBackend(); err != nil {
-		a.persistenceNotice("初始化 MCP 失败", err)
-	}
 	a.terminalError = a.loadTerminalSettings()
-	a.files.ratio = theme.Current().C.FTPSplit.DefaultRatio
-	a.files.activeRemote = true
-	a.files.localPaths = map[string]string{}
-	if err := a.loadFilePreferences(); err != nil {
-		a.files.notice = &uikit.ToastProps{
-			ID: "无法读取文件传输偏好：" + err.Error(), Tone: uikit.ToneDanger,
-			Title: "无法读取文件传输偏好", Detail: err.Error(),
-		}
-	}
 	if err := a.loadAppPreferences(); err != nil {
-		a.terminalError = errors.Join(a.terminalError, err)
+		a.security.errorText = err.Error()
 	}
-	if err := a.loadHostFacts(); err != nil {
-		a.persistenceNotice("读取主机基础信息失败", err)
-	}
-	a.restoreWorkspace()
-	if err := a.restoreTransfers(); err != nil {
-		detail := err.Error()
-		if a.files.notice != nil {
-			detail = a.files.notice.Title + "：" + a.files.notice.Detail + "\n" + detail
-		}
-		a.files.notice = &uikit.ToastProps{ID: "transfer-restore-error", Tone: uikit.ToneDanger, Title: "无法恢复传输记录", Detail: detail}
-	}
-	if len(a.tabs) > 0 && a.section == sectionSSH {
-		a.activateTab(a.activeTab)
+	a.vault, err = vault.OpenWithKeyStore(ctx, db, directory, platformUnlockKeys())
+	if err != nil {
+		a.security.errorText = err.Error()
+		a.security.status = "blocked"
+	} else {
+		a.security.migration = a.vault.State() == "pending_migration"
+		a.security.requirePassword = a.vault.RequiresPassword()
 	}
 	mygo.Theme.SetSource([]mygo.ThemeSource{mygo.ThemeLight, mygo.ThemeDark, mygo.ThemeSystem}[a.appearance])
 	stopTokens := theme.OnChange(func(t *theme.Theme) {
@@ -310,7 +297,6 @@ func Run() (runErr error) {
 			Content:              ui.View(a.view),
 		})
 		a.windowMaterial = material
-		a.startMCPBackend()
 		a.syncWindowMaterial()
 		a.window.OnClose(func(e *mygo.CloseEvent) {
 			if a.quitReady {
@@ -326,6 +312,7 @@ func Run() (runErr error) {
 		// Windows can build the first frame synchronously when shown. Finish
 		// assigning and setting up a.window before that frame starts UI work.
 		a.window.Show()
+		a.beginStartup()
 	}
 	mygo.App.WhenReady(openWindow)
 	stopActivate := mygo.App.OnActivate(func(visible bool) {
@@ -337,6 +324,14 @@ func Run() (runErr error) {
 	})
 	defer stopActivate()
 	stopQuit := mygo.App.OnBeforeQuit(func(e *mygo.QuitEvent) {
+		if !a.security.initialized {
+			a.cancel()
+			return
+		}
+		if a.security.changing {
+			e.PreventDefault()
+			return
+		}
 		if a.quitPending {
 			e.PreventDefault()
 			return
@@ -393,6 +388,10 @@ func Run() (runErr error) {
 }
 
 func (a *app) view(c *ui.Context) {
+	if !a.security.ready {
+		a.startupView(c)
+		return
+	}
 	a.tickMCPBackend(c)
 	t := theme.Current()
 	a.theme = uikit.Install(c)
@@ -413,7 +412,7 @@ func (a *app) view(c *ui.Context) {
 			background = ui.Transparent
 		}
 	}
-	c.Root().Background(background).Disabled(a.transfers.quitting || a.catalogSaving || a.quitPending || a.terminal.importing)
+	c.Root().Background(background).Disabled(a.security.changing || a.transfers.quitting || a.catalogSaving || a.quitPending || a.terminal.importing)
 	root := ui.Column(c).Fill()
 	x, y, _ := root.PointerPosition()
 	a.pointer = ui.Point{X: x, Y: y}
@@ -507,6 +506,7 @@ func (a *app) view(c *ui.Context) {
 	a.sshDialogs(c)
 	a.fileSSHLinkDialog(c)
 	a.credentialDialogs(c)
+	a.applicationSecurityDialog(c)
 	a.closeTabDialog(c)
 	if a.files.drag != nil && !a.files.dragSeen {
 		drag := a.files.drag

@@ -5,13 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"golang.org/x/crypto/ssh"
-	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 	"time"
 
-	"sshdesk/internal/localfs"
 	"sshdesk/internal/store"
 )
 
@@ -148,21 +145,10 @@ func (a *app) readCatalog() error {
 		if err != nil {
 			return err
 		}
-		expected := filepath.Join(a.dataDirectory, "keys", k.ID)
-		if filepath.Clean(k.Path) != expected {
-			return errors.New("managed key must be inside the application's keys directory")
+		if k.SecretID != privateCredentialKey(k.ID) {
+			return errors.New("managed key credential reference mismatch")
 		}
-		info, err := os.Lstat(expected)
-		if err != nil {
-			return err
-		}
-		if !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 {
-			return errors.New("managed key must be a regular file")
-		}
-		if err := localfs.CheckPrivate(expected, info); err != nil {
-			return err
-		}
-		a.keys = append(a.keys, managedKey{PublicKey: k.PublicKey, ID: k.ID, Name: k.Name, Type: k.Kind, Fingerprint: k.Fingerprint, Path: k.Path, Comment: k.Comment, Bits: k.Bits, CreatedAt: created})
+		a.keys = append(a.keys, managedKey{PublicKey: k.PublicKey, ID: k.ID, Name: k.Name, Type: k.Kind, Fingerprint: k.Fingerprint, SecretID: k.SecretID, Comment: k.Comment, Bits: k.Bits, CreatedAt: created})
 	}
 	if err := validateSessionCatalog(a.hosts, a.keys); err != nil {
 		return err
@@ -189,7 +175,7 @@ func (a *app) catalogSnapshotData() (store.Catalog, error) {
 	}
 	c := store.Catalog{}
 	for _, k := range a.keys {
-		c.Keys = append(c.Keys, store.Key{PublicKey: k.PublicKey, ID: k.ID, Name: k.Name, Kind: k.Type, Fingerprint: k.Fingerprint, Path: k.Path, Comment: k.Comment, Bits: k.Bits, CreatedAt: k.CreatedAt.Format(time.RFC3339Nano)})
+		c.Keys = append(c.Keys, store.Key{PublicKey: k.PublicKey, ID: k.ID, Name: k.Name, Kind: k.Type, Fingerprint: k.Fingerprint, SecretID: k.SecretID, Comment: k.Comment, Bits: k.Bits, CreatedAt: k.CreatedAt.Format(time.RFC3339Nano)})
 	}
 	for order, g := range a.groups {
 		if g.stableID == "" {

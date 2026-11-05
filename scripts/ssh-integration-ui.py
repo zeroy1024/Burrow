@@ -327,7 +327,7 @@ def prepare(repo, task_dir, address):
     local_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
     for name in ("cache", "logs"):
         (config_root / name).mkdir(mode=0o700)
-    # Seed only the current schema in a disposable directory; no legacy import.
+    # Seed pre-vault credentials in a disposable directory; migrate through the isolated provider.
     now = datetime.now(timezone.utc).isoformat()
     key_ids = {}
     with sqlite3.connect(config_dir / "burrow.db") as db:
@@ -398,8 +398,27 @@ func configureDataDirectory() (string,error) {
  mygo.App.SetPath(mygo.PathUserData,directory)
  return directory,nil
 }
-func credentialStore() mygo.SecretsModule {return mygo.Secrets.Service("dev.burrow.app.integration")}
+func legacyCredentialStore() mygo.SecretsModule {return mygo.Secrets.Service("dev.burrow.app.integration")}
 ''')
+    mapping[str(original)] = str(replacement)
+    original = repo / "internal/desktop/application_security.go"
+    replacement = overlay_dir / "application_security.go"
+    content = original.read_text()
+    content = replace_once(content, "import (", 'import (\n "os"\n "path/filepath"')
+    content = replace_once(content, 'a.security.status = "migration"\n\t\treturn', '''a.security.status = "migration"
+        catalog,err:=a.store.ReadCatalog(a.ctx)
+        if err!=nil {a.security.errorText=err.Error();return}
+        phrase,err:=os.ReadFile(filepath.Join(os.Getenv("SSHDESK_TEST_DIR"),"key_passphrase"))
+        if err!=nil {a.security.errorText=err.Error();return}
+        a.security.migrationPhrases=map[string]string{}
+        for _,key:=range catalog.Keys {
+            if key.Name=="key_encrypted" {a.security.migrationPhrases[key.ID]=strings.TrimSpace(string(phrase))}
+        }
+        clear(phrase)
+        a.submitStartup()
+        return''')
+    content = replace_once(content, '"path/filepath"', '"path/filepath"\n "strings"')
+    replacement.write_text(content)
     mapping[str(original)] = str(replacement)
     original = repo / "internal/desktop/ssh_terminal.go"
     replacement = overlay_dir / "ssh_terminal.go"

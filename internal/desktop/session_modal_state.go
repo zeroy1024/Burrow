@@ -2,7 +2,6 @@ package desktop
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net"
 	"regexp"
@@ -439,15 +438,9 @@ func (a *app) saveSessionDraft(c *ui.Context, d *hostDraft, connect bool) {
 		}
 		factsKey = hostFactsKey(plan)
 	}
-	rollback, release, err := snapshotSessionSecrets(h, d.passwordChanged, d.passphraseChanged)
+	changes, err := a.prepareSessionSecrets(&h, d.password, d.passwordChanged, d.passphrase, d.passphraseChanged)
 	if err != nil {
-		uikit.Toast(c, uikit.ToastProps{Tone: uikit.ToneDanger, Title: "读取原有凭据失败", Detail: err.Error()})
-		d.saving = false
-		return
-	}
-	if err := a.storeSessionSecrets(&h, d.password, d.passwordChanged, d.passphrase, d.passphraseChanged); err != nil {
-		uikit.Toast(c, uikit.ToastProps{Tone: uikit.ToneDanger, Title: "保存凭据失败", Detail: errors.Join(err, rollback()).Error()})
-		release()
+		uikit.Toast(c, uikit.ToastProps{Tone: uikit.ToneDanger, Title: "保存凭据失败", Detail: err.Error()})
 		d.saving = false
 		return
 	}
@@ -455,7 +448,7 @@ func (a *app) saveSessionDraft(c *ui.Context, d *hostDraft, connect bool) {
 	if d.editing {
 		id = d.id
 	}
-	a.commitCatalogMoveAsync(func() {
+	a.commitCatalogSecretsAsync(changes, func() {
 		if d.editing {
 			a.hosts[id] = h
 		} else {
@@ -477,10 +470,9 @@ func (a *app) saveSessionDraft(c *ui.Context, d *hostDraft, connect bool) {
 			}
 		}
 	}, func(err error) {
-		defer release()
 		d.saving = false
 		if err != nil {
-			a.persistenceNotice("保存会话失败", errors.Join(err, rollback()))
+			a.persistenceNotice("保存会话失败", err)
 			return
 		}
 		if facts != nil {

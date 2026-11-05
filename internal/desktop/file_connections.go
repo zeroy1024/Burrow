@@ -12,11 +12,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/egoist/mygo"
 	"sshdesk/internal/fileclient"
 	"sshdesk/internal/mcpserver"
 	"sshdesk/internal/sshclient"
 	"sshdesk/internal/uikit"
+	"sshdesk/internal/vault"
 )
 
 type fileNavigation struct {
@@ -41,6 +41,10 @@ type fileRuntime struct {
 // subsystem. The group's transport is shared, but canceling a consumer is not.
 // This entry point and its completion callback run on the UI thread.
 func (a *app) openFileClient(ctx context.Context, session *fileSession, complete func(fileclient.Client, error)) *sshConnectionRequest {
+	if !a.businessReady() {
+		complete(nil, errAppUnavailable)
+		return nil
+	}
 	h := cloneHostEndpoint(session.endpoint)
 	var request *sshConnectionRequest
 	finished := false
@@ -92,7 +96,7 @@ func (a *app) openFileClient(ctx context.Context, session *fileSession, complete
 			} else {
 				if secret == "" {
 					secret, err = a.sessionPassword(h)
-					if errors.Is(err, mygo.ErrSecretNotFound) {
+					if errors.Is(err, vault.ErrNotFound) {
 						err = nil
 					}
 				}

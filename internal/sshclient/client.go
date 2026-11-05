@@ -28,6 +28,7 @@ type Config struct {
 	Password   string
 	KeyPath    string
 	Passphrase string
+	Signer     ssh.Signer
 	HostKey    ssh.HostKeyCallback
 	// SetupTimeout bounds authentication and underlying TCP/tunnel creation.
 	// Zero uses two minutes; it does not limit an established connection.

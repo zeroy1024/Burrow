@@ -76,6 +76,7 @@ func OperationID(ctx context.Context) (string, int) {
 // All methods may be called from HTTP workers. The adapter is responsible for
 // dispatching access to desktop-owned state onto the window thread.
 type Backend interface {
+	Available(context.Context) error
 	Connections(context.Context) ([]Connection, error)
 	OpenFiles(context.Context, Connection) (fileclient.Client, error)
 	Exec(context.Context, Connection, string) (sshclient.ExecResult, error)

@@ -43,12 +43,15 @@ func (a *app) persist(work func() error, done func(error)) {
 	}}
 }
 
-func (a *app) saveCatalogAsync(done func(error)) {
+func (a *app) saveCatalogAsync(done func(error)) { a.saveCatalogSecretsAsync(nil, done) }
+
+func (a *app) saveCatalogSecretsAsync(changes *store.VaultChanges, done func(error)) {
 	c, err := a.catalogSnapshotData()
 	if err != nil {
 		done(err)
 		return
 	}
+	c.VaultChanges = changes
 	a.catalogSaving = true
 	a.persist(func() error { return a.store.SaveCatalog(a.ctx, c) }, func(err error) {
 		a.catalogSaving = false
@@ -62,8 +65,12 @@ func (a *app) saveCatalogAsync(done func(error)) {
 }
 
 func (a *app) commitCatalogMoveAsync(change func(), done func(error)) {
+	a.commitCatalogSecretsAsync(nil, change, done)
+}
+
+func (a *app) commitCatalogSecretsAsync(changes *store.VaultChanges, change func(), done func(error)) {
 	complete := a.beginCatalogMove(change)
-	a.saveCatalogAsync(func(err error) {
+	a.saveCatalogSecretsAsync(changes, func(err error) {
 		complete(err)
 		done(err)
 	})

@@ -185,6 +185,10 @@ func (s *Service) Handler(cfg Config) http.Handler {
 		s.requests.Add(1)
 		s.mu.Unlock()
 		defer s.requests.Done()
+		if err := s.Backend.Available(r.Context()); err != nil {
+			http.Error(w, err.Error(), http.StatusServiceUnavailable)
+			return
+		}
 		if r.URL.Path != "/mcp" {
 			http.NotFound(w, r)
 			return
