@@ -1,0 +1,163 @@
+package desktop
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+
+	"github.com/egoist/mygo"
+	"golang.org/x/crypto/ssh"
+	"sshdesk/internal/localfs"
+	"sshdesk/internal/vault"
+)
+
+type migrationPassphraseError struct{ ID, Name string }
+
+func (e *migrationPassphraseError) Error() string {
+	return "迁移私钥「" + e.Name + "」需要原私钥口令"
+}
+
+type migrationCredentialError struct{ ID, Name string }
+
+func (e *migrationCredentialError) Error() string {
+	return "迁移会话「" + e.Name + "」需要重新输入已丢失的保存密码"
+}
+
+func (a *app) migrateVault(ctx context.Context, temporary map[string]string) error {
+	catalog, err := a.store.ReadCatalog(ctx)
+	if err != nil {
+		return err
+	}
+	profiles, err := a.store.LegacyCredentialProfiles(ctx)
+	if err != nil {
+		return err
+	}
+	source := legacyCredentialStore()
+	items := []vault.PlainItem{}
+	defer func() {
+		for _, item := range items {
+			clear(item.Data)
+		}
+	}()
+	latest := map[string]storedSession{}
+	for _, profile := range catalog.Profiles {
+		var endpoint storedSession
+		if err := json.Unmarshal(profile.Value, &endpoint); err != nil {
+			return err
+		}
+		latest[endpoint.ID] = endpoint
+	}
+	seen := map[string]bool{}
+	for _, data := range profiles {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		var endpoint storedSession
+		if err := json.Unmarshal(data, &endpoint); err != nil {
+			return err
+		}
+		if !endpoint.PasswordSaved || seen[endpoint.ID] {
+			continue
+		}
+		if current, present := latest[endpoint.ID]; present && current.PasswordSaved {
+			endpoint = current
+		}
+		id := sessionCredentialKey(endpoint.ID)
+		var value []byte
+		if explicit, present := temporary[id]; present {
+			if explicit == "" || endpoint.PasswordRevision == "" {
+				return errors.New("重新输入的密码或旧凭据版本无效")
+			}
+			value, err = json.Marshal(sessionCredential{Revision: endpoint.PasswordRevision, Secret: explicit})
+		} else {
+			value, err = source.Get(id)
+		}
+		if errors.Is(err, mygo.ErrSecretNotFound) {
+			return &migrationCredentialError{ID: id, Name: endpoint.Name}
+		}
+		if err != nil {
+			return fmt.Errorf("迁移会话「%s」的密码：%w", endpoint.Name, err)
+		}
+		var credential sessionCredential
+		if err := json.Unmarshal(value, &credential); err != nil || credential.Revision == "" || credential.Secret == "" {
+			clear(value)
+			return errors.New("旧会话凭据格式无效")
+		}
+		// The saved latest revision remains authoritative. Immutable stale snapshots
+		// continue to fail their normal revision comparison after migration.
+		items = append(items, vault.PlainItem{ID: sessionCredentialKey(endpoint.ID), Kind: "session_password", Revision: credential.Revision, Data: value})
+		seen[endpoint.ID] = true
+	}
+	keys := map[string]string{}
+	for _, key := range catalog.Keys {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		expected := filepath.Join(a.dataDirectory, "keys", key.ID)
+		if !localfs.ValidName(key.ID) || filepath.Clean(key.SecretID) != expected {
+			return errors.New("旧托管私钥路径无效")
+		}
+		info, err := os.Lstat(expected)
+		if err != nil {
+			return fmt.Errorf("迁移私钥「%s」：%w", key.Name, err)
+		}
+		if !info.Mode().IsRegular() {
+			return errors.New("旧托管私钥必须是普通文件")
+		}
+		if err := localfs.CheckPrivate(expected, info); err != nil {
+			return err
+		}
+		data, err := os.ReadFile(expected)
+		if err != nil {
+			return err
+		}
+		id := privateCredentialKey(key.ID)
+		items = append(items, vault.PlainItem{ID: id, Kind: "private_key", Revision: key.ID, Data: data})
+		phrase, err := source.Get("key/" + key.ID + "/passphrase")
+		saved := err == nil
+		if err != nil && !errors.Is(err, mygo.ErrSecretNotFound) {
+			return err
+		}
+		password := phrase
+		if explicit, present := temporary[key.ID]; present {
+			password = []byte(explicit)
+			defer clear(password)
+		}
+		signer, parseErr := ssh.ParsePrivateKey(data)
+		var missing *ssh.PassphraseMissingError
+		if errors.As(parseErr, &missing) {
+			if len(password) == 0 {
+				return &migrationPassphraseError{ID: key.ID, Name: key.Name}
+			}
+			signer, parseErr = ssh.ParsePrivateKeyWithPassphrase(data, password)
+			if parseErr != nil {
+				clear(phrase)
+				return &migrationPassphraseError{ID: key.ID, Name: key.Name}
+			}
+		}
+		if saved {
+			savedPhrase := bytes.Clone(password)
+			clear(phrase)
+			items = append(items, vault.PlainItem{ID: "key/" + key.ID + "/passphrase", Kind: "key_passphrase", Revision: key.ID, Data: savedPhrase})
+		}
+		if parseErr != nil {
+			return fmt.Errorf("验证私钥「%s」：%w", key.Name, parseErr)
+		}
+		public, _, _, _, err := ssh.ParseAuthorizedKey(key.PublicKey)
+		if err != nil {
+			return err
+		}
+		if !bytes.Equal(public.Marshal(), signer.PublicKey().Marshal()) || ssh.FingerprintSHA256(public) != key.Fingerprint {
+			return errors.New("迁移私钥公钥与已保存指纹不匹配")
+		}
+		keys[key.ID] = id
+	}
+	if err := a.vault.Initialize(ctx, items, keys); err != nil {
+		return err
+	}
+	return nil
+}

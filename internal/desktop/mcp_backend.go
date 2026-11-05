@@ -63,11 +63,29 @@ func mcpOnUI[T any](ctx context.Context, b *mcpDesktop, fn func() (T, error)) (T
 	}
 }
 
+func (b *mcpDesktop) Available(ctx context.Context) error {
+	_, err := mcpOnUI(ctx, b, func() (bool, error) {
+		if !b.a.businessReady() {
+			return false, errAppUnavailable
+		}
+		return true, nil
+	})
+	return err
+}
+
 func (b *mcpDesktop) Connections(ctx context.Context) ([]mcpserver.Connection, error) {
-	return mcpOnUI(ctx, b, func() ([]mcpserver.Connection, error) { return b.captureConnections() })
+	return mcpOnUI(ctx, b, func() ([]mcpserver.Connection, error) {
+		if !b.a.businessReady() {
+			return nil, errAppUnavailable
+		}
+		return b.captureConnections()
+	})
 }
 
 func (b *mcpDesktop) captureConnections() ([]mcpserver.Connection, error) {
+	if !b.a.businessReady() && b.a.security.initialized {
+		return nil, errAppUnavailable
+	}
 	connections := make([]mcpserver.Connection, 0, len(b.a.hosts))
 	for i, h := range b.a.hosts {
 		h = cloneHostEndpoint(h)
@@ -122,8 +140,16 @@ func (b *mcpDesktop) captureConnections() ([]mcpserver.Connection, error) {
 		if protocol == "ftp" && h.session.Files != nil && h.session.Files.FTPTLS != "" && h.session.Files.FTPTLS != "none" {
 			protocol = "ftps"
 		}
-		connections = append(connections, mcpserver.Connection{ID: h.session.ID, Name: h.name, Protocol: protocol,
-			Host: h.address, Port: h.port, User: h.user, Identity: digest, Runtime: session})
+		connection := mcpserver.Connection{ID: h.session.ID, Name: h.name, Protocol: protocol,
+			Host: h.address, Port: h.port, User: h.user, Identity: digest, Runtime: session}
+		if protocol == "ssh" {
+			platform := b.a.knownPlatform(h)
+			connection.OS = string(platform)
+			if facts := b.a.savedHostFacts(h); facts != nil && facts.Platform == platform {
+				connection.OSName, connection.Arch, connection.Shell = facts.OSName, facts.Arch, facts.Shell
+			}
+		}
+		connections = append(connections, connection)
 	}
 	return connections, nil
 }
@@ -131,6 +157,9 @@ func (b *mcpDesktop) captureConnections() ([]mcpserver.Connection, error) {
 func (b *mcpDesktop) OpenFiles(ctx context.Context, c mcpserver.Connection) (fileclient.Client, error) {
 	ready := make(chan transferClientResult, 1)
 	_, err := mcpOnUI(ctx, b, func() (bool, error) {
+		if !b.a.businessReady() {
+			return false, errAppUnavailable
+		}
 		b.a.openFileClient(ctx, c.Runtime.(*fileSession), func(client fileclient.Client, err error) {
 			ready <- transferClientResult{client, err}
 		})
@@ -154,6 +183,9 @@ func (b *mcpDesktop) Exec(ctx context.Context, c mcpserver.Connection, command s
 	}
 	ready := make(chan result, 1)
 	_, err := mcpOnUI(ctx, b, func() (bool, error) {
+		if !b.a.businessReady() {
+			return false, errAppUnavailable
+		}
 		request := &sshConnectionRequest{ctx: ctx, group: c.Runtime.(*fileSession).connection}
 		request.mcpOperationID, request.mcpTaskID = mcpserver.OperationID(ctx)
 		request.failed = func(err error) { ready <- result{err: err} }
@@ -343,7 +375,7 @@ func (b *mcpDesktop) Enqueue(ctx context.Context, request mcpserver.TransferRequ
 	var saved store.MCPTask
 	_, err = mcpOnUI(acceptCtx, b, func() (bool, error) {
 		a := b.a
-		if !b.service.Accepting() || a.quitPending || len(a.transfers.tasks) >= 1000 || a.transfers.quitting || a.transfers.storeErr != nil || a.transfers.writeErr != nil {
+		if !a.businessReady() || !b.service.Accepting() || a.quitPending || len(a.transfers.tasks) >= 1000 || a.transfers.quitting || a.transfers.storeErr != nil || a.transfers.writeErr != nil {
 			return false, errors.New("传输队列不可用或已达到容量限制")
 		}
 		a.transfers.nextID++
@@ -396,6 +428,9 @@ func (b *mcpDesktop) ControlTask(ctx context.Context, id int, action string) err
 		return errors.New("MCP 服务未开启，不能继续任务")
 	}
 	_, err := mcpOnUI(ctx, b, func() (bool, error) {
+		if action == "resume" && !b.a.businessReady() {
+			return false, errAppUnavailable
+		}
 		for _, t := range b.a.transfers.tasks {
 			if t.id != id || t.mcp == nil {
 				continue

@@ -34,53 +34,50 @@ var (
 	bellIcon       = uikit.IconSVG(uikit.IconBell)
 	lockIcon       = uikit.IconSVG(uikit.IconLock)
 	codeIcon       = uikit.IconSVG(uikit.IconCode)
-	ubuntuIcon     = uikit.BrandIcon(`
-<circle cx="12" cy="12" r="6.2" stroke-width="3"/>
-<circle cx="20" cy="12" r="2.8" fill="currentColor" stroke="none"/>
-<circle cx="8" cy="5" r="2.8" fill="currentColor" stroke="none"/>
-<circle cx="8" cy="19" r="2.8" fill="currentColor" stroke="none"/>
-`)
-	debianIcon = uikit.BrandIcon(`
-<path d="M13 11c4 0 4-5 1-6-4-2-8 2-8 6 0 6 5 10 11 9-5-1-8-4-8-8 0-3 2-5 5-4 2 1 1 4-1 3Z"/>
-`)
-	centosIcon = uikit.BrandIcon(`
-<path d="M12 2 22 12 12 22 2 12ZM5 5h14v14H5ZM12 2v20M2 12h20M5 5l14 14M19 5 5 19" stroke-width="1"/>
-`)
-	alpineIcon = uikit.BrandIcon(`
-<circle cx="12" cy="12" r="10" fill="currentColor" stroke="none"/>
-<path d="m5 17 7-9 7 9-4-2-3-4-4 6Z" fill="white" stroke="none"/>
-`)
-	fedoraIcon = uikit.BrandIcon(`
-<circle cx="12" cy="12" r="10" fill="currentColor" stroke="none"/>
-<path d="M15 5c-3-1-4 1-4 4v7c0 4-6 4-6 0 0-3 3-4 9-4M8 9h9" stroke="white" stroke-width="1.7"/>
-`)
-	linuxIcon = uikit.BrandIcon(`
-<ellipse cx="12" cy="14" rx="6" ry="8" fill="currentColor"/>
-<ellipse cx="12" cy="15" rx="4" ry="5.5" fill="white" stroke="none"/>
-<circle cx="12" cy="6" r="3.5" fill="currentColor"/>
-<path d="m10 7 2 2 2-2M8 19l-3 2h5m6-2 3 2h-5" stroke="currentColor"/>
-<circle cx="11" cy="5" r=".5" fill="white"/>
-<circle cx="13" cy="5" r=".5" fill="white"/>
-`)
-	archIcon = uikit.BrandIcon(`<path d="m12 2 10 20-7-4-3-6-3 6-7 4Z" fill="currentColor" stroke="none"/>`)
 )
 
 type systemStyle struct {
 	name  string
 	color color.NRGBA
 	icon  *ui.SVG
+	// ids are the os-release ID values (or other-platform names) shown with
+	// this logo.
+	ids []string
 }
 
-const linuxSystem = 5
+// Indexes are persisted for file connections; append new systems only.
+const (
+	linuxSystem   = 5
+	macOSSystem   = 7
+	windowsSystem = 8
+)
 
+func brand(hex uint32) color.NRGBA {
+	return color.NRGBA{R: uint8(hex >> 16), G: uint8(hex >> 8), B: uint8(hex), A: 0xff}
+}
+
+// Colors are the logos' official ones; uikit.OSLogoInk adjusts a glyph that
+// lacks contrast in the current theme.
 var systems = []systemStyle{
-	{name: "Ubuntu", color: color.NRGBA{R: 0xed, G: 0x54, B: 0x22, A: 0xff}, icon: ubuntuIcon},
-	{name: "Debian", color: color.NRGBA{R: 0xbd, G: 0x17, B: 0x47, A: 0xff}, icon: debianIcon},
-	{name: "CentOS", color: color.NRGBA{R: 0x65, G: 0x59, B: 0xaa, A: 0xff}, icon: centosIcon},
-	{name: "Alpine", color: color.NRGBA{R: 0x08, G: 0xb7, B: 0x89, A: 0xff}, icon: alpineIcon},
-	{name: "Fedora", color: color.NRGBA{R: 0x4c, G: 0x9e, B: 0xd8, A: 0xff}, icon: fedoraIcon},
-	{name: "Linux", color: color.NRGBA{R: 0x34, G: 0x34, B: 0x38, A: 0xff}, icon: linuxIcon},
-	{name: "Arch", color: color.NRGBA{R: 0x15, G: 0x99, B: 0xd3, A: 0xff}, icon: archIcon},
+	{name: "Ubuntu", color: brand(0xE95420), icon: uikit.LogoIcon(ubuntuLogo), ids: []string{"ubuntu"}},
+	{name: "Debian", color: brand(0xA81D33), icon: uikit.LogoIcon(debianLogo), ids: []string{"debian"}},
+	{name: "CentOS", color: brand(0x262577), icon: uikit.LogoIcon(centosLogo), ids: []string{"centos"}},
+	{name: "Alpine", color: brand(0x0D597F), icon: uikit.LogoIcon(alpineLogo), ids: []string{"alpine"}},
+	{name: "Fedora", color: brand(0x51A2DA), icon: uikit.LogoIcon(fedoraLogo), ids: []string{"fedora"}},
+	{name: "Linux", color: brand(0xFCC624), icon: uikit.LogoIcon(linuxLogo)},
+	{name: "Arch", color: brand(0x1793D1), icon: uikit.LogoIcon(archLogo), ids: []string{"arch"}},
+	{name: "macOS", color: brand(0x000000), icon: uikit.LogoIcon(appleLogo), ids: []string{"macos"}},
+	{name: "Windows", color: brand(0x0078D4), icon: uikit.LogoIcon(windowsLogo), ids: []string{"windows"}},
+	{name: "Red Hat", color: brand(0xEE0000), icon: uikit.LogoIcon(redHatLogo), ids: []string{"rhel"}},
+	{name: "Rocky Linux", color: brand(0x10B981), icon: uikit.LogoIcon(rockyLogo), ids: []string{"rocky"}},
+	{name: "AlmaLinux", color: brand(0x000000), icon: uikit.LogoIcon(almaLogo), ids: []string{"almalinux"}},
+	{name: "openSUSE", color: brand(0x73BA25), icon: uikit.LogoIcon(openSUSELogo),
+		ids: []string{"opensuse", "opensuse-leap", "opensuse-tumbleweed", "opensuse-slowroll", "opensuse-microos"}},
+	{name: "Kali", color: brand(0x557C94), icon: uikit.LogoIcon(kaliLogo), ids: []string{"kali"}},
+	{name: "Linux Mint", color: brand(0x86BE43), icon: uikit.LogoIcon(mintLogo), ids: []string{"linuxmint"}},
+	{name: "Raspberry Pi OS", color: brand(0xA22846), icon: uikit.LogoIcon(raspberryPiLogo), ids: []string{"raspbian"}},
+	{name: "deepin", color: brand(0x007CFF), icon: uikit.LogoIcon(deepinLogo), ids: []string{"deepin"}},
+	{name: "FreeBSD", color: brand(0xAB2B28), icon: uikit.LogoIcon(freeBSDLogo), ids: []string{"freebsd"}},
 }
 
 func init() {

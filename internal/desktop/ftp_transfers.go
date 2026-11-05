@@ -285,21 +285,25 @@ func (a *app) transferDock(c *ui.Context, maxHeight float32) {
 		card := uikit.TransferDockCard(c)
 		card.Children(func() {
 			a.transferHeader(c, session, tasks)
-			scroller := ui.Scroll(c).Grow(1).MinHeight(0).TrackScroll(scroll).Children(func() {
-				ui.Column(c).FillWidth().Children(func() {
-					if len(rows) == 0 {
-						message := "此分类暂无传输"
-						if len(tasks) == 0 {
-							message = "暂无传输任务"
+			if !q.collapsed {
+				// Only the inert exit copy remains while the dock closes.
+				scroller := ui.Scroll(c.Key("transfer-rows")).Grow(1).MinHeight(0).TrackScroll(scroll).
+					Transition(ui.ElementTransition{Duration: t.Motion.Duration.Focus, Exit: &ui.Motion{}}).Children(func() {
+					ui.Column(c).FillWidth().Children(func() {
+						if len(rows) == 0 {
+							message := "此分类暂无传输"
+							if len(tasks) == 0 {
+								message = "暂无传输任务"
+							}
+							uikit.TransferDockEmpty(c, message)
 						}
-						uikit.TransferDockEmpty(c, message)
-					}
-					for _, task := range rows {
-						a.transferRow(c, task)
-					}
+						for _, task := range rows {
+							a.transferRow(c, task)
+						}
+					})
 				})
-			})
-			uikit.Scrollbars(c, card, scroller, scroll, uikit.ScrollbarProps{Label: "传输任务滚动条"})
+				uikit.Scrollbars(c, card, scroller, scroll, uikit.ScrollbarProps{Label: "传输任务滚动条"})
+			}
 		})
 		if q.collapsed || !dock.Settled("rows") {
 			return

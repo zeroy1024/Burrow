@@ -17,13 +17,13 @@ type ModalProps struct {
 	DismissDisabled bool
 	// Compact keeps a centered confirmation/input layout. Width is its content
 	// width, matching the Dialog.GroupWidth/HostWidth tokens.
-	Compact           bool
-	ContentGap        float32
-	Motion            MotionMode
-	ExternalLifecycle bool
-	CloseKey          any
-	CloseLabel        string
-	Header, Footer    func(ModalParts)
+	Compact        bool
+	ContentGap     float32
+	Motion         MotionMode
+	Controller     *ModalController
+	CloseKey       any
+	CloseLabel     string
+	Header, Footer func(ModalParts)
 }
 
 type ModalBounds struct {
@@ -31,9 +31,20 @@ type ModalBounds struct {
 }
 
 type modalState struct {
-	Requested, Confirm, Closing, Entered, Dirty bool
-	CloseStarted                                time.Time
+	Requested, CloseRequested, Confirm, Discard, Closing, Dirty bool
+	EnterStarted, CloseStarted                                  time.Time
 }
+
+type modalLayerKey struct {
+	owner uint64
+	part  string
+}
+
+// ModalController requests an exit after a successful asynchronous operation.
+// Call Close on the UI thread and keep the modal mounted until Dismissed.
+type ModalController struct{ requested bool }
+
+func (controller *ModalController) Close() { controller.requested = true }
 
 type ModalParts struct {
 	Panel, Backdrop ui.Element
@@ -51,20 +62,52 @@ func (parts ModalParts) RequestDismiss() {
 	parts.context.Invalidate()
 }
 
+// Close exits a completed dialog without asking to discard its saved fields.
+func (parts ModalParts) Close() {
+	parts.state.CloseRequested = true
+	parts.context.Invalidate()
+}
+
 type ModalResult struct {
 	Panel, Backdrop                    ui.Element
 	Dismissed, Submit, DismissCanceled bool
+	Closing                            bool
+	Close                              func()
 }
 
-// Modal owns transient confirmation and its default animation. Applications
-// with an existing exit controller receive an accepted dismissal intent through
-// ExternalLifecycle and keep their single resource/animation owner.
+// Modal owns confirmation, animation and removal for every dismissal path.
 func Modal(c *ui.Context, open *bool, props ModalProps, body func(ModalParts)) ModalResult {
 	result := ModalResult{}
 	if !*open {
 		return result
 	}
 	p := theme.Current().C.Modal
+	// Keep the controller outside DialogBase so a completed exit never mounts
+	// a final backdrop. The anchor has no layout or painted content.
+	anchor := ui.Box(c).Absolute().Size(0, 0).PassThrough().Role(ui.RoleNone)
+	state := ui.Local(anchor, "uikit.modal.state", func() modalState { return modalState{} })
+	state.Dirty = props.Dirty
+	if props.Controller != nil && props.Controller.requested {
+		props.Controller.requested = false
+		state.CloseRequested = true
+	}
+	if state.CloseRequested && !state.Closing {
+		state.CloseRequested = false
+		state.Closing, state.CloseStarted = true, c.Now()
+	}
+	if state.Closing {
+		remaining := p.Exit - c.Now().Sub(state.CloseStarted)
+		if remaining <= 0 {
+			*open, result.Dismissed = false, true
+			return result
+		}
+		c.After(remaining)
+	}
+	requestClose := func() {
+		state.CloseRequested = true
+		c.Invalidate()
+	}
+	result.Close = requestClose
 	compact := theme.Current().C.Dialog
 	width, height := c.Size()
 	top := max(p.TopMin, height*p.TopRatio)
@@ -84,122 +127,106 @@ func Modal(c *ui.Context, open *bool, props ModalProps, body func(ModalParts)) M
 	if props.Label != "" {
 		label = props.Label
 	}
-	var state *modalState
-	accept := func() {
-		if props.ExternalLifecycle {
-			result.Dismissed = true
-		} else if !state.Closing {
-			state.Closing, state.CloseStarted = true, c.Now()
-			c.Invalidate()
-		}
-	}
-	ui.DialogBase(c, open, func(backdrop, panel ui.Element) {
-		state = ui.Local(panel, "uikit.modal.state", func() modalState { return modalState{} })
-		state.Dirty = props.Dirty
-		dismissDisabled := props.Disabled || props.DismissDisabled || state.Closing
-		result.Panel, result.Backdrop = panel, backdrop
-		backdrop.Column().Justify(ui.Start).AlignItems(ui.Center).Padding(top, 0, 0, 0)
-		panel.Column().Width(panelWidth).MaxWidth(bounds.MaxWidth).MaxHeight(bounds.MaxHeight).
-			Padding(0).Gap(0).Radius(p.Radius).Background(Color(p.Bg)).Label(label)
-		if props.Compact {
-			backdrop.Justify(ui.Center).Padding(compact.ViewportInset)
-			gap := props.ContentGap
-			if gap == 0 {
-				gap = theme.Current().Space.N14
-			}
-			panel.Padding(compact.Padding).Gap(gap).Radius(compact.Radius).Background(Color(compact.Bg))
-		}
-		StyleDisabled(panel, props.Disabled || state.Closing)
-		if props.Compact {
-			Shadow(panel, compact.Shadow)
-		} else {
-			Shadow(panel, p.Shadow)
-		}
-		if panel.Dismissed() {
-			*open = true
-			if !dismissDisabled {
-				state.Requested = true
-			}
-		}
-		if !props.ExternalLifecycle {
-			alpha, scale := float32(1), float32(1)
-			if !state.Entered {
-				alpha, scale, state.Entered = 0, p.EnterScale, true
-				c.AnimationFrame()
-			}
-			if state.Closing {
-				alpha, scale = 0, p.ExitScale
-				if c.Now().Sub(state.CloseStarted) >= p.Exit {
-					*open, result.Dismissed = false, true
-					panel.Hidden(true)
-					// DialogBase has already mounted its modal backdrop this frame.
-					// Rebuild once without it so the SDK can restore the trigger focus.
-					c.AnimationFrame()
-					return
+	dialogOpen := true
+	anchor.Children(func() {
+		ui.DialogBase(c.Key(modalLayerKey{owner: anchor.ID(), part: "dialog"}), &dialogOpen, func(backdrop, panel ui.Element) {
+			dismissDisabled := props.Disabled || props.DismissDisabled || state.Closing
+			result.Panel, result.Backdrop = panel, backdrop
+			backdrop.Column().Justify(ui.Start).AlignItems(ui.Center).Padding(top, 0, 0, 0)
+			panel.Column().Width(panelWidth).MaxWidth(bounds.MaxWidth).MaxHeight(bounds.MaxHeight).
+				Padding(0).Gap(0).Radius(p.Radius).Background(Color(p.Bg)).Label(label)
+			if props.Compact {
+				backdrop.Justify(ui.Center).Padding(compact.ViewportInset)
+				gap := props.ContentGap
+				if gap == 0 {
+					gap = theme.Current().Space.N14
 				}
+				panel.Padding(compact.Padding).Gap(gap).Radius(compact.Radius).Background(Color(compact.Bg))
+			}
+			if props.Compact {
+				Shadow(panel, compact.Shadow)
+			} else {
+				Shadow(panel, p.Shadow)
+			}
+			if panel.Dismissed() {
+				if !dismissDisabled {
+					state.Requested = true
+				}
+			}
+			fade, scale := float32(0), float32(1)
+			if state.EnterStarted.IsZero() {
+				state.EnterStarted = c.Now()
+			}
+			// A frame may rebuild the view before committing its first pose.
+			// Keep that pose for every pass of the opening frame.
+			if c.Now().Equal(state.EnterStarted) {
+				fade, scale = 1, p.EnterScale
 				c.AnimationFrame()
 			}
-			shown := Visual(panel, "uikit.modal.alpha", alpha, p.Fade)
+			animation := Tween(p.Fade)
+			if state.Closing {
+				fade, scale = 1, p.ExitScale
+				animation = ui.Animation{Duration: p.Exit, Ease: Easing(theme.Current().Motion.Easing.In)}
+			}
 			if MotionReduced(c, props.Motion) {
 				scale = 1
 			}
-			opacity := shown
-			if props.Disabled || state.Closing {
-				opacity *= theme.Current().Opacity.Disabled / 0.5
-			}
-			panel.AnimatePose(ui.Pose{Scale: scale}, Anim(c, p.Fade, props.Motion)).Opacity(opacity)
 			if props.Compact {
-				styleModalScrim(backdrop, shown, Color(compact.Backdrop))
+				styleModalScrim(backdrop, 1, Color(compact.Backdrop))
 			} else {
-				StyleModalScrim(backdrop, shown)
+				StyleModalScrim(backdrop, 1)
 			}
-		} else {
-			StyleModalScrim(backdrop, 1)
-		}
-		parts := ModalParts{Panel: panel, Backdrop: backdrop, Bounds: bounds, state: state, context: c}
-		if props.Header != nil {
-			props.Header(parts)
-		} else if props.Title != "" {
-			if props.Compact {
-				Text(c, props.Title, TextProps{Style: TextTitle}).FontSize(compact.TitleSize)
-			} else {
-				ModalHeader(c, props).Padding(p.HeaderPaddingTop, p.BodyPaddingX, p.HeaderPaddingBottom)
-			}
-		}
-		body(parts)
-		if props.Footer != nil {
-			props.Footer(parts)
-		}
-		if !props.Compact {
-			closeLabel := props.CloseLabel
-			if closeLabel == "" {
-				closeLabel = "关闭窗口"
-			}
-			closeButton := IconButton(c, IconClose, IconButtonProps{
-				Key: props.CloseKey, Label: closeLabel, Size: SizeSm, Disabled: dismissDisabled,
-			}).
-				Absolute().Top(p.HeaderPaddingTop).Right(p.HeaderPaddingRight)
-			if closeButton.Clicked() {
-				parts.RequestDismiss()
-			}
-		}
-		if !props.Disabled && !state.Closing && !state.Confirm {
-			result.Submit = panel.OverlayShortcut(ui.Super, ui.KeyEnter)
-		}
-		if state.Requested {
-			state.Requested = false
-			if !dismissDisabled {
-				if state.Dirty {
-					state.Confirm = true
+			backdrop.AnimatePose(ui.Pose{Fade: fade}, animation)
+			panel.AnimatePose(ui.Pose{Scale: scale}, animation)
+			parts := ModalParts{Panel: panel, Backdrop: backdrop, Bounds: bounds, state: state, context: c}
+			if props.Header != nil {
+				props.Header(parts)
+			} else if props.Title != "" {
+				if props.Compact {
+					Text(c, props.Title, TextProps{Style: TextTitle}).FontSize(compact.TitleSize)
 				} else {
-					accept()
+					ModalHeader(c, props).Padding(p.HeaderPaddingTop, p.BodyPaddingX, p.HeaderPaddingBottom)
 				}
 			}
-		}
+			body(parts)
+			if props.Footer != nil {
+				props.Footer(parts)
+			}
+			if !props.Compact {
+				closeLabel := props.CloseLabel
+				if closeLabel == "" {
+					closeLabel = "关闭窗口"
+				}
+				closeButton := IconButton(c, IconClose, IconButtonProps{
+					Key: props.CloseKey, Label: closeLabel, Size: SizeSm, Disabled: dismissDisabled,
+				}).
+					Absolute().Top(p.HeaderPaddingTop).Right(p.HeaderPaddingRight)
+				if closeButton.Clicked() {
+					parts.RequestDismiss()
+				}
+			}
+			if !props.Disabled && !state.Closing && !state.Confirm {
+				result.Submit = panel.OverlayShortcut(ui.Super, ui.KeyEnter)
+			}
+			if state.Requested {
+				state.Requested = false
+				if !dismissDisabled {
+					if state.Dirty {
+						state.Confirm = true
+					} else {
+						requestClose()
+					}
+				}
+			}
+			if props.Disabled || state.Closing {
+				ui.Overlay(c.Key(modalLayerKey{owner: anchor.ID(), part: "input"}), func() {
+					InputShield(c).Modal().AutoFocus().Role(ui.RoleStatus).Label("正在处理")
+				})
+			}
+		})
 	})
-	if state != nil && state.Confirm {
-		discard := false
-		confirm := Modal(c.Key("discard-confirm"), &state.Confirm, ModalProps{
+	if state.Confirm {
+		confirm := Modal(c.Key(modalLayerKey{owner: anchor.ID(), part: "confirm"}), &state.Confirm, ModalProps{
 			Title: "放弃未保存的更改？", Compact: true, Motion: props.Motion, ContentGap: compact.Gap,
 		}, func(parts ModalParts) {
 			t := theme.Current()
@@ -209,18 +236,26 @@ func Modal(c *ui.Context, open *bool, props ModalProps, body func(ModalParts)) M
 					parts.RequestDismiss()
 				}
 				if Button(c, "放弃更改", ButtonProps{Variant: ButtonDanger}).Clicked() {
-					discard = true
+					state.Discard = true
+					parts.Close()
 				}
 			})
 		})
 		confirm.Panel.Role(ui.RoleAlertDialog).Label("放弃未保存的更改")
-		if discard || confirm.Submit {
-			state.Confirm = false
-			accept()
-		} else if confirm.Dismissed {
-			result.DismissCanceled = true
+		if confirm.Submit {
+			state.Discard = true
+			confirm.Close()
+		}
+		if confirm.Dismissed {
+			if state.Discard {
+				state.Discard = false
+				requestClose()
+			} else {
+				result.DismissCanceled = true
+			}
 		}
 	}
+	result.Closing = state.Closing || state.CloseRequested
 	return result
 }
 
@@ -229,8 +264,7 @@ func ModalHeader(c *ui.Context, props ModalProps) ui.Element {
 	p := t.C.Modal
 	return ui.Row(c).FillWidth().Gap(p.HeaderGap).AlignItems(ui.Center).Children(func() {
 		if props.Icon != nil {
-			ui.Box(c).Size(p.IconTile, p.IconTile).Radius(p.IconTileRadius).
-				Background(Color(t.Color.Surface.Control)).Center().Children(func() {
+			IconTile(c, IconTileProps{Size: SizeLg}, func() {
 				ui.Icon(c, props.Icon).Size(t.Size.Icon, t.Size.Icon).PassThrough()
 			})
 		}

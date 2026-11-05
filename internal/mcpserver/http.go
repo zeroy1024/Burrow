@@ -185,6 +185,10 @@ func (s *Service) Handler(cfg Config) http.Handler {
 		s.requests.Add(1)
 		s.mu.Unlock()
 		defer s.requests.Done()
+		if err := s.Backend.Available(r.Context()); err != nil {
+			http.Error(w, err.Error(), http.StatusServiceUnavailable)
+			return
+		}
 		if r.URL.Path != "/mcp" {
 			http.NotFound(w, r)
 			return
@@ -257,7 +261,12 @@ func (s *Service) protocolServer(key store.MCPKey, requestContext context.Contex
 		}
 		result, err := s.Call(ctx, key.ID, name, arguments)
 		if err != nil {
-			result["error"] = map[string]any{"code": errorCode(err), "message": err.Error()}
+			detail := map[string]any{"code": errorCode(err), "message": err.Error()}
+			var failure *Failure
+			if errors.As(err, &failure) && len(failure.Hits) > 0 {
+				detail["hits"], detail["hint"] = agentHits(failure), interceptHint
+			}
+			result["error"] = detail
 		}
 		data, marshalErr := json.Marshal(result)
 		if marshalErr != nil {
@@ -290,10 +299,35 @@ func (s *Service) protocolServer(key store.MCPKey, requestContext context.Contex
 	return server
 }
 
+// Policies guard against mistakes rather than isolate the agent, so the hit
+// explains what to change; the hint keeps that from reading as a puzzle to
+// rewrite around.
+const interceptHint = "该操作命中了用户设置的拦截策略。请勿通过改写、拆分、转义或换用等效命令绕过；如果任务确实需要，请向用户说明原因，由用户调整策略。"
+
+func agentHits(failure *Failure) []map[string]any {
+	hits := make([]map[string]any, 0, len(failure.Hits))
+	for i, h := range failure.Hits {
+		hit := map[string]any{"policy_id": h.PolicyID, "policy_name": h.Name, "policy_version": h.Version,
+			"category": h.Category, "rule": h.Rule, "action": h.Action, "matched": failure.Matches[i].Text}
+		m := failure.Matches[i]
+		if m.Context != "" && m.Context != m.Text {
+			hit["context"] = m.Context
+		}
+		if m.Via != "" {
+			hit["via"] = m.Via
+		}
+		if m.Fallback != "" {
+			hit["fallback"] = m.Fallback
+		}
+		hits = append(hits, hit)
+	}
+	return hits
+}
+
 func toolDescription(name string) string {
 	return map[string]string{
-		"connections_list": "List saved connections authorized to this key, with stable IDs; never returns credentials.",
-		"ssh_exec":         "Run one non-PTY command. stdout, stderr and exit_code are separate; cancellation never reruns the command.",
+		"connections_list": "List saved connections authorized to this key, with stable IDs; never returns credentials. SSH connections include os (linux, darwin, windows or other), os_name and arch once known, and shell (the default shell: cmd, powershell, pwsh, ...) for Windows.",
+		"ssh_exec":         "Run one non-PTY command in the remote user's default shell (check connections_list os and, on Windows, shell). stdout, stderr and exit_code are separate; cancellation never reruns the command.",
 		"files_list":       "List one remote directory with bounded pagination; symlinks are not traversed.",
 		"files_stat":       "Read remote entry metadata without following symlinks.",
 		"files_read":       "Read a bounded UTF-8 text range from a remote regular file.",

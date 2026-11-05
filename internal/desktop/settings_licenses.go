@@ -56,6 +56,12 @@ var textLicense string
 //go:embed licenses/jetbrains-mono.txt
 var jetbrainsLicense string
 
+//go:embed licenses/mvdan-sh.txt
+var shLicense string
+
+//go:embed licenses/simple-icons.txt
+var simpleIconsLicense string
+
 var burrowIcon = func() *ui.Bitmap {
 	bitmap, err := ui.DecodeBitmap(assets.IconPNG)
 	if err != nil {
@@ -72,6 +78,7 @@ var dependencyNotices = []struct{ name, license, text string }{
 	{"modernc SQLite 及运行依赖", "BSD / MIT", sqliteLicense},
 	{"MCP Go SDK 及运行依赖", "Apache-2.0 / MIT / BSD-3-Clause", mcpLicense},
 	{"Lucide Icons " + uikit.LucideVersion, "ISC / MIT", uikit.LucideLicense},
+	{"Simple Icons 16.35.0（系统 logo）", "CC0-1.0", simpleIconsLicense},
 	{"golang.org/x/crypto/ssh", "BSD-3-Clause", cryptoLicense},
 	{"go-winio", "MIT", winioLicense},
 	{"PureGo", "Apache-2.0", puregoLicense},
@@ -79,6 +86,7 @@ var dependencyNotices = []struct{ name, license, text string }{
 	{"golang.org/x/image", "BSD-3-Clause", imageLicense},
 	{"golang.org/x/net", "BSD-3-Clause", netLicense},
 	{"golang.org/x/text", "BSD-3-Clause", textLicense},
+	{"mvdan.cc/sh", "BSD-3-Clause", shLicense},
 	{"Catppuccin / Dracula / Nord", "MIT", termtheme.Licenses},
 	{"JetBrains Mono", "SIL Open Font License 1.1", jetbrainsLicense},
 }
@@ -101,7 +109,7 @@ func (a *app) aboutSettings(c *ui.Context) {
 	}
 	fields := make([]settingField, 0, len(dependencyNotices))
 	for index, notice := range dependencyNotices {
-		fields = append(fields, settingField{notice.name, notice.license, func() {
+		fields = append(fields, settingField{notice.name, notice.license, "", func() {
 			anchor := uikit.Button(c, localize(c, "查看"), uikit.ButtonProps{}).OnClick(func() { a.settingsUI.license = index + 1 })
 			open := a.settingsUI.license == index+1
 			var viewer ui.Element

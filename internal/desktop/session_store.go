@@ -10,7 +10,9 @@ import (
 	"slices"
 	"time"
 
-	"github.com/egoist/mygo"
+	"sshdesk/internal/hostinfo"
+	"sshdesk/internal/store"
+	"sshdesk/internal/vault"
 )
 
 type sessionConfig struct {
@@ -32,6 +34,8 @@ type sshOptions struct {
 	InitCommand string   `json:"initCommand,omitempty"`
 	TermScheme  string   `json:"termScheme,omitempty"`
 	Env         []string `json:"env,omitempty"`
+	// Platform pins the remote system; empty detects it on connect.
+	Platform string `json:"platform,omitempty"`
 }
 
 type fileOptions struct {
@@ -48,7 +52,7 @@ type managedKey struct {
 	Name        string    `json:"name"`
 	Type        string    `json:"type"`
 	Fingerprint string    `json:"fingerprint"`
-	Path        string    `json:"path"`
+	SecretID    string    `json:"secretId"`
 	Comment     string    `json:"comment,omitempty"`
 	Bits        int       `json:"bits"`
 	CreatedAt   time.Time `json:"createdAt"`
@@ -106,116 +110,68 @@ type sessionCredential struct {
 
 func sessionCredentialKey(id string) string { return "session/" + id + "/credential" }
 
-// Credentials are revision-bound to immutable endpoint snapshots.
-func deleteSessionCredentials(id string) error {
-	return credentialStore().Delete(sessionCredentialKey(id))
-}
+func privateCredentialKey(id string) string { return "key/" + id + "/private" }
 
-// Secret JSON lives only in the credential store; configuration records keep
-// the revision that binds an immutable endpoint snapshot to one saved password.
-func (a *app) storeSessionSecrets(h *host, password string, changed bool, passphrase string, passphraseChanged bool) error {
+// The caller commits these ciphertext changes with the catalog in one transaction.
+func (a *app) prepareSessionSecrets(h *host, password string, changed bool, passphrase string, passphraseChanged bool) (*store.VaultChanges, error) {
 	initializeSession(h)
+	items := []vault.PlainItem{}
+	deleted := []string{}
+	defer func() {
+		for _, item := range items {
+			clear(item.Data)
+		}
+	}()
 	if changed {
-		var err error
 		revision := ""
 		if password == "" {
-			err = deleteSessionCredentials(h.session.ID)
+			deleted = append(deleted, sessionCredentialKey(h.session.ID))
 		} else {
 			revision = newSessionID()
-			var data []byte
-			data, err = json.Marshal(sessionCredential{Revision: revision, Secret: password})
-			if err == nil {
-				err = credentialStore().Set(sessionCredentialKey(h.session.ID), data)
+			data, err := json.Marshal(sessionCredential{Revision: revision, Secret: password})
+			if err != nil {
+				return nil, err
 			}
-			clear(data)
-		}
-		if err != nil {
-			return fmt.Errorf("系统钥匙串：%w", err)
+			items = append(items, vault.PlainItem{ID: sessionCredentialKey(h.session.ID), Kind: "session_password", Revision: revision, Data: data})
 		}
 		h.session.PasswordSaved = password != ""
 		h.session.PasswordRevision = revision
 	}
 	if passphraseChanged && h.session.KeyID != "" {
-		key := "key/" + h.session.KeyID + "/passphrase"
-		var err error
+		id := "key/" + h.session.KeyID + "/passphrase"
 		if passphrase == "" {
-			err = credentialStore().Delete(key)
+			deleted = append(deleted, id)
 		} else {
-			err = credentialStore().Set(key, []byte(passphrase))
-		}
-		if err != nil {
-			return fmt.Errorf("保存私钥口令：%w", err)
+			items = append(items, vault.PlainItem{ID: id, Kind: "key_passphrase", Revision: newSessionID(), Data: []byte(passphrase)})
 		}
 	}
 	h.session.UpdatedAt = time.Now().UTC()
-	return nil
+	return a.vault.Prepare(items, deleted)
 }
 
 func (a *app) sessionPassword(h host) (string, error) {
 	if !h.session.PasswordSaved {
 		return "", nil
 	}
-	data, err := credentialStore().Get(sessionCredentialKey(h.session.ID))
+	data, err := a.vault.Get(a.ctx, sessionCredentialKey(h.session.ID))
 	if err == nil {
 		defer clear(data)
 		if h.session.PasswordRevision == "" {
-			return "", fmt.Errorf("保存的密码已更新，请为此会话重新输入：%w", mygo.ErrSecretNotFound)
+			return "", fmt.Errorf("保存的密码已更新，请为此会话重新输入：%w", vault.ErrNotFound)
 		}
 		var credential sessionCredential
 		if err := json.Unmarshal(data, &credential); err != nil || credential.Revision == "" || credential.Secret == "" {
-			return "", errors.New("系统钥匙串中的会话凭据格式无效")
+			return "", errors.New("保存的会话凭据格式无效")
 		}
 		if credential.Revision != h.session.PasswordRevision {
-			return "", fmt.Errorf("保存的密码与此会话快照不匹配，请重新输入：%w", mygo.ErrSecretNotFound)
+			return "", fmt.Errorf("保存的密码与此会话快照不匹配，请重新输入：%w", vault.ErrNotFound)
 		}
 		return credential.Secret, nil
 	}
-	if !errors.Is(err, mygo.ErrSecretNotFound) {
+	if !errors.Is(err, vault.ErrNotFound) {
 		return "", fmt.Errorf("读取会话密码：%w", err)
 	}
-	return "", fmt.Errorf("此会话保存的密码已不可用，请重新输入：%w", mygo.ErrSecretNotFound)
-}
-
-// Keep the previous credential values until the atomic catalog write commits,
-// so a disk error does not silently change credentials of an existing session.
-func snapshotSessionSecrets(h host, passwordChanged, passphraseChanged bool) (func() error, func(), error) {
-	keys := []string{}
-	if passwordChanged {
-		keys = append(keys, sessionCredentialKey(h.session.ID))
-	}
-	if passphraseChanged && h.session.KeyID != "" {
-		keys = append(keys, "key/"+h.session.KeyID+"/passphrase")
-	}
-	values := make(map[string][]byte, len(keys))
-	release := func() {
-		for _, data := range values {
-			clear(data)
-		}
-	}
-	for _, key := range keys {
-		data, err := credentialStore().Get(key)
-		if err != nil && !errors.Is(err, mygo.ErrSecretNotFound) {
-			release()
-			return nil, nil, err
-		}
-		if err == nil {
-			values[key] = data
-		}
-	}
-	rollback := func() error {
-		var result error
-		for _, key := range keys {
-			var err error
-			if data, ok := values[key]; ok {
-				err = credentialStore().Set(key, data)
-			} else {
-				err = credentialStore().Delete(key)
-			}
-			result = errors.Join(result, err)
-		}
-		return result
-	}
-	return rollback, release, nil
+	return "", fmt.Errorf("此会话保存的密码已不可用，请重新输入：%w", vault.ErrNotFound)
 }
 
 func (a *app) modalAdvancedOpen(protocol string) bool {
@@ -284,6 +240,9 @@ func validateSessionProfile(h host, byID map[string]host, keyIDs map[string]bool
 		if options.KeepAlive < 0 || options.KeepAlive > 3600 {
 			return errors.New("invalid keepalive interval")
 		}
+		if !validPlatformOverride(options.Platform) {
+			return errors.New("invalid remote platform")
+		}
 		seen := map[string]bool{h.session.ID: true}
 		for next := options.JumpHostID; next != ""; {
 			jump, ok := byID[next]
@@ -306,4 +265,8 @@ func validateSessionProfile(h host, byID map[string]host, keyIDs map[string]bool
 		}
 	}
 	return nil
+}
+
+func validPlatformOverride(platform string) bool {
+	return platform == "" || slices.Contains(hostinfo.Overrides, hostinfo.Platform(platform))
 }

@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"sshdesk/internal/hostinfo"
 	"sshdesk/internal/termtheme"
 	"sshdesk/internal/theme"
 	"sshdesk/internal/uikit"
@@ -14,7 +15,7 @@ import (
 )
 
 func (a *app) sessionAdvanced(c *ui.Context, d *hostDraft) {
-	trigger := uikit.Section(c, &d.advanced, &d.advancedHeight, uikit.SectionProps{
+	trigger := uikit.Section(c, &d.advanced, uikit.SectionProps{
 		Key: "advanced", Title: "高级", Summary: d.advancedSummary(a), Chevron: chevronIcon,
 		Reduced: a.reduceMotion(c),
 	}, func() {
@@ -40,6 +41,17 @@ func (a *app) sessionSSHAdvanced(c *ui.Context, d *hostDraft) {
 		input := uikit.Select(c, &d.jumpID, options, uikit.SelectProps{Label: "跳板机"})
 		if input.Changed() {
 			d.changed("jump")
+		}
+		return input
+	})
+	a.sessionField(c, d, "platform", "远端系统", "", func() ui.Element {
+		options := []uikit.Option[string]{{Value: "", Label: "自动识别"}}
+		for _, platform := range hostinfo.Overrides {
+			options = append(options, uikit.Option[string]{Value: string(platform), Label: platform.DisplayName()})
+		}
+		input := uikit.Select(c, &d.platform, options, uikit.SelectProps{Label: "远端系统"}).Width(t.C.Input.SelectWidth)
+		if input.Changed() {
+			d.changed("platform")
 		}
 		return input
 	})

@@ -60,6 +60,9 @@ func (a *app) newSSHGroup(endpoint host) *sshConnectionGroup {
 func (a *app) connectSession(session *remoteSession) { a.startSSHSession(session, true) }
 
 func (a *app) startSSHSession(session *remoteSession, refresh bool) {
+	if !a.businessReady() {
+		return
+	}
 	stopSSH(session)
 	if refresh {
 		endpoint, id, _ := a.latestSessionEndpoint(session.endpoint, session.temporary)
@@ -83,9 +86,10 @@ func (a *app) startSSHSession(session *remoteSession, refresh bool) {
 		if errors.Is(err, errSSHConnectCanceled) {
 			session.state = disconnected
 			showSSHMessage(session, err.Error())
-			return
+		} else {
+			showSSHMessage(session, "连接失败："+err.Error())
 		}
-		showSSHMessage(session, "连接失败："+err.Error())
+		showReconnectHint(session, false)
 	}
 	request.ready = func(connection *sshclient.Connection) {
 		channelCtx, cancelChannel := context.WithCancel(ctx)
@@ -106,6 +110,7 @@ func (a *app) startSSHSession(session *remoteSession, refresh bool) {
 				if session.ssh == run && ctx.Err() == nil && session.state != connectionFailed {
 					session.state = connectionFailed
 					showSSHMessage(session, err.Error())
+					showReconnectHint(session, false)
 				}
 			})
 		}
@@ -177,6 +182,10 @@ func (a *app) startSSHSession(session *remoteSession, refresh bool) {
 }
 
 func (a *app) acquireSSH(request *sshConnectionRequest) {
+	if !a.businessReady() {
+		request.failed(errAppUnavailable)
+		return
+	}
 	group := request.group
 	if request.ctx.Err() != nil {
 		return
@@ -364,6 +373,7 @@ func (a *app) closeConnections() {
 	}
 	a.sshPrompts = nil
 	a.fileSSHLink = nil
+	a.fileSSHLinkAfterClose = nil
 }
 
 // A reconnect may see changed jump credentials while the leaf is unchanged.
@@ -393,7 +403,7 @@ func sameSSHPlan(left, right sshDialPlan) bool {
 		if a.address != b.address || a.port != b.port || a.user != b.user || a.session.ID != b.session.ID ||
 			a.session.Auth != b.session.Auth || a.session.KeyID != b.session.KeyID || a.session.PasswordSaved != b.session.PasswordSaved || a.session.PasswordRevision != b.session.PasswordRevision ||
 			!a.session.UpdatedAt.Equal(b.session.UpdatedAt) || keepalive(a) != keepalive(b) ||
-			one.key.ID != two.key.ID || one.key.Path != two.key.Path || one.key.Fingerprint != two.key.Fingerprint {
+			one.key.ID != two.key.ID || one.key.SecretID != two.key.SecretID || one.key.Fingerprint != two.key.Fingerprint {
 			return false
 		}
 	}

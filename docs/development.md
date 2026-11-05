@@ -54,6 +54,8 @@ build/windows-amd64/burrow-0.1.1-windows-amd64.zip
 
 Windows 本机构建时，MyGo 会准备所需 NSIS；从 macOS/Linux 交叉打包安装程序需要主机提供 `makensis`。缺少 NSIS 时仍生成 EXE 与便携 ZIP，并明确报告未生成安装程序，不将它算作安装包验证通过。安装程序名称为 `burrow-setup-0.1.1-amd64.exe`，ARM64 对应目录及文件名使用 `arm64`。
 
+macOS 正式包使用 [mygo.json](../mygo.json) 中固定的自签名身份，公有证书位于 [assets/signing/burrow-local.pem](../assets/signing/burrow-local.pem)，私钥由用户默认钥匙串管理。首次使用新私钥时，macOS 可能要求本人授权系统 codesign。完整打包会先执行身份检查；缺少原私钥时明确失败，不自动生成另一张证书或退回临时签名。其他构建机需导入同一签名身份。操作步骤见[macOS 签名与解锁](macos-signing.md)。
+
 仅构建应用包：
 
 ```sh
@@ -99,7 +101,9 @@ GOCACHE=/private/tmp/sshdesk-go-build mise exec -- go test ./...
 
 [提交检查](../.github/workflows/check.yml)在分支 push、PR 和手动触发时运行，使用托管 `ubuntu-24.04`。检查范围沿用 Gitea：Go 格式、Python 语法、根模块与终端扩展的已有 race 测试和 vet、Linux 编译、Windows 双架构交叉编译；另检查第三方许可汇总，并使用固定版本、校验 SHA-256 的 Gitleaks 扫描工作文件和检出仓库的全部历史引用。检出保留完整历史且不持久化凭据；工作流仅授予 `contents: read`，使用普通 `pull_request`，无需提供自定义仓库 Secret。
 
-[编译打包](../.github/workflows/package.yml)仅由 `v*` 标签触发，并要求标签与 `mygo.json` 一致，例如版本 `0.1.1` 对应 `v0.1.1`。Windows 使用 `ubuntu-24.04` 交叉构建 amd64/arm64 的 UPX NSIS 安装程序；macOS 使用 Apple Silicon `macos-15` 构建 ARM64 DMG。安装程序校验包括 EXE、DLL 和两个许可文件，macOS 校验 APP 内许可资源及 DMG。各附件附有 `SHA256SUMS`，保留 14 天；工作流不创建或更新 GitHub Release。
+[编译打包](../.github/workflows/package.yml)仅由 `v*` 标签触发，并要求标签与 `mygo.json` 一致，例如版本 `0.1.1` 对应 `v0.1.1`。Windows 使用 `ubuntu-24.04` 交叉构建 amd64/arm64 的 UPX NSIS 安装程序；macOS 使用带 `self-hosted`、`macOS`、`ARM64`、`burrow-release` 标签的受控 Apple Silicon runner 构建 ARM64 DMG。安装程序校验包括 EXE、DLL 和两个许可文件，macOS 校验 APP 内许可资源及 DMG。各附件附有 `SHA256SUMS`，保留 14 天；工作流不创建或更新 GitHub Release。
+
+macOS 发布 runner 需另行注册，提供 Xcode Command Line Tools、Node、Python 3 和同一固定签名身份，并在其登录用户上下文中完成 codesign 授权。作业先运行 `scripts/setup-macos-signing.py --check`，身份缺失会明确失败；不生成替代身份或回退临时签名。仅将该 runner 用于本仓库受信的发布标签，不分配给 fork PR 检查；在 GitHub 限制 `v*` 标签创建权限。私钥保留在发布机钥匙串，配置步骤见[macOS 签名与解锁](macos-signing.md)。runner 尚未配置时，该作业会等待匹配的 runner，不代表打包成功。
 
 Actions 均固定到提交 SHA，工具链沿用 `mise.toml`；APT 使用托管 Ubuntu runner 的 `sudo`，不复用 Gitea 的 rootless 容器设置。原生窗口、协议 Docker 联调、Windows 安装/升级/卸载、签名和公证状态需要单独验收，不能从工作流成功推断。
 

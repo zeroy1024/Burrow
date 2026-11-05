@@ -163,9 +163,20 @@ func (a *app) newShellSession(id hostID, endpoint host, temporary bool, connecti
 }
 
 func disconnectSession(session *remoteSession) {
+	running := terminalRunning(session)
 	stopSSH(session)
 	session.state = disconnected
-	showSSHMessage(session, "会话已断开。可从标签菜单重新连接。")
+	if running {
+		// The terminal reports its end with [Disconnected], and its OnExit adds the hint.
+		return
+	}
+	showSSHMessage(session, "会话已断开。")
+	showReconnectHint(session, false)
+}
+
+// awaitingConnect reports whether the pane offers a new connection attempt.
+func (session *remoteSession) awaitingConnect() bool {
+	return !session.closing && (session.state == disconnected || session.state == connectionFailed)
 }
 
 func appendSessionLines(session *remoteSession, lines ...terminalLine) {

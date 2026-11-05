@@ -4,12 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
-	"math"
-	"strconv"
+	"strings"
 	"time"
 
-	"sshdesk/internal/fileclient"
+	"sshdesk/internal/hostinfo"
 	"sshdesk/internal/sshclient"
 
 	"github.com/egoist/mygo/ui"
@@ -18,58 +16,54 @@ import (
 const (
 	monitorInterval     = 2 * time.Second
 	monitorDiskInterval = 10 * time.Second
-	monitorMountLimit   = 131072
+	// monitorSamples is the trend window: about two minutes at monitorInterval.
+	monitorSamples = 60
 )
 
+// monitorHistory keeps recent rates for the trend charts: CPU in percent,
+// network in bytes per second. A sample without a value adds nothing.
+type monitorHistory struct{ cpu, down, up []float64 }
+
+func (h *monitorHistory) add(metrics hostinfo.Metrics) {
+	h.cpu = appendMonitorSample(h.cpu, metrics.CPU)
+	h.down = appendMonitorSample(h.down, metrics.Down)
+	h.up = appendMonitorSample(h.up, metrics.Up)
+}
+
+func appendMonitorSample(samples []float64, value *float64) []float64 {
+	if value == nil {
+		return samples
+	}
+	samples = append(samples, *value)
+	if len(samples) > monitorSamples {
+		samples = append([]float64(nil), samples[len(samples)-monitorSamples:]...)
+	}
+	return samples
+}
+
 type monitorState struct {
-	session         *remoteSession
-	connection      *sshclient.Connection
-	ctx             context.Context
-	cancel          context.CancelFunc
-	generation      uint64
+	session    *remoteSession
+	connection *sshclient.Connection
+	ctx        context.Context
+	cancel     context.CancelFunc
+	generation uint64
+	// sampler belongs to connection and keeps its counter baseline; platform
+	// is what it was created for.
+	sampler         hostinfo.Sampler
+	platform        hostinfo.Platform
+	unsupported     bool
 	pending         bool
 	next            time.Time
-	previous        *monitorSample
-	metrics         *serverMetrics
-	history         []float64
+	metrics         *hostinfo.Metrics
+	history         monitorHistory
 	errorText       string
 	updatedAt       time.Time
 	diskPending     bool
 	diskNext        time.Time
 	diskIdentity    string
-	diskStats       *fileclient.FilesystemStats
+	diskStats       *hostinfo.Usage
 	diskError       string
 	diskUnsupported bool
-}
-
-type processMetric struct {
-	name string
-	cpu  float64
-}
-
-type serverMetrics struct {
-	cores, processes        int
-	hasProcesses            bool
-	load                    string
-	uptime                  *float64
-	cpu, memory, disk       *float64
-	memoryUsed, memoryTotal uint64
-	diskUsed, diskTotal     uint64
-	diskDevice, filesystem  string
-	root                    monitorRoot
-	networkInterface        string
-	down, up                *float64
-	top                     []processMetric
-	unavailable             []string
-}
-
-type monitorSample struct {
-	metrics           serverMetrics
-	cpuTotal, cpuIdle uint64
-	hasCPU            bool
-	bytesIn, bytesOut uint64
-	hasNetwork        bool
-	processes         map[monitorProcessID]monitorProcess
 }
 
 func (m *monitorState) stop() {
@@ -108,23 +102,34 @@ func (a *app) updateMonitor(c *ui.Context) {
 	if session.closing || session.state != connected || session.ssh == nil || session.ssh.conn == nil {
 		return
 	}
+	if m.sampler == nil {
+		platform, known := a.groupPlatform(session.connection)
+		if !known {
+			// The first connection to a host waits for platform detection.
+			if group := session.connection; !group.facts.pending && group.facts.errorText != "" {
+				m.errorText = group.facts.errorText
+			}
+			return
+		}
+		m.sampler, m.platform = hostinfo.For(platform).NewSampler(sshHostRunner{connection}), platform
+	}
 	a.updateMonitorSample(c)
 	a.updateMonitorDisk(c)
 }
 
 func (a *app) updateMonitorSample(c *ui.Context) {
 	m := &a.monitor
-	if m.pending {
+	if m.pending || m.unsupported {
 		return
 	}
 	if remaining := m.next.Sub(c.Now()); remaining > 0 {
 		c.After(remaining)
 		return
 	}
-	connection, generation, lifetime := m.connection, m.generation, m.ctx
+	connection, sampler, generation, lifetime := m.connection, m.sampler, m.generation, m.ctx
 	release, err := connection.Retain()
 	if err != nil {
-		m.metrics, m.previous, m.history = nil, nil, nil
+		m.metrics, m.history = nil, monitorHistory{}
 		m.errorText = err.Error()
 		m.next = c.Now().Add(monitorInterval)
 		c.After(monitorInterval)
@@ -135,46 +140,40 @@ func (a *app) updateMonitorSample(c *ui.Context) {
 	a.sshWorkers.Go(func() {
 		defer release()
 		defer cancel()
-		output, err := connection.Exec(ctx, monitorCommand)
-		var sample monitorSample
-		if err == nil {
-			sample, err = parseMonitorSample(string(output))
-		}
+		metrics, err := sampler.Sample(ctx)
 		a.window.Update(func() {
 			if m.generation != generation || m.connection != connection || lifetime.Err() != nil {
 				return
 			}
 			m.pending = false
 			m.next = time.Now().Add(monitorInterval)
+			if errors.Is(err, hostinfo.ErrUnsupported) {
+				m.unsupported, m.metrics, m.history = true, nil, monitorHistory{}
+				return
+			}
 			if err != nil {
-				m.metrics, m.previous, m.history = nil, nil, nil
+				m.metrics, m.history = nil, monitorHistory{}
 				m.errorText = err.Error()
 				return
 			}
-			completeMonitorRates(&sample, m.previous)
-			m.previous, m.metrics = &sample, &sample.metrics
+			m.metrics = &metrics
 			m.errorText, m.updatedAt = "", time.Now()
-			if sample.metrics.cpu != nil {
-				m.history = append(m.history, *sample.metrics.cpu/100)
-				if len(m.history) > 30 {
-					m.history = append([]float64(nil), m.history[len(m.history)-30:]...)
-				}
-			}
+			m.history.add(metrics)
 		})
 	})
 }
 
-// Filesystem space changes slowly. Its separate, short-lived SFTP channel and
-// deadline cannot erase /proc samples or close a browser/transfer subsystem.
+// Filesystem space changes slowly. Its separate, short-lived channel and
+// deadline cannot erase samples or close a browser/transfer subsystem.
 func (a *app) updateMonitorDisk(c *ui.Context) {
 	m := &a.monitor
-	if m.metrics == nil || m.metrics.root.identity == "" {
+	if m.metrics == nil || m.metrics.DiskKey == "" {
 		m.diskStats = nil
 		return
 	}
-	root := m.metrics.root
-	if m.diskIdentity != root.identity {
-		m.diskIdentity, m.diskStats, m.diskError = root.identity, nil, ""
+	key := m.metrics.DiskKey
+	if m.diskIdentity != key {
+		m.diskIdentity, m.diskStats, m.diskError = key, nil, ""
 		m.diskNext, m.diskUnsupported = time.Time{}, false
 	}
 	if m.diskPending || m.diskUnsupported {
@@ -184,18 +183,18 @@ func (a *app) updateMonitorDisk(c *ui.Context) {
 		c.After(remaining)
 		return
 	}
-	connection, generation, lifetime := m.connection, m.generation, m.ctx
+	connection, sampler, generation, lifetime := m.connection, m.sampler, m.generation, m.ctx
 	ctx, cancel := context.WithTimeout(lifetime, 3*time.Second)
 	m.diskPending = true
 	a.sshWorkers.Go(func() {
 		defer cancel()
-		stats, err := readMonitorDisk(ctx, connection, root)
+		usage, err := sampler.Disk(ctx, key)
 		a.window.Update(func() {
 			if m.generation != generation || m.connection != connection || lifetime.Err() != nil {
 				return
 			}
 			m.diskPending = false
-			if m.diskIdentity != root.identity {
+			if m.diskIdentity != key {
 				return
 			}
 			m.diskNext = time.Now().Add(monitorDiskInterval)
@@ -204,56 +203,28 @@ func (a *app) updateMonitorDisk(c *ui.Context) {
 				m.diskUnsupported = errors.Is(err, errors.ErrUnsupported)
 				return
 			}
-			m.diskStats, m.diskError = &stats, ""
+			m.diskStats, m.diskError = &usage, ""
 		})
 	})
 }
 
-func readMonitorDisk(ctx context.Context, connection *sshclient.Connection, root monitorRoot) (fileclient.FilesystemStats, error) {
-	var client fileclient.Client
-	for {
-		if err := connection.WaitChannelReady(ctx); err != nil {
-			return fileclient.FilesystemStats{}, err
-		}
-		if err := fileclient.WaitSFTPReady(ctx, connection); err != nil {
-			return fileclient.FilesystemStats{}, err
-		}
-		var err error
-		client, err = fileclient.NewSFTP(ctx, connection)
-		if !errors.Is(err, sshclient.ErrChannelPending) && !errors.Is(err, fileclient.ErrSFTPInitPending) {
-			if err != nil {
-				return fileclient.FilesystemStats{}, err
-			}
-			break
-		}
+// monitorNotice explains failed or missing metrics. Collection progress and
+// unsupported platforms show in the panel's host indicator instead.
+func monitorNotice(m *monitorState) string {
+	if m.errorText != "" {
+		return "监控采集失败：" + m.errorText
 	}
-	defer client.Close()
-	stats, err := client.(fileclient.FilesystemStatter).StatFilesystem(ctx, "/")
-	if err != nil {
-		return fileclient.FilesystemStats{}, err
+	if m.metrics == nil {
+		return ""
 	}
-	// An SFTP server can be chrooted independently of the SSH command channel.
-	// Confirm its root mount before labeling its statistics as the SSH root disk.
-	stream, err := client.OpenRead(ctx, "/proc/self/mountinfo", 0)
-	if err != nil {
-		return fileclient.FilesystemStats{}, err
+	unavailable := append([]string(nil), m.metrics.Unavailable...)
+	if m.diskError != "" {
+		unavailable = append(unavailable, "磁盘容量")
 	}
-	mounts, readErr := io.ReadAll(io.LimitReader(stream, monitorMountLimit+1))
-	if err := errors.Join(readErr, stream.Close()); err != nil {
-		return fileclient.FilesystemStats{}, err
+	if len(unavailable) > 0 {
+		return "不可用：" + strings.Join(unavailable, "、")
 	}
-	if len(mounts) > monitorMountLimit {
-		return fileclient.FilesystemStats{}, errors.New("SFTP 挂载信息超过采集上限")
-	}
-	if actual := parseMonitorRoot(string(mounts)); actual.identity == "" || actual.identity != root.identity {
-		return fileclient.FilesystemStats{}, errors.New("SFTP 根挂载与当前 SSH 会话不一致")
-	}
-	return stats, nil
-}
-
-func monitorNumber(text string) (float64, bool) {
-	value, err := strconv.ParseFloat(text, 64)
-	return value, err == nil && value >= 0 && !math.IsNaN(value) && !math.IsInf(value, 0)
+	return ""
 }
 
 func monitorText(value string) string {
@@ -263,25 +234,32 @@ func monitorText(value string) string {
 	return value
 }
 
-func monitorRate(value *float64) string {
-	if value == nil {
-		return "—"
-	}
-	for _, unit := range []struct {
+// monitorRate splits a byte rate into its number and unit, which the panel
+// sets in different sizes.
+func monitorRate(value float64) (number, unit string) {
+	for _, step := range []struct {
 		size float64
 		name string
 	}{{1e9, "GB/s"}, {1e6, "MB/s"}, {1e3, "KB/s"}} {
-		if *value >= unit.size {
-			return fmt.Sprintf("%.1f %s", *value/unit.size, unit.name)
+		if value >= step.size {
+			return fmt.Sprintf("%.1f", value/step.size), step.name
 		}
 	}
-	return fmt.Sprintf("%.0f B/s", *value)
+	return fmt.Sprintf("%.0f", value), "B/s"
 }
 
-func monitorUptime(value *float64) string {
+// monitorUptime drops the minutes when brief and the host has been up a day.
+func monitorUptime(value *float64, brief bool) string {
 	if value == nil {
 		return "—"
 	}
 	minutes := int64(*value) / 60
-	return fmt.Sprintf("%d 天 %d 小时 %d 分钟", minutes/1440, minutes/60%24, minutes%60)
+	days, hours := minutes/1440, minutes/60%24
+	if brief && days > 0 {
+		return fmt.Sprintf("%d 天 %d 小时", days, hours)
+	}
+	if brief {
+		return fmt.Sprintf("%d 小时 %d 分", hours, minutes%60)
+	}
+	return fmt.Sprintf("%d 天 %d 小时 %d 分", days, hours, minutes%60)
 }

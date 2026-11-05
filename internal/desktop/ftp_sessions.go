@@ -262,7 +262,12 @@ func (a *app) deleteFileSite(id hostID, done func(error)) {
 	}
 	previousWorkspace := a.savedWorkspace
 	a.savedWorkspace = a.workspaceSnapshot()
-	a.commitCatalogMoveAsync(func() {
+	changes, err := a.vault.Prepare(nil, []string{sessionCredentialKey(deleted.session.ID)})
+	if err != nil {
+		done(err)
+		return
+	}
+	a.commitCatalogSecretsAsync(changes, func() {
 		a.hosts = slices.Delete(a.hosts, int(id), int(id)+1)
 		for _, group := range a.groups {
 			group.hosts = slices.DeleteFunc(group.hosts, func(candidate hostID) bool { return candidate == id })
@@ -352,9 +357,6 @@ func (a *app) deleteFileSite(id hostID, done func(error)) {
 				a.closedTabs[i].host--
 			}
 		}
-		if err := deleteSessionCredentials(deleted.session.ID); err != nil {
-			a.files.notice = &uikit.ToastProps{ID: "会话已移除，但钥匙串清理失败：" + err.Error(), Tone: uikit.ToneDanger, Title: "会话已移除，但钥匙串清理失败", Detail: err.Error()}
-		}
 		done(nil)
 	})
 }
@@ -375,11 +377,12 @@ func (a *app) confirmDeleteSite(c *ui.Context, id hostID) {
 		uikit.Notify(c, "请先取消或清除该会话的传输任务")
 		return
 	}
+	page := a.page()
 	a.deleteFileSite(id, func(err error) {
 		if err != nil {
 			a.persistenceNotice("删除会话失败", err)
 			return
 		}
-		a.page().addHostOpen = false
+		page.draft.modal.Close()
 	})
 }

@@ -75,7 +75,8 @@ func (a *app) groupDialog(c *ui.Context) {
 	var name string
 	valid := false
 	result := uikit.Modal(dialogContext, &page.groupDialogOpen, uikit.ModalProps{
-		Title: localize(c, title), Compact: true, Width: t.C.Dialog.GroupWidth,
+		Controller: &page.groupModal,
+		Title:      localize(c, title), Compact: true, Width: t.C.Dialog.GroupWidth,
 		Motion: uikit.MotionOverride(a.reduceMotion(c)),
 	}, func(parts uikit.ModalParts) {
 		uikit.Text(c, localize(c, detail), uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneSecondary})
@@ -114,7 +115,7 @@ func (a *app) groupDialog(c *ui.Context) {
 				a.persistenceNotice("保存分组失败", err)
 				return
 			}
-			page.groupDialogOpen = false
+			page.groupModal.Close()
 			if target == nil {
 				page.query = ""
 			}
@@ -133,7 +134,8 @@ func (a *app) deleteGroupDialog(c *ui.Context) {
 	remove := false
 	t := theme.Current()
 	result := uikit.Modal(c.Key(group), &page.groupDialogOpen, uikit.ModalProps{
-		Title: localize(c, "删除分组？"), Compact: true, Width: t.C.Dialog.GroupWidth,
+		Controller: &page.groupModal,
+		Title:      localize(c, "删除分组？"), Compact: true, Width: t.C.Dialog.GroupWidth,
 		Motion: uikit.MotionOverride(a.reduceMotion(c)),
 	}, func(parts uikit.ModalParts) {
 		detail := fmt.Sprintf(localize(c, "删除「%s」分组，连接配置、已打开的会话和传输任务会保留。"), group.name)
@@ -163,7 +165,7 @@ func (a *app) deleteGroupDialog(c *ui.Context) {
 			if page.catalogFlash != nil && *page.catalogFlash == key {
 				page.catalogFlash = nil
 			}
-			page.groupDialogOpen = false
+			page.groupModal.Close()
 		})
 	}
 	if !page.groupDialogOpen {
@@ -174,7 +176,7 @@ func (a *app) deleteGroupDialog(c *ui.Context) {
 func draftField(c *ui.Context, label string, value *string) {
 	t := theme.Current()
 	ui.Column(c).Gap(t.Space.N6).Children(func() {
-		ui.Text(c, label).FontSize(t.Font.Size.Small)
+		uikit.Text(c, label, uikit.TextProps{Style: uikit.TextSmall})
 		uikit.Input(c, value, uikit.InputProps{}).Label(label).FillWidth()
 	})
 }

@@ -618,7 +618,8 @@ type ColorsFill struct {
 	Quieter         color.NRGBA // 玻璃上的面包屑
 	Placeholder     color.NRGBA // 拖动占位
 	PlaceholderEdge color.NRGBA
-	Strong          color.NRGBA // 资源条填充
+	Strong          color.NRGBA // 中性进度条填充
+	Shimmer         color.NRGBA // 骨架占位流光高光
 	QuietHover      color.NRGBA // 传输胶囊悬停
 	Skeleton        color.NRGBA
 }
@@ -766,172 +767,198 @@ type Spacing struct {
 
 // Sizes groups tokens.
 type Sizes struct {
-	Hairline                float32 // 0.5px 描边
-	Divider                 float32
-	FocusRing               float32 // 焦点环宽 / 虚线落位框宽
-	FocusHalo               float32 // 焦点光晕扩散
-	Dot                     float32
-	DotSm                   float32
-	DotHalo                 float32
-	TrafficLight            float32
-	Icon                    float32
-	IconMd                  float32
-	IconSm                  float32
-	IconStroke              float32 // Lucide 风格线宽
-	ControlXs               float32
-	ControlSm               float32
-	ControlMd               float32
-	Control                 float32
-	ControlLg               float32
-	RailButton              float32
-	Titlebar                float32
-	Rail                    float32
-	Sider                   float32
-	TitleLeft               float32 // 标题栏左区（交通灯 + 侧栏开关），与 rail+sider 对齐
-	PaneHeader              float32
-	StatusBar               float32
-	PaneStatusBar           float32
-	ListRow                 float32
-	FileHeader              float32
-	QueueRow                float32
-	GroupRow                float32
-	OsLogo                  float32
-	OsGlyph                 float32
-	Progress                float32
-	ProgressThin            float32
-	DropLine                float32 // 插入线（ListState.Reorder） [derived]
-	FadeExtent              float32 // 玻璃栏向内容延伸的渐隐长度
-	FadeExtentPane          float32 // 分屏窗格内的渐隐长度
-	StatsPanel              float32 // 监控侧栏（分屏时）
-	AutoScrollZone          float32
-	SeparatorShort          float32
-	SeparatorTall           float32
-	SeparatorStatus         float32
-	WindowWidth             float32
-	WindowHeight            float32
-	WindowMinWidth          float32
-	WindowMinHeight         float32
-	TrafficLightY           float32
-	SiderMinWidth           float32
-	SiderMaxWidth           float32
-	PaneMinWidth            float32
-	PaneMinHeight           float32
-	DragPreviewWidth        float32
-	DragPreviewHeight       float32
-	TabDetachDistance       float32
-	DragGrabX               float32
-	DragGrabY               float32
-	PaneEnterOffset         float32
-	DividerHandleWidth      float32
-	DividerHandleHeight     float32
-	DividerKeyboardStep     float32
-	PreviewInset            float32
-	PaneActionRevealPadding float32
-	HostDialogWidth         float32
-	GroupDialogWidth        float32
-	PortFieldWidth          float32
-	DialogTitleSize         float32
-	TabContentHeight        float32
-	TabStripHeight          float32
-	TabDragHandleInset      float32
-	TabTitleOffset          float32
-	TabCountOffset          float32
-	ScrollbarMinThumb       float32
-	ScrollbarRevealZone     float32
-	TerminalContentBottom   float32
-	EmptyPaneTitleSize      float32
-	StatsHeaderHeight       float32
-	StatsChartHeight        float32
-	StatsChartStroke        float32
-	StatsSectionGap         float32
-	EmptyPaneIcon           float32
-	BellIcon                float32
-	CatalogRowHeight        float32
-	PaneMinLocal            float32
-	PaneMinRemote           float32
-	Popover                 float32
-	CapsuleBarWidth         float32
-	CapsuleBarHeight        float32
-	DockHeader              float32
-	DockRow                 float32
-	TabSpinner              float32
-	FileToolbar             float32
-	FileCompactWidth        float32
-	FileSearchWidth         float32
-	FileSizeWidth           float32
-	FileDateWidth           float32
-	FilePermissionsWidth    float32
-	FileOwnerWidth          float32
-	FileGridCellWidth       float32
-	FileGridCellHeight      float32
-	TransferProgressWidth   float32
-	TransferSpeedWidth      float32
-	TransferNameMinWidth    float32
-	TransferStatusWidth     float32 // 传输状态列固定宽度 [derived]
-	SplitGripHeight         float32
-	TransferPopoverHeader   float32
-	FileNameMinWidth        float32
-	FileGridIconSize        float32
-	TransferDockMaxRows     float32
-	TransferPopoverMaxRows  float32
-	TransferConcurrency     float32
-	TooltipMaxWidth         float32 // 提示最大宽度
-	PreviewLineHeight       float32
-	PreviewLineLong         float32
-	PreviewLineMedium       float32
-	PreviewLineShort        float32
-	Modal                   float32
-	FormLabel               float32
-	SettingsContent         float32
-	ModalTopRatio           float32
-	ModalTopMin             float32
-	ModalIconTile           float32
-	InputMonoSize           float32
-	FormErrorIcon           float32
-	TestSpinner             float32
-	CollapseChevron         float32
-	CollapseChevronStroke   float32
-	CollapseChevronRotate   float32
-	SwitchWidth             float32
-	SwitchHeight            float32
-	SwitchKnob              float32
-	SettingsHeaderPaddingX  float32
-	SettingsRowHeight       float32
-	SettingsFadeHeight      float32
-	SchemePreviewHeight     float32
-	SchemePreviewFont       float32
-	SchemePreviewLineHeight float32
-	SchemeBadgeIcon         float32
-	ThemeAspect             float32
-	ThemeRadio              float32
-	ThemeRadioRing          float32
-	AccentSwatch            float32
-	AccentRing              float32
-	AccentRingGap           float32
-	CredentialModal         float32
-	SettingsSelect          float32
-	SettingsNumber          float32
-	SettingsScrollback      float32
-	Keycap                  float32
-	ButtonLarge             float32
-	BadgeSmall              float32
-	BadgeMedium             float32
-	Check                   float32
-	RadioDot                float32
-	PanelHeader             float32
-	Toast                   float32
-	EmptyMaxWidth           float32
-	KeyValueRow             float32
-	SparklineHeight         float32
-	SparklineStroke         float32
-	MeterHeight             float32
-	IconXs                  float32
-	SegmentedItem           float32
-	LatencyWarn             float32
-	LatencyBad              float32
-	TableNameMinWidth       float32
-	MeterWarnRatio          float32
-	MeterCriticalRatio      float32
+	Hairline                 float32 // 0.5px 描边
+	Divider                  float32
+	FocusRing                float32 // 焦点环宽 / 虚线落位框宽
+	FocusHalo                float32 // 焦点光晕扩散
+	Dot                      float32
+	DotSm                    float32
+	DotHalo                  float32
+	TrafficLight             float32
+	Icon                     float32
+	IconMd                   float32
+	IconSm                   float32
+	IconStroke               float32 // Lucide 风格线宽
+	ControlXs                float32
+	ControlSm                float32
+	ControlMd                float32
+	Control                  float32
+	ControlLg                float32
+	RailButton               float32
+	Titlebar                 float32
+	Rail                     float32
+	Sider                    float32
+	TitleLeft                float32 // 标题栏左区（交通灯 + 侧栏开关），与 rail+sider 对齐
+	PaneHeader               float32
+	StatusBar                float32
+	PaneStatusBar            float32
+	ListRow                  float32
+	FileHeader               float32
+	QueueRow                 float32
+	GroupRow                 float32
+	OsLogo                   float32
+	OsGlyph                  float32
+	Progress                 float32
+	ProgressThin             float32
+	DropLine                 float32 // 插入线（ListState.Reorder） [derived]
+	FadeExtent               float32 // 玻璃栏向内容延伸的渐隐长度
+	FadeExtentPane           float32 // 分屏窗格内的渐隐长度
+	StatsPanel               float32 // 监控侧栏（分屏时）
+	AutoScrollZone           float32
+	SeparatorShort           float32
+	SeparatorTall            float32
+	SeparatorStatus          float32
+	WindowWidth              float32
+	WindowHeight             float32
+	WindowMinWidth           float32
+	WindowMinHeight          float32
+	TrafficLightY            float32
+	SiderMinWidth            float32
+	SiderMaxWidth            float32
+	PaneMinWidth             float32
+	PaneMinHeight            float32
+	DragPreviewWidth         float32
+	DragPreviewHeight        float32
+	TabDetachDistance        float32
+	DragGrabX                float32
+	DragGrabY                float32
+	PaneEnterOffset          float32
+	DividerHandleWidth       float32
+	DividerHandleHeight      float32
+	DividerKeyboardStep      float32
+	PreviewInset             float32
+	PaneActionRevealPadding  float32
+	HostDialogWidth          float32
+	GroupDialogWidth         float32
+	PortFieldWidth           float32
+	DialogTitleSize          float32
+	TabContentHeight         float32
+	TabStripHeight           float32
+	TabDragHandleInset       float32
+	TabTitleOffset           float32
+	TabCountOffset           float32
+	ScrollbarMinThumb        float32
+	ScrollbarRevealZone      float32
+	TerminalContentBottom    float32
+	EmptyPaneTitleSize       float32
+	StatsHeaderHeight        float32
+	StatsChartHeight         float32 // CPU 趋势图
+	StatsChartStroke         float32
+	StatsSectionGap          float32
+	StatsNetChartHeight      float32 // 网络上下行迷你趋势
+	StatsValueLarge          float32 // CPU 主数字
+	StatsSkeletonLine        float32 // 进程 Top 骨架条
+	EmptyPaneIcon            float32
+	BellIcon                 float32
+	CatalogRowHeight         float32
+	PaneMinLocal             float32
+	PaneMinRemote            float32
+	Popover                  float32
+	CapsuleBarWidth          float32
+	CapsuleBarHeight         float32
+	DockHeader               float32
+	DockRow                  float32
+	TabSpinner               float32
+	FileToolbar              float32
+	FileCompactWidth         float32
+	FileSearchWidth          float32
+	FileSizeWidth            float32
+	FileDateWidth            float32
+	FilePermissionsWidth     float32
+	FileOwnerWidth           float32
+	FileGridCellWidth        float32
+	FileGridCellHeight       float32
+	TransferProgressWidth    float32
+	TransferSpeedWidth       float32
+	TransferNameMinWidth     float32
+	TransferStatusWidth      float32 // 传输状态列固定宽度 [derived]
+	SplitGripHeight          float32
+	TransferPopoverHeader    float32
+	FileNameMinWidth         float32
+	FileGridIconSize         float32
+	TransferDockMaxRows      float32
+	TransferPopoverMaxRows   float32
+	TransferConcurrency      float32
+	TooltipMaxWidth          float32 // 提示最大宽度
+	PreviewLineHeight        float32
+	PreviewLineLong          float32
+	PreviewLineMedium        float32
+	PreviewLineShort         float32
+	Modal                    float32
+	FormLabel                float32
+	SettingsContent          float32
+	ModalTopRatio            float32
+	ModalTopMin              float32
+	ModalIconTile            float32
+	InputMonoSize            float32
+	FormErrorIcon            float32
+	TestSpinner              float32
+	CollapseChevron          float32
+	CollapseChevronStroke    float32
+	CollapseChevronRotate    float32
+	SwitchWidth              float32
+	SwitchHeight             float32
+	SwitchKnob               float32
+	SettingsHeaderPaddingX   float32
+	SettingsRowHeight        float32
+	SettingsFadeHeight       float32
+	SchemePreviewHeight      float32
+	SchemePreviewFont        float32
+	SchemePreviewLineHeight  float32
+	SchemeBadgeIcon          float32
+	ThemeAspect              float32
+	ThemeRadio               float32
+	ThemeRadioRing           float32
+	AccentSwatch             float32
+	AccentRing               float32
+	AccentRingGap            float32
+	CredentialModal          float32
+	SettingsSelect           float32
+	SettingsNumber           float32
+	SettingsScrollback       float32
+	SettingsShortcut         float32
+	Keycap                   float32
+	ButtonLarge              float32
+	BadgeSmall               float32
+	BadgeMedium              float32
+	Check                    float32
+	RadioDot                 float32
+	PanelHeader              float32
+	Toast                    float32
+	EmptyMaxWidth            float32
+	KeyValueRow              float32
+	SparklineHeight          float32
+	SparklineStroke          float32
+	MeterHeight              float32
+	IconXs                   float32
+	SegmentedItem            float32
+	LatencyWarn              float32
+	LatencyBad               float32
+	TableNameMinWidth        float32
+	SparklineDotRadius       float32 // 趋势图末点
+	SparklineHaloRadius      float32 // 趋势图末点光圈
+	MeterWarnRatio           float32
+	MeterCriticalRatio       float32
+	McpTableMinWidth         float32
+	McpNameColumn            float32
+	McpBadgeColumn           float32
+	McpScopeColumn           float32
+	McpTimeColumn            float32
+	McpKeysColumn            float32
+	McpAuditTimeColumn       float32
+	McpAuditKeyColumn        float32
+	McpAuditConnectionColumn float32
+	McpAuditActionColumn     float32
+	McpAuditStatusColumn     float32
+	McpAuditDurationColumn   float32
+	McpPolicyModal           float32
+	McpKeyModal              float32
+	McpDialog                float32
+	McpDrawerMinWidth        float32
+	McpDrawerWidth           float32
+	McpMainMinWidth          float32
+	McpRuleModeWidth         float32 // 命令规则匹配方式选择框
+	McpPermissionColumn      float32 // 连接授权矩阵能力列
 }
 
 // TypographyFamily groups tokens.
@@ -1070,6 +1097,7 @@ type Opacities struct {
 	LiftStackBack             float32
 	Hidden                    float32
 	OsTint                    float32 // OS logo 底 = 品牌色 9% 混入卡片色
+	LiveBeatScale             float32 // 实时状态点跳动起始缩放
 	DragRotation              float32
 	DragPreview               float32
 	PreviewHeader             float32
@@ -1084,7 +1112,8 @@ type Opacities struct {
 	ModalEnterScale           float32
 	ModalExitScale            float32
 	CollapseContentFadeFactor float32
-	SparklineFill             float32
+	SparklineFill             float32 // 趋势图渐变填充顶部不透明度
+	SparklineHalo             float32
 }
 
 // MotionDuration groups tokens.
@@ -1099,6 +1128,8 @@ type MotionDuration struct {
 	Drop              time.Duration // 落位
 	AutoExpand        time.Duration // 悬停自动展开
 	Flash             time.Duration // 落位闪光
+	Shimmer           time.Duration // 骨架占位流光一周
+	LiveBeat          time.Duration // 实时状态点每次采样的跳动
 	FrameInterval     time.Duration
 	Zoom              time.Duration
 	PaneEnter         time.Duration
@@ -1117,6 +1148,7 @@ type MotionDuration struct {
 	Fast              time.Duration
 	Base              time.Duration
 	AutoHide          time.Duration
+	ScrollGesture     time.Duration // 同一滚动手势相邻事件的最大间隔
 }
 
 // MotionEasing groups tokens.
@@ -1678,7 +1710,7 @@ type ProgressTokens struct {
 	FillPaused  color.NRGBA // ← color.status.paused
 	FillDone    color.NRGBA // ← color.success.default
 	HeightMeter float32     // ← size.meterHeight
-	MeterFill   color.NRGBA // ← color.fill.strong
+	MeterFill   color.NRGBA // ← color.accent.default
 	MeterWarnAt float32     // ← size.meterWarnRatio
 	MeterCritAt float32     // ← size.meterCriticalRatio
 	FillError   color.NRGBA // ← color.danger.default
@@ -1861,6 +1893,7 @@ type ScrollbarTokens struct {
 	EndInset     float32       // ← space.2
 	RevealZone   float32       // ← size.scrollbarRevealZone
 	Color        color.NRGBA   // ← color.status.scrollbar
+	GestureGap   time.Duration // ← motion.duration.scrollGesture
 }
 
 // DialogTokens groups tokens.
@@ -1880,10 +1913,23 @@ type DialogTokens struct {
 
 // StatsTokens groups tokens.
 type StatsTokens struct {
-	HeaderHeight float32 // ← size.statsHeaderHeight
-	ChartHeight  float32 // ← size.statsChartHeight
-	ChartStroke  float32 // ← size.statsChartStroke
-	SectionGap   float32 // ← size.statsSectionGap
+	HeaderHeight   float32       // ← size.statsHeaderHeight
+	ChartHeight    float32       // ← size.statsChartHeight
+	ChartStroke    float32       // ← size.statsChartStroke
+	SectionGap     float32       // ← size.statsSectionGap
+	NetChartHeight float32       // ← size.statsNetChartHeight
+	ValueLarge     float32       // ← size.statsValueLarge
+	HostBg         color.NRGBA   // ← color.surface.sunken
+	HostRadius     float32       // ← radius.card
+	ProcessBar     color.NRGBA   // ← color.accent.tint10
+	ProcessRadius  float32       // ← radius.controlSm
+	Skeleton       color.NRGBA   // ← color.border.subtle
+	Shimmer        color.NRGBA   // ← color.fill.shimmer
+	ShimmerPeriod  time.Duration // ← motion.duration.shimmer
+	SkeletonLine   float32       // ← size.statsSkeletonLine
+	BeatDuration   time.Duration // ← motion.duration.liveBeat
+	BeatScale      float32       // ← opacity.liveBeatScale
+	BeatEasing     Bezier        // ← motion.easing.out
 }
 
 // CatalogTokens groups tokens.
@@ -2028,8 +2074,6 @@ type TransferDockTokens struct {
 
 // TransferRowTokens groups tokens.
 type TransferRowTokens struct {
-	IconTile           float32       // ← size.control
-	IconRadius         float32       // ← radius.control
 	UpBg               color.NRGBA   // ← color.accent.subtle
 	UpIcon             color.NRGBA   // ← color.accent.default
 	DownBg             color.NRGBA   // ← color.surface.control
@@ -2145,7 +2189,6 @@ type ModalTokens struct {
 	HeaderPaddingLeft   float32       // ← space.24
 	HeaderGap           float32       // ← space.12
 	IconTile            float32       // ← size.modalIconTile
-	IconTileRadius      float32       // ← radius.railButton
 	TitleSize           float32       // ← font.size.title
 	TitleWeight         int           // ← font.weight.semibold
 	SubtitleSize        float32       // ← font.size.footnote
@@ -2271,8 +2314,6 @@ type SettingsTokens struct {
 	RowLabel            color.NRGBA   // ← color.text.primary
 	RowDescSize         float32       // ← font.size.footnote
 	RowDesc             color.NRGBA   // ← color.text.secondary
-	GroupFootnoteSize   float32       // ← font.size.footnote
-	GroupFootnote       color.NRGBA   // ← color.text.tertiary
 	FadeHeight          float32       // ← size.settingsFadeHeight
 	EnterY              float32       // ← space.8
 	ExitY               float32       // ← space.4
@@ -2285,6 +2326,7 @@ type SettingsTokens struct {
 	SelectWidth         float32       // ← size.settingsSelect
 	NumberWidth         float32       // ← size.settingsNumber
 	ScrollbackWidth     float32       // ← size.settingsScrollback
+	RowGap              float32       // ← space.16
 }
 
 // SchemeCardTokens groups tokens.
@@ -2331,6 +2373,23 @@ type AccentSwatchTokens struct {
 	RingGap   float32     // ← size.accentRingGap
 	RingWidth float32     // ← size.accentRing
 	RingInset color.NRGBA // ← color.surface.card
+}
+
+// ShortcutFieldTokens groups tokens.
+type ShortcutFieldTokens struct {
+	Width      float32     // ← size.settingsShortcut
+	KeyGap     float32     // ← space.4
+	KeyText    color.NRGBA // ← color.text.secondary
+	Prompt     color.NRGBA // ← color.text.accent
+	ControlGap float32     // ← space.8
+}
+
+// HelpTipTokens groups tokens.
+type HelpTipTokens struct {
+	Size      float32     // ← size.iconSm
+	Gap       float32     // ← space.4
+	Icon      color.NRGBA // ← color.text.tertiary
+	IconHover color.NRGBA // ← color.text.secondary
 }
 
 // KbdTokens groups tokens.
@@ -2410,10 +2469,14 @@ type PanelTokens struct {
 
 // SparklineTokens groups tokens.
 type SparklineTokens struct {
-	Height    float32     // ← size.sparklineHeight
-	Stroke    float32     // ← size.sparklineStroke
-	Line      color.NRGBA // ← color.accent.default
-	FillAlpha float32     // ← opacity.sparklineFill
+	Height     float32     // ← size.sparklineHeight
+	Stroke     float32     // ← size.sparklineStroke
+	Line       color.NRGBA // ← color.accent.default
+	FillAlpha  float32     // ← opacity.sparklineFill
+	Grid       color.NRGBA // ← color.border.divider
+	DotRadius  float32     // ← size.sparklineDotRadius
+	HaloRadius float32     // ← size.sparklineHaloRadius
+	HaloAlpha  float32     // ← opacity.sparklineHalo
 }
 
 // KeyValueTokens groups tokens.
@@ -2502,6 +2565,62 @@ type PaneFooterTokens struct {
 	Divider  color.NRGBA // ← color.border.divider
 }
 
+// McpTokens groups tokens.
+type McpTokens struct {
+	TableMinWidth     float32 // ← size.mcpTableMinWidth
+	KeyName           float32 // ← size.mcpNameColumn
+	KeyState          float32 // ← size.mcpBadgeColumn
+	KeyDirs           float32 // ← size.mcpNameColumn
+	KeyUsed           float32 // ← size.mcpTimeColumn
+	PolicyName        float32 // ← size.mcpNameColumn
+	PolicyCategory    float32 // ← size.mcpBadgeColumn
+	PolicyConnections float32 // ← size.mcpScopeColumn
+	PolicyKeys        float32 // ← size.mcpKeysColumn
+	PolicyState       float32 // ← size.mcpScopeColumn
+	AuditTime         float32 // ← size.mcpAuditTimeColumn
+	AuditKey          float32 // ← size.mcpAuditKeyColumn
+	AuditConnection   float32 // ← size.mcpAuditConnectionColumn
+	AuditAction       float32 // ← size.mcpAuditActionColumn
+	AuditStatus       float32 // ← size.mcpAuditStatusColumn
+	AuditDuration     float32 // ← size.mcpAuditDurationColumn
+	PolicyModalWidth  float32 // ← size.mcpPolicyModal
+	KeyModalWidth     float32 // ← size.mcpKeyModal
+	DialogWidth       float32 // ← size.mcpDialog
+	DrawerMinWidth    float32 // ← size.mcpDrawerMinWidth
+	DrawerWidth       float32 // ← size.mcpDrawerWidth
+	MainMinWidth      float32 // ← size.mcpMainMinWidth
+	RuleModeWidth     float32 // ← size.mcpRuleModeWidth
+	PermissionColumn  float32 // ← size.mcpPermissionColumn
+}
+
+// InsetTokens groups tokens.
+type InsetTokens struct {
+	Padding         float32     // ← space.10
+	Radius          float32     // ← radius.control
+	BorderWidth     float32     // ← size.hairline
+	CompactPaddingX float32     // ← space.8
+	CompactPaddingY float32     // ← space.6
+	CompactRadius   float32     // ← radius.controlSm
+	Bg              color.NRGBA // ← color.surface.sunken
+	Border          color.NRGBA // ← color.border.subtle
+	RaisedBg        color.NRGBA // ← color.surface.card
+	WarningBg       color.NRGBA // ← color.warning.subtle
+	WarningBorder   color.NRGBA // ← color.warning.default
+	DangerBg        color.NRGBA // ← color.danger.subtle
+	DangerBorder    color.NRGBA // ← color.danger.default
+}
+
+// IconTileTokens groups tokens.
+type IconTileTokens struct {
+	SizeSm   float32     // ← size.controlSm
+	RadiusSm float32     // ← radius.controlSm
+	Size     float32     // ← size.control
+	Radius   float32     // ← radius.control
+	SizeLg   float32     // ← size.modalIconTile
+	RadiusLg float32     // ← radius.railButton
+	Bg       color.NRGBA // ← color.surface.control
+}
+
 // Components 组件层：只由 Semantic 计算得出（见 buildComponents）。
 type Components struct {
 	Window              WindowTokens
@@ -2561,6 +2680,8 @@ type Components struct {
 	SchemeCard          SchemeCardTokens
 	ThemeCard           ThemeCardTokens
 	AccentSwatch        AccentSwatchTokens
+	ShortcutField       ShortcutFieldTokens
+	HelpTip             HelpTipTokens
 	Kbd                 KbdTokens
 	Divider             DividerTokens
 	Spinner             SpinnerTokens
@@ -2576,6 +2697,9 @@ type Components struct {
 	ListRow             ListRowTokens
 	PaneHeader          PaneHeaderTokens
 	PaneFooter          PaneFooterTokens
+	Mcp                 McpTokens
+	Inset               InsetTokens
+	IconTile            IconTileTokens
 }
 
 // Palette is the primitive tier.
@@ -3039,6 +3163,7 @@ func lightSemantic() Semantic {
 				Placeholder:     Palette.Black.A035,
 				PlaceholderEdge: Palette.Black.A05,
 				Strong:          Palette.Gray.N900,
+				Shimmer:         Palette.Gray.N40,
 				QuietHover:      Palette.Black.A08,
 				Skeleton:        Palette.Gray.N175,
 			},
@@ -3139,172 +3264,198 @@ func lightSemantic() Semantic {
 			N20: Palette.Space.N20,
 		},
 		Size: Sizes{
-			Hairline:                Palette.Size.N0_5,
-			Divider:                 Palette.Size.N1,
-			FocusRing:               Palette.Size.N1_5,
-			FocusHalo:               Palette.Size.N5,
-			Dot:                     Palette.Size.N7,
-			DotSm:                   Palette.Size.N6,
-			DotHalo:                 Palette.Size.N3,
-			TrafficLight:            Palette.Size.N12,
-			Icon:                    Palette.Size.N16,
-			IconMd:                  Palette.Size.N15,
-			IconSm:                  Palette.Size.N14,
-			IconStroke:              Palette.Size.N1_75,
-			ControlXs:               Palette.Size.N22,
-			ControlSm:               Palette.Size.N24,
-			ControlMd:               Palette.Size.N26,
-			Control:                 Palette.Size.N28,
-			ControlLg:               Palette.Size.N30,
-			RailButton:              Palette.Size.N34,
-			Titlebar:                Palette.Size.N44,
-			Rail:                    Palette.Size.N52,
-			Sider:                   Palette.Size.N236,
-			TitleLeft:               Palette.Size.N296,
-			PaneHeader:              Palette.Size.N36,
-			StatusBar:               Palette.Size.N34,
-			PaneStatusBar:           Palette.Size.N32,
-			ListRow:                 Palette.Size.N30,
-			FileHeader:              Palette.Size.N40,
-			QueueRow:                Palette.Size.N56,
-			GroupRow:                Palette.Size.N30,
-			OsLogo:                  Palette.Size.N26,
-			OsGlyph:                 Palette.Size.N15,
-			Progress:                Palette.Size.N5,
-			ProgressThin:            Palette.Size.N2,
-			DropLine:                Palette.Size.N2,
-			FadeExtent:              Palette.Size.N24,
-			FadeExtentPane:          Palette.Size.N22,
-			StatsPanel:              Palette.Size.N204,
-			AutoScrollZone:          Palette.Size.N48,
-			SeparatorShort:          Palette.Size.N12,
-			SeparatorTall:           Palette.Size.N16,
-			SeparatorStatus:         Palette.Size.N18,
-			WindowWidth:             1180,
-			WindowHeight:            780,
-			WindowMinWidth:          1000,
-			WindowMinHeight:         640,
-			TrafficLightY:           17,
-			SiderMinWidth:           236,
-			SiderMaxWidth:           320,
-			PaneMinWidth:            280,
-			PaneMinHeight:           160,
-			DragPreviewWidth:        220,
-			DragPreviewHeight:       140,
-			TabDetachDistance:       8,
-			DragGrabX:               30,
-			DragGrabY:               18,
-			PaneEnterOffset:         12,
-			DividerHandleWidth:      3,
-			DividerHandleHeight:     28,
-			DividerKeyboardStep:     8,
-			PreviewInset:            4,
-			PaneActionRevealPadding: 40,
-			HostDialogWidth:         340,
-			GroupDialogWidth:        320,
-			PortFieldWidth:          90,
-			DialogTitleSize:         18,
-			TabContentHeight:        20,
-			TabStripHeight:          36,
-			TabDragHandleInset:      30,
-			TabTitleOffset:          -1.5,
-			TabCountOffset:          -0.5,
-			ScrollbarMinThumb:       24,
-			ScrollbarRevealZone:     24,
-			TerminalContentBottom:   50,
-			EmptyPaneTitleSize:      15,
-			StatsHeaderHeight:       44,
-			StatsChartHeight:        34,
-			StatsChartStroke:        1.3,
-			StatsSectionGap:         20,
-			EmptyPaneIcon:           32,
-			BellIcon:                13,
-			CatalogRowHeight:        40,
-			PaneMinLocal:            Palette.Size.N320,
-			PaneMinRemote:           Palette.Size.N420,
-			Popover:                 Palette.Size.N384,
-			CapsuleBarWidth:         Palette.Size.N32,
-			CapsuleBarHeight:        Palette.Size.N3,
-			DockHeader:              Palette.Size.N42,
-			DockRow:                 Palette.Size.N50,
-			TabSpinner:              Palette.Size.N10,
-			FileToolbar:             Palette.Size.N44,
-			FileCompactWidth:        Palette.Size.N720,
-			FileSearchWidth:         Palette.Size.N160,
-			FileSizeWidth:           Palette.Size.N80,
-			FileDateWidth:           Palette.Size.N140,
-			FilePermissionsWidth:    Palette.Size.N100,
-			FileOwnerWidth:          Palette.Size.N90,
-			FileGridCellWidth:       Palette.Size.N120,
-			FileGridCellHeight:      Palette.Size.N100,
-			TransferProgressWidth:   Palette.Size.N180,
-			TransferSpeedWidth:      Palette.Size.N120,
-			TransferNameMinWidth:    Palette.Size.N120,
-			TransferStatusWidth:     Palette.Size.N80,
-			SplitGripHeight:         Palette.Size.N32,
-			TransferPopoverHeader:   Palette.Size.N32,
-			FileNameMinWidth:        Palette.Size.N100,
-			FileGridIconSize:        Palette.Size.N32,
-			TransferDockMaxRows:     Palette.Size.N5,
-			TransferPopoverMaxRows:  Palette.Size.N6,
-			TransferConcurrency:     Palette.Size.N3,
-			TooltipMaxWidth:         Palette.Size.N320,
-			PreviewLineHeight:       Palette.Size.N6,
-			PreviewLineLong:         Palette.Ratio.N0_78,
-			PreviewLineMedium:       Palette.Ratio.N0_6,
-			PreviewLineShort:        Palette.Ratio.N0_45,
-			Modal:                   560,
-			FormLabel:               72,
-			SettingsContent:         720,
-			ModalTopRatio:           0.12,
-			ModalTopMin:             72,
-			ModalIconTile:           32,
-			InputMonoSize:           12,
-			FormErrorIcon:           12,
-			TestSpinner:             13,
-			CollapseChevron:         12,
-			CollapseChevronStroke:   2.25,
-			CollapseChevronRotate:   90,
-			SwitchWidth:             32,
-			SwitchHeight:            19,
-			SwitchKnob:              15,
-			SettingsHeaderPaddingX:  32,
-			SettingsRowHeight:       48,
-			SettingsFadeHeight:      40,
-			SchemePreviewHeight:     66,
-			SchemePreviewFont:       10,
-			SchemePreviewLineHeight: 16,
-			SchemeBadgeIcon:         10,
-			ThemeAspect:             1.6,
-			ThemeRadio:              14,
-			ThemeRadioRing:          4.5,
-			AccentSwatch:            20,
-			AccentRing:              1.5,
-			AccentRingGap:           2,
-			CredentialModal:         Palette.Size.N420,
-			SettingsSelect:          220,
-			SettingsNumber:          64,
-			SettingsScrollback:      96,
-			Keycap:                  Palette.Size.N18,
-			ButtonLarge:             Palette.Size.N32,
-			BadgeSmall:              Palette.Size.N18,
-			BadgeMedium:             20,
-			Check:                   Palette.Size.N14,
-			RadioDot:                4.5,
-			PanelHeader:             46,
-			Toast:                   340,
-			EmptyMaxWidth:           220,
-			KeyValueRow:             Palette.Size.N22,
-			SparklineHeight:         Palette.Size.N34,
-			SparklineStroke:         Palette.Size.N1_5,
-			MeterHeight:             Palette.Size.N4,
-			IconXs:                  Palette.Size.N12,
-			SegmentedItem:           Palette.Size.N24,
-			LatencyWarn:             150,
-			LatencyBad:              400,
-			TableNameMinWidth:       160,
-			MeterWarnRatio:          0.7,
-			MeterCriticalRatio:      0.9,
+			Hairline:                 Palette.Size.N0_5,
+			Divider:                  Palette.Size.N1,
+			FocusRing:                Palette.Size.N1_5,
+			FocusHalo:                Palette.Size.N5,
+			Dot:                      Palette.Size.N7,
+			DotSm:                    Palette.Size.N6,
+			DotHalo:                  Palette.Size.N3,
+			TrafficLight:             Palette.Size.N12,
+			Icon:                     Palette.Size.N16,
+			IconMd:                   Palette.Size.N15,
+			IconSm:                   Palette.Size.N14,
+			IconStroke:               Palette.Size.N1_75,
+			ControlXs:                Palette.Size.N22,
+			ControlSm:                Palette.Size.N24,
+			ControlMd:                Palette.Size.N26,
+			Control:                  Palette.Size.N28,
+			ControlLg:                Palette.Size.N30,
+			RailButton:               Palette.Size.N34,
+			Titlebar:                 Palette.Size.N44,
+			Rail:                     Palette.Size.N52,
+			Sider:                    Palette.Size.N236,
+			TitleLeft:                Palette.Size.N296,
+			PaneHeader:               Palette.Size.N36,
+			StatusBar:                Palette.Size.N34,
+			PaneStatusBar:            Palette.Size.N32,
+			ListRow:                  Palette.Size.N30,
+			FileHeader:               Palette.Size.N40,
+			QueueRow:                 Palette.Size.N56,
+			GroupRow:                 Palette.Size.N30,
+			OsLogo:                   Palette.Size.N26,
+			OsGlyph:                  Palette.Size.N15,
+			Progress:                 Palette.Size.N5,
+			ProgressThin:             Palette.Size.N2,
+			DropLine:                 Palette.Size.N2,
+			FadeExtent:               Palette.Size.N24,
+			FadeExtentPane:           Palette.Size.N22,
+			StatsPanel:               Palette.Size.N204,
+			AutoScrollZone:           Palette.Size.N48,
+			SeparatorShort:           Palette.Size.N12,
+			SeparatorTall:            Palette.Size.N16,
+			SeparatorStatus:          Palette.Size.N18,
+			WindowWidth:              1180,
+			WindowHeight:             780,
+			WindowMinWidth:           1000,
+			WindowMinHeight:          640,
+			TrafficLightY:            17,
+			SiderMinWidth:            236,
+			SiderMaxWidth:            320,
+			PaneMinWidth:             280,
+			PaneMinHeight:            160,
+			DragPreviewWidth:         220,
+			DragPreviewHeight:        140,
+			TabDetachDistance:        8,
+			DragGrabX:                30,
+			DragGrabY:                18,
+			PaneEnterOffset:          12,
+			DividerHandleWidth:       3,
+			DividerHandleHeight:      28,
+			DividerKeyboardStep:      8,
+			PreviewInset:             4,
+			PaneActionRevealPadding:  40,
+			HostDialogWidth:          340,
+			GroupDialogWidth:         320,
+			PortFieldWidth:           90,
+			DialogTitleSize:          18,
+			TabContentHeight:         20,
+			TabStripHeight:           36,
+			TabDragHandleInset:       30,
+			TabTitleOffset:           -1.5,
+			TabCountOffset:           -0.5,
+			ScrollbarMinThumb:        24,
+			ScrollbarRevealZone:      24,
+			TerminalContentBottom:    50,
+			EmptyPaneTitleSize:       15,
+			StatsHeaderHeight:        44,
+			StatsChartHeight:         44,
+			StatsChartStroke:         1.3,
+			StatsSectionGap:          18,
+			StatsNetChartHeight:      20,
+			StatsValueLarge:          28,
+			StatsSkeletonLine:        10,
+			EmptyPaneIcon:            32,
+			BellIcon:                 13,
+			CatalogRowHeight:         40,
+			PaneMinLocal:             Palette.Size.N320,
+			PaneMinRemote:            Palette.Size.N420,
+			Popover:                  Palette.Size.N384,
+			CapsuleBarWidth:          Palette.Size.N32,
+			CapsuleBarHeight:         Palette.Size.N3,
+			DockHeader:               Palette.Size.N42,
+			DockRow:                  Palette.Size.N50,
+			TabSpinner:               Palette.Size.N10,
+			FileToolbar:              Palette.Size.N44,
+			FileCompactWidth:         Palette.Size.N720,
+			FileSearchWidth:          Palette.Size.N160,
+			FileSizeWidth:            Palette.Size.N80,
+			FileDateWidth:            Palette.Size.N140,
+			FilePermissionsWidth:     Palette.Size.N100,
+			FileOwnerWidth:           Palette.Size.N90,
+			FileGridCellWidth:        Palette.Size.N120,
+			FileGridCellHeight:       Palette.Size.N100,
+			TransferProgressWidth:    Palette.Size.N180,
+			TransferSpeedWidth:       Palette.Size.N120,
+			TransferNameMinWidth:     Palette.Size.N120,
+			TransferStatusWidth:      Palette.Size.N80,
+			SplitGripHeight:          Palette.Size.N32,
+			TransferPopoverHeader:    Palette.Size.N32,
+			FileNameMinWidth:         Palette.Size.N100,
+			FileGridIconSize:         Palette.Size.N32,
+			TransferDockMaxRows:      Palette.Size.N5,
+			TransferPopoverMaxRows:   Palette.Size.N6,
+			TransferConcurrency:      Palette.Size.N3,
+			TooltipMaxWidth:          Palette.Size.N320,
+			PreviewLineHeight:        Palette.Size.N6,
+			PreviewLineLong:          Palette.Ratio.N0_78,
+			PreviewLineMedium:        Palette.Ratio.N0_6,
+			PreviewLineShort:         Palette.Ratio.N0_45,
+			Modal:                    560,
+			FormLabel:                72,
+			SettingsContent:          720,
+			ModalTopRatio:            0.12,
+			ModalTopMin:              72,
+			ModalIconTile:            32,
+			InputMonoSize:            12,
+			FormErrorIcon:            12,
+			TestSpinner:              13,
+			CollapseChevron:          12,
+			CollapseChevronStroke:    2.25,
+			CollapseChevronRotate:    90,
+			SwitchWidth:              32,
+			SwitchHeight:             19,
+			SwitchKnob:               15,
+			SettingsHeaderPaddingX:   32,
+			SettingsRowHeight:        48,
+			SettingsFadeHeight:       40,
+			SchemePreviewHeight:      66,
+			SchemePreviewFont:        10,
+			SchemePreviewLineHeight:  16,
+			SchemeBadgeIcon:          10,
+			ThemeAspect:              1.6,
+			ThemeRadio:               14,
+			ThemeRadioRing:           4.5,
+			AccentSwatch:             20,
+			AccentRing:               1.5,
+			AccentRingGap:            2,
+			CredentialModal:          Palette.Size.N420,
+			SettingsSelect:           220,
+			SettingsNumber:           64,
+			SettingsScrollback:       96,
+			SettingsShortcut:         176,
+			Keycap:                   Palette.Size.N18,
+			ButtonLarge:              Palette.Size.N32,
+			BadgeSmall:               Palette.Size.N18,
+			BadgeMedium:              20,
+			Check:                    Palette.Size.N14,
+			RadioDot:                 4.5,
+			PanelHeader:              46,
+			Toast:                    340,
+			EmptyMaxWidth:            220,
+			KeyValueRow:              Palette.Size.N22,
+			SparklineHeight:          Palette.Size.N34,
+			SparklineStroke:          Palette.Size.N1_5,
+			MeterHeight:              Palette.Size.N4,
+			IconXs:                   Palette.Size.N12,
+			SegmentedItem:            Palette.Size.N24,
+			LatencyWarn:              150,
+			LatencyBad:               400,
+			TableNameMinWidth:        160,
+			SparklineDotRadius:       2.5,
+			SparklineHaloRadius:      5,
+			MeterWarnRatio:           0.7,
+			MeterCriticalRatio:       0.9,
+			McpTableMinWidth:         1024,
+			McpNameColumn:            210,
+			McpBadgeColumn:           86,
+			McpScopeColumn:           130,
+			McpTimeColumn:            150,
+			McpKeysColumn:            115,
+			McpAuditTimeColumn:       72,
+			McpAuditKeyColumn:        148,
+			McpAuditConnectionColumn: 120,
+			McpAuditActionColumn:     96,
+			McpAuditStatusColumn:     104,
+			McpAuditDurationColumn:   56,
+			McpPolicyModal:           720,
+			McpKeyModal:              680,
+			McpDialog:                440,
+			McpDrawerMinWidth:        340,
+			McpDrawerWidth:           500,
+			McpMainMinWidth:          360,
+			McpRuleModeWidth:         120,
+			McpPermissionColumn:      118,
 		},
 		Font: Typography{
 			Family: TypographyFamily{
@@ -3411,6 +3562,7 @@ func lightSemantic() Semantic {
 			LiftStackBack:             Palette.Ratio.N0_8,
 			Hidden:                    Palette.Ratio.N0,
 			OsTint:                    Palette.Ratio.N0_09,
+			LiveBeatScale:             1.35,
 			DragRotation:              -1,
 			DragPreview:               0.9,
 			PreviewHeader:             0.96,
@@ -3425,7 +3577,8 @@ func lightSemantic() Semantic {
 			ModalEnterScale:           0.96,
 			ModalExitScale:            0.98,
 			CollapseContentFadeFactor: 1.6,
-			SparklineFill:             0.1,
+			SparklineFill:             0.2,
+			SparklineHalo:             0.18,
 		},
 		Motion: Motion{
 			Duration: MotionDuration{
@@ -3439,6 +3592,8 @@ func lightSemantic() Semantic {
 				Drop:              Palette.Duration.N320,
 				AutoExpand:        Palette.Duration.N500,
 				Flash:             Palette.Duration.N600,
+				Shimmer:           1400 * time.Millisecond,
+				LiveBeat:          900 * time.Millisecond,
 				FrameInterval:     16 * time.Millisecond,
 				Zoom:              240 * time.Millisecond,
 				PaneEnter:         220 * time.Millisecond,
@@ -3457,6 +3612,7 @@ func lightSemantic() Semantic {
 				Fast:              Palette.Duration.N120,
 				Base:              Palette.Duration.N160,
 				AutoHide:          3000 * time.Millisecond,
+				ScrollGesture:     300 * time.Millisecond,
 			},
 			Easing: MotionEasing{
 				Out:    Palette.Easing.EaseOut,
@@ -3566,6 +3722,7 @@ func darkOverrides(s *Semantic) {
 	s.Shadow.GlassHighlight = Shadow{{X: 0, Y: 0.5, Blur: 0, Spread: 0, Color: Palette.WhiteA.A10, Inset: true}}
 	s.Opacity.PaneUnfocusedContent = Palette.Ratio.N0_45
 	s.Opacity.OsTint = Palette.Ratio.N0_18
+	s.Color.Fill.Shimmer = Palette.Graphite.N600
 	s.Color.State.TabHover = Palette.WhiteA.A10
 	s.Color.State.RailHover = Palette.WhiteA.A06
 	s.Color.State.RailPressed = Palette.WhiteA.A12
@@ -4063,7 +4220,7 @@ func buildComponents(s *Semantic) Components {
 			FillPaused:  s.Color.Status.Paused,
 			FillDone:    s.Color.Success.Default,
 			HeightMeter: s.Size.MeterHeight,
-			MeterFill:   s.Color.Fill.Strong,
+			MeterFill:   s.Color.Accent.Default,
 			MeterWarnAt: s.Size.MeterWarnRatio,
 			MeterCritAt: s.Size.MeterCriticalRatio,
 			FillError:   s.Color.Danger.Default,
@@ -4228,6 +4385,7 @@ func buildComponents(s *Semantic) Components {
 			EndInset:     s.Space.N2,
 			RevealZone:   s.Size.ScrollbarRevealZone,
 			Color:        s.Color.Status.Scrollbar,
+			GestureGap:   s.Motion.Duration.ScrollGesture,
 		},
 		Dialog: DialogTokens{
 			HostWidth:     s.Size.HostDialogWidth,
@@ -4243,10 +4401,23 @@ func buildComponents(s *Semantic) Components {
 			ViewportInset: s.Space.N20,
 		},
 		Stats: StatsTokens{
-			HeaderHeight: s.Size.StatsHeaderHeight,
-			ChartHeight:  s.Size.StatsChartHeight,
-			ChartStroke:  s.Size.StatsChartStroke,
-			SectionGap:   s.Size.StatsSectionGap,
+			HeaderHeight:   s.Size.StatsHeaderHeight,
+			ChartHeight:    s.Size.StatsChartHeight,
+			ChartStroke:    s.Size.StatsChartStroke,
+			SectionGap:     s.Size.StatsSectionGap,
+			NetChartHeight: s.Size.StatsNetChartHeight,
+			ValueLarge:     s.Size.StatsValueLarge,
+			HostBg:         s.Color.Surface.Sunken,
+			HostRadius:     s.Radius.Card,
+			ProcessBar:     s.Color.Accent.Tint10,
+			ProcessRadius:  s.Radius.ControlSm,
+			Skeleton:       s.Color.Border.Subtle,
+			Shimmer:        s.Color.Fill.Shimmer,
+			ShimmerPeriod:  s.Motion.Duration.Shimmer,
+			SkeletonLine:   s.Size.StatsSkeletonLine,
+			BeatDuration:   s.Motion.Duration.LiveBeat,
+			BeatScale:      s.Opacity.LiveBeatScale,
+			BeatEasing:     s.Motion.Easing.Out,
 		},
 		Catalog: CatalogTokens{
 			RowHeight:    s.Size.CatalogRowHeight,
@@ -4371,8 +4542,6 @@ func buildComponents(s *Semantic) Components {
 			CompactBreakpoint: s.Size.FileCompactWidth,
 		},
 		TransferRow: TransferRowTokens{
-			IconTile:           s.Size.Control,
-			IconRadius:         s.Radius.Control,
 			UpBg:               s.Color.Accent.Subtle,
 			UpIcon:             s.Color.Accent.Default,
 			DownBg:             s.Color.Surface.Control,
@@ -4480,7 +4649,6 @@ func buildComponents(s *Semantic) Components {
 			HeaderPaddingLeft:   s.Space.N24,
 			HeaderGap:           s.Space.N12,
 			IconTile:            s.Size.ModalIconTile,
-			IconTileRadius:      s.Radius.RailButton,
 			TitleSize:           s.Font.Size.Title,
 			TitleWeight:         s.Font.Weight.Semibold,
 			SubtitleSize:        s.Font.Size.Footnote,
@@ -4596,8 +4764,6 @@ func buildComponents(s *Semantic) Components {
 			RowLabel:            s.Color.Text.Primary,
 			RowDescSize:         s.Font.Size.Footnote,
 			RowDesc:             s.Color.Text.Secondary,
-			GroupFootnoteSize:   s.Font.Size.Footnote,
-			GroupFootnote:       s.Color.Text.Tertiary,
 			FadeHeight:          s.Size.SettingsFadeHeight,
 			EnterY:              s.Space.N8,
 			ExitY:               s.Space.N4,
@@ -4610,6 +4776,7 @@ func buildComponents(s *Semantic) Components {
 			SelectWidth:         s.Size.SettingsSelect,
 			NumberWidth:         s.Size.SettingsNumber,
 			ScrollbackWidth:     s.Size.SettingsScrollback,
+			RowGap:              s.Space.N16,
 		},
 		SchemeCard: SchemeCardTokens{
 			Radius:            s.Radius.Lift,
@@ -4650,6 +4817,19 @@ func buildComponents(s *Semantic) Components {
 			RingGap:   s.Size.AccentRingGap,
 			RingWidth: s.Size.AccentRing,
 			RingInset: s.Color.Surface.Card,
+		},
+		ShortcutField: ShortcutFieldTokens{
+			Width:      s.Size.SettingsShortcut,
+			KeyGap:     s.Space.N4,
+			KeyText:    s.Color.Text.Secondary,
+			Prompt:     s.Color.Text.Accent,
+			ControlGap: s.Space.N8,
+		},
+		HelpTip: HelpTipTokens{
+			Size:      s.Size.IconSm,
+			Gap:       s.Space.N4,
+			Icon:      s.Color.Text.Tertiary,
+			IconHover: s.Color.Text.Secondary,
 		},
 		Kbd: KbdTokens{
 			Height:     s.Size.Keycap,
@@ -4715,10 +4895,14 @@ func buildComponents(s *Semantic) Components {
 			Caption:      s.Color.Text.Tertiary,
 		},
 		Sparkline: SparklineTokens{
-			Height:    s.Size.SparklineHeight,
-			Stroke:    s.Size.SparklineStroke,
-			Line:      s.Color.Accent.Default,
-			FillAlpha: s.Opacity.SparklineFill,
+			Height:     s.Size.SparklineHeight,
+			Stroke:     s.Size.SparklineStroke,
+			Line:       s.Color.Accent.Default,
+			FillAlpha:  s.Opacity.SparklineFill,
+			Grid:       s.Color.Border.Divider,
+			DotRadius:  s.Size.SparklineDotRadius,
+			HaloRadius: s.Size.SparklineHaloRadius,
+			HaloAlpha:  s.Opacity.SparklineHalo,
 		},
 		KeyValue: KeyValueTokens{
 			RowHeight: s.Size.KeyValueRow,
@@ -4789,6 +4973,56 @@ func buildComponents(s *Semantic) Components {
 			Text:     s.Color.Text.Secondary,
 			Font:     s.Font.Size.Footnote,
 			Divider:  s.Color.Border.Divider,
+		},
+		Mcp: McpTokens{
+			TableMinWidth:     s.Size.McpTableMinWidth,
+			KeyName:           s.Size.McpNameColumn,
+			KeyState:          s.Size.McpBadgeColumn,
+			KeyDirs:           s.Size.McpNameColumn,
+			KeyUsed:           s.Size.McpTimeColumn,
+			PolicyName:        s.Size.McpNameColumn,
+			PolicyCategory:    s.Size.McpBadgeColumn,
+			PolicyConnections: s.Size.McpScopeColumn,
+			PolicyKeys:        s.Size.McpKeysColumn,
+			PolicyState:       s.Size.McpScopeColumn,
+			AuditTime:         s.Size.McpAuditTimeColumn,
+			AuditKey:          s.Size.McpAuditKeyColumn,
+			AuditConnection:   s.Size.McpAuditConnectionColumn,
+			AuditAction:       s.Size.McpAuditActionColumn,
+			AuditStatus:       s.Size.McpAuditStatusColumn,
+			AuditDuration:     s.Size.McpAuditDurationColumn,
+			PolicyModalWidth:  s.Size.McpPolicyModal,
+			KeyModalWidth:     s.Size.McpKeyModal,
+			DialogWidth:       s.Size.McpDialog,
+			DrawerMinWidth:    s.Size.McpDrawerMinWidth,
+			DrawerWidth:       s.Size.McpDrawerWidth,
+			MainMinWidth:      s.Size.McpMainMinWidth,
+			RuleModeWidth:     s.Size.McpRuleModeWidth,
+			PermissionColumn:  s.Size.McpPermissionColumn,
+		},
+		Inset: InsetTokens{
+			Padding:         s.Space.N10,
+			Radius:          s.Radius.Control,
+			BorderWidth:     s.Size.Hairline,
+			CompactPaddingX: s.Space.N8,
+			CompactPaddingY: s.Space.N6,
+			CompactRadius:   s.Radius.ControlSm,
+			Bg:              s.Color.Surface.Sunken,
+			Border:          s.Color.Border.Subtle,
+			RaisedBg:        s.Color.Surface.Card,
+			WarningBg:       s.Color.Warning.Subtle,
+			WarningBorder:   s.Color.Warning.Default,
+			DangerBg:        s.Color.Danger.Subtle,
+			DangerBorder:    s.Color.Danger.Default,
+		},
+		IconTile: IconTileTokens{
+			SizeSm:   s.Size.ControlSm,
+			RadiusSm: s.Radius.ControlSm,
+			Size:     s.Size.Control,
+			Radius:   s.Radius.Control,
+			SizeLg:   s.Size.ModalIconTile,
+			RadiusLg: s.Radius.RailButton,
+			Bg:       s.Color.Surface.Control,
 		},
 	}
 }

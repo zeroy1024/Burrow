@@ -8,80 +8,82 @@ import (
 	"sshdesk/internal/theme"
 )
 
-// ShortcutTable has fixed columns and content-driven height. Only the settings
-// page scrolls; action keys keep recording controls stable when filtering rows.
-func ShortcutTable(c *ui.Context, handle *ui.Handle, label, actionTitle, bindingTitle string, count int, key func(int) any, cell func(int, int)) ui.Element {
+type ShortcutFieldProps struct {
+	Label     string
+	Keys      []string
+	Text      string
+	Recording bool
+	Error     string
+}
+
+// ShortcutField is a shortcut recorder of fixed width, so the fields of a
+// settings group line up. It shows one keycap per key, else Text; the caller
+// owns recording and key input. Error rings it as a conflicting binding.
+func ShortcutField(c *ui.Context, props ShortcutFieldProps) ui.Element {
 	t := theme.Current()
-	columns := []struct {
-		id, title string
-		share     float32
-	}{
-		{"action", actionTitle, 3},
-		{"binding", bindingTitle, 2},
-		{"controls", actionTitle, 1},
+	p, f := t.C.Input, t.C.ShortcutField
+	e := ui.ButtonBase(c).Width(f.Width).Height(p.Height).Padding(0, p.PaddingX).Gap(f.KeyGap).
+		Radius(p.Radius).Background(Color(p.Bg)).FontSize(p.FontSize).Label(props.Label).FocusRing(false)
+	styleFormControl(e, props.Error, props.Recording || e.FocusVisible())
+	value := props.Text
+	if len(props.Keys) > 0 {
+		value = strings.Join(props.Keys, " ")
 	}
-	frame := ui.Column(c).FillWidth().Shrink(0).Role(ui.RoleTable).Label(label).Bind(handle)
-	frame.Children(func() {
-		ui.Row(c).Key("header").FillWidth().Height(2 * t.Space.N16).Shrink(0).Role(ui.RoleRow).Children(func() {
-			for _, column := range columns {
-				ui.Row(c).Key(column.id).BasisPercent(column.share*100/6).Shrink(0).MinWidth(0).Padding(t.Space.N6, t.Space.N10).
-					AlignItems(ui.Center).Role(ui.RoleColumnHeader).Label(column.title).Children(func() {
-					Text(c, column.title, TextProps{Tone: ToneSecondary}).FontWeight(t.Font.Weight.Semibold).SingleLine()
-				})
+	e.Description(value)
+	e.Children(func() {
+		if len(props.Keys) == 0 {
+			ink := p.Placeholder
+			if props.Recording {
+				ink = f.Prompt
 			}
-		})
-		Divider(c)
-		for row := range count {
-			item := ui.Row(c).Key(key(row)).FillWidth().MinHeight(2 * t.Space.N16).Shrink(0).AlignItems(ui.Stretch).Role(ui.RoleRow)
-			if item.Hovered() {
-				item.Background(Color(t.C.Button.SecondaryBgHover))
-			}
-			item.Children(func() {
-				for index, column := range columns {
-					ui.Column(c).Key(column.id).BasisPercent(column.share * 100 / 6).Shrink(0).MinWidth(0).
-						Padding(t.Space.N8).Role(ui.RoleCell).Children(func() { cell(row, index) })
-				}
-			})
+			ui.Text(c, props.Text).TextColor(Color(ink)).SingleLine().PassThrough()
+			return
+		}
+		ink := f.KeyText
+		for index, key := range props.Keys {
+			Kbd(c.Key(index), key, KbdProps{Text: &ink})
 		}
 	})
-	return frame
+	return e
 }
 
 type SettingsGroupProps struct {
-	Key       any
-	Title     string
-	Footnote  string
-	HeaderRow bool
-	Actions   func()
+	Key     any
+	Title   string
+	Help    string
+	Actions func()
 }
 
 func SettingsGroup(c *ui.Context, props SettingsGroupProps, content func()) ui.Element {
-	t := theme.Current()
-	p := t.C.Settings
+	p := theme.Current().C.Settings
 	group := ui.Column(c).FillWidth().Gap(p.GroupTitleGap)
 	if props.Key != nil {
 		group.Key(props.Key)
 	}
 	group.Children(func() {
-		heading := func() ui.Element {
-			return ui.Text(c, props.Title).FontSize(p.GroupTitleSize).FontWeight(p.GroupTitleWeight).TextColor(Color(p.GroupTitle))
-		}
-		if props.HeaderRow {
-			ui.Row(c).FillWidth().AlignItems(ui.Center).Gap(t.Space.N8).Children(func() {
-				heading().Grow(1)
-				if props.Actions != nil {
-					props.Actions()
-				}
-			})
-		} else {
-			heading()
-		}
+		SettingsGroupTitle(c, props.Title, props.Help, props.Actions)
 		SettingsGroupBody(c).Children(content)
-		if props.Footnote != "" {
-			ui.Text(c, props.Footnote).FontSize(p.GroupFootnoteSize).TextColor(Color(p.GroupFootnote))
-		}
 	})
 	return group
+}
+
+// SettingsGroupTitle heads a settings group: its title with any help, and
+// any actions at its trailing end.
+func SettingsGroupTitle(c *ui.Context, title, help string, actions func()) ui.Element {
+	t := theme.Current()
+	p := t.C.Settings
+	heading := func() ui.Element {
+		return SettingsLabel(c, help, func() {
+			ui.Text(c, title).FontSize(p.GroupTitleSize).FontWeight(p.GroupTitleWeight).TextColor(Color(p.GroupTitle))
+		})
+	}
+	if actions == nil {
+		return heading()
+	}
+	return ui.Row(c).FillWidth().AlignItems(ui.Center).Gap(t.Space.N8).Children(func() {
+		heading().Grow(1)
+		actions()
+	})
 }
 
 func SettingsGroupBody(c *ui.Context) ui.Element {
@@ -98,13 +100,13 @@ func SettingsDivider(c *ui.Context) ui.Element {
 }
 
 type SettingsRowProps struct {
-	Key           any
-	Gap           float32
-	Inline        bool
-	Title, Detail string
-	Text          func()
-	Control       func()
-	Divider       bool
+	Key                 any
+	Gap                 float32
+	Inline              bool
+	Title, Detail, Help string
+	Text                func()
+	Control             func()
+	Divider             bool
 }
 
 func SettingsRow(c *ui.Context, props SettingsRowProps) ui.Element {
@@ -125,7 +127,9 @@ func SettingsRow(c *ui.Context, props SettingsRowProps) ui.Element {
 				if props.Text != nil {
 					props.Text()
 				} else {
-					ui.Text(c, props.Title).FontSize(p.RowLabelSize).TextColor(Color(p.RowLabel))
+					SettingsLabel(c, props.Help, func() {
+						ui.Text(c, props.Title).FontSize(p.RowLabelSize).TextColor(Color(p.RowLabel))
+					})
 					if props.Detail != "" {
 						ui.Text(c, props.Detail).FontSize(p.RowDescSize).TextColor(Color(p.RowDesc))
 					}
@@ -137,6 +141,17 @@ func SettingsRow(c *ui.Context, props SettingsRowProps) ui.Element {
 		})
 	}
 	return row
+}
+
+// SettingsLabel puts a HelpTip after the label that label builds, when help
+// is not empty; hints are not shown on the page itself.
+func SettingsLabel(c *ui.Context, help string, label func()) ui.Element {
+	return ui.Row(c).Gap(theme.Current().C.HelpTip.Gap).AlignItems(ui.Center).Children(func() {
+		label()
+		if help != "" {
+			HelpTip(c, help)
+		}
+	})
 }
 
 func SettingsTextColumn(c *ui.Context) ui.Element {

@@ -9,18 +9,6 @@ func SidePanelBody(c *ui.Context) ui.Element {
 	return ui.Column(c).Width(theme.Current().Size.StatsPanel).FillHeight()
 }
 
-type SidePanelHeaderParts struct {
-	Root, Close ui.Element
-}
-
-func SidePanelHeader(c *ui.Context, title, closeLabel string, closeIcon *ui.SVG) SidePanelHeaderParts {
-	t := theme.Current()
-	header := PaneHeader(c, HeaderProps{Density: DensityTitle, Title: title, Close: true, CloseLabel: closeLabel})
-	header.Root.Height(t.C.Stats.HeaderHeight).Padding(0, t.Space.N14)
-	header.CloseButton.Size(t.C.IconButton.SizeXs, t.C.IconButton.SizeSm)
-	return SidePanelHeaderParts{Root: header.Root, Close: header.CloseButton}
-}
-
 func SidePanelViewport(c *ui.Context) ui.Element {
 	return ui.Box(c).Key("status-viewport").Grow(1).MinHeight(0).Clip()
 }
@@ -84,6 +72,14 @@ func SidePanel(c *ui.Context, props SidePanelProps, body func()) SidePanelResult
 			*props.Open = false
 		}
 		result.Viewport = SidePanelViewport(c)
+		if props.Footer == nil {
+			// The panel sits in a Card, and without a footer the viewport reaches
+			// its bottom corners. Only the innermost clip draws rounded corners
+			// (outer clips cut rectangles), so the viewport rounds them itself or
+			// the bottom fade covers the card's.
+			card := t.C.Card.Radius
+			result.Viewport.Radius(0, 0, card, card)
+		}
 		result.Viewport.Children(func() {
 			content := ui.Scroll(c).Fill().MinHeight(0).TrackScroll(scroll).Padding(0, padding)
 			content.Children(body)

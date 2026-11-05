@@ -14,15 +14,24 @@ type ListRowProps struct {
 	Table                  bool
 	FocusVisible           bool
 	Odd, Selected, Focused bool
+	// PaddingY lets a row of stacked lines grow to its content; zero keeps
+	// the fixed row height.
+	PaddingY float32
 }
 
 func ListRow(c *ui.Context, props ListRowProps) ui.Element {
 	t := theme.Current()
 	p := t.C.ListRow
-	row := ui.Row(c).Key(props.Key).Height(p.Height).FillWidth().Shrink(0).
-		Padding(0, p.PaddingX).Gap(p.Gap).Radius(p.Radius).Label(props.Label).Role(ui.RoleListItem).Selected(props.Selected)
+	paddingX, gap, radius, role := p.PaddingX, p.Gap, p.Radius, ui.RoleListItem
 	if props.Table {
-		row.Padding(0, t.C.FileList.RowPaddingX).Gap(t.C.FileList.ColumnGap).Radius(t.C.FileList.RowRadius).Role(ui.RoleRow)
+		paddingX, gap, radius, role = t.C.FileList.RowPaddingX, t.C.FileList.ColumnGap, t.C.FileList.RowRadius, ui.RoleRow
+	}
+	row := ui.Row(c).Key(props.Key).FillWidth().Shrink(0).Padding(props.PaddingY, paddingX).Gap(gap).Radius(radius).
+		Label(props.Label).Role(role).Selected(props.Selected)
+	if props.PaddingY > 0 {
+		row.MinHeight(p.Height)
+	} else {
+		row.Height(p.Height)
 	}
 	background, text := ui.Transparent, Color(t.Color.Text.Primary)
 	if props.Odd {

@@ -125,7 +125,7 @@ SEM={
   'success':{'default':C(P('green.500'),'在线点、完成进度'),'text':C(P('green.700')),'subtle':C(P('green.50')),'halo':C(P('greenA.a14'),'在线点 3px 光圈'),'onGlass':C(P('greenA.a15'))},
   'warning':{'default':C(P('amber.500'),'连接中'),'text':C(P('amber.600'),'连接中文字 / 响铃'),'textStrong':C(P('amber.700')),'subtle':C(P('amber.50')),'tint14':C(P('amberA.a14'),'响铃徽章底'),'halo':C(P('amberA.a18'))},
   'status':{'offline':C(P('gray.350'),'离线点'),'paused':C(P('gray.400'),'暂停进度')},
-  'fill':{'quiet':C(P('black.a05'),'⌘N 芯片、玻璃上徽章'),'quieter':C(P('black.a04'),'玻璃上的面包屑'),'placeholder':C(P('black.a035'),'拖动占位'),'placeholderEdge':C(P('black.a05')),'strong':C(P('gray.900'),'资源条填充')},
+  'fill':{'quiet':C(P('black.a05'),'⌘N 芯片、玻璃上徽章'),'quieter':C(P('black.a04'),'玻璃上的面包屑'),'placeholder':C(P('black.a035'),'拖动占位'),'placeholderEdge':C(P('black.a05')),'strong':C(P('gray.900'),'中性进度条填充')},
   'traffic':{'close':C(P('traffic.red')),'minimize':C(P('traffic.yellow')),'zoom':C(P('traffic.green')),'edge':C(P('black.a15'))},
   'tooltip':{'bg':C(P('ink.a92')),'text':C(P('gray.0')),'kbd':C(P('white.a60'))},
   'glass':{'titleTab':C(P('white.a85'),'标题栏选中 tab'),'float':C(P('white.a70'),'悬浮胶囊（回到底部）'),'bar':C(P('white.a42'),'v4 玻璃栏（无渐隐时）'),'highlight':C(P('white.a90'),'玻璃顶部内高光')},
@@ -344,9 +344,16 @@ SEM['size'].update({
  'tabDragHandleInset':D(30), 'tabTitleOffset':D(-1.5), 'tabCountOffset':D(-.5),
  'scrollbarMinThumb':D(24), 'scrollbarRevealZone':D(24),
  'terminalContentBottom':D(50), 'emptyPaneTitleSize':D(15),
- 'statsHeaderHeight':D(44), 'statsChartHeight':D(34),
- 'statsChartStroke':D(1.3), 'statsSectionGap':D(20),
+ 'statsHeaderHeight':D(44), 'statsChartHeight':D(44,'CPU 趋势图'),
+ 'statsChartStroke':D(1.3), 'statsSectionGap':D(18),
+ 'statsNetChartHeight':D(20,'网络上下行迷你趋势'), 'statsValueLarge':D(28,'CPU 主数字'),
+ 'statsSkeletonLine':D(10,'进程 Top 骨架条'),
 })
+SEM['color']['fill']['shimmer']=C(P('gray.40'),'骨架占位流光高光')
+DARK['color.fill.shimmer']=P('graphite.600')
+SEM['motion']['duration']['shimmer']=MS(1400,'骨架占位流光一周')
+SEM['motion']['duration']['liveBeat']=MS(900,'实时状态点每次采样的跳动')
+SEM['opacity']['liveBeatScale']=N(1.35,'实时状态点跳动起始缩放')
 SEM['opacity'].update({
  'dragRotation':N(-1), 'dragPreview':N(.9), 'previewHeader':N(.96),
  'paneCloseScale':N(.97), 'dropEdgeRatio':N(.3), 'paneActionTint':N(.9),
@@ -412,6 +419,12 @@ COMP['dialog']={
 COMP['stats']={
  'headerHeight':'size.statsHeaderHeight','chartHeight':'size.statsChartHeight',
  'chartStroke':'size.statsChartStroke','sectionGap':'size.statsSectionGap',
+ 'netChartHeight':'size.statsNetChartHeight','valueLarge':'size.statsValueLarge',
+ 'hostBg':'color.surface.sunken','hostRadius':'radius.card',
+ 'processBar':'color.accent.tint10','processRadius':'radius.controlSm',
+ 'skeleton':'color.border.subtle','shimmer':'color.fill.shimmer','shimmerPeriod':'motion.duration.shimmer',
+ 'skeletonLine':'size.statsSkeletonLine',
+ 'beatDuration':'motion.duration.liveBeat','beatScale':'opacity.liveBeatScale','beatEasing':'motion.easing.out',
 }
 COMP['tab'].update({
  'contentHeight':'size.tabContentHeight','stripHeight':'size.tabStripHeight',
@@ -585,7 +598,6 @@ COMP['transferDock']={
  'progressWidth':'size.transferProgressWidth','compactBreakpoint':'size.fileCompactWidth',
 }
 COMP['transferRow']={
- 'iconTile':'size.control','iconRadius':'radius.control',
  'upBg':'color.accent.subtle','upIcon':'color.accent.default',
  'downBg':'color.surface.control','downIcon':'color.text.muted',
  'doneBg':'color.success.subtle','doneIcon':'color.success.text',
@@ -727,7 +739,7 @@ COMP['modal']={
  'width':'size.modal','radius':'radius.window','bg':'color.surface.card','shadow':'shadow.modal','scrim':'color.scrim',
  'topRatio':'size.modalTopRatio','topMin':'size.modalTopMin','bottomMargin':'space.24',
  'headerPaddingTop':'space.18','headerPaddingRight':'space.16','headerPaddingBottom':'space.14','headerPaddingLeft':'space.24',
- 'headerGap':'space.12','iconTile':'size.modalIconTile','iconTileRadius':'radius.railButton',
+ 'headerGap':'space.12','iconTile':'size.modalIconTile',
  'titleSize':'font.size.title','titleWeight':'font.weight.semibold','subtitleSize':'font.size.footnote','subtitle':'color.text.secondary',
  'bodyPaddingX':'space.24','divider':'color.border.divider',
  'footerPaddingTop':'space.14','footerPaddingRight':'space.16','footerPaddingBottom':'space.16','footerPaddingLeft':'space.24',
@@ -769,7 +781,7 @@ COMP['settings']={
  'groupGap':'space.22','groupBg':'color.surface.zebra','groupRadius':'radius.card','groupBorder':'color.border.raised','groupBorderWidth':'size.hairline',
  'rowMinHeight':'size.settingsRowHeight','rowPaddingY':'space.9','rowPaddingX':'space.14','rowDivider':'color.border.subtle','rowDividerInset':'space.14',
  'rowLabelSize':'font.size.bodyLg','rowLabel':'color.text.primary','rowDescSize':'font.size.footnote','rowDesc':'color.text.secondary',
- 'groupFootnoteSize':'font.size.footnote','groupFootnote':'color.text.tertiary','fadeHeight':'size.settingsFadeHeight',
+ 'fadeHeight':'size.settingsFadeHeight',
  'enterY':'space.8','exitY':'space.4','enter':'motion.spring.smooth','fade':'motion.duration.focus','exit':'motion.duration.exit',
  'switchY':'space.4','switchFadeOut':'motion.duration.settingsSwitchOut','switchFadeIn':'motion.duration.exit',
 }
@@ -796,8 +808,13 @@ PALETTE['lineHeight']['18']=D(18)
 SEM['font']['lineHeight']['input']=D(P('lineHeight.18'),'统一空输入与中文占位文字行高，避免字体回退造成基线偏移')
 COMP['input']['lineHeight']='font.lineHeight.input'
 COMP['search']['lineHeight']='font.lineHeight.input'
-SEM['size'].update({'settingsSelect':D(220),'settingsNumber':D(64),'settingsScrollback':D(96)})
-COMP['settings'].update({'selectWidth':'size.settingsSelect','numberWidth':'size.settingsNumber','scrollbackWidth':'size.settingsScrollback'})
+SEM['size'].update({'settingsSelect':D(220),'settingsNumber':D(64),'settingsScrollback':D(96),'settingsShortcut':D(176)})
+COMP['settings'].update({'selectWidth':'size.settingsSelect','numberWidth':'size.settingsNumber','scrollbackWidth':'size.settingsScrollback','rowGap':'space.16'})
+# Shortcut recorder: a fixed width lines the rows up; controlGap spaces the
+# controls beside it (reset, conflict Replace).
+COMP['shortcutField']={'width':'size.settingsShortcut','keyGap':'space.4','keyText':'color.text.secondary','prompt':'color.text.accent','controlGap':'space.8'}
+# Hover-only question mark after a settings label; gap is from the label.
+COMP['helpTip']={'size':'size.iconSm','gap':'space.4','icon':'color.text.tertiary','iconHover':'color.text.secondary'}
 
 # Shared key hints. Flat hints retain the existing search-field text geometry.
 SEM['size']['keycap']=D(P('size.18'))
@@ -817,9 +834,10 @@ SEM['size'].update({
  'emptyMaxWidth':D(220), 'keyValueRow':D(P('size.22')), 'sparklineHeight':D(P('size.34')),
  'sparklineStroke':D(P('size.1_5')), 'meterHeight':D(P('size.4')), 'iconXs':D(P('size.12')),
  'segmentedItem':D(P('size.24')), 'latencyWarn':N(150), 'latencyBad':N(400),
- 'tableNameMinWidth':D(160),
+ 'tableNameMinWidth':D(160), 'sparklineDotRadius':D(2.5,'趋势图末点'), 'sparklineHaloRadius':D(5,'趋势图末点光圈'),
 })
-SEM['opacity']['sparklineFill']=N(.10)
+SEM['opacity']['sparklineFill']=N(.20,'趋势图渐变填充顶部不透明度')
+SEM['opacity']['sparklineHalo']=N(.18)
 SEM['size'].update({'meterWarnRatio':N(.70),'meterCriticalRatio':N(.90)})
 SEM['motion']['duration'].update({'fast':MS(P('duration.120')), 'base':MS(P('duration.160')), 'autoHide':MS(3000)})
 SEM['color']['accent'].update({'hover':C(P('blue.600')), 'pressed':C(P('blue.700'))})
@@ -870,7 +888,8 @@ COMP['panel']={
  'width':'size.statsPanel','headerHeight':'size.panelHeader','paddingX':'space.14','sectionGap':'space.8',
  'divider':'color.border.divider','statLabel':'color.text.primary','statValue':'color.text.secondary','caption':'color.text.tertiary',
 }
-COMP['sparkline']={'height':'size.sparklineHeight','stroke':'size.sparklineStroke','line':'color.accent.default','fillAlpha':'opacity.sparklineFill'}
+COMP['sparkline']={'height':'size.sparklineHeight','stroke':'size.sparklineStroke','line':'color.accent.default','fillAlpha':'opacity.sparklineFill',
+ 'grid':'color.border.divider','dotRadius':'size.sparklineDotRadius','haloRadius':'size.sparklineHaloRadius','haloAlpha':'opacity.sparklineHalo'}
 COMP['keyValue']={'rowHeight':'size.keyValueRow','key':'color.text.secondary','value':'color.text.primary','valueDim':'color.text.tertiary','font':'font.size.footnote'}
 COMP['emptyState']={
  'iconTile':'size.titlebar','iconRadius':'radius.window','iconBg':'color.surface.control','icon':'color.text.secondary',
@@ -886,7 +905,7 @@ COMP['latency']={'warnMs':'size.latencyWarn','badMs':'size.latencyBad','normal':
 COMP['listRow']={'height':'size.listRow','radius':'radius.controlSm','paddingX':'space.8','gap':'space.9','meta':'color.text.secondary'}
 COMP['breadcrumb']['iconSize']='size.iconXs'
 COMP['fileList'].update({'headerBg':'color.surface.card','columnGap':'space.16','nameMinWidth':'size.tableNameMinWidth'})
-COMP['progress'].update({'heightMeter':'size.meterHeight','meterFill':'color.fill.strong','meterWarnAt':'size.meterWarnRatio','meterCritAt':'size.meterCriticalRatio','fillError':'color.danger.default'})
+COMP['progress'].update({'heightMeter':'size.meterHeight','meterFill':'color.accent.default','meterWarnAt':'size.meterWarnRatio','meterCritAt':'size.meterCriticalRatio','fillError':'color.danger.default'})
 COMP['paneHeader']={
  'heightCompact':'size.paneHeader','heightToolbar':'size.fileHeader','heightTitle':'size.panelHeader',
  'titleFont':'font.size.bodyLg','titleWeight':'font.weight.semibold','paddingLeft':'space.14','paddingRight':'space.8','gap':'space.7',
@@ -895,3 +914,48 @@ COMP['paneFooter']={'height':'size.paneStatusBar','paddingX':'space.14','gap':'s
 COMP['filePaneFocus'].update({'borderFocused':'color.accent.default','borderWidthFocused':'size.focusRing'})
 SEM['motion']['drag'].update({'standardScale':N(1.02),'standardRotation':N(-.6)})
 COMP['dragLift'].update({'standardScale':'motion.drag.standardScale','standardRotation':'motion.drag.standardRotation'})
+
+# MCP management page. Each table's header and rows share these column widths;
+# its compact dialogs share one width.
+SEM['size'].update({
+ 'mcpTableMinWidth':D(1024),'mcpNameColumn':D(210),'mcpBadgeColumn':D(86),'mcpScopeColumn':D(130),
+ 'mcpTimeColumn':D(150),'mcpKeysColumn':D(115),'mcpAuditTimeColumn':D(72),'mcpAuditKeyColumn':D(148),
+ 'mcpAuditConnectionColumn':D(120),'mcpAuditActionColumn':D(96),'mcpAuditStatusColumn':D(104),'mcpAuditDurationColumn':D(56),
+ 'mcpPolicyModal':D(720),'mcpKeyModal':D(680),'mcpDialog':D(440),
+ 'mcpDrawerMinWidth':D(340),'mcpDrawerWidth':D(500),'mcpMainMinWidth':D(360),
+ 'mcpRuleModeWidth':D(120,'命令规则匹配方式选择框'),'mcpPermissionColumn':D(118,'连接授权矩阵能力列'),
+})
+COMP['mcp']={
+ 'tableMinWidth':'size.mcpTableMinWidth',
+ 'keyName':'size.mcpNameColumn','keyState':'size.mcpBadgeColumn','keyDirs':'size.mcpNameColumn','keyUsed':'size.mcpTimeColumn',
+ 'policyName':'size.mcpNameColumn','policyCategory':'size.mcpBadgeColumn','policyConnections':'size.mcpScopeColumn',
+ 'policyKeys':'size.mcpKeysColumn','policyState':'size.mcpScopeColumn',
+ 'auditTime':'size.mcpAuditTimeColumn','auditKey':'size.mcpAuditKeyColumn','auditConnection':'size.mcpAuditConnectionColumn',
+ 'auditAction':'size.mcpAuditActionColumn','auditStatus':'size.mcpAuditStatusColumn','auditDuration':'size.mcpAuditDurationColumn',
+ 'policyModalWidth':'size.mcpPolicyModal','keyModalWidth':'size.mcpKeyModal','dialogWidth':'size.mcpDialog',
+ 'drawerMinWidth':'size.mcpDrawerMinWidth','drawerWidth':'size.mcpDrawerWidth','mainMinWidth':'size.mcpMainMinWidth',
+ 'ruleModeWidth':'size.mcpRuleModeWidth','permissionColumn':'size.mcpPermissionColumn',
+}
+
+# Bordered panels set into dialog and card bodies: rules, tasks, hit records.
+COMP['inset']={
+ 'padding':'space.10','radius':'radius.control','borderWidth':'size.hairline',
+ 'compactPaddingX':'space.8','compactPaddingY':'space.6','compactRadius':'radius.controlSm',
+ 'bg':'color.surface.sunken','border':'color.border.subtle','raisedBg':'color.surface.card',
+ 'warningBg':'color.warning.subtle','warningBorder':'color.warning.default',
+ 'dangerBg':'color.danger.subtle','dangerBorder':'color.danger.default',
+}
+
+# A glyph or logo on a rounded fill: beside a line of text, in a list row, or
+# beside a title.
+COMP['iconTile']={
+ 'sizeSm':'size.controlSm','radiusSm':'radius.controlSm',
+ 'size':'size.control','radius':'radius.control',
+ 'sizeLg':'size.modalIconTile','radiusLg':'radius.railButton',
+ 'bg':'color.surface.control',
+}
+
+# Events of one scroll gesture, momentum included, arrive within this gap; a
+# contained scroller keeps a gesture it took until the gap passes.
+SEM['motion']['duration']['scrollGesture']=MS(300,'同一滚动手势相邻事件的最大间隔')
+COMP['scrollbar']['gestureGap']='motion.duration.scrollGesture'

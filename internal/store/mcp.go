@@ -25,7 +25,12 @@ type MCPKey struct {
 	UploadDirs, DownloadDirs []string
 }
 
-type MCPCommandRule struct{ Mode, Pattern string }
+type MCPCommandRule struct {
+	Mode, Pattern string
+	// IgnoreCase folds argument case for "command" rules; program names always
+	// compare case-insensitively.
+	IgnoreCase bool `json:",omitempty"`
+}
 
 type MCPFileRule struct {
 	Side, Kind, Path string

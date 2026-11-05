@@ -167,7 +167,7 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 			session.columns = max(1, int((rect.W-2*p.ContentSide)/a.cellWidth))
 			session.rows = max(1, int((rect.H-topPadding-bottomPadding)/prefs.LineHeight))
 		}
-	} else {
+	} else if !session.closing {
 		c.After(p.FrameInterval)
 	}
 	pane.OnClick(func() { a.focusSession(tab, session) })
@@ -224,16 +224,15 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 						Uniforms: map[string]any{"Saturation": appearance.Saturation},
 					}))
 				}
-				output.Children(func() {
-					hasOutput := len(session.transcript) > 0 || len(session.output) > 0
-					if session.state == disconnected && !hasOutput {
-						ui.Text(c, localize(c, "会话已恢复，尚未连接。")).
-							TextColor(uikit.Color(colors.Foreground)).FixedLineHeight(prefs.LineHeight)
-						return
+				output.Children(func() { a.terminalLines(c, session, focused) })
+				// The scrollbar owns the node's input handler, so Enter rides on its hook.
+				terminalScrollbar(c, card, output, scroll, terminalBackground, func(ev ui.InputEvent) bool {
+					if ev.Kind != ui.InputKeyDown || ev.Key != ui.KeyEnter || ev.Mods != 0 || !session.awaitingConnect() {
+						return false
 					}
-					a.terminalLines(c, session, focused)
+					a.connectSession(session)
+					return true
 				})
-				terminalScrollbar(c, card, output, scroll, terminalBackground)
 			}
 			if multiple {
 				a.terminalScrollEdge(c, p.HeaderHeight, false, background)

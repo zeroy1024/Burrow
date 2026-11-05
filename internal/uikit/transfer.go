@@ -86,8 +86,7 @@ func transferRowShell(c *ui.Context, props transferRowProps) ui.Element {
 
 func TransferIcon(c *ui.Context, icon *ui.SVG, background, foreground color.NRGBA) ui.Element {
 	t := theme.Current()
-	p := t.C.TransferRow
-	return ui.Box(c).Size(p.IconTile, p.IconTile).Shrink(0).Radius(p.IconRadius).Background(Color(background)).Center().Children(func() {
+	return IconTile(c, IconTileProps{Background: background}, func() {
 		ui.Icon(c, icon).Size(t.Size.Icon, t.Size.Icon).TextColor(Color(foreground))
 	})
 }

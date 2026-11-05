@@ -11,6 +11,6 @@ SVG 文件保持上游原样，逻辑名称与文件名的对应关系集中在 
 
 新增图标时，从上述固定提交取得对应 SVG，增加 `IconName` 和 `iconFiles` 映射；业务页面通过 `IconSVG`、`Icon` 或 `IconButton` 使用，不再自行拼写通用 SVG 路径。更新版本时同步核对素材、映射、`LucideVersion`、本文件和许可证。
 
-刷新统一使用 `refresh-cw`，重试使用 `rotate-ccw`；侧栏使用 `panel-left`，关闭本地面板使用 `panel-left-close`；分栏与窗格缩放使用 `columns-2`、`maximize-2`、`minimize-2`。
+刷新统一使用 `refresh-cw`，重试使用 `rotate-ccw`；侧栏使用 `panel-left`，关闭本地面板使用 `panel-left-close`；分栏与窗格缩放使用 `columns-2`、`maximize-2`、`minimize-2`。设置说明的悬停问号使用 `circle-question-mark`。
 
 Lucide 不收录品牌标识。Burrow 应用图标、操作系统标识和现有 MCP 标识单独保留，品牌图形继续通过 `BrandIcon` 或专用素材入口渲染。

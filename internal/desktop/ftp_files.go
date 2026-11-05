@@ -54,6 +54,7 @@ type fileWorkspaceState struct {
 }
 
 type fileActionDialog struct {
+	modal     uikit.ModalController
 	busy      bool
 	session   *fileSession
 	pane      *filePaneState

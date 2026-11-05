@@ -65,6 +65,7 @@ const (
 	IconRefresh      IconName = "refresh"
 	IconSidebarClose IconName = "sidebar-close"
 	IconLink         IconName = "link"
+	IconHelp         IconName = "help"
 )
 
 const LucideVersion = "1.67.0"
@@ -129,6 +130,7 @@ var iconFiles = map[IconName]string{
 	IconRefresh:      "refresh-cw",
 	IconSidebarClose: "panel-left-close",
 	IconLink:         "link",
+	IconHelp:         "circle-question-mark",
 }
 
 // The cache holds immutable SVG geometry, keyed by the current token stroke.
@@ -171,6 +173,11 @@ func IconSVG(name IconName) *ui.SVG {
 
 // BrandIcon keeps brand geometry independent from the application's UI stroke.
 func BrandIcon(shapes string) *ui.SVG { return strokedIcon(shapes, 1.6) }
+
+// LogoIcon is a filled single-color 24×24 logo path drawn in the text color.
+func LogoIcon(path string) *ui.SVG {
+	return ui.MustParseSVG(fmt.Appendf(nil, `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="currentColor" d="%s"/></svg>`, path))
+}
 
 func strokedIcon(shapes string, stroke float32) *ui.SVG {
 	return ui.MustParseSVG(fmt.Appendf(nil, `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"

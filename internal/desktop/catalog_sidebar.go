@@ -233,7 +233,7 @@ func (a *app) catalogHostMenu(c *ui.Context, id hostID) []uikit.MenuEntry {
 				uikit.Notify(c, "请先取消或清除该会话的传输任务")
 				return
 			}
-			a.page().draft = hostDraft{id: id, deleting: true}
+			a.page().draft = hostDraft{id: id, name: h.name, deleting: true}
 			a.page().addHostOpen = true
 		}},
 	}
@@ -309,7 +309,7 @@ func (a *app) catalogDragPreview(c *ui.Context) {
 	} else {
 		animation := a.catalogLandingAnimation()
 		if d.phase == catalogCanceling {
-			animation = ui.Animation{Spring: uikit.Spring(t.C.ReorderMotion.Cancel)}
+			animation = a.positionAnimation(ui.Animation{Spring: uikit.Spring(t.C.ReorderMotion.Cancel)})
 		}
 		animation.Spring.Velocity = d.velocityY
 		ghost.Left(d.settleBase.X).Top(d.settleBase.Y).Width(d.settleBase.W).

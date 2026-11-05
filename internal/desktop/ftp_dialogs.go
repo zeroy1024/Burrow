@@ -83,12 +83,14 @@ func (a *app) fileActionModal(c *ui.Context) {
 	var submitted, clicked bool
 	var current uikit.ModalParts
 	result := uikit.Modal(c.Key(dialog), &open, uikit.ModalProps{
-		Compact: true, Width: t.C.Dialog.HostWidth, Title: title, Disabled: dialog.busy, Motion: uikit.MotionOverride(a.reduceMotion(c)),
+		Controller: &dialog.modal,
+		Compact:    true, Width: t.C.Dialog.HostWidth, Title: title, Disabled: dialog.busy, Motion: uikit.MotionOverride(a.reduceMotion(c)),
 	}, func(parts uikit.ModalParts) {
 		current = parts
 		uikit.Text(c, "操作将应用到当前目录中的实际文件。", uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneSecondary})
 		if dialog.kind == "delete" {
-			message := fmt.Sprintf("确认删除选中的 %d 项？", len(dialog.pane.selection()))
+			count := ui.Local(parts.Panel, "uikit.file-action.selection-count", func() int { return len(dialog.pane.selection()) })
+			message := fmt.Sprintf("确认删除选中的 %d 项？", *count)
 			if dialog.original != "" {
 				message = fmt.Sprintf("确认删除「%s」？", dialog.original)
 			}
@@ -118,7 +120,7 @@ func (a *app) fileActionModal(c *ui.Context) {
 	if (clicked || submitted || result.Submit) && nameError == "" {
 		if a.applyFileAction(c, dialog) {
 			current.SetDirty(false)
-			a.files.dialog = nil
+			dialog.modal.Close()
 			return
 		}
 	}
@@ -156,7 +158,7 @@ func (a *app) fileConflictModal(c *ui.Context) {
 	result := uikit.Modal(c.Key(conflict), &open, uikit.ModalProps{
 		Compact: true, Width: t.C.Dialog.HostWidth, Title: "目标中已存在同名项目", Motion: uikit.MotionOverride(a.reduceMotion(c)),
 	}, func(parts uikit.ModalParts) {
-		uikit.Text(c, entry.name, uikit.TextProps{Style: uikit.TextBodyStrong}).FontSize(t.Font.Size.BodyLg).FontWeight(t.Font.Weight.Medium)
+		uikit.Text(c, entry.name, uikit.TextProps{Style: uikit.TextHeadline})
 		uikit.Text(c, "目标："+path.Join(conflict.target, entry.name), uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneSecondary})
 		uikit.Checkbox(c, &conflict.applyAll, "对所有重名项应用此选择")
 		ui.Row(c).Justify(ui.End).Gap(t.Space.N8).Children(func() {
@@ -177,10 +179,13 @@ func (a *app) fileConflictModal(c *ui.Context) {
 	}
 	if choice != 0 {
 		conflict.choice = choice
-		a.resolveFileConflicts(c)
-		return
+		result.Close()
 	}
 	if !open {
-		a.cancelFileConflict()
+		if conflict.choice != 0 {
+			a.resolveFileConflicts(c)
+		} else {
+			a.cancelFileConflict()
+		}
 	}
 }

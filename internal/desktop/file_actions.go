@@ -83,7 +83,7 @@ func (a *app) applyFileAction(c *ui.Context, dialog *fileActionDialog) bool {
 				}
 			} else {
 				if a.files.dialog == dialog {
-					a.files.dialog = nil
+					dialog.modal.Close()
 				}
 				pane.table.Clear()
 				pane.reveal = reveal

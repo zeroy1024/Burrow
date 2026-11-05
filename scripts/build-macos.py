@@ -7,6 +7,7 @@ import argparse
 import json
 from pathlib import Path
 import subprocess
+import sys
 
 import dmgbuild
 
@@ -17,6 +18,12 @@ parser = argparse.ArgumentParser(description="Build the macOS APP, DMG, and ZIP"
 parser.add_argument("--arch", choices=("amd64", "arm64"))
 args = parser.parse_args()
 arch = args.arch or subprocess.check_output(["go", "env", "GOARCH"], text=True).strip()
+
+subprocess.run(
+    [sys.executable, str(project_root / "scripts/setup-macos-signing.py"), "--check"],
+    cwd=project_root,
+    check=True,
+)
 
 subprocess.run(
     ["go", "tool", "mygo", "build", "-skip-dmg", "-platform", f"darwin/{arch}"],

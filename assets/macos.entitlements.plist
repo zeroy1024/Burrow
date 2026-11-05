@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Application-level exception: a local signing certificate
+         has no Apple Team ID. This permits nonmatching libraries broadly,
+         which the bundled Ghostty library requires. Other runtime checks stay enabled.
+         It does not grant data-protection Keychain access. -->
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+</dict>
+</plist>

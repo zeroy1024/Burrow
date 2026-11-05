@@ -92,6 +92,7 @@ func (a *app) attachSSH(session *remoteSession, run *sshRuntime) {
 	blink := prefs.CursorBlink && !a.sshReduceMotion()
 	scrollbackLines := a.prefs.ScrollbackLines
 	columns, rows := run.conn.Size()
+	var view *nativeterm.Terminal
 	view, err := nativeterm.New(nativeterm.Options{
 		Columns: columns, Rows: rows,
 		Conn: transport, Font: a.sshFont(), Theme: a.sshColors(session),
@@ -108,15 +109,30 @@ func (a *app) attachSSH(session *remoteSession, run *sshRuntime) {
 		OnExit: func(int) {
 			err := run.conn.Wait()
 			a.window.Update(func() {
-				if session.ssh != run || run.ctx.Err() != nil || session.state == connectionFailed {
+				if session.terminal == nil || session.terminal.view != view {
 					return
 				}
-				session.state = disconnected
-				if err != nil {
-					session.state = connectionFailed
-					showSSHMessage(session, "SSH 会话结束："+err.Error())
+				// The terminal has just written [Disconnected]; a message, if any, follows it.
+				afterMessage := false
+				if session.ssh == run && run.ctx.Err() == nil && session.state != connectionFailed {
+					session.state = disconnected
+					if err != nil {
+						session.state, afterMessage = connectionFailed, true
+						showSSHMessage(session, "SSH 会话结束："+err.Error())
+					}
+				}
+				if session.awaitingConnect() {
+					showReconnectHint(session, !afterMessage)
 				}
 			})
+		},
+		// A finished shell takes no input, so Enter starts a new one in place.
+		OnKey: func(mods ui.Modifiers, key ui.Key) bool {
+			if key != ui.KeyEnter || mods != 0 || !session.awaitingConnect() {
+				return false
+			}
+			a.connectSession(session)
+			return true
 		},
 	})
 	if err != nil {
@@ -229,6 +245,35 @@ func showSSHMessage(session *remoteSession, message string) {
 		return
 	}
 	appendSessionLines(session, terminalLine{{Text: message}})
+}
+
+// terminalRunning reports whether the session's terminal still reads its connection.
+func terminalRunning(session *remoteSession) bool {
+	if session.terminal == nil {
+		return false
+	}
+	select {
+	case <-session.terminal.view.Done():
+		return false
+	default:
+		return true
+	}
+}
+
+// showReconnectHint ends an ended terminal's output with a prompt-like hint,
+// leaving the cursor after it. A running terminal gets it from its OnExit,
+// after [Disconnected]; a pane without a terminal draws it (reconnectHint).
+// newLine starts it on a line of its own, for when the cursor is not at the
+// start of one.
+func showReconnectHint(session *remoteSession, newLine bool) {
+	if session.terminal == nil || terminalRunning(session) {
+		return
+	}
+	hint := "\x1b[0;2m" + localizeTag(mygo.App.Locale(), "按 Enter 重新连接") + "\x1b[0m"
+	if newLine {
+		hint = "\r\n" + hint
+	}
+	session.terminal.view.Feed([]byte(hint))
 }
 
 func releaseSSH(session *remoteSession) {

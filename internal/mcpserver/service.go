@@ -36,6 +36,14 @@ type Connection struct {
 	Host     string `json:"host"`
 	Port     int    `json:"port"`
 	User     string `json:"user"`
+	// OS is the SSH host's pinned or last detected platform (linux, darwin,
+	// windows or other); empty until detected.
+	OS string `json:"os,omitempty"`
+	// OSName, Arch and Shell come from the last facts collected for that
+	// platform; Shell is set for Windows hosts.
+	OSName   string `json:"os_name,omitempty"`
+	Arch     string `json:"arch,omitempty"`
+	Shell    string `json:"shell,omitempty"`
 	Identity string `json:"-"`
 	Runtime  any    `json:"-"`
 }
@@ -68,6 +76,7 @@ func OperationID(ctx context.Context) (string, int) {
 // All methods may be called from HTTP workers. The adapter is responsible for
 // dispatching access to desktop-owned state onto the window thread.
 type Backend interface {
+	Available(context.Context) error
 	Connections(context.Context) ([]Connection, error)
 	OpenFiles(context.Context, Connection) (fileclient.Client, error)
 	Exec(context.Context, Connection, string) (sshclient.ExecResult, error)
@@ -115,6 +124,17 @@ type Failure struct {
 	Code    string
 	Message string
 	Hits    []store.MCPHit
+	// Matches[i] is the part of the request that triggered Hits[i]. It goes
+	// back to the calling agent only; audit hits stay deduplicated per rule.
+	Matches []Match
+}
+
+// Match is the matched command text, or the canonical path for a file rule.
+// Context is the whitespace-delimited command word containing Text for text
+// rules. A command rule reports the launchers it ran through (Via), or why it
+// fell back to keyword matching.
+type Match struct {
+	Text, Context, Via, Fallback string
 }
 
 func (e *Failure) Error() string { return e.Message }

@@ -118,7 +118,7 @@ jobs:
 
   macos:
     name: macOS ARM64 DMG
-    runs-on: macos-15
+    runs-on: [self-hosted, macOS, ARM64, burrow-release]
     timeout-minutes: 45
     env:
       GOFLAGS: -mod=readonly
@@ -128,6 +128,9 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
+
+      - name: 检查固定签名身份
+        run: python3 scripts/setup-macos-signing.py --check
 
       - name: 核对版本标签与许可
         run: |

@@ -59,6 +59,9 @@ func (a *app) initMCPBackend() error {
 }
 
 func (a *app) startMCPBackend() {
+	if !a.businessReady() {
+		return
+	}
 	if a.mcpBackend == nil || a.mcpBackend.service == nil {
 		return
 	}
@@ -334,7 +337,7 @@ func (a *app) applyMCPData(data mcpData) {
 		}
 		if p.Category == "ssh" {
 			for _, r := range p.CommandRules {
-				view.CmdRules = append(view.CmdRules, mcpCommandRule{Mode: r.Mode, Pattern: r.Pattern})
+				view.CmdRules = append(view.CmdRules, mcpCommandRule{Mode: r.Mode, Pattern: r.Pattern, IgnoreCase: r.IgnoreCase})
 			}
 		} else {
 			for _, r := range p.FileRules {
@@ -348,6 +351,9 @@ func (a *app) applyMCPData(data mcpData) {
 			view.RulePrimary = view.FileRules[0].Path
 		}
 		view.RuleSub = fmt.Sprintf("共 %d 条规则", len(view.CmdRules)+len(view.FileRules))
+		if slices.ContainsFunc(view.CmdRules, func(r mcpCommandRule) bool { return r.Mode == "contains" }) {
+			view.RuleSub += " · 含模糊匹配，可能误报"
+		}
 		a.mcp.policies = append(a.mcp.policies, view)
 	}
 	a.mcp.audits = nil
@@ -523,7 +529,7 @@ func (a *app) saveMCPBackendKey() {
 		}
 		a.mcp.selectedKeyID = key.ID
 		if draft.EditingID != "" {
-			draft.Open = false
+			draft.modal.Close()
 		} else {
 			draft.GeneratedKey, draft.OneTimeView, draft.SavedConfirmed = secret, true, false
 		}
@@ -549,7 +555,7 @@ func (a *app) saveMCPBackendPolicy() {
 	if draft.CategorySeg == 0 {
 		p.Category = "ssh"
 		for _, r := range draft.CmdRules {
-			p.CommandRules = append(p.CommandRules, store.MCPCommandRule{Mode: r.Mode, Pattern: r.Pattern})
+			p.CommandRules = append(p.CommandRules, store.MCPCommandRule{Mode: r.Mode, Pattern: r.Pattern, IgnoreCase: r.Mode == "command" && r.IgnoreCase})
 		}
 	} else {
 		for _, r := range draft.FileRules {
@@ -563,7 +569,7 @@ func (a *app) saveMCPBackendPolicy() {
 	}
 	a.mcpWork(func() error { return a.mcpBackend.service.SavePolicy(a.ctx, p) }, func(err error) {
 		if err == nil {
-			a.mcp.policyModalOpen = false
+			form.modal.Close()
 		} else {
 			form.SaveError = err.Error()
 			form.Scroll.ScrollTo(0, 0, ui.Animation{})
@@ -589,7 +595,7 @@ func (a *app) toggleMCPBackendPolicy(id string) {
 func (a *app) deleteMCPBackendPolicy(id string) {
 	a.mcpWork(func() error { return a.mcpBackend.service.DeletePolicy(a.ctx, id) }, func(err error) {
 		if err == nil {
-			a.mcp.policyDelete.Open = false
+			a.mcp.policyDelete.modal.Close()
 			a.mcp.selectedPolicyID = ""
 		}
 	})

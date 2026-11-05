@@ -12,11 +12,13 @@ import (
 	"runtime"
 	"slices"
 	"strings"
+	"unicode/utf8"
 
 	"golang.org/x/text/cases"
 	"golang.org/x/text/unicode/norm"
 
 	"sshdesk/internal/fileclient"
+	"sshdesk/internal/shellcmd"
 	"sshdesk/internal/store"
 )
 
@@ -41,8 +43,15 @@ func ValidatePolicy(p store.MCPPolicy) error {
 			if r.Pattern == "" || len(r.Pattern) > 8192 {
 				return fail("invalid_argument", "命令规则为空或超长")
 			}
+			if r.IgnoreCase && r.Mode != "command" {
+				return fail("invalid_argument", "仅命令匹配支持忽略参数大小写")
+			}
 			switch r.Mode {
 			case "exact", "contains":
+			case "command":
+				if _, err := shellcmd.ParseRule(r.Pattern, r.IgnoreCase); err != nil {
+					return fail("invalid_argument", err.Error())
+				}
 			case "regex":
 				if _, err := regexp.Compile(r.Pattern); err != nil {
 					return fmt.Errorf("正则表达式无效：%w", err)
@@ -91,34 +100,119 @@ func (s *Service) CheckCommand(ctx context.Context, keyID, connectionID, command
 		return s.storageFault(err)
 	}
 	var hits []store.MCPHit
+	var matches []Match
+	var reasons []string
+	var analysis *shellcmd.Analysis
 	for _, p := range policies {
 		if !applies(p, keyID, connectionID, "ssh") {
 			continue
 		}
 		for _, r := range p.CommandRules {
-			matched := false
+			rule := r.Mode + ": " + r.Pattern
+			if r.IgnoreCase {
+				rule += "（参数忽略大小写）"
+			}
+			hit := store.MCPHit{PolicyID: p.ID, Name: p.Name, Version: p.Version,
+				Category: p.Category, Rule: rule, Action: "exec"}
+			reason := fmt.Sprintf("策略「%s」的规则 %s", p.Name, rule)
+			if r.Mode == "command" {
+				matcher, err := shellcmd.ParseRule(r.Pattern, r.IgnoreCase)
+				if err != nil {
+					return fail("invalid_policy", "已保存的策略无效，拒绝执行")
+				}
+				// One parse serves every command rule of every policy.
+				if analysis == nil {
+					result := shellcmd.Analyze(command)
+					analysis = &result
+				}
+				ev, ok := matcher.Match(*analysis)
+				if !ok {
+					continue
+				}
+				match := Match{Text: ev.Text, Via: strings.Join(ev.Via, " ▸ "), Fallback: ev.Fallback}
+				if ev.Fallback != "" {
+					reason += fmt.Sprintf(" 按关键词从严命中（%s）：%q", ev.Fallback, clip(ev.Text))
+				} else {
+					reason += fmt.Sprintf(" 命中命令 %q", clip(ev.Text))
+					if match.Via != "" {
+						reason += "（经由 " + match.Via + "）"
+					}
+					if ev.Count > 1 {
+						reason += fmt.Sprintf("，共 %d 处", ev.Count)
+					}
+				}
+				hits, matches, reasons = append(hits, hit), append(matches, match), append(reasons, reason)
+				continue
+			}
+			start, end := -1, -1
 			switch r.Mode {
 			case "exact":
-				matched = command == r.Pattern
+				if command == r.Pattern {
+					start, end = 0, len(command)
+				}
 			case "contains":
-				matched = strings.Contains(command, r.Pattern)
+				if start = strings.Index(command, r.Pattern); start >= 0 {
+					end = start + len(r.Pattern)
+				}
 			case "regex":
 				re, err := regexp.Compile(r.Pattern)
 				if err != nil {
 					return fail("invalid_policy", "已保存的策略无效，拒绝执行")
 				}
-				matched = re.MatchString(command)
+				if span := re.FindStringIndex(command); span != nil {
+					start, end = span[0], span[1]
+				}
 			}
-			if matched {
-				hits = append(hits, store.MCPHit{PolicyID: p.ID, Name: p.Name, Version: p.Version,
-					Category: p.Category, Rule: r.Mode + ": " + r.Pattern, Action: "exec"})
+			if start < 0 {
+				continue
 			}
+			match := Match{Text: command[start:end], Context: commandWord(command, start, end)}
+			switch {
+			case r.Mode == "exact":
+				reason += " 与整条命令完全一致"
+			case match.Text == "":
+				reason += fmt.Sprintf(" 在第 %d 字节处匹配到空文本", start)
+			case match.Context != match.Text:
+				reason += fmt.Sprintf(" 命中 %q（位于 %q）", clip(match.Text), clip(match.Context))
+			default:
+				reason += fmt.Sprintf(" 命中 %q", clip(match.Text))
+			}
+			hits, matches, reasons = append(hits, hit), append(matches, match), append(reasons, reason)
 		}
 	}
 	if len(hits) > 0 {
-		return &Failure{Code: "intercepted", Message: "命令被拦截策略拒绝", Hits: hits}
+		return &Failure{Code: "intercepted", Message: "命令被拦截策略拒绝：" + strings.Join(reasons, "；"), Hits: hits, Matches: matches}
 	}
 	return nil
+}
+
+// commandWord widens a match to the surrounding whitespace-delimited word so
+// the agent can see why, e.g., "rm" matched inside "format". A word longer
+// than the clip limit is not useful context and is omitted.
+func commandWord(command string, start, end int) string {
+	from := strings.LastIndexAny(command[:start], " \t\r\n") + 1
+	to := len(command)
+	if i := strings.IndexAny(command[end:], " \t\r\n"); i >= 0 {
+		to = end + i
+	}
+	if to-from > clipBytes {
+		return ""
+	}
+	return command[from:to]
+}
+
+const clipBytes = 120
+
+// clip shortens text echoed in messages without splitting a UTF-8 sequence.
+func clip(text string) string {
+	if len(text) <= clipBytes {
+		return text
+	}
+	cut := clipBytes
+	for cut > 0 && !utf8.RuneStart(text[cut]) {
+		cut--
+	}
+	return text[:cut] + "…"
 }
 
 func (s *Service) CheckFile(ctx context.Context, keyID, connectionID, side, name, action string, client fileclient.Client) error {
@@ -130,6 +224,8 @@ func (s *Service) CheckFile(ctx context.Context, keyID, connectionID, side, name
 		return s.storageFault(err)
 	}
 	var hits []store.MCPHit
+	var matches []Match
+	var reasons []string
 	for _, p := range policies {
 		if !applies(p, keyID, connectionID, "files") {
 			continue
@@ -150,6 +246,7 @@ func (s *Service) CheckFile(ctx context.Context, keyID, connectionID, side, name
 			if err != nil {
 				return fail("path_unverifiable", "无法核实拦截规则的实际路径")
 			}
+			actual := target
 			// Match conservatively on native platforms where case and Unicode
 			// aliases are common. This only broadens a denial, never a grant.
 			if side == "local" && (runtime.GOOS == "darwin" || runtime.GOOS == "windows") {
@@ -164,13 +261,17 @@ func (s *Service) CheckFile(ctx context.Context, keyID, connectionID, side, name
 				}
 			}
 			if matched {
-				hits = append(hits, store.MCPHit{PolicyID: p.ID, Name: p.Name, Version: p.Version,
-					Category: p.Category, Rule: side + ": " + r.Path, Action: action})
+				hit := store.MCPHit{PolicyID: p.ID, Name: p.Name, Version: p.Version,
+					Category: p.Category, Rule: side + ": " + r.Path, Action: action}
+				// Report the canonical path: it may differ from the requested
+				// name when a symlink or alias led into the protected location.
+				hits, matches = append(hits, hit), append(matches, Match{Text: actual})
+				reasons = append(reasons, fmt.Sprintf("策略「%s」的规则 %s 禁止 %s，实际路径 %q 受保护", p.Name, hit.Rule, action, actual))
 			}
 		}
 	}
 	if len(hits) > 0 {
-		return &Failure{Code: "intercepted", Message: "文件操作被拦截策略拒绝", Hits: hits}
+		return &Failure{Code: "intercepted", Message: "文件操作被拦截策略拒绝：" + strings.Join(reasons, "；"), Hits: hits, Matches: matches}
 	}
 	return nil
 }

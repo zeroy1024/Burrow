@@ -314,6 +314,30 @@ class Suite:
                 raise RuntimeError("deleting a policy changed its historical hit snapshot")
         self.case("command policy blocks actual SSH side effects; deleted rule snapshot remains auditable")
 
+        # An agent-style compound command reaches rm only through timeout and a
+        # nested bash -c string. The whole command must be refused before its
+        # first segment runs, while lookalike words and quoted data still run.
+        policy_id = "integration-" + uuid.uuid4().hex
+        folder = "/home/sshdesk/mcp-command-match-" + uuid.uuid4().hex
+        self.remote(server["container"], "install -d -o sshdesk -g sshdesk " + folder)
+        policy = dict(ID=policy_id, Version=1, Name="MCP command match integration", Category="ssh", Enabled=True,
+                      AllKeys=True, ConnectionIDs=[ssh["id"]], CommandRules=[dict(Mode="command", Pattern="rm -rf")])
+        self.action("policy", policy=policy)
+        command = "cd /home/sshdesk && touch " + folder + "/started && timeout 30 bash -lc '\\rm -fr " + folder + "'"
+        denied = self.full.call("ssh_exec", dict(connection_id=ssh["id"], command=command), expect_error=True)
+        if denied["error"]["code"] != "intercepted":
+            raise RuntimeError("command-mode rule did not intercept rm behind timeout and bash -c")
+        if self.remote(server["container"], "test -d " + folder + " && test ! -e " + folder + "/started && printf intact") != "intact":
+            raise RuntimeError("command-mode interception let part of the compound command run")
+        hit = denied["error"]["hits"][0]
+        if hit["rule"] != "command: rm -rf" or hit["via"] != "timeout ▸ bash -c" or hit["matched"] != "\\rm -fr " + folder or not denied["error"].get("hint"):
+            raise RuntimeError("command-mode interception did not explain the matched invocation: " + json.dumps(hit, ensure_ascii=False))
+        allowed = self.full.call("ssh_exec", dict(connection_id=ssh["id"], command="printf 'format %s' --rm && echo 'rm -rf /' >/dev/null"))
+        if allowed["stdout"] != "format --rm" or allowed["exit_code"] != 0:
+            raise RuntimeError("command-mode rule blocked lookalike words or quoted data")
+        self.action("delete_policy", policy_id=policy_id)
+        self.case("command-mode rule blocks rm via timeout/bash -c before any segment runs and reports the path; lookalikes still run")
+
         sftp = self.connection("Docker Plain Key", "sftp")
         folder = "/home/sshdesk/mcp-protected-" + uuid.uuid4().hex
         self.remote(server["container"], "install -d -o sshdesk -g sshdesk " + folder)
@@ -605,9 +629,11 @@ class Suite:
         try:
             ssh = self.connection("Docker Plain Key", "ssh")
             marker = "/home/sshdesk/audit-must-not-execute-" + uuid.uuid4().hex
-            failure = self.full.call("ssh_exec",dict(connection_id=ssh["id"],command="touch " + marker),expect_error=True)
-            if failure["error"]["code"] != "audit_unavailable":
-                raise RuntimeError("audit failure was not exposed as unavailable")
+            # The audited /mcp entry persists the operation before the SDK runs the
+            # tool, so a failed beginning record is rejected there with HTTP 503.
+            failure = self.full.request("tools/call",dict(name="ssh_exec",arguments=dict(connection_id=ssh["id"],command="touch " + marker)))
+            if failure.get("http_error") != 503 or "audit storage unavailable" not in failure.get("message",""):
+                raise RuntimeError("audit failure was not rejected at the audited MCP entry: " + json.dumps(failure))
             server = json.loads((self.task_dir / "server.json").read_text())
             if self.remote(server["container"],"test ! -e " + marker + " && printf absent") != "absent":
                 raise RuntimeError("remote side effect occurred without durable beginning audit")

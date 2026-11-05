@@ -58,7 +58,6 @@ type settingsState struct {
 	scroll                         [7]ui.ScrollState
 	notice                         string
 	allSchemes                     bool
-	shortcutTable                  ui.Handle
 	recording                      string
 	pendingBinding, conflictAction string
 	fonts                          []string
@@ -67,8 +66,7 @@ type settingsState struct {
 
 func (s *settingsState) reset() {
 	clean := settingsState{
-		search:        s.search,
-		shortcutTable: s.shortcutTable,
+		search: s.search,
 	}
 	for index := range s.scroll {
 		clean.scroll[index].Handle = s.scroll[index].Handle

@@ -16,9 +16,9 @@ type Group struct {
 }
 
 type Key struct {
-	PublicKey                                             []byte
-	ID, Name, Kind, Fingerprint, Path, Comment, CreatedAt string
-	Bits                                                  int
+	PublicKey                                                 []byte
+	ID, Name, Kind, Fingerprint, SecretID, Comment, CreatedAt string
+	Bits                                                      int
 }
 
 type Profile struct {
@@ -36,10 +36,11 @@ type Workspace struct {
 	Endpoints []Endpoint
 }
 type Catalog struct {
-	Groups    []Group
-	Profiles  []Profile
-	Keys      []Key
-	Workspace *Workspace
+	Groups       []Group
+	Profiles     []Profile
+	Keys         []Key
+	Workspace    *Workspace
+	VaultChanges *VaultChanges
 }
 
 // EndpointID makes immutable connection snapshots independent of profile edits.
@@ -83,13 +84,13 @@ func (s *Store) ReadCatalog(ctx context.Context) (Catalog, error) {
 	if err := closeRows(rows); err != nil {
 		return c, err
 	}
-	rows, err = tx.QueryContext(ctx, "SELECT id,name,kind,fingerprint,path,comment,bits,created_at,public_key FROM managed_keys ORDER BY created_at,id")
+	rows, err = tx.QueryContext(ctx, "SELECT id,name,kind,fingerprint,secret_id,comment,bits,created_at,public_key FROM managed_keys ORDER BY created_at,id")
 	if err != nil {
 		return c, err
 	}
 	for rows.Next() {
 		var k Key
-		if err := rows.Scan(&k.ID, &k.Name, &k.Kind, &k.Fingerprint, &k.Path, &k.Comment, &k.Bits, &k.CreatedAt, &k.PublicKey); err != nil {
+		if err := rows.Scan(&k.ID, &k.Name, &k.Kind, &k.Fingerprint, &k.SecretID, &k.Comment, &k.Bits, &k.CreatedAt, &k.PublicKey); err != nil {
 			rows.Close()
 			return c, err
 		}
@@ -145,6 +146,9 @@ func (s *Store) SaveCatalog(ctx context.Context, c Catalog) error {
 		return err
 	}
 	defer tx.Rollback()
+	if err := saveVaultChanges(ctx, tx, c.VaultChanges); err != nil {
+		return err
+	}
 	// The catalog is small and its order is a single user operation. Replace it
 	// atomically; immutable endpoints and task rows are never cascaded away.
 	for _, table := range []string{"profiles", "catalog_groups", "managed_keys"} {
@@ -153,7 +157,7 @@ func (s *Store) SaveCatalog(ctx context.Context, c Catalog) error {
 		}
 	}
 	for _, k := range c.Keys {
-		if _, err := tx.ExecContext(ctx, "INSERT INTO managed_keys VALUES(?,?,?,?,?,?,?,?,?)", k.ID, k.Name, k.Kind, k.Fingerprint, k.Path, k.Comment, k.Bits, k.CreatedAt, k.PublicKey); err != nil {
+		if _, err := tx.ExecContext(ctx, "INSERT INTO managed_keys VALUES(?,?,?,?,?,?,?,?,?)", k.ID, k.Name, k.Kind, k.Fingerprint, k.SecretID, k.Comment, k.Bits, k.CreatedAt, k.PublicKey); err != nil {
 			return err
 		}
 	}

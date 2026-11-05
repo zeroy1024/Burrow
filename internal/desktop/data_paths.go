@@ -46,7 +46,7 @@ func configureDataDirectory() (string, error) {
 	return directory, nil
 }
 
-func credentialStore() mygo.SecretsModule {
+func legacyCredentialStore() mygo.SecretsModule {
 	service := "dev.burrow.app"
 	if mygo.App.Name() == "Burrow Dev" {
 		service += ".dev"
