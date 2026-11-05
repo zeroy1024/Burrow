@@ -8,7 +8,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"time"
 	"unicode"
 
 	"github.com/egoist/mygo/ui"
@@ -17,38 +16,37 @@ import (
 )
 
 type hostDraft struct {
-	afterClose                                              func()
-	name, address, user, port, group, system                string
-	protocol, auth, keyID, password, passphrase             string
-	jumpID, keepalive, initCommand, termScheme, platform    string
-	remoteDir, localDir, encoding, ftpMode, ftpTLS          string
-	env                                                     []string
-	envInput, newGroup                                      string
-	id                                                      hostID
-	editing, deleting, files, portEdited                    bool
-	passwordChanged, passphraseChanged, passwordSaved       bool
-	advanced, entered, closing, selectedName, creatingGroup bool
-	closeStarted                                            time.Time
-	errors                                                  map[string]string
-	focused                                                 map[string]bool
-	handles                                                 map[string]*ui.Handle
-	scroll                                                  ui.ScrollState
-	advancedHeight                                          float32
-	testCancel                                              context.CancelFunc
-	testResults                                             <-chan connectionTestResult
-	testResult                                              *connectionTestResult
-	testVisible                                             bool
-	choosingDirectory                                       bool
-	listedAgent                                             bool
-	agentCount                                              int
-	agentError                                              error
-	submitted                                               bool
-	saving                                                  bool
-	agentResults                                            <-chan sessionAgentResult
-	generation                                              string
-	initialValues                                           [21]string
-	initialEnv                                              []string
-	initialPortEdited                                       bool
+	afterClose                                           func()
+	name, address, user, port, group, system             string
+	protocol, auth, keyID, password, passphrase          string
+	jumpID, keepalive, initCommand, termScheme, platform string
+	remoteDir, localDir, encoding, ftpMode, ftpTLS       string
+	env                                                  []string
+	envInput, newGroup                                   string
+	id                                                   hostID
+	editing, deleting, files, portEdited                 bool
+	passwordChanged, passphraseChanged, passwordSaved    bool
+	advanced, closing, selectedName, creatingGroup       bool
+	modal                                                uikit.ModalController
+	errors                                               map[string]string
+	focused                                              map[string]bool
+	handles                                              map[string]*ui.Handle
+	scroll                                               ui.ScrollState
+	testCancel                                           context.CancelFunc
+	testResults                                          <-chan connectionTestResult
+	testResult                                           *connectionTestResult
+	testVisible                                          bool
+	choosingDirectory                                    bool
+	listedAgent                                          bool
+	agentCount                                           int
+	agentError                                           error
+	submitted                                            bool
+	saving                                               bool
+	agentResults                                         <-chan sessionAgentResult
+	generation                                           string
+	initialValues                                        [21]string
+	initialEnv                                           []string
+	initialPortEdited                                    bool
 }
 
 type sessionAgentResult struct {
@@ -507,6 +505,7 @@ func (a *app) closeSessionDraft(d *hostDraft) {
 	d.cancelTest()
 	d.password, d.passphrase = "", ""
 	d.closing = true
+	d.modal.Close()
 }
 
 func (a *app) draftOpenTabs(d *hostDraft) int {

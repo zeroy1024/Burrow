@@ -27,7 +27,8 @@ func (a *app) hostDialog(c *ui.Context) {
 	if d.deleting {
 		requested := false
 		result := uikit.Modal(c.Key("delete-site-dialog"), &page.addHostOpen, uikit.ModalProps{
-			Title: "删除会话「" + a.hosts[d.id].name + "」？", Compact: true,
+			Controller: &d.modal,
+			Title:      "删除会话「" + d.name + "」？", Compact: true,
 			Width: theme.Current().C.Dialog.HostWidth, Motion: uikit.MotionOverride(a.reduceMotion(c)),
 		}, func(parts uikit.ModalParts) {
 			requested = a.deleteSiteDialogContents(c, parts)
@@ -62,55 +63,12 @@ func (a *app) hostDialog(c *ui.Context) {
 	p := t.C.Modal
 	d.submitted = false
 	dialog := uikit.Modal(c.Key(d.generation), &page.addHostOpen, uikit.ModalProps{
-		Title: a.sessionDraftTitle(d), Disabled: d.closing || d.saving, Dirty: d.dirty(),
-		ExternalLifecycle: true, Motion: uikit.MotionOverride(a.reduceMotion(c)),
+		Title: a.sessionDraftTitle(d), Disabled: d.saving, Dirty: d.dirty(),
+		Controller: &d.modal, Motion: uikit.MotionOverride(a.reduceMotion(c)),
 		CloseKey: "session-close", CloseLabel: "关闭会话设置",
 		Header: func(uikit.ModalParts) { a.sessionDraftHeader(c, d) },
 	}, func(parts uikit.ModalParts) {
-		backdrop, panel, bounds := parts.Backdrop, parts.Panel, parts.Bounds
-		alphaTarget, scaleTarget := float32(1), float32(1)
-		duration := p.Fade
-		animation := ui.Animation{Spring: uikit.Spring(p.Enter)}
-		if !d.entered {
-			alphaTarget, scaleTarget = 0, p.EnterScale
-			d.entered = true
-			c.AnimationFrame()
-		}
-		if d.closing {
-			alphaTarget, scaleTarget, duration = 0, p.ExitScale, p.Exit
-			animation = ui.Animation{Duration: p.Exit, Ease: uikit.Easing(t.Motion.Easing.In)}
-			if d.closeStarted.IsZero() {
-				d.closeStarted = c.Now()
-			}
-			if c.Now().Sub(d.closeStarted) >= p.Exit {
-				page.addHostOpen = false
-				panel.Hidden(true)
-				if d.afterClose != nil {
-					open := d.afterClose
-					d.afterClose = nil
-					open()
-				}
-				c.AnimationFrame()
-				return
-			}
-			c.AnimationFrame()
-		}
-		fadeAnimation := uikit.Tween(duration)
-		if d.closing {
-			fadeAnimation.Ease = uikit.Easing(t.Motion.Easing.In)
-		}
-		alphaColor := panel.AnimateColor("modal-alpha", ui.Color{A: uint8(alphaTarget * 255)}, fadeAnimation)
-		alpha := float32(alphaColor.A) / 255
-		scale := panel.AnimateTo("modal-scale", scaleTarget, animation)
-		if a.reduceMotion(c) {
-			scale = 1
-		}
-		opacity := alpha
-		if d.closing || d.saving {
-			opacity *= t.Opacity.Disabled / 0.5
-		}
-		panel.AnimatePose(ui.Pose{Scale: scale}, ui.Animation{Duration: t.Motion.Duration.InstantNonzero}).Opacity(opacity)
-		uikit.StyleModalScrim(backdrop, alpha)
+		panel, bounds := parts.Panel, parts.Bounds
 		noticeHeight := float32(0)
 		if count := a.draftOpenTabs(d); count > 0 {
 			// Banner fills its parent's content width. Inset that content with
@@ -152,11 +110,14 @@ func (a *app) hostDialog(c *ui.Context) {
 	if dialog.Submit && !d.saving && !d.closing {
 		a.saveSessionDraft(c, d, true)
 	}
-	if dialog.Dismissed {
-		page.addHostOpen = true
-		if !d.saving {
-			a.closeSessionDraft(d)
-		}
+	if dialog.Closing && !d.closing {
+		a.closeSessionDraft(d)
+	}
+	if dialog.Dismissed && d.afterClose != nil {
+		afterClose := d.afterClose
+		d.afterClose = nil
+		afterClose()
+		c.Invalidate()
 	}
 }
 

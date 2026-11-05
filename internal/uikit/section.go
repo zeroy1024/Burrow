@@ -13,7 +13,7 @@ type SectionProps struct {
 	Reduced        bool
 }
 
-func Section(c *ui.Context, open *bool, contentHeight *float32, props SectionProps, body func()) ui.Element {
+func Section(c *ui.Context, open *bool, props SectionProps, body func()) ui.Element {
 	t := theme.Current()
 	p := t.C.Collapse
 	var trigger ui.Element
@@ -40,23 +40,14 @@ func Section(c *ui.Context, open *bool, contentHeight *float32, props SectionPro
 			summary := ui.Text(c, props.Summary).Grow(1).MinWidth(0).SingleLine().FontSize(p.SummarySize).TextColor(Color(p.Summary)).PassThrough()
 			summary.Opacity(Visual(summary, "summary", 1-target, t.Motion.Duration.Exit))
 		})
-		if !*open && progress == 0 {
-			return
-		}
-		clip := ui.Column(c).FillWidth().Shrink(0).ClipY().Disabled(!*open)
-		if progress < 1 {
-			clip.Height(progress * *contentHeight)
-		}
-		clip.Children(func() {
-			inner := ui.Column(c).FillWidth().Shrink(0).Padding(0, t.C.Modal.BodyPaddingX, t.Space.N20, t.C.Modal.BodyPaddingX).Gap(t.C.FormRow.RowGap)
-			inner.Opacity(min(1, progress*p.ContentFadeFactor))
-			inner.Children(body)
-			if height := inner.Bounds().H; height > 0 {
-				*contentHeight = height
+		if *open {
+			motion := &ui.Motion{Collapse: true}
+			if props.Reduced {
+				motion = &ui.Motion{}
 			}
-		})
-		if *contentHeight == 0 {
-			c.AnimationFrame()
+			ui.Column(c).Key("section-content").FillWidth().Shrink(0).
+				Padding(0, t.C.Modal.BodyPaddingX, t.Space.N20, t.C.Modal.BodyPaddingX).Gap(t.C.FormRow.RowGap).
+				Transition(ui.ElementTransition{Duration: p.Duration, Enter: motion, Exit: motion}).Children(body)
 		}
 	})
 	return trigger

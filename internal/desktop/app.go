@@ -53,6 +53,7 @@ type pageState struct {
 	addHostOpen       bool
 	draft             hostDraft
 	groupDialogOpen   bool
+	groupModal        uikit.ModalController
 	groupDraft        string
 	groupDelete       *hostGroup
 	groupRename       *hostGroup
@@ -87,6 +88,7 @@ type app struct {
 	nextCatalogGroupID     int
 	sshPrompts             []*sshPrompt
 	fileSSHLink            *fileSession
+	fileSSHLinkAfterClose  func()
 
 	section            section
 	settingsButton     ui.Handle
@@ -141,6 +143,7 @@ type app struct {
 	closeRequest       *workspaceTab
 	closeFileRequest   *fileSession
 	closePaneRequest   *paneCloseRequest
+	closeConfirmed     bool
 	savedWorkspace     *storedWorkspace
 	reduceTransparency bool
 }
@@ -413,11 +416,11 @@ func (a *app) view(c *ui.Context) {
 			background = ui.Transparent
 		}
 	}
-	c.Root().Background(background).Disabled(a.security.changing || a.transfers.quitting || a.catalogSaving || a.quitPending || a.terminal.importing)
+	c.Root().Background(background)
 	root := ui.Column(c).Fill()
 	x, y, _ := root.PointerPosition()
 	a.pointer = ui.Point{X: x, Y: y}
-	if !a.transfers.quitting {
+	if !a.interactionBlocked() {
 		a.appShortcuts(c)
 	}
 	if a.drag == nil && !a.terminalCapturePressed(c) {
@@ -528,6 +531,15 @@ func (a *app) view(c *ui.Context) {
 		a.files.notice = nil
 	}
 	uikit.ToastViewport(c, uikit.MotionOverride(a.reduceMotion(c)))
+	if a.interactionBlocked() {
+		ui.Overlay(c.Key("application-input-shield"), func() {
+			uikit.InputShield(c).Modal().AutoFocus().Role(ui.RoleStatus).Label("正在处理")
+		})
+	}
+}
+
+func (a *app) interactionBlocked() bool {
+	return a.security.changing || a.transfers.quitting || a.catalogSaving || a.quitPending || a.terminal.importing
 }
 
 func (a *app) navigation(c *ui.Context) {

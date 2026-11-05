@@ -141,6 +141,7 @@ type mcpAuditItem struct {
 }
 
 type mcpKeyModalDraft struct {
+	modal          uikit.ModalController
 	Open           bool
 	EditingID      string
 	OneTimeView    bool
@@ -155,6 +156,7 @@ type mcpKeyModalDraft struct {
 }
 
 type mcpKeyConfirmDialog struct {
+	modal  uikit.ModalController
 	Open   bool
 	KeyID  string
 	Name   string
@@ -162,12 +164,14 @@ type mcpKeyConfirmDialog struct {
 }
 
 type mcpPolicyDeleteDialog struct {
+	modal    uikit.ModalController
 	Open     bool
 	PolicyID string
 	Name     string
 }
 
 type mcpPolicyDraft struct {
+	modal        uikit.ModalController
 	EditingID    string
 	Version      int
 	Name         string

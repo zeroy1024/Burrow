@@ -377,11 +377,12 @@ func (a *app) confirmDeleteSite(c *ui.Context, id hostID) {
 		uikit.Notify(c, "请先取消或清除该会话的传输任务")
 		return
 	}
+	page := a.page()
 	a.deleteFileSite(id, func(err error) {
 		if err != nil {
 			a.persistenceNotice("删除会话失败", err)
 			return
 		}
-		a.page().addHostOpen = false
+		page.draft.modal.Close()
 	})
 }

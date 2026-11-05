@@ -12,6 +12,7 @@ import (
 )
 
 type sshPrompt struct {
+	modal                uikit.ModalController
 	ctx                  context.Context
 	title, address       string
 	confirmLabel, detail string
@@ -49,7 +50,7 @@ func (a *app) askSSH(ctx context.Context, prompt *sshPrompt) sshAnswer {
 
 func (a *app) sshDialogs(c *ui.Context) {
 	a.sshPrompts = slices.DeleteFunc(a.sshPrompts, func(p *sshPrompt) bool {
-		if p.ctx.Err() == nil {
+		if p.responded || p.ctx.Err() == nil {
 			return false
 		}
 		p.secret = ""
@@ -66,10 +67,12 @@ func (a *app) sshDialogs(c *ui.Context) {
 		}
 		p.responded = true
 		p.answer <- sshAnswer{accepted: accepted, secret: p.secret}
-		p.secret, p.open = "", false
+		p.secret = ""
+		p.modal.Close()
 	}
 	result := uikit.Modal(c.Key("ssh-prompt").Key(p), &p.open, uikit.ModalProps{
-		Title: p.title, Compact: true, Width: t.C.Dialog.HostWidth,
+		Controller: &p.modal,
+		Title:      p.title, Compact: true, Width: t.C.Dialog.HostWidth,
 		Motion: uikit.MotionOverride(a.reduceMotion(c)),
 	}, func(parts uikit.ModalParts) {
 		uikit.Text(c, p.address, uikit.TextProps{Style: uikit.TextSmall})

@@ -115,8 +115,9 @@ func (a *app) mcpPolicyModal(c *ui.Context) {
 
 	saveRequested := false
 	dialog := uikit.Modal(c.Key("mcp-policy-modal"), &a.mcp.policyModalOpen, uikit.ModalProps{
-		Disabled: a.mcpBusy(),
-		Title:    title, Subtitle: idBadge, Icon: uikit.IconSVG(uikit.IconShield),
+		Controller: &draft.modal,
+		Disabled:   a.mcpBusy(),
+		Title:      title, Subtitle: idBadge, Icon: uikit.IconSVG(uikit.IconShield),
 		Width: t.C.Mcp.PolicyModalWidth, CloseLabel: "关闭策略窗口", Motion: uikit.MotionOverride(a.reduceMotion(c)),
 		Footer: func(parts uikit.ModalParts) {
 			uikit.ModalFooter(c).Children(func() {
@@ -786,6 +787,7 @@ func (a *app) mcpKeyModal(c *ui.Context) {
 	}
 
 	uikit.Modal(c.Key("mcp-key-modal"), &draft.Open, uikit.ModalProps{
+		Controller:      &draft.modal,
 		Title:           title,
 		Subtitle:        subtitle,
 		Icon:            uikit.IconSVG(uikit.IconKey),
@@ -942,10 +944,11 @@ func (a *app) mcpKeyConfirmModal(c *ui.Context) {
 		variant = uikit.ButtonDanger
 	}
 	uikit.Modal(c.Key("mcp-key-confirm"), &dlg.Open, uikit.ModalProps{
-		Title:    title,
-		Compact:  true,
-		Width:    t.C.Mcp.DialogWidth,
-		Disabled: a.mcpBusy(),
+		Controller: &dlg.modal,
+		Title:      title,
+		Compact:    true,
+		Width:      t.C.Mcp.DialogWidth,
+		Disabled:   a.mcpBusy(),
 	}, func(parts uikit.ModalParts) {
 		uikit.Text(c, "• 立即拒绝该密钥的后续 MCP 请求。", uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneSecondary})
 		uikit.Text(c, fmt.Sprintf("• 自动取消 %d 个排队任务，并向关联的执行中任务请求取消。", a.mcpQueuedTasks(dlg.KeyID)), uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneSecondary})
@@ -966,7 +969,7 @@ func (a *app) mcpKeyConfirmModal(c *ui.Context) {
 				}
 				a.setMCPBackendKeyState(dlg.KeyID, state, func(err error) {
 					if err == nil {
-						dlg.Open = false
+						dlg.modal.Close()
 					}
 				})
 			}
@@ -981,9 +984,10 @@ func (a *app) mcpPolicyDeleteModal(c *ui.Context) {
 	t := theme.Current()
 	dlg := &a.mcp.policyDelete
 	uikit.Modal(c.Key("mcp-policy-delete"), &dlg.Open, uikit.ModalProps{
-		Title:   fmt.Sprintf("删除策略「%s」？", dlg.Name),
-		Compact: true,
-		Width:   t.C.Mcp.DialogWidth,
+		Controller: &dlg.modal,
+		Title:      fmt.Sprintf("删除策略「%s」？", dlg.Name),
+		Compact:    true,
+		Width:      t.C.Mcp.DialogWidth,
 	}, func(parts uikit.ModalParts) {
 		uikit.Text(c, "删除后，该策略将不再参与后续操作的拦截判定。此操作不可恢复，历史命中审计与规则快照保留。", uikit.TextProps{
 			Style: uikit.TextSmall, Tone: uikit.ToneSecondary,
@@ -1082,7 +1086,7 @@ func (a *app) mcpRetentionModal(c *ui.Context) {
 				parts.RequestDismiss()
 			}
 			if uikit.Button(c, "清理记录", uikit.ButtonProps{Variant: uikit.ButtonDanger}).Clicked() {
-				a.mcp.retentionOpen = false
+				parts.Close()
 				a.pruneMCPBackend()
 			}
 		})
@@ -1108,7 +1112,7 @@ func (a *app) mcpClientConfigModal(c *ui.Context) {
 		}
 		ui.Row(c).FillWidth().Justify(ui.End).Gap(t.Space.N8).Children(func() {
 			if uikit.Button(c, "完成", uikit.ButtonProps{Variant: uikit.ButtonPrimary}).Clicked() {
-				a.mcp.configModalOpen = false
+				parts.Close()
 			}
 		})
 	})

@@ -373,6 +373,7 @@ func (a *app) closeConnections() {
 	}
 	a.sshPrompts = nil
 	a.fileSSHLink = nil
+	a.fileSSHLinkAfterClose = nil
 }
 
 // A reconnect may see changed jump credentials while the leaf is unchanged.

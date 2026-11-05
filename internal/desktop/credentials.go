@@ -22,6 +22,7 @@ import (
 	"golang.org/x/crypto/ssh/agent"
 	"sshdesk/internal/sshclient"
 	"sshdesk/internal/store"
+	"sshdesk/internal/uikit"
 	"sshdesk/internal/vault"
 )
 
@@ -39,6 +40,7 @@ type credentialState struct {
 }
 
 type credentialDraft struct {
+	modal                                           uikit.ModalController
 	kind, name, keyType, comment, passphrase, keyID string
 	data                                            []byte
 	remember                                        bool
@@ -225,8 +227,8 @@ func (a *app) dismissCredentialDraft() {
 	if a.credentials.draft != nil {
 		clear(a.credentials.draft.data)
 		a.credentials.draft.passphrase = ""
+		a.credentials.draft.modal.Close()
 	}
-	a.credentials.draft = nil
 }
 
 func (a *app) choosePrivateKey() {

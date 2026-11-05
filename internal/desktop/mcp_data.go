@@ -529,7 +529,7 @@ func (a *app) saveMCPBackendKey() {
 		}
 		a.mcp.selectedKeyID = key.ID
 		if draft.EditingID != "" {
-			draft.Open = false
+			draft.modal.Close()
 		} else {
 			draft.GeneratedKey, draft.OneTimeView, draft.SavedConfirmed = secret, true, false
 		}
@@ -569,7 +569,7 @@ func (a *app) saveMCPBackendPolicy() {
 	}
 	a.mcpWork(func() error { return a.mcpBackend.service.SavePolicy(a.ctx, p) }, func(err error) {
 		if err == nil {
-			a.mcp.policyModalOpen = false
+			form.modal.Close()
 		} else {
 			form.SaveError = err.Error()
 			form.Scroll.ScrollTo(0, 0, ui.Animation{})
@@ -595,7 +595,7 @@ func (a *app) toggleMCPBackendPolicy(id string) {
 func (a *app) deleteMCPBackendPolicy(id string) {
 	a.mcpWork(func() error { return a.mcpBackend.service.DeletePolicy(a.ctx, id) }, func(err error) {
 		if err == nil {
-			a.mcp.policyDelete.Open = false
+			a.mcp.policyDelete.modal.Close()
 			a.mcp.selectedPolicyID = ""
 		}
 	})

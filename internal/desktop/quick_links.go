@@ -116,21 +116,22 @@ func (a *app) fileSSHLinkDialog(c *ui.Context) {
 						for _, id := range group.hosts {
 							h := a.hosts[id]
 							uikit.Button(c, fmt.Sprintf("%s · %s@%s:%d", h.name, h.user, h.address, h.port), uikit.ButtonProps{}).Key(id).FillWidth().OnClick(func() {
-								for _, tab := range a.tabs {
-									for _, candidate := range tab.root.sessions() {
-										if !candidate.temporary && !candidate.closing && candidate.host == id && sameSSHIdentity(candidate.endpoint, h) {
-											source.sshPeer, candidate.filePeer = candidate, source
-											a.fileSSHLink = nil
-											a.activateSSHView(candidate)
-											return
+								a.fileSSHLinkAfterClose = func() {
+									for _, tab := range a.tabs {
+										for _, candidate := range tab.root.sessions() {
+											if !candidate.temporary && !candidate.closing && candidate.host == id && sameSSHIdentity(candidate.endpoint, h) {
+												source.sshPeer, candidate.filePeer = candidate, source
+												a.activateSSHView(candidate)
+												return
+											}
 										}
 									}
+									a.openHost(id)
+									session := a.currentTab().focused
+									source.sshPeer, session.filePeer = session, source
+									a.switchSection(sectionSSH)
 								}
-								a.openHost(id)
-								session := a.currentTab().focused
-								source.sshPeer, session.filePeer = session, source
-								a.fileSSHLink = nil
-								a.switchSection(sectionSSH)
+								parts.Close()
 							})
 						}
 					}
@@ -142,6 +143,11 @@ func (a *app) fileSSHLinkDialog(c *ui.Context) {
 	})
 	if !open {
 		a.fileSSHLink = nil
+		afterClose := a.fileSSHLinkAfterClose
+		a.fileSSHLinkAfterClose = nil
+		if afterClose != nil {
+			afterClose()
+		}
 	}
 }
 

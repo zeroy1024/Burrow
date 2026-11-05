@@ -15,7 +15,7 @@ import (
 )
 
 func (a *app) sessionAdvanced(c *ui.Context, d *hostDraft) {
-	trigger := uikit.Section(c, &d.advanced, &d.advancedHeight, uikit.SectionProps{
+	trigger := uikit.Section(c, &d.advanced, uikit.SectionProps{
 		Key: "advanced", Title: "高级", Summary: d.advancedSummary(a), Chevron: chevronIcon,
 		Reduced: a.reduceMotion(c),
 	}, func() {

@@ -36,6 +36,7 @@ type protectionFieldState struct {
 }
 
 type protectionDraft struct {
+	modal                                       uikit.ModalController
 	kind, current, password, confirm, errorText string
 	verificationError                           string
 	fields                                      [protectionFieldCount]protectionFieldState
@@ -286,10 +287,11 @@ func (a *app) applicationSecurityDialog(c *ui.Context) {
 	open := true
 	submit := false
 	props := uikit.ModalProps{
-		Title:    localize(c, title),
-		Width:    t.C.Modal.GenerateWidth,
-		Disabled: a.security.changing,
-		Motion:   uikit.MotionOverride(a.reduceMotion(c)),
+		Controller: &d.modal,
+		Title:      localize(c, title),
+		Width:      t.C.Modal.GenerateWidth,
+		Disabled:   a.security.changing,
+		Motion:     uikit.MotionOverride(a.reduceMotion(c)),
 		Footer: func(parts uikit.ModalParts) {
 			uikit.ModalFooter(c).Justify(ui.End).Children(func() {
 				uikit.Button(c, localize(c, "取消"), uikit.ButtonProps{Disabled: a.security.changing}).
@@ -485,7 +487,7 @@ func (a *app) changeApplicationProtection(d *protectionDraft) {
 			return
 		}
 		d.current, d.password, d.confirm = "", "", ""
-		a.security.dialog = nil
+		d.modal.Close()
 		a.security.requirePassword = protected
 		if cleanup != nil {
 			a.credentials.notice = "解锁设置已保存，旧解锁材料清理失败：" + cleanup.cause.Error()

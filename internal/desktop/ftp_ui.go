@@ -119,8 +119,14 @@ func (a *app) filePanels(c *ui.Context, session *fileSession) {
 				x = 0
 			}
 			local := ui.Box(c).Key("local-card").Absolute().Left(x).Top(0).Bottom(0).
-				Width(localWidth).Opacity(opacity).Disabled(target == 0)
-			local.Children(func() { a.filePane(c, session, session.local, localWidth) })
+				Width(localWidth).Opacity(opacity)
+			local.Children(func() {
+				if target == 1 {
+					ui.Box(c).Key("local-content").Fill().Transition(ui.ElementTransition{
+						Duration: split.Crossfade, Exit: &ui.Motion{},
+					}).Children(func() { a.filePane(c, session, session.local, localWidth) })
+				}
+			})
 		}
 		if localVisible && !localOverlay {
 			localPane()
@@ -314,23 +320,32 @@ func (a *app) fileSearchSlot(c *ui.Context, session *fileSession, pane *filePane
 	if pane.searchOpen {
 		target = 1
 	}
-	progress := slot.AnimateTo("search-open", target, ui.Animation{
+	progress := slot.AnimateTo("search-open", target, a.positionAnimation(ui.Animation{
 		Duration: t.C.Search.Transition, Ease: uikit.Easing(t.C.Search.Easing),
-	})
-	opacity := uikit.Visual(slot, "search-opacity", target, t.C.Search.Transition)
+	}))
 	reduced := a.reduceMotion(c)
+	transition := ui.ElementTransition{Duration: t.C.Search.Transition, Enter: &ui.Motion{}, Exit: &ui.Motion{}}
 	slot.Children(func() {
 		location := ui.Box(c).Key("file-location").WidthPercent((1 - progress) * 100).Shrink(0).
-			Height(t.C.Breadcrumb.Height).MinWidth(0).ClipX().Opacity(1 - opacity).Disabled(pane.searchOpen)
+			Height(t.C.Breadcrumb.Height).MinWidth(0).ClipX().PassThrough()
 		search := ui.Box(c).Key("file-search").WidthPercent(progress * 100).Shrink(0).
-			Height(t.C.Breadcrumb.Height).MinWidth(0).ClipX().Opacity(opacity).Disabled(!pane.searchOpen)
+			Height(t.C.Breadcrumb.Height).MinWidth(0).ClipX().PassThrough()
 		if reduced {
-			// Geometry switches immediately; both layers keep their width while fading.
-			location.Absolute().Top(0).Left(0).WidthPercent(100).Hidden(opacity == 1)
-			search.Absolute().Top(0).Left(0).WidthPercent(100).Hidden(opacity == 0)
+			location.Absolute().Top(0).Left(0).WidthPercent(100)
+			search.Absolute().Top(0).Left(0).WidthPercent(100)
 		}
-		location.Children(func() { a.fileBreadcrumbs(c, session, pane) })
-		search.Children(func() { fileSearchInput(c, pane).Fill() })
+		location.Children(func() {
+			if !pane.searchOpen {
+				ui.Box(c).Key("location-content").Fill().Transition(transition).
+					Children(func() { a.fileBreadcrumbs(c, session, pane) })
+			}
+		})
+		search.Children(func() {
+			if pane.searchOpen {
+				ui.Box(c).Key("search-content").Fill().Transition(transition).
+					Children(func() { fileSearchInput(c, pane).Fill() })
+			}
+		})
 	})
 }
 

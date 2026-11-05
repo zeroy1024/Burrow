@@ -198,6 +198,7 @@ func (a *app) credentialDialogs(c *ui.Context) {
 	}
 	open := true
 	props := uikit.ModalProps{Width: p.GenerateWidth, Title: localize(c, title), Disabled: a.credentials.busy,
+		Controller: &d.modal,
 		CloseLabel: localize(c, "关闭密钥窗口"), Motion: uikit.MotionOverride(a.reduceMotion(c))}
 	props.Header = func(parts uikit.ModalParts) {
 		parts.Panel.Padding(p.HeaderPaddingTop, p.BodyPaddingX, p.FooterPaddingBottom).Gap(t.Space.N14)
@@ -264,7 +265,9 @@ func (a *app) credentialDialogs(c *ui.Context) {
 		submit()
 	}
 	if result.Dismissed && !a.credentials.busy {
-		a.dismissCredentialDraft()
+		clear(d.data)
+		d.passphrase = ""
+		a.credentials.draft = nil
 	}
 }
 

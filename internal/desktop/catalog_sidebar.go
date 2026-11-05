@@ -233,7 +233,7 @@ func (a *app) catalogHostMenu(c *ui.Context, id hostID) []uikit.MenuEntry {
 				uikit.Notify(c, "请先取消或清除该会话的传输任务")
 				return
 			}
-			a.page().draft = hostDraft{id: id, deleting: true}
+			a.page().draft = hostDraft{id: id, name: h.name, deleting: true}
 			a.page().addHostOpen = true
 		}},
 	}

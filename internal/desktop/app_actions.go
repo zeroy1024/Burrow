@@ -381,6 +381,10 @@ func (a *app) closeTabDialog(c *ui.Context) {
 		})
 	})
 	if closeRequested || result.Submit {
+		a.closeConfirmed = true
+		result.Close()
+	}
+	if result.Dismissed && a.closeConfirmed {
 		tabRequest := a.closeRequest
 		a.closeRequest, a.closeFileRequest, a.closePaneRequest = nil, nil, nil
 		if paneRequest != nil {
@@ -400,6 +404,7 @@ func (a *app) closeTabDialog(c *ui.Context) {
 	}
 	if !open {
 		a.closeRequest, a.closeFileRequest, a.closePaneRequest = nil, nil, nil
+		a.closeConfirmed = false
 	}
 }
 
