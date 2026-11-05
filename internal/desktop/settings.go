@@ -26,14 +26,14 @@ var settingsCategories = [...]settingsCategory{
 	{"appearance", "外观", "主题、强调色与动态效果", paletteIcon},
 	{"terminal", "终端", "配色、背景、字体与光标 · 修改立即生效", terminalIcon},
 	{"files", "文件传输", "目录、传输与同名文件", filesIcon},
-	{"shortcuts", "快捷键", "点击快捷键进行录制", textCursorIcon},
+	{"shortcuts", "快捷键", "点击快捷键录制 · Esc 取消 · Delete 清除", textCursorIcon},
 	{"keys", "密钥与凭据", "私钥、ssh-agent 与已保存的密码", lockIcon},
 	{"about", "关于", "Burrow 与开源许可", infoIcon},
 }
 
 type settingField struct {
-	label, description string
-	control            func()
+	label, description, help string
+	control                  func()
 }
 
 func (a *app) settingsPage(c *ui.Context) {
@@ -212,10 +212,10 @@ func (a *app) settingsText(c *ui.Context, text string, props uikit.TextProps, si
 	ui.RichText(c, spans...).Font(font.Family).FontSize(font.Size).FontWeight(font.Weight)
 }
 
-func (a *app) settingsGroup(c *ui.Context, title, footnote string, fields []settingField) {
+func (a *app) settingsGroup(c *ui.Context, title, help string, fields []settingField) {
 	visible := make([]settingField, 0, len(fields))
 	for _, field := range fields {
-		if a.settingMatches(field.label, field.description) {
+		if a.settingMatches(field.label, field.description) || a.settingMatches(field.label, field.help) {
 			visible = append(visible, field)
 		}
 	}
@@ -224,13 +224,15 @@ func (a *app) settingsGroup(c *ui.Context, title, footnote string, fields []sett
 	}
 	t := theme.Current()
 	p := t.C.Settings
-	uikit.SettingsGroup(c, uikit.SettingsGroupProps{Key: title, Title: localize(c, title), Footnote: localize(c, footnote)}, func() {
+	uikit.SettingsGroup(c, uikit.SettingsGroupProps{Key: title, Title: localize(c, title), Help: localize(c, help)}, func() {
 		for index, field := range visible {
 			uikit.SettingsRow(c, uikit.SettingsRowProps{
-				Key: field.label, Gap: t.Space.N16, Title: localize(c, field.label), Detail: localize(c, field.description),
+				Key: field.label, Gap: p.RowGap, Title: localize(c, field.label), Detail: localize(c, field.description),
 				Divider: index > 0,
 				Text: func() {
-					a.settingsText(c, field.label, uikit.TextProps{}, p.RowLabelSize)
+					uikit.SettingsLabel(c, localize(c, field.help), func() {
+						a.settingsText(c, field.label, uikit.TextProps{}, p.RowLabelSize)
+					})
 					if field.description != "" {
 						a.settingsText(c, field.description, uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneSecondary}, p.RowDescSize)
 					}
@@ -267,7 +269,7 @@ func (a *app) preferenceSwitch(c *ui.Context, label string, value *bool) {
 }
 
 func (a *app) generalSettings(c *ui.Context) {
-	a.settingsGroup(c, "语言", "", []settingField{{"语言", "更改后立即生效", func() {
+	a.settingsGroup(c, "语言", "", []settingField{{"语言", "", "更改后立即生效", func() {
 		options := []string{localize(c, "跟随系统"), i18n.Autonym("zh-Hans"), i18n.Autonym("en")}
 		tags := []string{"", "zh-Hans", "en"}
 		index := slices.Index(tags, a.prefs.Locale)
@@ -282,12 +284,12 @@ func (a *app) generalSettings(c *ui.Context) {
 		}
 	}}})
 	a.settingsGroup(c, "启动与选项卡", "", []settingField{
-		{"启动时恢复会话", "重新打开上次退出时的选项卡（不会自动输入密码）", func() { a.preferenceSwitch(c, "启动时恢复会话", &a.prefs.RestoreSessions) }},
-		{"关闭最后一个选项卡时", "", func() {
+		{"启动时恢复会话", "", "重新打开上次退出时的选项卡（不会自动输入密码）", func() { a.preferenceSwitch(c, "启动时恢复会话", &a.prefs.RestoreSessions) }},
+		{"关闭最后一个选项卡时", "", "", func() {
 			values := []string{"keep", "closeWindow", "quit"}
 			settingsSegment(c, "last-tab-close", "关闭最后一个选项卡时", []string{"保留窗口", "关闭窗口", "退出应用"}, slices.Index(values, a.prefs.LastTabClose), func(index int) { a.prefs.LastTabClose = values[index]; a.preferencesChanged() })
 		}},
-		{"关闭活动连接前确认", "", func() {
+		{"关闭活动连接前确认", "", "", func() {
 			a.preferenceSwitch(c, "关闭活动连接前确认", &a.prefs.ConfirmCloseActive)
 		}},
 	})
@@ -295,7 +297,7 @@ func (a *app) generalSettings(c *ui.Context) {
 
 func (a *app) appearanceSettings(c *ui.Context) {
 	t := theme.Current()
-	a.settingsGroup(c, "应用主题", "", []settingField{{"应用主题", "", func() {
+	a.settingsGroup(c, "应用主题", "", []settingField{{"应用主题", "", "", func() {
 		ui.Row(c).Gap(t.Space.N12).Width(t.C.Settings.ContentMax * 2 / 3).Children(func() {
 			choice := a.appearance
 			for index, label := range []string{"浅色", "深色", "跟随系统"} {
@@ -307,7 +309,7 @@ func (a *app) appearanceSettings(c *ui.Context) {
 			}
 		})
 	}}})
-	a.settingsGroup(c, "强调色", "", []settingField{{"强调色", a.accentName(), func() {
+	a.settingsGroup(c, "强调色", "", []settingField{{"强调色", a.accentName(), "", func() {
 		p := t.C.AccentSwatch
 		ui.Row(c).Gap(p.Gap).AlignItems(ui.Center).Children(func() {
 			colors := []color.NRGBA{t.Color.AccentChoices.Blue, t.Color.AccentChoices.Purple, t.Color.AccentChoices.Pink, t.Color.AccentChoices.Red, t.Color.AccentChoices.Orange, t.Color.AccentChoices.Yellow, t.Color.AccentChoices.Green, t.Color.AccentChoices.Graphite}
@@ -327,7 +329,7 @@ func (a *app) appearanceSettings(c *ui.Context) {
 					OnClick(func() { a.prefs.Accent = value; a.syncAppearance(); a.preferencesChanged() })
 			}
 		})
-	}}, {"预览", "", func() {
+	}}, {"预览", "", "", func() {
 		ui.Row(c).Gap(t.Space.N12).AlignItems(ui.Center).Children(func() {
 			uikit.Button(c, localize(c, "主按钮"), uikit.ButtonProps{Variant: uikit.ButtonPrimary})
 			settingsSegment(c, "accent-preview", "预览", []string{"项目一", "项目二"}, 0, func(int) {})
@@ -339,11 +341,11 @@ func (a *app) appearanceSettings(c *ui.Context) {
 		})
 	}}})
 	a.settingsGroup(c, "辅助功能", "关闭应用内动态效果时，系统减少动态效果仍对 MyGo 内建控件生效。", []settingField{
-		{"减少动态效果", "减少位移与缩放，保留透明度和颜色过渡", func() {
+		{"减少动态效果", "", "减少位移与缩放，保留透明度和颜色过渡", func() {
 			values := []string{"system", "on", "off"}
 			settingsSegment(c, "reduce-motion", "减少动态效果", []string{"跟随系统", "始终开启", "关闭"}, slices.Index(values, a.prefs.ReduceMotion), func(index int) { a.prefs.ReduceMotion = values[index]; a.preferencesChanged() })
 		}},
-		{"窗口半透明", "macOS 全局毛玻璃及栏内模糊；系统「降低透明度」开启时自动关闭", func() {
+		{"窗口半透明", "", "macOS 全局毛玻璃及栏内模糊；系统「降低透明度」开启时自动关闭", func() {
 			value := a.prefs.Translucency
 			locked := a.reduceTransparency
 			if locked {
@@ -431,14 +433,17 @@ func (a *app) terminalColorSettings(c *ui.Context) {
 	if a.settingMatches("配色方案", "方案 跟随应用明暗 固定一种 配色 浅色外观时 深色外观时") {
 		ui.Column(c).FillWidth().Gap(t.C.Settings.GroupTitleGap).Children(func() {
 			ui.Row(c).FillWidth().AlignItems(ui.Center).Children(func() {
-				uikit.Text(c, localize(c, "配色方案"), uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneSecondary}).FontWeight(t.C.Settings.GroupTitleWeight).Grow(1)
+				uikit.SettingsLabel(c, localize(c, "点击卡片：按配色自身明暗放进浅色或深色槽位。导入支持 Ghostty 主题格式。"), func() {
+					uikit.Text(c, localize(c, "配色方案"), uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneSecondary}).FontWeight(t.C.Settings.GroupTitleWeight)
+				}).Grow(1)
 				uikit.Button(c, localize(c, "导入配色…"), uikit.ButtonProps{Size: uikit.SizeSm, Disabled: a.terminal.importing}).OnClick(a.chooseTerminalTheme)
 			})
 			uikit.SettingsGroupBody(c).Children(func() {
 				uikit.SettingsRow(c, uikit.SettingsRowProps{Gap: t.Space.N12}).MinHeight(0).Children(func() {
 					ui.Column(c).Grow(1).Gap(t.Space.N4).Children(func() {
-						uikit.Text(c, localize(c, "方案"), uikit.TextProps{}).FontSize(t.C.Settings.RowLabelSize)
-						uikit.Text(c, localize(c, "跟随：按应用当前明暗，在下方两种配色间自动切换"), uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneTertiary})
+						uikit.SettingsLabel(c, localize(c, "跟随：按应用当前明暗，在下方两种配色间自动切换"), func() {
+							uikit.Text(c, localize(c, "方案"), uikit.TextProps{}).FontSize(t.C.Settings.RowLabelSize)
+						})
 					})
 					index := 0
 					if a.terminal.mode.Kind == termtheme.FixedScheme {
@@ -466,10 +471,9 @@ func (a *app) terminalColorSettings(c *ui.Context) {
 					}
 				}
 			})
-			uikit.Text(c, localize(c, "点击卡片：按配色自身明暗放进浅色或深色槽位。导入支持 Ghostty 主题格式。"), uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneTertiary})
 		})
 	}
-	a.settingsGroup(c, "背景", "", []settingField{{"终端背景", "配色自带：任何外观都用配色的背景色。与卡片一致：用卡片底色", func() {
+	a.settingsGroup(c, "背景", "", []settingField{{"终端背景", "", "配色自带：任何外观都用配色的背景色。与卡片一致：用卡片底色", func() {
 		settingsSegment(c, "terminal-bg", "终端背景", []string{"配色自带（默认）", "与卡片一致"}, int(a.terminal.prefs.Background), func(index int) {
 			a.changeTerminalSettings(func() { a.terminal.prefs.Background = termtheme.BackgroundSource(index) })
 		})
@@ -577,13 +581,13 @@ func (a *app) terminalTextSettings(c *ui.Context) {
 		}
 	}
 	a.settingsGroup(c, "字体", "", []settingField{
-		{"字体", "", func() {
+		{"字体", "", "", func() {
 			selected := a.terminal.prefs.FontFamily[0]
 			if uikit.Select(c, &selected, uikit.StringOptions(a.settingsUI.fonts), uikit.SelectProps{Label: localize(c, "字体")}).Width(t.C.Settings.SelectWidth).Label(localize(c, "字体")).Changed() {
 				a.changeTerminalSettings(func() { a.terminal.prefs.FontFamily = []string{selected, "monospace"} })
 			}
 		}},
-		{"字号", "", func() {
+		{"字号", "", "", func() {
 			value := float64(a.terminal.prefs.FontSize)
 			if settingsNumberInput(c, "字号", &value, 9, 24, 0.5, t.C.Settings.NumberWidth, false) {
 				a.changeTerminalSettings(func() {
@@ -599,7 +603,7 @@ func (a *app) terminalTextSettings(c *ui.Context) {
 			}
 			uikit.Text(c, localize(c, "px"), uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneTertiary})
 		}},
-		{"行高", "", func() {
+		{"行高", "", "", func() {
 			value := float64(a.terminal.prefs.LineHeight)
 			if settingsNumberInput(c, "行高", &value, math.Ceil(float64(a.terminal.prefs.FontSize)*1.2), 40, 1, t.C.Settings.NumberWidth, false) {
 				a.changeTerminalSettings(func() { a.terminal.prefs.LineHeight = float32(value); a.prefs.LineHeightEdited = true })
@@ -608,19 +612,19 @@ func (a *app) terminalTextSettings(c *ui.Context) {
 		}},
 	})
 	a.settingsGroup(c, "光标", "", []settingField{
-		{"样式", "", func() {
+		{"样式", "", "", func() {
 			settingsSegment(c, "cursor-shape", "光标样式", []string{"▉ 块", "▏竖线", "▁ 下划线"}, int(a.terminal.prefs.CursorShape), func(index int) {
 				a.changeTerminalSettings(func() { a.terminal.prefs.CursorShape = termtheme.CursorShape(index) })
 			})
 		}},
-		{"闪烁", "", func() {
+		{"闪烁", "", "", func() {
 			value := a.terminal.prefs.CursorBlink
 			if uikit.Switch(c, &value, uikit.ToggleProps{Label: localize(c, "光标闪烁"), Motion: uikit.MotionOverride(a.reduceMotion(c))}).Changed() {
 				a.changeTerminalSettings(func() { a.terminal.prefs.CursorBlink = value })
 			}
 		}},
 	})
-	a.settingsGroup(c, "回滚", "超过后丢弃最早的输出。", []settingField{{"回滚行数", "行 · 每个会话", func() {
+	a.settingsGroup(c, "回滚", "", []settingField{{"回滚行数", "", "每个会话保留的输出行数，超过后丢弃最早的输出。", func() {
 		value := float64(a.prefs.ScrollbackLines)
 		if settingsNumberInput(c, "回滚行数", &value, 1000, 200000, 1000, t.C.Settings.ScrollbackWidth, true) {
 			a.prefs.ScrollbackLines = int(value)
@@ -640,21 +644,21 @@ func (a *app) terminalNumberSetting(c *ui.Context, label string, destination *fl
 
 func (a *app) fileSettings(c *ui.Context) {
 	t := theme.Current()
-	a.settingsGroup(c, "目录", "", []settingField{{"默认本地目录", "展开本地面板时打开的目录", func() {
+	a.settingsGroup(c, "目录", "", []settingField{{"默认本地目录", "", "展开本地面板时打开的目录", func() {
 		if uikit.Input(c, &a.prefs.DefaultLocalDir, uikit.InputProps{Mono: true, Label: localize(c, "默认本地目录")}).Width(t.C.Settings.SelectWidth).Changed() {
 			a.preferencesChanged()
 		}
 		uikit.IconButton(c, filesIcon, uikit.IconButtonProps{Key: "default-local-folder", Label: "选择本地目录"}).OnClick(a.chooseDefaultLocalDirectory)
 	}}})
 	a.settingsGroup(c, "传输", "", []settingField{
-		{"同时传输数", "", func() {
+		{"同时传输数", "", "", func() {
 			value := float64(a.prefs.TransferParallel)
 			if settingsNumberInput(c, "同时传输数", &value, 1, 8, 1, t.C.Settings.NumberWidth, false) {
 				a.prefs.TransferParallel = int(value)
 				a.preferencesChanged()
 			}
 		}},
-		{"同名冲突", "", func() {
+		{"同名冲突", "", "", func() {
 			values := []string{"ask", "overwrite", "skip", "rename"}
 			settingsSegment(c, "conflict-policy", "同名冲突", []string{"询问", "覆盖", "跳过", "重命名"}, slices.Index(values, a.prefs.ConflictPolicy), func(index int) { a.prefs.ConflictPolicy = values[index]; a.preferencesChanged() })
 		}},

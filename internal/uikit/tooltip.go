@@ -35,3 +35,23 @@ func Tip(c *ui.Context, anchor ui.Element, label string, shortcuts ...string) ui
 	})
 	return anchor
 }
+
+// HelpTip is the question mark after a settings label. Its hint shows only
+// while the pointer is over it: it takes neither clicks nor the focus, and
+// assistive technology reads the hint as its description.
+func HelpTip(c *ui.Context, hint string) ui.Element {
+	t := theme.Current()
+	p := t.C.HelpTip
+	icon := ui.Icon(c, IconSVG(IconHelp)).Size(p.Size, p.Size).Shrink(0).Description(hint)
+	ink := p.Icon
+	if icon.Hovered() {
+		ink = p.IconHover
+	}
+	icon.TextColor(Color(ink))
+	ui.TooltipBase(c, icon, func(tip ui.Element) {
+		StyleTooltip(tip).AttachTo(icon, ui.AnchorTop, ui.AnchorBottom).Margin(0, 0, t.C.Tooltip.Offset, 0).Children(func() {
+			ui.Text(c, hint).PassThrough()
+		})
+	})
+	return icon
+}

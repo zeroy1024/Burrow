@@ -250,7 +250,7 @@ func (a *app) startupView(c *ui.Context) {
 func (a *app) applicationSecuritySettings(c *ui.Context) {
 	on := a.security.requirePassword
 	fields := []settingField{
-		{"打开应用时需要解锁", "开启后，每次启动 Burrow 都需要输入解锁密码。", func() {
+		{"打开应用时需要解锁", "", "开启后，每次启动 Burrow 都需要输入解锁密码。", func() {
 			selected := on
 			if uikit.Switch(c, &selected, uikit.ToggleProps{Label: localize(c, "打开应用时需要解锁"), Disabled: a.credentials.busy || a.catalogSaving || a.security.changing}).Changed() {
 				kind := "enable"
@@ -262,7 +262,7 @@ func (a *app) applicationSecuritySettings(c *ui.Context) {
 		}},
 	}
 	if on {
-		fields = append(fields, settingField{"修改密码", "", func() {
+		fields = append(fields, settingField{"修改密码", "", "", func() {
 			uikit.Button(c, localize(c, "修改密码…"), uikit.ButtonProps{Disabled: a.credentials.busy || a.catalogSaving}).OnClick(func() { a.security.dialog = &protectionDraft{kind: "change"} })
 		}})
 	}

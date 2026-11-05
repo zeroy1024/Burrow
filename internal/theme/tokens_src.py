@@ -782,7 +782,7 @@ COMP['settings']={
  'groupGap':'space.22','groupBg':'color.surface.zebra','groupRadius':'radius.card','groupBorder':'color.border.raised','groupBorderWidth':'size.hairline',
  'rowMinHeight':'size.settingsRowHeight','rowPaddingY':'space.9','rowPaddingX':'space.14','rowDivider':'color.border.subtle','rowDividerInset':'space.14',
  'rowLabelSize':'font.size.bodyLg','rowLabel':'color.text.primary','rowDescSize':'font.size.footnote','rowDesc':'color.text.secondary',
- 'groupFootnoteSize':'font.size.footnote','groupFootnote':'color.text.tertiary','fadeHeight':'size.settingsFadeHeight',
+ 'fadeHeight':'size.settingsFadeHeight',
  'enterY':'space.8','exitY':'space.4','enter':'motion.spring.smooth','fade':'motion.duration.focus','exit':'motion.duration.exit',
  'switchY':'space.4','switchFadeOut':'motion.duration.settingsSwitchOut','switchFadeIn':'motion.duration.exit',
 }
@@ -809,8 +809,13 @@ PALETTE['lineHeight']['18']=D(18)
 SEM['font']['lineHeight']['input']=D(P('lineHeight.18'),'统一空输入与中文占位文字行高，避免字体回退造成基线偏移')
 COMP['input']['lineHeight']='font.lineHeight.input'
 COMP['search']['lineHeight']='font.lineHeight.input'
-SEM['size'].update({'settingsSelect':D(220),'settingsNumber':D(64),'settingsScrollback':D(96)})
-COMP['settings'].update({'selectWidth':'size.settingsSelect','numberWidth':'size.settingsNumber','scrollbackWidth':'size.settingsScrollback'})
+SEM['size'].update({'settingsSelect':D(220),'settingsNumber':D(64),'settingsScrollback':D(96),'settingsShortcut':D(176)})
+COMP['settings'].update({'selectWidth':'size.settingsSelect','numberWidth':'size.settingsNumber','scrollbackWidth':'size.settingsScrollback','rowGap':'space.16'})
+# Shortcut recorder: a fixed width lines the rows up; controlGap spaces the
+# controls beside it (reset, conflict Replace).
+COMP['shortcutField']={'width':'size.settingsShortcut','keyGap':'space.4','keyText':'color.text.secondary','prompt':'color.text.accent','controlGap':'space.8'}
+# Hover-only question mark after a settings label; gap is from the label.
+COMP['helpTip']={'size':'size.iconSm','gap':'space.4','icon':'color.text.tertiary','iconHover':'color.text.secondary'}
 
 # Shared key hints. Flat hints retain the existing search-field text geometry.
 SEM['size']['keycap']=D(P('size.18'))

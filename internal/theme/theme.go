@@ -916,6 +916,7 @@ type Sizes struct {
 	SettingsSelect          float32
 	SettingsNumber          float32
 	SettingsScrollback      float32
+	SettingsShortcut        float32
 	Keycap                  float32
 	ButtonLarge             float32
 	BadgeSmall              float32
@@ -2294,8 +2295,6 @@ type SettingsTokens struct {
 	RowLabel            color.NRGBA   // ← color.text.primary
 	RowDescSize         float32       // ← font.size.footnote
 	RowDesc             color.NRGBA   // ← color.text.secondary
-	GroupFootnoteSize   float32       // ← font.size.footnote
-	GroupFootnote       color.NRGBA   // ← color.text.tertiary
 	FadeHeight          float32       // ← size.settingsFadeHeight
 	EnterY              float32       // ← space.8
 	ExitY               float32       // ← space.4
@@ -2308,6 +2307,7 @@ type SettingsTokens struct {
 	SelectWidth         float32       // ← size.settingsSelect
 	NumberWidth         float32       // ← size.settingsNumber
 	ScrollbackWidth     float32       // ← size.settingsScrollback
+	RowGap              float32       // ← space.16
 }
 
 // SchemeCardTokens groups tokens.
@@ -2354,6 +2354,23 @@ type AccentSwatchTokens struct {
 	RingGap   float32     // ← size.accentRingGap
 	RingWidth float32     // ← size.accentRing
 	RingInset color.NRGBA // ← color.surface.card
+}
+
+// ShortcutFieldTokens groups tokens.
+type ShortcutFieldTokens struct {
+	Width      float32     // ← size.settingsShortcut
+	KeyGap     float32     // ← space.4
+	KeyText    color.NRGBA // ← color.text.secondary
+	Prompt     color.NRGBA // ← color.text.accent
+	ControlGap float32     // ← space.8
+}
+
+// HelpTipTokens groups tokens.
+type HelpTipTokens struct {
+	Size      float32     // ← size.iconSm
+	Gap       float32     // ← space.4
+	Icon      color.NRGBA // ← color.text.tertiary
+	IconHover color.NRGBA // ← color.text.secondary
 }
 
 // KbdTokens groups tokens.
@@ -2588,6 +2605,8 @@ type Components struct {
 	SchemeCard          SchemeCardTokens
 	ThemeCard           ThemeCardTokens
 	AccentSwatch        AccentSwatchTokens
+	ShortcutField       ShortcutFieldTokens
+	HelpTip             HelpTipTokens
 	Kbd                 KbdTokens
 	Divider             DividerTokens
 	Spinner             SpinnerTokens
@@ -3316,6 +3335,7 @@ func lightSemantic() Semantic {
 			SettingsSelect:          220,
 			SettingsNumber:          64,
 			SettingsScrollback:      96,
+			SettingsShortcut:        176,
 			Keycap:                  Palette.Size.N18,
 			ButtonLarge:             Palette.Size.N32,
 			BadgeSmall:              Palette.Size.N18,
@@ -4647,8 +4667,6 @@ func buildComponents(s *Semantic) Components {
 			RowLabel:            s.Color.Text.Primary,
 			RowDescSize:         s.Font.Size.Footnote,
 			RowDesc:             s.Color.Text.Secondary,
-			GroupFootnoteSize:   s.Font.Size.Footnote,
-			GroupFootnote:       s.Color.Text.Tertiary,
 			FadeHeight:          s.Size.SettingsFadeHeight,
 			EnterY:              s.Space.N8,
 			ExitY:               s.Space.N4,
@@ -4661,6 +4679,7 @@ func buildComponents(s *Semantic) Components {
 			SelectWidth:         s.Size.SettingsSelect,
 			NumberWidth:         s.Size.SettingsNumber,
 			ScrollbackWidth:     s.Size.SettingsScrollback,
+			RowGap:              s.Space.N16,
 		},
 		SchemeCard: SchemeCardTokens{
 			Radius:            s.Radius.Lift,
@@ -4701,6 +4720,19 @@ func buildComponents(s *Semantic) Components {
 			RingGap:   s.Size.AccentRingGap,
 			RingWidth: s.Size.AccentRing,
 			RingInset: s.Color.Surface.Card,
+		},
+		ShortcutField: ShortcutFieldTokens{
+			Width:      s.Size.SettingsShortcut,
+			KeyGap:     s.Space.N4,
+			KeyText:    s.Color.Text.Secondary,
+			Prompt:     s.Color.Text.Accent,
+			ControlGap: s.Space.N8,
+		},
+		HelpTip: HelpTipTokens{
+			Size:      s.Size.IconSm,
+			Gap:       s.Space.N4,
+			Icon:      s.Color.Text.Tertiary,
+			IconHover: s.Color.Text.Secondary,
 		},
 		Kbd: KbdTokens{
 			Height:     s.Size.Keycap,

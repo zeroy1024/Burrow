@@ -38,6 +38,18 @@ func ShortcutDisplay(binding string) string {
 	return strings.ReplaceAll(binding, "Cmd+", "Ctrl+")
 }
 
+// ShortcutKeys splits a binding into one ShortcutDisplay label per key, for
+// a keycap each.
+func ShortcutKeys(binding string) []string {
+	keys := strings.Split(binding, "+")
+	last := len(keys) - 1
+	for index, key := range keys[:last] {
+		keys[index] = strings.TrimSuffix(ShortcutDisplay(key+"+"), "+")
+	}
+	keys[last] = ShortcutDisplay(keys[last])
+	return keys
+}
+
 // Kbd is decorative. Flat hints add no padding or height to the original text.
 func Kbd(c *ui.Context, keys string, props KbdProps) ui.Element {
 	t := theme.Current()

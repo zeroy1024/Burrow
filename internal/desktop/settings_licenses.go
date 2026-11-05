@@ -97,7 +97,7 @@ func (a *app) aboutSettings(c *ui.Context) {
 	}
 	fields := make([]settingField, 0, len(dependencyNotices))
 	for index, notice := range dependencyNotices {
-		fields = append(fields, settingField{notice.name, notice.license, func() {
+		fields = append(fields, settingField{notice.name, notice.license, "", func() {
 			anchor := uikit.Button(c, localize(c, "查看"), uikit.ButtonProps{}).OnClick(func() { a.settingsUI.license = index + 1 })
 			open := a.settingsUI.license == index+1
 			var viewer ui.Element
