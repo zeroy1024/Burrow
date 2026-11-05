@@ -44,85 +44,127 @@ func (a *app) shortcutBinding(id string) string {
 }
 
 func (a *app) shortcutSettings(c *ui.Context) {
-	t := theme.Current()
-	uikit.SettingsGroupTitle(c, localize(c, "快捷键"), func() {
-		uikit.Button(c, localize(c, "全部恢复默认"), uikit.ButtonProps{}).OnClick(func() {
+	var groups []string
+	actions := map[string][]shortcutAction{}
+	for _, action := range defaultShortcutActions {
+		if !a.settingMatches(action.label, action.group+"快捷键") {
+			continue
+		}
+		if _, ok := actions[action.group]; !ok {
+			groups = append(groups, action.group)
+		}
+		actions[action.group] = append(actions[action.group], action)
+	}
+	if len(groups) == 0 {
+		return
+	}
+	ui.Row(c).Key("shortcut-toolbar").FillWidth().Justify(ui.End).Children(func() {
+		uikit.Button(c, localize(c, "全部恢复默认"), uikit.ButtonProps{Size: uikit.SizeSm, Disabled: len(a.prefs.Keymap) == 0}).OnClick(func() {
 			a.prefs.Keymap = map[string]string{}
 			a.settingsUI.recording, a.settingsUI.pendingBinding, a.settingsUI.conflictAction = "", "", ""
 			a.preferencesChanged()
 		})
 	})
-	uikit.FieldMessage(c,
-		localize(c, "SSH 多分屏时优先切换分屏；单窗格及文件传输页切换选项卡。Ctrl+Tab / Ctrl+Shift+Tab 始终切换选项卡。"),
-		uikit.FieldMessageProps{},
-	)
-	actions := make([]shortcutAction, 0, len(defaultShortcutActions))
-	for _, action := range defaultShortcutActions {
-		if a.settingMatches(action.label, action.group+"快捷键") {
-			actions = append(actions, action)
+	for _, group := range groups {
+		help := ""
+		if group == "会话" {
+			help = "SSH 多分屏时优先切换分屏；单窗格及文件传输页切换选项卡。Ctrl+Tab / Ctrl+Shift+Tab 始终切换选项卡。"
 		}
+		uikit.SettingsGroup(c, uikit.SettingsGroupProps{Key: group, Title: localize(c, group), Help: localize(c, help)}, func() {
+			for index, action := range actions[group] {
+				a.shortcutRow(c, action, index > 0)
+			}
+		})
 	}
-	actionKey := func(row int) any { return actions[row].id }
-	uikit.ShortcutTable(c, &a.settingsUI.shortcutTable, localize(c, "快捷键"), localize(c, "操作"), localize(c, "快捷键"), len(actions), actionKey, func(row, col int) {
-		action := actions[row]
-		switch col {
-		case 0:
-			uikit.Text(c, localize(c, action.label), uikit.TextProps{})
-		case 1:
-			binding := a.shortcutBinding(action.id)
-			label := shortcutDisplay(binding)
-			if binding == "" {
-				label = "未设置"
-			}
-			recording := a.settingsUI.recording == action.id
-			if recording {
-				label = "按下新的快捷键…"
-			}
-			buttonLabel := localize(c, label)
-			props := uikit.ButtonProps{}
-			if binding != "" && !recording {
-				props.Kbd = label
-				buttonLabel = ""
-			}
-			item := uikit.Button(c.Key(action.id), buttonLabel, props).Font(strings.Join(t.Font.Family.Mono, ", ")).Label(localize(c, action.label) + " " + localize(c, "快捷键")).
-				OnClick(func() {
-					a.settingsUI.recording = action.id
-					a.settingsUI.pendingBinding = ""
-					a.settingsUI.conflictAction = ""
+}
+
+func (a *app) shortcutRow(c *ui.Context, action shortcutAction, divider bool) {
+	t := theme.Current()
+	p := t.C.Settings
+	row := ui.Column(c).Key(action.id).FillWidth()
+	// Recording ends once the focus leaves the row: a click elsewhere moves it
+	// or clears it. The row holds the conflict's Replace button too.
+	if a.settingsUI.recording == action.id && !row.FocusWithin() {
+		a.settingsUI.recording, a.settingsUI.pendingBinding, a.settingsUI.conflictAction = "", "", ""
+	}
+	recording := a.settingsUI.recording == action.id
+	conflict := ""
+	if recording && a.settingsUI.conflictAction != "" {
+		index := slices.IndexFunc(defaultShortcutActions, func(v shortcutAction) bool { return v.id == a.settingsUI.conflictAction })
+		conflict = fmt.Sprintf(localize(c, "与「%s」冲突"), localize(c, defaultShortcutActions[index].label))
+	}
+	binding := a.shortcutBinding(action.id)
+	row.Children(func() {
+		uikit.SettingsRow(c, uikit.SettingsRowProps{
+			Gap: p.RowGap, Divider: divider,
+			Text: func() {
+				a.settingsText(c, action.label, uikit.TextProps{}, p.RowLabelSize)
+				if conflict == "" {
+					return
+				}
+				ui.Row(c).Gap(t.C.ShortcutField.ControlGap).AlignItems(ui.Center).Children(func() {
+					uikit.Text(c, conflict, uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneDanger}).MinWidth(0)
+					uikit.Button(c, localize(c, "替换"), uikit.ButtonProps{Size: uikit.SizeSm}).OnClick(func() {
+						a.prefs.Keymap[a.settingsUI.conflictAction] = ""
+						a.storeShortcut(action.id, a.settingsUI.pendingBinding)
+					})
 				})
-			if recording {
-				uikit.Shadow(item, t.Shadow.InputFocus)
-				item.Focus().HandleInput(func(ev ui.InputEvent) bool {
-					if ev.Kind != ui.InputKeyDown {
-						return false
+			},
+			Control: func() {
+				ui.Row(c).Shrink(0).Gap(t.C.ShortcutField.ControlGap).AlignItems(ui.Center).Children(func() {
+					a.shortcutField(c, action, binding, recording, conflict)
+					size := t.C.IconButton.SizeSm
+					if binding == action.binding {
+						ui.Box(c).Size(size, size)
+						return
 					}
-					if ev.Key == ui.KeyEscape {
-						a.settingsUI.recording, a.settingsUI.pendingBinding, a.settingsUI.conflictAction = "", "", ""
-						return true
-					}
-					if ev.Key == ui.KeyBackspace || ev.Key == ui.KeyDelete {
-						a.storeShortcut(action.id, "")
-						return true
-					}
-					binding, ok := keyToBinding(ev.Mods, ev.Key)
-					if !ok {
-						return true
-					}
-					a.storeShortcut(action.id, binding)
-					return true
+					uikit.IconButton(c, uikit.IconRetry, uikit.IconButtonProps{Key: "reset", Label: localize(c, "恢复默认"), Size: uikit.SizeSm}).
+						Label(localize(c, "恢复默认：") + localize(c, action.label)).OnClick(func() { a.storeShortcut(action.id, action.binding) })
 				})
-			}
-			if recording && a.settingsUI.conflictAction != "" {
-				index := slices.IndexFunc(defaultShortcutActions, func(v shortcutAction) bool { return v.id == a.settingsUI.conflictAction })
-				uikit.Text(c, localize(c, fmt.Sprintf(localize(c, "与「%s」冲突"), localize(c, defaultShortcutActions[index].label))), uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneDanger})
-				uikit.Button(c, localize(c, "替换"), uikit.ButtonProps{}).OnClick(func() {
-					a.prefs.Keymap[a.settingsUI.conflictAction] = ""
-					a.storeShortcut(action.id, a.settingsUI.pendingBinding)
-				})
-			}
-		case 2:
-			uikit.Button(c, localize(c, "恢复默认"), uikit.ButtonProps{}).Label(localize(c, "恢复默认：") + localize(c, action.label)).OnClick(func() { a.storeShortcut(action.id, action.binding) })
+			},
+		})
+	})
+}
+
+func (a *app) shortcutField(c *ui.Context, action shortcutAction, binding string, recording bool, conflict string) {
+	props := uikit.ShortcutFieldProps{Label: localize(c, action.label) + " " + localize(c, "快捷键"), Recording: recording, Error: conflict}
+	switch {
+	case conflict != "":
+		props.Keys = uikit.ShortcutKeys(a.settingsUI.pendingBinding)
+	case recording:
+		props.Text = localize(c, "按下新的快捷键…")
+	case binding == "":
+		props.Text = localize(c, "未设置")
+	default:
+		props.Keys = uikit.ShortcutKeys(binding)
+	}
+	field := uikit.ShortcutField(c.Key("binding"), props)
+	if field.Clicked() {
+		a.settingsUI.recording, a.settingsUI.pendingBinding, a.settingsUI.conflictAction = action.id, "", ""
+		// Take the focus once; the row checks it in later frames.
+		field.Focus()
+	}
+	if !recording {
+		return
+	}
+	field.HandleInput(func(ev ui.InputEvent) bool {
+		if ev.Kind != ui.InputKeyDown {
+			return false
 		}
+		if ev.Key == ui.KeyEscape {
+			a.settingsUI.recording, a.settingsUI.pendingBinding, a.settingsUI.conflictAction = "", "", ""
+			return true
+		}
+		if ev.Key == ui.KeyBackspace || ev.Key == ui.KeyDelete {
+			a.storeShortcut(action.id, "")
+			return true
+		}
+		binding, ok := keyToBinding(ev.Mods, ev.Key)
+		if !ok {
+			return true
+		}
+		a.storeShortcut(action.id, binding)
+		return true
 	})
 }
 
