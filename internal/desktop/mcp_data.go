@@ -687,7 +687,7 @@ func mcpAuditView(op store.MCPOperation, files []store.MCPFileEvent, task store.
 		view.ActionType = "管理操作"
 	}
 	if view.IsCommand {
-		view.Summary = request.Command
+		view.Summary = strings.Join(strings.Fields(request.Command), " ")
 	} else if strings.HasPrefix(op.Action, "mcp.") {
 		view.Summary = strings.TrimPrefix(op.Action, "mcp.")
 	}
