@@ -39,7 +39,7 @@ func EmptyMessage(c *ui.Context, text string, kind EmptyMessageKind) ui.Element 
 	e := ui.Text(c, text)
 	switch kind {
 	case EmptyFolder:
-		return e.FillWidth().Padding(t.Space.N24).TextColor(Color(t.Color.Text.Secondary))
+		return e.FillWidth().Padding(t.Space.N24).TextAlign(ui.Center).TextColor(Color(t.Color.Text.Secondary))
 	case EmptyCatalogSearch:
 		return e.FontSize(t.Font.Size.Small).TextColor(Color(t.Color.Text.Secondary)).Padding(t.Space.N12)
 	}

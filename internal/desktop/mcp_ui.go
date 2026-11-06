@@ -510,10 +510,19 @@ func (a *app) mcpKeysTab(c *ui.Context) {
 	pageItems := ordered[min(offset, count):min(offset+20, count)]
 	columns := mcpKeyColumns(t)
 	ui.Column(c).Grow(1).MinHeight(0).FillWidth().Children(func() {
-		uikit.TableViewport(c, &a.mcp.keysScroll, uikit.TableViewportProps{
+		props := uikit.TableViewportProps{
 			Label: "授权密钥列表", MinWidth: t.C.Mcp.TableMinWidth, PaddingY: t.Space.N8,
 			Header: func() { uikit.TableHeaderRow(c, columns) },
-		}, func() {
+		}
+		if count == 0 {
+			props.Empty = func() {
+				uikit.EmptyState(c, uikit.EmptyProps{
+					IconName: uikit.IconKey, Title: "还没有授权密钥",
+					Detail: "新增密钥并授权连接后，MCP 客户端才能通过它访问服务器。", Action: "新增密钥",
+				}).Action.OnClick(a.openNewMCPKeyModal)
+			}
+		}
+		uikit.TableViewport(c, &a.mcp.keysScroll, props, func() {
 			ui.Column(c).FillWidth().Gap(t.Space.N4).Children(func() {
 				for _, item := range pageItems {
 					keyItem := item
@@ -661,7 +670,7 @@ func (a *app) mcpPoliciesTab(c *ui.Context) {
 	pageItems := filtered[min(offset, count):min(offset+20, count)]
 	columns := mcpPolicyColumns(t)
 	ui.Column(c).Grow(1).MinHeight(0).FillWidth().Children(func() {
-		uikit.TableViewport(c, &a.mcp.policiesScroll, uikit.TableViewportProps{
+		props := uikit.TableViewportProps{
 			Label: "拦截策略", MinWidth: t.C.Mcp.TableMinWidth, PaddingY: t.Space.N8,
 			Header: func() {
 				uikit.TableToolbar(c).Children(func() {
@@ -686,7 +695,27 @@ func (a *app) mcpPoliciesTab(c *ui.Context) {
 				})
 				uikit.TableHeaderRow(c, columns)
 			},
-		}, func() {
+		}
+		switch {
+		case totalAll == 0:
+			props.Empty = func() {
+				uikit.EmptyState(c, uikit.EmptyProps{
+					IconName: uikit.IconShield, Title: "还没有拦截策略",
+					Detail: "新增策略后，命中规则的 MCP 命令或文件操作会被拦截。", Action: "新增策略",
+				}).Action.OnClick(a.openNewMCPPolicyModal)
+			}
+		case count == 0:
+			props.Empty = func() {
+				uikit.EmptyState(c, uikit.EmptyProps{
+					IconName: uikit.IconShield, Title: "筛选无结果",
+					Detail: "当前筛选条件下没有匹配的拦截策略。", Action: "重置筛选条件",
+				}).Action.OnClick(func() {
+					a.mcp.policyCategorySeg = 0
+					a.mcp.policyConnFilter, a.mcp.policyKeyFilter, a.mcp.policyStateFilter = "all", "all", "all"
+				})
+			}
+		}
+		uikit.TableViewport(c, &a.mcp.policiesScroll, props, func() {
 			ui.Column(c).FillWidth().Gap(t.Space.N4).Children(func() {
 				for _, item := range pageItems {
 					pol := item
@@ -803,7 +832,7 @@ func (a *app) mcpAuditTab(c *ui.Context) {
 	columns := mcpAuditColumns(t)
 
 	ui.Column(c).Grow(1).MinHeight(0).FillWidth().Children(func() {
-		uikit.TableViewport(c, &a.mcp.auditScroll, uikit.TableViewportProps{
+		props := uikit.TableViewportProps{
 			Label: "审计记录", MinWidth: t.C.Mcp.TableMinWidth, PaddingY: t.Space.N6,
 			Header: func() {
 				uikit.TableToolbar(c).Children(func() {
@@ -834,16 +863,18 @@ func (a *app) mcpAuditTab(c *ui.Context) {
 				})
 				uikit.TableHeaderRow(c, columns)
 			},
-		}, func() {
-			if len(filtered) == 0 {
+		}
+		if len(filtered) == 0 {
+			props.Empty = func() {
 				uikit.EmptyState(c, uikit.EmptyProps{
 					IconName: uikit.IconDocument, Title: "筛选无结果",
 					Detail: "当前筛选条件下没有匹配的审计记录。", Action: "重置筛选条件",
 				}).Action.OnClick(func() {
 					a.mcp.auditKeyFilter, a.mcp.auditConnFilter, a.mcp.auditTypeFilter, a.mcp.auditResultFilter = "all", "all", "all", "all"
 				})
-				return
 			}
+		}
+		uikit.TableViewport(c, &a.mcp.auditScroll, props, func() {
 			ui.Column(c).FillWidth().Gap(t.Space.N2).Children(func() {
 				for _, entry := range filtered {
 					item := entry

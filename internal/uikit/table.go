@@ -81,6 +81,10 @@ type TableViewportProps struct {
 	Label              string
 	MinWidth, PaddingY float32
 	Header             func()
+	// Empty, set when the table has no rows, takes the place of body. It is
+	// centred in the visible body rather than in the rows, which are as wide
+	// as MinWidth and start at the top.
+	Empty func()
 }
 
 func TableViewport(c *ui.Context, scroll *ui.ScrollState, props TableViewportProps, body func()) ui.Element {
@@ -99,9 +103,16 @@ func TableViewport(c *ui.Context, scroll *ui.ScrollState, props TableViewportPro
 		viewport.Children(func() {
 			scroller = ui.ScrollBoth(c).Fill().TrackScroll(scroll).Label(props.Label).
 				Children(func() {
-					ui.Column(c).Width(contentWidth).Shrink(0).
-						Padding(props.PaddingY, tableViewportInset(t)).Children(body)
+					rows := ui.Column(c).Width(contentWidth).Shrink(0).
+						Padding(props.PaddingY, tableViewportInset(t))
+					if props.Empty == nil {
+						rows.Children(body)
+					}
 				})
+			if props.Empty != nil {
+				ui.Box(c).Key("empty").Absolute().Top(0).Bottom(0).Left(0).Right(0).
+					Padding(props.PaddingY, tableViewportInset(t)).Center().Clip().PassThrough().Children(props.Empty)
+			}
 			Scrollbars(c, viewport, scroller, scroll, ScrollbarProps{
 				Label: props.Label + "滚动条", Horizontal: true, Vertical: true,
 			})
@@ -279,7 +290,7 @@ func DataTable(
 		})
 		if props.Count == 0 && empty != nil {
 			ui.Box(c).Key("empty").Absolute().Top(props.HeaderHeight).Bottom(props.FooterHeight).
-				Left(t.C.FilePane.ContentPadding).Right(t.C.FilePane.ContentPadding).Clip().PassThrough().Children(empty)
+				Left(t.C.FilePane.ContentPadding).Right(t.C.FilePane.ContentPadding).Center().Clip().PassThrough().Children(empty)
 		}
 		if props.Underlay != nil {
 			if props.Backdrop != nil {
