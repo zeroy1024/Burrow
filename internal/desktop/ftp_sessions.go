@@ -15,6 +15,8 @@ type fileSession struct {
 	endpoint       host
 	temporary      bool
 	connection     *sshConnectionGroup
+	gatewayErr     error
+	gatewayScope   string
 	runtime        *fileRuntime
 	localRuntime   *fileRuntime
 	sshPeer        *remoteSession
@@ -71,6 +73,7 @@ func (a *app) openFileHost(id hostID) {
 }
 
 func (a *app) newFileSession(id hostID, endpoint host, temporary bool, connection *sshConnectionGroup) *fileSession {
+	var gatewayErr error
 	endpoint = cloneHostEndpoint(endpoint)
 	if endpoint.session.Files == nil {
 		endpoint.session.Files = &fileOptions{Encoding: "UTF-8"}
@@ -79,9 +82,15 @@ func (a *app) newFileSession(id hostID, endpoint host, temporary bool, connectio
 	if connection == nil && endpoint.protocol != "ftp" {
 		connection = a.newSSHGroup(endpoint)
 	}
+	if connection != nil && connection.planErr == nil {
+		route := connection.plan.route
+		endpoint.session.GatewayRoute = &route
+	} else if endpoint.protocol == "ftp" && endpoint.session.GatewayRoute == nil {
+		endpoint, gatewayErr = a.freezeGatewayRoute(endpoint)
+	}
 	session := &fileSession{
 		id: a.nextFileSession, restoreID: newSessionID(), host: id, endpoint: endpoint, config: endpoint.session,
-		temporary: temporary, connection: connection,
+		temporary: temporary, connection: connection, gatewayErr: gatewayErr,
 		local: newFilePane(false), remote: newFilePane(true),
 	}
 	a.restoreFileSession(session)
@@ -246,16 +255,16 @@ func (a *app) catalogHostIcon(c *ui.Context, id hostID) {
 
 func (a *app) deleteFileSite(id hostID, done func(error)) {
 	deleted := a.hosts[id]
-	for _, h := range a.hosts {
-		if h.session.SSH != nil && h.session.SSH.JumpHostID != "" && h.session.SSH.JumpHostID == deleted.session.ID {
-			done(fmt.Errorf("会话正被「%s」用作跳板机，请先修改该会话", h.name))
+	for _, g := range a.gateways {
+		if g.SSHProfileID == deleted.session.ID {
+			done(fmt.Errorf("主机被网关「%s」引用，请先修改该网关", g.Name))
 			return
 		}
 	}
 	for _, group := range a.runtimeSSHGroups() {
-		for _, step := range group.plan.steps {
-			if options := step.endpoint.session.SSH; options != nil && options.JumpHostID == deleted.session.ID {
-				done(fmt.Errorf("会话（含可恢复的关闭标签）仍将此条目用作跳板机，请先按新配置重连相关标签，或取消并清除相关传输"))
+		for _, hop := range group.plan.route {
+			if hop.SSH != nil && hop.SSH.ID == deleted.session.ID {
+				done(fmt.Errorf("主机仍被网关连接使用，请先关闭相关会话和传输"))
 				return
 			}
 		}

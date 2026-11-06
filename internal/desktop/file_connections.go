@@ -46,6 +46,10 @@ func (a *app) openFileClient(ctx context.Context, session *fileSession, complete
 		return nil
 	}
 	h := cloneHostEndpoint(session.endpoint)
+	if session.gatewayErr != nil {
+		complete(nil, session.gatewayErr)
+		return nil
+	}
 	var request *sshConnectionRequest
 	finished := false
 	finish := func(client fileclient.Client, err error) {
@@ -87,10 +91,27 @@ func (a *app) openFileClient(ctx context.Context, session *fileSession, complete
 		a.window.Update(func() { cancelSSHRequest(request); finish(nil, ctx.Err()) })
 	})
 	if h.protocol == "ftp" {
+		plan, planErr := a.captureSSHPlan(h)
+		plan.gatewayScope = session.gatewayScope
+		if id, _ := mcpserver.OperationID(ctx); id != "" {
+			plan.promptChanged = func(waiting bool, detail string) { a.mcpPromptChanged(ctx, waiting, detail) }
+		}
 		secret := session.ftpSecret
 		a.sshWorkers.Go(func() {
+			if planErr != nil {
+				deliver(nil, planErr, nil)
+				return
+			}
+			if len(plan.route) > 0 && h.session.Files != nil && h.session.Files.FTPMode == "active" {
+				deliver(nil, errors.New("FTP 主动模式暂不支持连接网关，请选择被动模式"), nil)
+				return
+			}
+			dial, release, err := a.gatewayDialer(ctx, plan)
+			if err != nil {
+				deliver(nil, err, nil)
+				return
+			}
 			user := h.user
-			var err error
 			if h.session.Auth == "anonymous" {
 				user, secret = "anonymous", "anonymous@"
 			} else {
@@ -110,7 +131,7 @@ func (a *app) openFileClient(ctx context.Context, session *fileSession, complete
 				}
 			}
 			if err != nil {
-				deliver(nil, err, nil)
+				deliver(nil, err, release)
 				return
 			}
 			options := fileOptions{Encoding: "UTF-8", FTPMode: "passive", FTPTLS: "none"}
@@ -118,7 +139,8 @@ func (a *app) openFileClient(ctx context.Context, session *fileSession, complete
 				options = *h.session.Files
 			}
 			client, err := fileclient.DialFTP(ctx, fileclient.FTPConfig{
-				Host: h.address, Port: h.port, User: user, Password: secret,
+				DialContext: dial,
+				Host:        h.address, Port: h.port, User: user, Password: secret,
 				TLSMode: options.FTPTLS, Mode: options.FTPMode, Encoding: options.Encoding,
 			})
 			if err == nil && h.session.Auth != "anonymous" {
@@ -135,7 +157,7 @@ func (a *app) openFileClient(ctx context.Context, session *fileSession, complete
 				})
 			}
 			secret = ""
-			deliver(client, err, nil)
+			deliver(client, err, release)
 		})
 		return nil
 	}
@@ -191,7 +213,9 @@ func (a *app) reconnectFileSession(session *fileSession) { a.startFileSession(se
 func (a *app) startFileSession(session *fileSession, refresh bool) {
 	a.disconnectFileSession(session)
 	if refresh {
+		session.gatewayErr = nil
 		previousFiles := *session.config.Files
+		previousRoute := session.endpoint.session.GatewayRoute
 		endpoint, id, changed := a.latestSessionEndpoint(session.endpoint, session.temporary)
 		session.endpoint, session.config, session.host = endpoint, endpoint.session, id
 		a.refreshFileInitialDirectories(session, previousFiles)
@@ -200,8 +224,18 @@ func (a *app) startFileSession(session *fileSession, refresh bool) {
 		}
 		if endpoint.protocol == "ftp" {
 			session.connection = nil
+			session.endpoint, session.gatewayErr = a.freezeGatewayRoute(endpoint)
+			session.config = session.endpoint.session
+			if !sameGatewayRoute(previousRoute, session.endpoint.session.GatewayRoute) {
+				session.ftpSecret = ""
+			}
 		} else {
 			session.connection = a.reconnectSSHGroup(session.connection, endpoint)
+			if session.connection.planErr == nil {
+				route := session.connection.plan.route
+				session.endpoint.session.GatewayRoute = &route
+				session.config = session.endpoint.session
+			}
 		}
 	}
 	a.ensureLocalFiles(session)

@@ -21,6 +21,7 @@ import (
 const ftpOperationTimeout = 20 * time.Second
 
 type FTPConfig struct {
+	DialContext    func(context.Context, string, string) (net.Conn, error)
 	Host           string
 	Port           int
 	User, Password string
@@ -37,26 +38,29 @@ type FTPConfig struct {
 // Canceling an active command closes this client; queued cancellation does not.
 // Transfer tasks use independent clients so this cannot affect other consumers.
 type ftpClient struct {
-	ctx        context.Context
-	cancel     context.CancelFunc
-	stopParent func() bool
-	gate       chan struct{}
-	done       chan struct{}
-	closeOnce  sync.Once
-	closeErr   error
-	mu         sync.Mutex
-	closed     bool
-	sockets    map[net.Conn]struct{}
-	listeners  map[net.Listener]struct{}
-	control    *textproto.Conn
-	connection net.Conn
-	peer       net.IP
-	local      net.IP
-	tlsConfig  *tls.Config
-	mode       string
-	codec      filenameCodec
-	mlsd       bool
-	home       string
+	dialContext func(context.Context, string, string) (net.Conn, error)
+	targetHost  string
+	proxied     bool
+	ctx         context.Context
+	cancel      context.CancelFunc
+	stopParent  func() bool
+	gate        chan struct{}
+	done        chan struct{}
+	closeOnce   sync.Once
+	closeErr    error
+	mu          sync.Mutex
+	closed      bool
+	sockets     map[net.Conn]struct{}
+	listeners   map[net.Listener]struct{}
+	control     *textproto.Conn
+	connection  net.Conn
+	peer        net.IP
+	local       net.IP
+	tlsConfig   *tls.Config
+	mode        string
+	codec       filenameCodec
+	mlsd        bool
+	home        string
 }
 
 type ftpRedactedError struct {
@@ -69,6 +73,9 @@ func (e *ftpRedactedError) Error() string { return e.message }
 func (e *ftpRedactedError) Unwrap() error { return e.cause }
 
 func DialFTP(ctx context.Context, cfg FTPConfig) (Client, error) {
+	if cfg.DialContext != nil && cfg.Mode == "active" {
+		return nil, errors.New("FTP 主动模式暂不支持连接网关，请选择被动模式")
+	}
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -100,6 +107,7 @@ func DialFTP(ctx context.Context, cfg FTPConfig) (Client, error) {
 	lifetime, cancel := context.WithCancel(ctx)
 	c := &ftpClient{ctx: lifetime, cancel: cancel, gate: make(chan struct{}, 1), done: make(chan struct{}),
 		sockets: make(map[net.Conn]struct{}), listeners: make(map[net.Listener]struct{}), mode: cfg.Mode, codec: codec}
+	c.dialContext, c.proxied, c.targetHost = cfg.DialContext, cfg.DialContext != nil, strings.Trim(cfg.Host, "[]")
 	if cfg.TLSMode != "none" {
 		c.tlsConfig = &tls.Config{ServerName: strings.Trim(cfg.Host, "[]"), MinVersion: tls.VersionTLS12,
 			ClientSessionCache: tls.NewLRUClientSessionCache(16)}
@@ -119,8 +127,10 @@ func DialFTP(ctx context.Context, cfg FTPConfig) (Client, error) {
 		if err != nil {
 			return fmt.Errorf("connect FTP: %w", err)
 		}
-		c.peer = raw.RemoteAddr().(*net.TCPAddr).IP
-		c.local = raw.LocalAddr().(*net.TCPAddr).IP
+		if !c.proxied {
+			c.peer = raw.RemoteAddr().(*net.TCPAddr).IP
+			c.local = raw.LocalAddr().(*net.TCPAddr).IP
+		}
 		c.connection = raw
 		if cfg.TLSMode == "implicit" {
 			c.connection, err = c.secure(opCtx, raw)
@@ -273,7 +283,11 @@ func (c *ftpClient) closeSocket(connection net.Conn) error {
 }
 
 func (c *ftpClient) dial(ctx context.Context, address string) (net.Conn, error) {
-	raw, err := (&net.Dialer{Timeout: ftpOperationTimeout}).DialContext(ctx, "tcp", address)
+	dial := c.dialContext
+	if dial == nil {
+		dial = (&net.Dialer{Timeout: ftpOperationTimeout}).DialContext
+	}
+	raw, err := dial(ctx, "tcp", address)
 	if err != nil {
 		return nil, err
 	}
@@ -781,7 +795,11 @@ func (c *ftpClient) openData(ctx context.Context, verb, argument string, offset 
 		if err != nil {
 			return nil, nil, err
 		}
-		raw, err = c.dial(ctx, net.JoinHostPort(c.peer.String(), strconv.Itoa(port)))
+		host := c.targetHost
+		if !c.proxied {
+			host = c.peer.String()
+		}
+		raw, err = c.dial(ctx, net.JoinHostPort(host, strconv.Itoa(port)))
 		if err != nil {
 			return nil, nil, err
 		}
@@ -859,7 +877,7 @@ func (c *ftpClient) passivePort() (int, error) {
 		}
 		return ftpPort(pieces[3])
 	}
-	if c.peer.To4() == nil || (code != 500 && code != 502 && code != 522) {
+	if !c.proxied && c.peer.To4() == nil || (code != 500 && code != 502 && code != 522) {
 		return 0, &textproto.Error{Code: code, Msg: message}
 	}
 	_, message, err = c.command(227, "PASV")

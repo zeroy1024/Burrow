@@ -92,6 +92,12 @@ func Open(ctx context.Context, name string) (*Store, error) {
 			return nil, errors.Join(fmt.Errorf("backup before vault upgrade: %w", err), db.Close())
 		}
 	}
+	if originalVersion == 4 && originalApplication == 0x42525731 {
+		backup := name + ".before-gateways-" + time.Now().UTC().Format("20060102T150405.000000000") + ".bak"
+		if err := s.Backup(ctx, backup); err != nil {
+			return nil, errors.Join(fmt.Errorf("backup before gateway upgrade: %w", err), db.Close())
+		}
+	}
 	if err := s.initialize(ctx); err != nil {
 		return nil, errors.Join(err, db.Close())
 	}
@@ -126,7 +132,7 @@ func (s *Store) initialize(ctx context.Context) error {
 			return fmt.Errorf("create database schema: %w", err)
 		}
 		version = 1
-	} else if (version < 1 || version > 4) || application != applicationID {
+	} else if (version < 1 || version > 5) || application != applicationID {
 		return fmt.Errorf("unsupported Burrow database schema %d (application %x)", version, application)
 	}
 	if version == 1 {
@@ -151,6 +157,12 @@ func (s *Store) initialize(ctx context.Context) error {
 		}
 		if _, err := tx.ExecContext(ctx, "INSERT INTO vault_meta VALUES(1,?,?)", state, "{}"); err != nil {
 			return err
+		}
+		version = 4
+	}
+	if version == 4 {
+		if err := migrateGateways(ctx, tx); err != nil {
+			return fmt.Errorf("upgrade database schema to version 5: %w", err)
 		}
 	}
 	return tx.Commit()

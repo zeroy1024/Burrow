@@ -32,18 +32,7 @@ func (a *app) sessionAdvanced(c *ui.Context, d *hostDraft) {
 
 func (a *app) sessionSSHAdvanced(c *ui.Context, d *hostDraft) {
 	t := theme.Current()
-	a.sessionField(c, d, "jump", "跳板机", "", func() ui.Element {
-		options := []uikit.Option[string]{{Value: "", Label: "无"}}
-		for _, id := range a.jumpCandidates(d) {
-			h := a.hosts[id]
-			options = append(options, uikit.Option[string]{Value: h.session.ID, Label: h.name + "  " + h.user + "@" + h.address})
-		}
-		input := uikit.Select(c, &d.jumpID, options, uikit.SelectProps{Label: "跳板机"})
-		if input.Changed() {
-			d.changed("jump")
-		}
-		return input
-	})
+
 	a.sessionField(c, d, "platform", "远端系统", "", func() ui.Element {
 		options := []uikit.Option[string]{{Value: "", Label: "自动识别"}}
 		for _, platform := range hostinfo.Overrides {

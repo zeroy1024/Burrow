@@ -153,15 +153,9 @@ func (a *app) fileSSHLinkDialog(c *ui.Context) {
 
 func sameSSHIdentity(left, right host) bool {
 	return left.address == right.address && left.port == right.port && left.user == right.user &&
-		left.session.Auth == right.session.Auth && left.session.KeyID == right.session.KeyID && sameSSHJump(left, right)
+		left.session.Auth == right.session.Auth && left.session.KeyID == right.session.KeyID && sameSSHGateway(left, right)
 }
 
-func sameSSHJump(left, right host) bool {
-	jump := func(h host) string {
-		if h.session.SSH != nil {
-			return h.session.SSH.JumpHostID
-		}
-		return ""
-	}
-	return jump(left) == jump(right)
+func sameSSHGateway(left, right host) bool {
+	return left.session.Gateway == right.session.Gateway
 }

@@ -179,9 +179,6 @@ func (a *app) transferSnapshot() *storedTransferQueue {
 		groups[group] = id
 		stored := storedTransferConnection{ID: id,
 			Endpoint: snapshotWorkspaceSession(group.endpoint, group.endpoint.session, true, 0).Endpoint}
-		for _, step := range group.plan.steps {
-			stored.Steps = append(stored.Steps, snapshotWorkspaceSession(step.endpoint, step.endpoint.session, true, 0).Endpoint)
-		}
 		result.Connections = append(result.Connections, stored)
 		return id
 	}
@@ -288,7 +285,7 @@ func (a *app) restoreTransfers() (err error) {
 		endpoint := transferStoredHost(stored.Endpoint)
 		group := a.newSSHGroup(endpoint)
 		if len(stored.Steps) > 0 {
-			group.plan, group.planErr = sshDialPlan{trust: a.store}, nil
+			group.plan, group.planErr = sshDialPlan{trust: a.store, route: group.plan.route}, nil
 			for _, value := range stored.Steps {
 				step := sshDialStep{endpoint: transferStoredHost(value)}
 				if step.endpoint.session.Auth == "key" {
@@ -354,6 +351,8 @@ func (a *app) restoreTransfers() (err error) {
 			completed: stored.Completed, errorText: stored.Error, cleanupPending: stored.CleanupPending, job: job, persisted: true}
 		q.tasks = append(q.tasks, task)
 		if task.mcp != nil && a.mcpBackend != nil {
+			task.session.gatewayScope = "mcp:" + task.session.restoreID
+			a.mcpBackend.observeGroup(task.session.connection)
 			owner, ownerErr := a.store.MCPTask(a.ctx, task.id)
 			if ownerErr != nil {
 				return ownerErr
@@ -431,6 +430,9 @@ func validateTransferEndpoint(endpoint storedSession, files bool) error {
 			return errors.New("FTP传输选项无效")
 		}
 	}
+	if endpoint.GatewayRoute != nil {
+		return validateGatewayRoute(*endpoint.GatewayRoute)
+	}
 	return nil
 }
 
@@ -459,6 +461,14 @@ func validateTransferQueue(saved *storedTransferQueue) error {
 			return err
 		}
 		seen := map[string]bool{}
+		routeSteps := []storedSession{}
+		if group.Endpoint.GatewayRoute != nil {
+			for _, hop := range *group.Endpoint.GatewayRoute {
+				if hop.SSH != nil {
+					routeSteps = append(routeSteps, *hop.SSH)
+				}
+			}
+		}
 		for index, step := range group.Steps {
 			if err := validateTransferEndpoint(step, false); err != nil {
 				return err
@@ -467,9 +477,12 @@ func validateTransferQueue(saved *storedTransferQueue) error {
 				return errors.New("传输跳板机快照成环")
 			}
 			seen[step.ID] = true
-			if index > 0 && (step.SSH == nil || step.SSH.JumpHostID != group.Steps[index-1].ID) {
-				return errors.New("传输跳板机快照顺序无效")
+			if index < len(group.Steps)-1 && (index >= len(routeSteps) || !sameTransferEndpoint(step, routeSteps[index])) {
+				return errors.New("传输网关快照顺序无效")
 			}
+		}
+		if len(group.Steps) > 0 && len(group.Steps) != len(routeSteps)+1 {
+			return errors.New("传输网关快照数量无效")
 		}
 		if len(group.Steps) > 0 && !sameTransferEndpoint(group.Endpoint, group.Steps[len(group.Steps)-1]) {
 			return errors.New("传输连接目标与快照不同")
@@ -499,7 +512,7 @@ func validateTransferQueue(saved *storedTransferQueue) error {
 			}
 		} else {
 			group, ok := groups[session.Session.Connection]
-			if !ok || !sameTransferEndpoint(session.Session.Endpoint, group.Endpoint) {
+			if !ok || !sameTransferEndpoint(session.Session.Endpoint, group.Endpoint) || !sameGatewayRoute(session.Session.Endpoint.GatewayRoute, group.Endpoint.GatewayRoute) {
 				return errors.New("SFTP连接快照不匹配")
 			}
 		}

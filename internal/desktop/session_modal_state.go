@@ -16,37 +16,38 @@ import (
 )
 
 type hostDraft struct {
-	afterClose                                           func()
-	name, address, user, port, group, system             string
-	protocol, auth, keyID, password, passphrase          string
-	jumpID, keepalive, initCommand, termScheme, platform string
-	remoteDir, localDir, encoding, ftpMode, ftpTLS       string
-	env                                                  []string
-	envInput, newGroup                                   string
-	id                                                   hostID
-	editing, deleting, files, portEdited                 bool
-	passwordChanged, passphraseChanged, passwordSaved    bool
-	advanced, closing, selectedName, creatingGroup       bool
-	modal                                                uikit.ModalController
-	errors                                               map[string]string
-	focused                                              map[string]bool
-	handles                                              map[string]*ui.Handle
-	scroll                                               ui.ScrollState
-	testCancel                                           context.CancelFunc
-	testResults                                          <-chan connectionTestResult
-	testResult                                           *connectionTestResult
-	testVisible                                          bool
-	choosingDirectory                                    bool
-	listedAgent                                          bool
-	agentCount                                           int
-	agentError                                           error
-	submitted                                            bool
-	saving                                               bool
-	agentResults                                         <-chan sessionAgentResult
-	generation                                           string
-	initialValues                                        [21]string
-	initialEnv                                           []string
-	initialPortEdited                                    bool
+	afterClose                                            func()
+	credentialSource                                      *host
+	name, address, user, port, group, system              string
+	protocol, auth, keyID, password, passphrase           string
+	gateway, keepalive, initCommand, termScheme, platform string
+	remoteDir, localDir, encoding, ftpMode, ftpTLS        string
+	env                                                   []string
+	envInput, newGroup                                    string
+	id                                                    hostID
+	editing, deleting, files, portEdited                  bool
+	passwordChanged, passphraseChanged, passwordSaved     bool
+	advanced, closing, selectedName, creatingGroup        bool
+	modal                                                 uikit.ModalController
+	errors                                                map[string]string
+	focused                                               map[string]bool
+	handles                                               map[string]*ui.Handle
+	scroll                                                ui.ScrollState
+	testCancel                                            context.CancelFunc
+	testResults                                           <-chan connectionTestResult
+	testResult                                            *connectionTestResult
+	testVisible                                           bool
+	choosingDirectory                                     bool
+	listedAgent                                           bool
+	agentCount                                            int
+	agentError                                            error
+	submitted                                             bool
+	saving                                                bool
+	agentResults                                          <-chan sessionAgentResult
+	generation                                            string
+	initialValues                                         [21]string
+	initialEnv                                            []string
+	initialPortEdited                                     bool
 }
 
 type sessionAgentResult struct {
@@ -80,6 +81,27 @@ func (a *app) startHostDraft() {
 	page.addHostOpen = true
 }
 
+func (a *app) startOtherProtocolDraft(id hostID) {
+	source := cloneHostEndpoint(a.hosts[id])
+	target := sectionFiles
+	if source.protocol == "sftp" {
+		target = sectionSSH
+	}
+	a.switchSection(target)
+	a.startHostDraft()
+	d := &a.page().draft
+	d.name, d.address, d.user = source.name, source.address, source.user
+	d.port, d.system = strconv.Itoa(source.port), systems[source.os].name
+	d.auth, d.keyID, d.gateway = source.session.Auth, source.session.KeyID, source.session.Gateway
+	d.portEdited = source.session.PortEdited || source.port != d.defaultPort()
+	d.passwordSaved = d.auth == "password" && source.session.PasswordSaved
+	if d.passwordSaved {
+		// Read the captured credential only when the user tests or saves the new profile.
+		d.credentialSource = &source
+	}
+	d.initState()
+}
+
 func (a *app) startEditHostDraft(id hostID) {
 	a.closeSettings()
 	h := a.hosts[id]
@@ -96,7 +118,7 @@ func (a *app) startEditHostDraft(id hostID) {
 		id: id, editing: true, files: h.protocol != "" && h.protocol != "ssh", protocol: protocol,
 		name: h.name, address: h.address, user: h.user, port: strconv.Itoa(h.port),
 		system: systems[h.os].name, auth: h.session.Auth, keyID: h.session.KeyID,
-		passwordSaved: h.session.PasswordSaved, keepalive: "30", encoding: "UTF-8", ftpMode: "passive", ftpTLS: "explicit",
+		gateway: h.session.Gateway, passwordSaved: h.session.PasswordSaved, keepalive: "30", encoding: "UTF-8", ftpMode: "passive", ftpTLS: "explicit",
 	}
 	if d.auth == "" {
 		d.auth = "password"
@@ -108,7 +130,7 @@ func (a *app) startEditHostDraft(id hostID) {
 		}
 	}
 	if p := h.session.SSH; p != nil && !d.files {
-		d.jumpID, d.keepalive, d.initCommand, d.termScheme = p.JumpHostID, strconv.Itoa(p.KeepAlive), p.InitCommand, p.TermScheme
+		d.keepalive, d.initCommand, d.termScheme = strconv.Itoa(p.KeepAlive), p.InitCommand, p.TermScheme
 		d.platform = p.Platform
 		d.env = slices.Clone(p.Env)
 	}
@@ -138,7 +160,7 @@ func (d *hostDraft) initState() {
 
 func (d *hostDraft) inputValues() [21]string {
 	return [21]string{d.name, d.address, d.user, d.port, d.group, d.system,
-		d.protocol, d.auth, d.keyID, d.jumpID, d.keepalive, d.initCommand, d.termScheme, d.platform,
+		d.protocol, d.auth, d.keyID, d.gateway, d.keepalive, d.initCommand, d.termScheme, d.platform,
 		d.remoteDir, d.localDir, d.encoding, d.ftpMode, d.ftpTLS, d.envInput, d.newGroup}
 }
 
@@ -189,7 +211,7 @@ func (d *hostDraft) hasAdvanced() bool {
 	if d.files {
 		return d.remoteDir != "" || d.localDir != "" || d.encoding != "UTF-8" || d.protocol == "FTP" && (d.ftpMode != "passive" || d.ftpTLS != "explicit")
 	}
-	return d.jumpID != "" || d.keepalive != "30" || d.initCommand != "" || d.termScheme != "" || len(d.env) > 0 || d.platform != ""
+	return d.keepalive != "30" || d.initCommand != "" || d.termScheme != "" || len(d.env) > 0 || d.platform != ""
 }
 
 func (d *hostDraft) advancedSummary(a *app) string {
@@ -211,12 +233,6 @@ func (d *hostDraft) advancedSummary(a *app) string {
 			parts = append(parts, map[string]string{"none": "无加密", "explicit": "显式 TLS", "implicit": "隐式 TLS"}[d.ftpTLS])
 		}
 	} else {
-		for _, h := range a.hosts {
-			if h.session.ID == d.jumpID && d.jumpID != "" {
-				parts = append(parts, "跳板机 "+h.name)
-				break
-			}
-		}
 		if d.keepalive != "30" {
 			parts = append(parts, "Keepalive "+d.keepalive+" 秒")
 		}
@@ -366,6 +382,7 @@ func (a *app) draftHost(d *hostDraft) host {
 		h.protocol = strings.ToLower(d.protocol)
 	}
 	h.session.Auth, h.session.KeyID, h.session.PortEdited = d.auth, d.keyID, d.portEdited
+	h.session.Gateway, h.session.GatewayRoute = d.gateway, nil
 	if d.auth != "key" {
 		h.session.KeyID = ""
 	}
@@ -384,7 +401,7 @@ func (a *app) draftHost(d *hostDraft) host {
 		if d.envInput != "" {
 			env = append(env, d.envInput)
 		}
-		h.session.SSH = &sshOptions{JumpHostID: d.jumpID, KeepAlive: keepalive, InitCommand: d.initCommand, TermScheme: d.termScheme, Env: env, Platform: d.platform}
+		h.session.SSH = &sshOptions{KeepAlive: keepalive, InitCommand: d.initCommand, TermScheme: d.termScheme, Env: env, Platform: d.platform}
 	}
 	return h
 }
@@ -397,7 +414,11 @@ func (a *app) startDraftTest(c *ui.Context, d *hostDraft) {
 	password := d.password
 	if d.auth == "password" && d.passwordSaved && !d.passwordChanged {
 		var err error
-		password, err = a.sessionPassword(h)
+		credentialHost := h
+		if d.credentialSource != nil {
+			credentialHost = *d.credentialSource
+		}
+		password, err = a.sessionPassword(credentialHost)
 		if err != nil {
 			d.testResult = &connectionTestResult{Summary: "无法读取已保存的密码", Detail: err.Error(), Err: err}
 			d.testVisible = true
@@ -436,7 +457,18 @@ func (a *app) saveSessionDraft(c *ui.Context, d *hostDraft, connect bool) {
 		}
 		factsKey = hostFactsKey(plan)
 	}
-	changes, err := a.prepareSessionSecrets(&h, d.password, d.passwordChanged, d.passphrase, d.passphraseChanged)
+	password, passwordChanged := d.password, d.passwordChanged
+	if d.credentialSource != nil && d.auth == "password" && d.passwordSaved && !passwordChanged {
+		var err error
+		password, err = a.sessionPassword(*d.credentialSource)
+		if err != nil {
+			a.persistenceNotice("读取来源会话密码失败", err)
+			d.saving = false
+			return
+		}
+		passwordChanged = true
+	}
+	changes, err := a.prepareSessionSecrets(&h, password, passwordChanged, d.passphrase, d.passphraseChanged)
 	if err != nil {
 		uikit.Toast(c, uikit.ToastProps{Tone: uikit.ToneDanger, Title: "保存凭据失败", Detail: err.Error()})
 		d.saving = false
@@ -524,35 +556,6 @@ func (a *app) draftOpenTabs(d *hostDraft) int {
 		}
 	}
 	return n
-}
-
-func (a *app) jumpCandidates(d *hostDraft) []hostID {
-	ids := []hostID{}
-	for index, h := range a.hosts {
-		if h.protocol != "" && h.protocol != "ssh" || d.editing && hostID(index) == d.id || h.session.ID == "" {
-			continue
-		}
-		seen := map[string]bool{}
-		current := h
-		cycle := false
-		for current.session.SSH != nil && current.session.SSH.JumpHostID != "" {
-			id := current.session.SSH.JumpHostID
-			if seen[id] || d.editing && id == a.hosts[d.id].session.ID {
-				cycle = true
-				break
-			}
-			seen[id] = true
-			found := slices.IndexFunc(a.hosts, func(candidate host) bool { return candidate.session.ID == id })
-			if found < 0 {
-				break
-			}
-			current = a.hosts[found]
-		}
-		if !cycle {
-			ids = append(ids, hostID(index))
-		}
-	}
-	return ids
 }
 
 func (d *hostDraft) schemeName() string {

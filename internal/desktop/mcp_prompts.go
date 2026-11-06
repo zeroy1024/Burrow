@@ -2,6 +2,7 @@ package desktop
 
 import (
 	"context"
+	"strconv"
 	"time"
 
 	"sshdesk/internal/mcpserver"
@@ -23,6 +24,7 @@ func (b *mcpDesktop) observeGroup(group *sshConnectionGroup) {
 	if group == nil {
 		return
 	}
+	group.plan.gatewayScope = "mcp:" + strconv.Itoa(group.id)
 	group.plan.promptChanged = func(waiting bool, detail string) {
 		b.a.window.Update(func() {
 			for request := range group.waiters {

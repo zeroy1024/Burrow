@@ -38,6 +38,7 @@ const (
 	sectionFiles
 	sectionSettings
 	sectionMCP
+	sectionGateways
 )
 
 func (s section) hasCatalog() bool {
@@ -89,10 +90,14 @@ type app struct {
 	sshPrompts             []*sshPrompt
 	fileSSHLink            *fileSession
 	fileSSHLinkAfterClose  func()
+	gateways               []gatewayConfig
+	defaultGateway         string
+	gatewayUI              gatewayUIState
+	gatewayPool            gatewayPool
 
 	section            section
 	settingsButton     ui.Handle
-	pages              [sectionMCP + 1]pageState
+	pages              [sectionGateways + 1]pageState
 	mcp                mcpUIState
 	mcpBackend         *mcpDesktop
 	appearance         int
@@ -167,6 +172,9 @@ func (a *app) switchSection(target section) {
 	}
 	if a.activeSection() == target {
 		return
+	}
+	if a.section == sectionGateways {
+		a.cancelGatewayTest()
 	}
 	if a.settingsUI.open {
 		a.settingsUI.previousFocus = ui.Handle{}
@@ -455,7 +463,7 @@ func (a *app) view(c *ui.Context) {
 				a.titleBar(c, shown)
 			case sectionFiles:
 				a.fileTitleBar(c, shown)
-			case sectionMCP, sectionSettings:
+			case sectionMCP, sectionSettings, sectionGateways:
 				uikit.TitleBar(c).FillWidth()
 			}
 		})
@@ -468,6 +476,8 @@ func (a *app) view(c *ui.Context) {
 				case sectionMCP:
 					ui.Box(c).Fill().Padding(0, t.C.Window.Gutter, t.C.Window.Gutter, 0).
 						Children(func() { a.mcpPage(c) })
+				case sectionGateways:
+					ui.Box(c).Fill().Padding(0, t.C.Window.Gutter, t.C.Window.Gutter, 0).Children(func() { a.gatewayPage(c) })
 				case sectionSettings:
 					ui.Box(c).Fill().Padding(0, t.C.Window.Gutter, t.C.Window.Gutter, 0).
 						Children(func() { a.settingsPage(c) })
@@ -507,6 +517,7 @@ func (a *app) view(c *ui.Context) {
 	if active == sectionMCP {
 		a.mcpDialogs(c)
 	}
+	a.gatewayDialog(c)
 	a.sshDialogs(c)
 	a.fileSSHLinkDialog(c)
 	a.credentialDialogs(c)
@@ -555,6 +566,12 @@ func (a *app) navigation(c *ui.Context) {
 			sectionFiles,
 			"SFTP / FTP",
 			filesIcon,
+		)
+		a.navigationButton(
+			c,
+			sectionGateways,
+			"网关",
+			routeIcon,
 		)
 		a.navigationButton(
 			c,

@@ -299,6 +299,7 @@ func (a *app) requestTransferClient(task *transferTask, run *transferRun) {
 func (a *app) snapshotTransferSession(view *fileSession) *fileSession {
 	snapshot := a.newFileSession(view.host, view.endpoint, view.temporary, view.connection)
 	snapshot.restoreID = view.restoreID
+	snapshot.gatewayScope = view.gatewayScope
 	snapshot.ftpSecret = view.ftpSecret
 	snapshot.local.path, snapshot.remote.path = view.local.path, view.remote.path
 	snapshot.local.history, snapshot.remote.history = slices.Clone(view.local.history), slices.Clone(view.remote.history)
@@ -318,6 +319,9 @@ func sameTransferView(view, snapshot *fileSession) bool {
 	}
 	if (one.session.Files == nil) != (two.session.Files == nil) ||
 		one.session.Files != nil && *one.session.Files != *two.session.Files {
+		return false
+	}
+	if !sameGatewayRoute(one.session.GatewayRoute, two.session.GatewayRoute) {
 		return false
 	}
 	return one.protocol == "ftp" || view.connection == snapshot.connection

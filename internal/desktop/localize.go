@@ -18,13 +18,15 @@ func localizeTag(tag, text string) string {
 }
 
 var settingsEnglish = map[string]string{
-	"请填写当前密码":   "Enter the current password.",
-	"请填写新密码":    "Enter a new password.",
-	"请再次输入新密码":  "Enter the new password again.",
-	"正在打开应用…":   "Opening the app…",
-	"无法打开应用":    "Unable to Open the App",
-	"应用解锁":      "App Unlock",
-	"打开应用时需要解锁": "Require unlocking when opening the app",
+	"快捷添加到 SFTP…": "Quick add to SFTP…",
+	"快捷添加到 SSH…":  "Quick add to SSH…",
+	"请填写当前密码":     "Enter the current password.",
+	"请填写新密码":      "Enter a new password.",
+	"请再次输入新密码":    "Enter the new password again.",
+	"正在打开应用…":     "Opening the app…",
+	"无法打开应用":      "Unable to Open the App",
+	"应用解锁":        "App Unlock",
+	"打开应用时需要解锁":   "Require unlocking when opening the app",
 	"开启后，每次启动 Burrow 都需要输入解锁密码。": "Require the unlock password each time Burrow starts.",
 	"修改密码":        "Change Password",
 	"修改密码…":       "Change Password…",

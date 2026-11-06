@@ -149,6 +149,10 @@ func (a *app) newDisconnectedSession(id hostID, endpoint host, temporary bool, c
 	if connection == nil {
 		connection = a.newSSHGroup(endpoint)
 	}
+	if connection.planErr == nil {
+		route := connection.plan.route
+		endpoint.session.GatewayRoute = &route
+	}
 	return &remoteSession{
 		id: a.nextSession, host: id, endpoint: endpoint, config: endpoint.session,
 		temporary: temporary, connection: connection,
@@ -407,7 +411,9 @@ func (a *app) latestSessionEndpoint(current host, temporary bool) (host, hostID,
 		savedFiles := saved.protocol == "sftp" || saved.protocol == "ftp"
 		if saved.session.ID == current.session.ID && savedFiles == currentFiles {
 			changed := saved.protocol != current.protocol || !saved.session.UpdatedAt.Equal(current.session.UpdatedAt)
-			return cloneHostEndpoint(saved), hostID(index), changed
+			endpoint := cloneHostEndpoint(saved)
+			endpoint.session.GatewayRoute = nil
+			return endpoint, hostID(index), changed
 		}
 	}
 	return current, -1, false

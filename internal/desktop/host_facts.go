@@ -31,6 +31,11 @@ type hostFactsProbe struct {
 // configuration revisions. Refreshing facts must not change a connection plan.
 func hostFactsKey(plan sshDialPlan) string {
 	var target strings.Builder
+	for _, hop := range plan.route {
+		if hop.SOCKS != nil {
+			fmt.Fprintf(&target, "socks5 %q %d\n", hop.SOCKS.Address, hop.SOCKS.Port)
+		}
+	}
 	for _, step := range plan.steps {
 		h := step.endpoint
 		fmt.Fprintf(

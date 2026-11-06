@@ -66,6 +66,8 @@ const (
 	IconSidebarClose IconName = "sidebar-close"
 	IconLink         IconName = "link"
 	IconHelp         IconName = "help"
+	IconRoute        IconName = "route"
+	IconGlobe        IconName = "globe"
 )
 
 const LucideVersion = "1.67.0"
@@ -131,6 +133,8 @@ var iconFiles = map[IconName]string{
 	IconSidebarClose: "panel-left-close",
 	IconLink:         "link",
 	IconHelp:         "circle-question-mark",
+	IconRoute:        "route",
+	IconGlobe:        "globe",
 }
 
 // The cache holds immutable SVG geometry, keyed by the current token stroke.

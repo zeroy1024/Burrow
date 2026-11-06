@@ -34,6 +34,8 @@ var (
 	bellIcon       = uikit.IconSVG(uikit.IconBell)
 	lockIcon       = uikit.IconSVG(uikit.IconLock)
 	codeIcon       = uikit.IconSVG(uikit.IconCode)
+	routeIcon      = uikit.IconSVG(uikit.IconRoute)
+	globeIcon      = uikit.IconSVG(uikit.IconGlobe)
 )
 
 type systemStyle struct {

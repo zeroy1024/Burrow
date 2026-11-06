@@ -332,6 +332,13 @@ func (a *app) sessionDraftFields(c *ui.Context, d *hostDraft, dismiss func()) {
 		})
 	}
 
+	a.sessionField(c, d, "gateway", "连接网关", "", func() ui.Element {
+		input := uikit.Select(c, &d.gateway, a.hostGatewayOptions(d), uikit.SelectProps{Label: "连接网关"})
+		if input.Changed() {
+			d.changed("gateway")
+		}
+		return input
+	})
 	a.sessionField(c, d, "group", "分组", "", func() ui.Element {
 		if d.creatingGroup {
 			return a.sessionInput(c, d, "group", "新建分组", &d.newGroup, false).Placeholder("新建分组名称")

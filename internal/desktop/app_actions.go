@@ -104,7 +104,7 @@ func (a *app) appShortcuts(c *ui.Context) {
 		}
 	}
 	// These keys always navigate tabs, even when the current tab is split.
-	if !a.settingsUI.open && count > 0 {
+	if !a.settingsUI.open && a.section.hasCatalog() && count > 0 {
 		if c.Shortcut(ui.Ctrl|ui.Shift, ui.KeyTab) {
 			a.cycleTab(-1)
 			return
@@ -126,6 +126,10 @@ func (a *app) appShortcuts(c *ui.Context) {
 	if a.actionPressed(c, "session.new") {
 		run(func() {
 			a.closeSettings()
+			if a.section == sectionGateways {
+				a.startGatewayDraft(gatewayConfig{}, false)
+				return
+			}
 			if a.section == sectionMCP {
 				if a.mcp.activeTab == 1 {
 					a.openNewMCPPolicyModal()
@@ -140,6 +144,12 @@ func (a *app) appShortcuts(c *ui.Context) {
 	if a.settingsUI.open {
 		if a.actionPressed(c, "host.search") {
 			a.settingsUI.search.Focus()
+		}
+		return
+	}
+	if a.section == sectionGateways {
+		if a.actionPressed(c, "host.search") {
+			a.page().search.Focus()
 		}
 		return
 	}
