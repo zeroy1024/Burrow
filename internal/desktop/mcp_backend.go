@@ -97,6 +97,7 @@ func (b *mcpDesktop) captureConnections() ([]mcpserver.Connection, error) {
 			Protocol, Host, User, Auth, KeyID, Revision, KeyFingerprint string
 			Port                                                        int
 			Files                                                       *fileOptions
+			SOCKS                                                       *socksGateway `json:",omitempty"`
 		}
 		makeIdentity := func(endpoint host) identity {
 			var options *fileOptions
@@ -115,25 +116,33 @@ func (b *mcpDesktop) captureConnections() ([]mcpserver.Connection, error) {
 				Auth: endpoint.session.Auth, KeyID: endpoint.session.KeyID, Revision: endpoint.session.PasswordRevision,
 				Port: endpoint.port, Files: options, KeyFingerprint: fingerprint}
 		}
-		chain := []identity{makeIdentity(h)}
-		if protocol != "ftp" {
-			plan, err := b.a.captureSSHPlan(h)
-			if err != nil {
-				return nil, err
-			}
-			chain = nil
-			for _, step := range plan.steps {
-				chain = append(chain, makeIdentity(step.endpoint))
-			}
+		plan, err := b.a.captureSSHPlan(h)
+		if err != nil {
+			return nil, err
 		}
+		chain := make([]identity, 0, len(plan.route)+1)
+		sshIndex := 0
+		for _, hop := range plan.route {
+			if hop.Kind == "socks5" {
+				chain = append(chain, identity{SOCKS: hop.SOCKS})
+				continue
+			}
+			chain = append(chain, makeIdentity(plan.steps[sshIndex].endpoint))
+			sshIndex++
+		}
+		chain = append(chain, makeIdentity(h))
+
 		data, err := json.Marshal(chain)
 		if err != nil {
 			return nil, err
 		}
 		digest := store.EndpointID(data)
 		session := b.sessions[h.session.ID+":"+digest]
-		if session == nil {
+		if session == nil || !sameGatewayRoute(session.endpoint.session.GatewayRoute, &plan.route) {
+			route := plan.route
+			h.session.GatewayRoute = &route
 			session = b.a.newFileSession(hostID(i), h, false, nil)
+			session.gatewayScope = "mcp:" + session.restoreID
 			b.observeGroup(session.connection)
 			b.sessions[h.session.ID+":"+digest] = session
 		}

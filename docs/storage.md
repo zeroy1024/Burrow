@@ -2,7 +2,7 @@
 
 ## 默认数据位置
 
-结构化业务数据统一保存在 `burrow.db`，使用 SQLite schema v4。已有 v1 / v2 / v3 数据库先生成升级前的一致性备份，再升级结构并执行一次性凭据迁移，保留原有业务数据。应用数据目录为：
+结构化业务数据统一保存在 `burrow.db`，使用 SQLite schema v5。已有 v1 / v2 / v3 数据库先生成升级前的一致性备份，再升级结构并执行一次性凭据迁移；v4 升级前生成 `.before-gateways-<时间>.bak`，在同一事务转换旧跳板配置、工作区和传输快照及其哈希引用，保留原有业务数据。应用数据目录为：
 
 | 系统 | 正式版 | 开发版 |
 |---|---|---|
@@ -19,10 +19,12 @@
 | 位置 | 内容 |
 |---|---|
 | SQLite `catalog_groups` / `profiles` | 分组、稳定 ID、排序、连接配置及凭据版本引用 |
+| SQLite `gateways` / `gateway_settings` | SSH / SOCKS5 网关、SSH 源主机与 SOCKS5 上游引用及应用默认出口 |
 | SQLite `managed_keys` | 公钥原文、密钥名称、类型、指纹及私钥凭据引用等元数据 |
 | SQLite `settings` | 唯一一份应用及终端设置、快捷键、文件面板偏好 |
 | SQLite `workspace` / `endpoints` | 布局、焦点、文件标签路径及独立的连接快照 |
-| SQLite `transfer_*` | 批次、标签归属、端点/跳板快照、任务、递归清单、提交状态及检查点 |
+| SQLite `endpoint_keys` | 连接快照中网关私钥的引用，保护恢复和传输仍需要的托管密钥 |
+| SQLite `transfer_*` | 批次、标签归属、端点/网关路径快照、任务、递归清单、提交状态及检查点 |
 | SQLite `host_keys` | 规范化主机名/IP、端口、完整公钥、算法、撤销标记与确认时间 |
 | SQLite `themes` | 导入配色的名称、原文件名和原始字节，保留来源及许可注释 |
 | SQLite `settings` 的 `mcp` 条目 | MCP 启用状态、监听 Host / Port 和审计保留周期 |
@@ -30,7 +32,7 @@
 | SQLite `mcp_operations` / `mcp_files` | 操作、目标与命中规则快照、生命周期及逐文件原始事件 |
 | SQLite `mcp_payloads` | 按操作 ID 关联的 MCP 请求与响应，详情按需读取；随对应审计记录级联清理 |
 | SQLite `mcp_tasks` / 原有 `transfer_*` | MCP 任务归属与现有传输清单；接受任务前在同一事务提交 |
-| SQLite `vault_meta` / `vault_items` | 解锁参数、被封装的数据密钥，以及密码、托管私钥和已保存私钥口令的密文 |
+| SQLite `vault_meta` / `vault_items` | 解锁参数、被封装的数据密钥，以及会话/网关密码、托管私钥和已保存私钥口令的密文 |
 | macOS 正式版的登录钥匙串 | 关闭启动解锁时的一份随机解锁密钥，按凭据库 ID 和密钥 ID 绑定；不保存远端密码或私钥 |
 | `vault-keys/<id>.key` | Windows、Linux、开发/联调及可移植备份的随机解锁密钥；开启应用密码后没有活动引用 |
 | 原系统凭据和 `keys/` | 仅作为迁移来源；迁移完成不自动删除旧副本，不再用于正常连接 |

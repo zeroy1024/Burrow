@@ -26,9 +26,14 @@ type sshDialStep struct {
 // Plans contain value snapshots only. Workers never inspect the live catalogs
 // while the window thread edits or reorders them.
 type sshDialPlan struct {
+	route         []gatewayHop
+	gatewayScope  string
 	promptChanged func(bool, string)
-	steps         []sshDialStep
-	trust         sshclient.HostKeyStore
+	// hopProgress observes actual connection/authentication stages; a ready SSH
+	// gateway also proves the upstream hops that its transport passed through.
+	hopProgress func(index int, ready bool)
+	steps       []sshDialStep
+	trust       sshclient.HostKeyStore
 }
 
 type sshSecretsOverride struct {
@@ -50,36 +55,42 @@ func sshHostSnapshot(h host) host {
 
 // captureSSHPlan is called on the window thread before starting a worker.
 func (a *app) captureSSHPlan(endpoint host) (sshDialPlan, error) {
-	plan := sshDialPlan{trust: a.store}
-	var err error
-	seen := map[string]bool{}
-	for {
-		endpoint = sshHostSnapshot(endpoint)
-		if endpoint.session.ID != "" {
-			if seen[endpoint.session.ID] {
-				return sshDialPlan{}, errors.New("SSH 跳板机形成环路")
-			}
-			seen[endpoint.session.ID] = true
+	route, err := a.captureGatewayRoute(endpoint)
+	if err != nil {
+		return sshDialPlan{}, err
+	}
+	plan, err := a.captureGatewayPlan(route)
+	if err != nil {
+		return plan, err
+	}
+	step := sshDialStep{endpoint: sshHostSnapshot(endpoint)}
+	if endpoint.session.Auth == "key" {
+		step.key, err = a.keyByID(endpoint.session.KeyID)
+		if err != nil {
+			return plan, err
 		}
-		step := sshDialStep{endpoint: endpoint}
-		if endpoint.session.Auth == "key" {
-			step.key, err = a.keyByID(endpoint.session.KeyID)
+	}
+	plan.steps = append(plan.steps, step)
+	return plan, nil
+}
+
+func (a *app) captureGatewayPlan(route []gatewayHop) (sshDialPlan, error) {
+	plan := sshDialPlan{trust: a.store, route: route}
+	for _, hop := range route {
+		if hop.Kind != "ssh" {
+			continue
+		}
+		h := transferStoredHost(*hop.SSH)
+		step := sshDialStep{endpoint: h}
+		if h.session.Auth == "key" {
+			var err error
+			step.key, err = a.keyByID(h.session.KeyID)
 			if err != nil {
-				return sshDialPlan{}, err
+				return plan, err
 			}
 		}
 		plan.steps = append(plan.steps, step)
-		options := endpoint.session.SSH
-		if options == nil || options.JumpHostID == "" {
-			break
-		}
-		index := slices.IndexFunc(a.hosts, func(h host) bool { return h.session.ID == options.JumpHostID })
-		if index == -1 || a.hosts[index].protocol != "" {
-			return sshDialPlan{}, errors.New("SSH 跳板机会话不存在")
-		}
-		endpoint = a.hosts[index]
 	}
-	slices.Reverse(plan.steps)
 	return plan, nil
 }
 
@@ -87,56 +98,16 @@ func (a *app) dialSSHPlan(ctx context.Context, plan sshDialPlan, override sshSec
 	if plan.promptChanged != nil {
 		ctx = context.WithValue(ctx, mcpPromptObserverKey{}, plan.promptChanged)
 	}
-	var connection *sshclient.Connection
-	var chain []*sshclient.Connection
-	success := false
-	defer func() {
-		if !success {
-			for _, opened := range chain {
-				opened.Close()
-			}
-		}
-	}()
-	for i, step := range plan.steps {
-		setupCtx, cancelSetup := context.WithTimeout(ctx, 2*time.Minute)
-		secrets := sshSecretsOverride{}
-		if i == len(plan.steps)-1 {
-			secrets = override
-		}
-		cfg, err := a.sshRuntimeConfig(setupCtx, step, secrets)
-		if err != nil {
-			cancelSetup()
-			return nil, err
-		}
-		cfg.HostKey = a.sshHostKeyCallback(setupCtx, plan.trust, result)
-		if connection != nil {
-			cfg.DialContext = connection.DialContext
-		}
-		if err := setupCtx.Err(); err != nil {
-			cancelSetup()
-			return nil, err
-		}
-		deadline, _ := setupCtx.Deadline()
-		cfg.SetupTimeout = time.Until(deadline)
-		if cfg.SetupTimeout <= 0 {
-			cancelSetup()
-			return nil, context.DeadlineExceeded
-		}
-		connection, err = sshclient.Dial(ctx, cfg)
-		cfg.Password, cfg.Passphrase, cfg.Signer = "", "", nil
-		setupErr := setupCtx.Err()
-		cancelSetup()
-		if err != nil {
-			if setupErr != nil {
-				return nil, setupErr
-			}
-			return nil, err
-		}
-		chain = append(chain, connection)
-		opened := connection
-		a.sshWorkers.Go(func() { opened.Wait() })
+	dial, release, err := a.gatewayDialer(ctx, plan)
+	if err != nil {
+		return nil, err
 	}
-	success = true
+	connection, err := a.openSSHStep(ctx, plan.steps[len(plan.steps)-1], plan.trust, dial, override, result)
+	if err != nil {
+		release()
+		return nil, err
+	}
+	a.sshWorkers.Go(func() { connection.Wait(); release() })
 	return connection, nil
 }
 

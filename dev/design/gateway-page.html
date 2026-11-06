@@ -1,0 +1,928 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>连接网关 · 设计草图</title>
+<style>
+:root{
+  --font-ui:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC",Inter,"Noto Sans CJK SC",system-ui,sans-serif;
+  --font-mono:"JetBrains Mono","SF Mono",Menlo,monospace;
+  --page:#d6d6da;
+  --bg-window:#e7e7e8; --card:#fff; --raised:#fff; --sunken:#f4f4f5; --field:#f6f6f7;
+  --control:#f2f2f4; --control-strong:#ececef;
+  --hover:#f7f7f8; --selected:#efeff1; --pressed:#e6e6e9; --on-window:#d6d6d8;
+  --rail-hover:rgba(0,0,0,.045); --selected-accent:#e8f2fe;
+  --border-card:rgba(0,0,0,.06); --border-subtle:#f0f0f2; --border-divider:#f2f2f4;
+  --border-control:#e6e6e9; --border-control-hover:#c7c7cc; --border-raised:rgba(0,0,0,.08);
+  --text:#1d1d1f; --text-2:#8e8e93; --text-3:#a1a1a6; --text-4:#b0b0b5; --text-muted:#6e6e73;
+  --text-strong:#3a3a3f; --text-badge:#5b5b62; --text-ph:#c7c7cc; --icon:#6e6e73;
+  --accent:#0a84ff; --accent-hover:#0a6fd6; --accent-text:#0a6fd6; --accent-subtle:#eaf3fe; --accent-halo:rgba(10,132,255,.16);
+  --success:#30c45a; --success-text:#1f8a3f; --success-subtle:#ebf8ef; --success-halo:rgba(48,196,90,.14);
+  --warning:#f5a623; --warning-text:#b26a00; --warning-subtle:#fdf3e3;
+  --danger:#ff3b30; --danger-text:#d70015; --danger-subtle:#fdecec;
+  --wire:#c7c7cc;
+  --ssh-bg:rgba(10,132,255,.10); --ssh-fg:#0a6fd6;
+  --socks-bg:rgba(142,92,247,.11); --socks-fg:#7444db;
+  --scrim:rgba(0,0,0,.16);
+  --shadow-window:0 0 0 .5px rgba(0,0,0,.18),0 24px 60px rgba(0,0,0,.18),0 4px 14px rgba(0,0,0,.08);
+  --shadow-popover:0 0 0 .5px rgba(0,0,0,.1),0 10px 28px rgba(0,0,0,.12),0 2px 6px rgba(0,0,0,.06);
+  --shadow-dialog:0 0 0 .5px rgba(0,0,0,.08),0 10px 30px rgba(0,0,0,.22);
+  --shadow-node:0 0 0 .5px rgba(0,0,0,.08),0 1px 2px rgba(0,0,0,.04);
+  --shadow-seg:0 1px 2px rgba(0,0,0,.08),0 0 0 .5px rgba(0,0,0,.06);
+  color-scheme:light;
+}
+:root[data-theme="dark"]{
+  --page:#0e0e10;
+  --bg-window:#1c1c1e; --card:#252527; --raised:#2e2e31; --sunken:#2a2a2d; --field:#2a2a2d;
+  --control:#2e2e31; --control-strong:#333336;
+  --hover:#2a2a2d; --selected:#333336; --pressed:#3a3a3d; --on-window:#3a3a3d;
+  --rail-hover:rgba(255,255,255,.06); --selected-accent:#16304d;
+  --border-card:rgba(255,255,255,.08); --border-subtle:#333336; --border-divider:#333336;
+  --border-control:#444448; --border-control-hover:#5a5a5f; --border-raised:rgba(255,255,255,.1);
+  --text:#f5f5f7; --text-2:#98989d; --text-3:#6e6e73; --text-4:#5a5a5f; --text-muted:#a1a1a6;
+  --text-strong:#d1d1d6; --text-badge:#c7c7cc; --text-ph:#5a5a5f; --icon:#a1a1a6;
+  --accent-hover:#4da3ff; --accent-text:#4da3ff; --accent-subtle:#16304d; --accent-halo:rgba(10,132,255,.24);
+  --success:#32d74b; --success-text:#5fd97a; --success-subtle:#173523;
+  --warning:#ffb340; --warning-text:#ffc15c; --warning-subtle:#3d2e12;
+  --danger:#ff453a; --danger-text:#ff6961; --danger-subtle:#3a1d1c;
+  --wire:#5a5a5f;
+  --ssh-bg:rgba(10,132,255,.2); --ssh-fg:#6cb4ff;
+  --socks-bg:rgba(142,92,247,.24); --socks-fg:#b79cff;
+  --scrim:rgba(0,0,0,.42);
+  --shadow-window:0 0 0 .5px rgba(255,255,255,.14),0 24px 60px rgba(0,0,0,.5),0 4px 14px rgba(0,0,0,.3);
+  --shadow-popover:0 0 0 .5px rgba(255,255,255,.14),0 10px 28px rgba(0,0,0,.45),0 2px 6px rgba(0,0,0,.25);
+  --shadow-dialog:0 0 0 .5px rgba(255,255,255,.12),0 10px 30px rgba(0,0,0,.5);
+  --shadow-node:0 0 0 .5px rgba(255,255,255,.1),0 1px 2px rgba(0,0,0,.3);
+  --shadow-seg:0 1px 2px rgba(0,0,0,.3),0 0 0 .5px rgba(255,255,255,.08);
+  color-scheme:dark;
+}
+
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--page);color:var(--text);font:12.5px/1.45 var(--font-ui);-webkit-font-smoothing:antialiased;min-width:1180px;padding-bottom:48px}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;cursor:default;text-align:inherit}
+input,select{font:inherit;color:inherit}
+h1,h2,h3,p{margin:0}
+.mono{font-family:var(--font-mono);letter-spacing:-.2px}
+.grow{flex:1 1 auto}
+.ic{flex:none;display:block}
+.spin{animation:spin .9s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ---------- 草图控制条（窗口外） ---------- */
+.sketchbar{width:1320px;margin:22px auto 14px;display:flex;align-items:center;gap:14px}
+.sketchbar h1{font-size:14px;font-weight:600}
+.sketchbar .cap{color:var(--text-2);font-size:12px}
+.seg{display:inline-flex;padding:2px;border-radius:7px;background:var(--control);gap:2px}
+.seg button{height:24px;padding:0 10px;border-radius:5px;color:var(--text-muted);font-weight:500;font-size:12px}
+.seg button.on{background:var(--raised);color:var(--text);box-shadow:var(--shadow-seg)}
+.sketchbar .seg{background:rgba(0,0,0,.07)}
+:root[data-theme="dark"] .sketchbar .seg{background:rgba(255,255,255,.08)}
+
+/* ---------- 窗口骨架 ---------- */
+.window{position:relative;width:1320px;height:820px;margin:0 auto;background:var(--bg-window);border-radius:12px;box-shadow:var(--shadow-window);display:grid;grid-template-rows:50px minmax(0,1fr);overflow:hidden}
+.titlebar{display:flex;align-items:center;gap:8px;padding-left:20px}
+.titlebar i{width:12px;height:12px;border-radius:50%;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.12)}
+.wbody{display:grid;grid-template-columns:52px minmax(0,1fr);min-height:0}
+.rail{display:flex;flex-direction:column;align-items:center;gap:6px;padding:4px 0 10px}
+.rail-btn{position:relative;width:34px;height:34px;border-radius:8px;display:grid;place-items:center;color:var(--text-muted);transition:background .16s,color .16s}
+.rail-btn:hover{background:var(--rail-hover)}
+.rail-btn.on{background:var(--on-window);color:var(--text)}
+.rail .grow{flex:1}
+.main{display:flex;flex-direction:column;gap:8px;padding:0 8px 8px 0;min-width:0;min-height:0}
+.card{background:var(--card);border-radius:10px;box-shadow:inset 0 0 0 .5px var(--border-card)}
+
+/* ---------- 通用控件 ---------- */
+.btn{height:28px;padding:0 10px;border-radius:7px;background:var(--control);color:var(--text-strong);display:inline-flex;align-items:center;gap:6px;font-weight:500;white-space:nowrap;transition:background .16s}
+.btn:hover{background:var(--control-strong)}
+.btn:active{background:var(--pressed)}
+.btn.primary{background:var(--accent);color:#fff}
+.btn.primary:hover{background:var(--accent-hover)}
+.btn.danger{background:var(--danger);color:#fff}
+.btn.plain{background:transparent}
+.btn.plain:hover{background:var(--hover)}
+.btn.sm{height:24px;padding:0 8px;font-size:12px}
+.btn[disabled]{opacity:.42;pointer-events:none}
+.ibtn{width:26px;height:26px;border-radius:6px;display:grid;place-items:center;color:var(--icon);transition:background .16s,color .16s}
+.ibtn:hover{background:var(--hover);color:var(--text)}
+.ibtn.filled{background:var(--control)}
+.ibtn.filled:hover{background:var(--control-strong)}
+.badge{height:18px;padding:0 7px;border-radius:20px;font-size:11px;font-weight:500;display:inline-flex;align-items:center;gap:5px;white-space:nowrap;flex:none}
+.badge.neutral{background:var(--control);color:var(--text-badge)}
+.badge.run{background:var(--accent-subtle);color:var(--accent-text)}
+.badge.ok{background:var(--success-subtle);color:var(--success-text)}
+.badge.ok i{width:6px;height:6px;border-radius:50%;background:var(--success)}
+.count{min-width:18px;height:16px;padding:0 5px;border-radius:9px;background:var(--control);color:var(--text-badge);font-size:10.5px;font-weight:600;display:inline-grid;place-items:center}
+.link{color:var(--accent-text);font-weight:500}
+.link:hover{text-decoration:underline}
+
+.tile{position:relative;width:28px;height:28px;border-radius:7px;display:grid;place-items:center;flex:none}
+.tile.xs{width:20px;height:20px;border-radius:5px}
+.tile.sm{width:22px;height:22px;border-radius:6px}
+.tile.lg{width:40px;height:40px;border-radius:10px}
+.k-ssh{background:var(--ssh-bg);color:var(--ssh-fg)}
+.k-socks{background:var(--socks-bg);color:var(--socks-fg)}
+.k-local{background:var(--control);color:var(--icon)}
+.k-ghost{background:transparent;color:var(--text-3);box-shadow:inset 0 0 0 1px var(--border-control)}
+
+/* ---------- 顶栏：应用默认出口 ---------- */
+.topbar{height:52px;flex:none;display:flex;align-items:center;gap:12px;padding:0 16px}
+.tb-title{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;white-space:nowrap}
+.tb-title .ic{color:var(--icon)}
+.picker{height:28px;padding:0 8px 0 6px;border-radius:7px;background:var(--control);display:inline-flex;align-items:center;gap:7px;transition:background .16s}
+.picker:hover,.picker.open{background:var(--control-strong)}
+.picker b{font-weight:600}
+.picker .kind{color:var(--text-2);font-size:11.5px}
+.picker .ic.chev{color:var(--text-2)}
+.trail{display:flex;align-items:center;gap:4px;color:var(--text-2);font-size:12px;white-space:nowrap;min-width:0}
+.trail .ic{color:var(--text-4)}
+.trail .mono{font-size:11.5px}
+.stats{display:flex;align-items:center;gap:18px;white-space:nowrap}
+.stat{display:flex;align-items:baseline;gap:5px;color:var(--text-2)}
+.stat b{color:var(--text);font-size:13px;font-weight:600}
+.stat b.ok{color:var(--success-text)}
+
+/* ---------- 主从布局 ---------- */
+.split{flex:1;min-height:0;display:grid;grid-template-columns:304px minmax(0,1fr);gap:8px}
+.list{display:flex;flex-direction:column;min-height:0}
+.list-head{display:flex;align-items:center;justify-content:space-between;padding:14px 12px 10px 16px}
+.list-head h2{font-size:15px;font-weight:600}
+.search{margin:0 12px 6px;height:30px;border-radius:7px;background:var(--sunken);display:flex;align-items:center;gap:6px;padding:0 9px;color:var(--text-2);transition:box-shadow .16s}
+.search:focus-within{box-shadow:0 0 0 1.5px var(--accent),0 0 0 5px var(--accent-halo)}
+.search input{flex:1;min-width:0;border:0;outline:0;background:transparent;font-size:12.5px;line-height:18px;color:var(--text)}
+.search input::placeholder{color:var(--text-2)}
+.search .kbd{font-size:11px;color:var(--text-3)}
+.list-body{flex:1;min-height:0;overflow:auto;padding:0 8px 8px;scrollbar-width:thin}
+.ghead{height:30px;display:flex;align-items:center;gap:4px;padding:12px 8px 5px;box-sizing:content-box;height:13px;color:var(--text-2);font-size:11.5px;font-weight:500}
+.ghead .n{margin-left:auto;color:var(--text-4);font-size:11px;font-weight:500}
+.row{--row-bg:var(--card);display:flex;align-items:center;gap:9px;padding:6px 6px 6px 8px;border-radius:7px;margin-bottom:1px;background:var(--row-bg);transition:background .16s}
+.row:hover{--row-bg:var(--hover)}
+.row.sel{--row-bg:var(--selected-accent)}
+.row .pres{position:absolute;right:-2px;bottom:-2px;width:8px;height:8px;border-radius:50%;background:var(--success);box-shadow:0 0 0 2px var(--row-bg)}
+.row-main{flex:1;min-width:0}
+.row-name{font-size:13px;font-weight:500;line-height:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row-sub{font:11.5px/15px var(--font-mono);letter-spacing:-.2px;color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row-side{display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex:none}
+.pill{height:16px;padding:0 6px;border-radius:9px;font-size:10.5px;font-weight:600;display:inline-flex;align-items:center;background:var(--accent-subtle);color:var(--accent-text)}
+.hops{display:inline-flex;align-items:center;gap:3px;color:var(--text-3);font-size:11px}
+.row.sel .pill{background:var(--card)}
+.list-empty{padding:28px 12px;text-align:center;color:var(--text-2);font-size:12px}
+.list-foot{flex:none;height:40px;border-top:1px solid var(--border-subtle);display:flex;align-items:center;gap:7px;padding:0 16px;color:var(--text-2);font-size:12px}
+
+/* ---------- 详情 ---------- */
+.detail{display:flex;flex-direction:column;min-width:0;min-height:0}
+.d-head{flex:none;display:flex;align-items:center;gap:12px;padding:16px 16px 16px 20px;border-bottom:1px solid var(--border-divider)}
+.d-title{flex:1;min-width:0}
+.d-name-row{display:flex;align-items:center;gap:8px}
+.d-name-row h2{font-size:15px;font-weight:600;line-height:20px}
+.d-sub{margin-top:2px;color:var(--text-2);font-size:12px}
+.d-actions{display:flex;align-items:center;gap:6px}
+.d-body{flex:1;min-height:0;overflow:auto;padding:18px 20px 28px;display:flex;flex-direction:column;gap:26px;scrollbar-width:thin}
+.sec-head{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.sec-head h3{font-size:13px;font-weight:600}
+.sec-sub{color:var(--text-3);font-size:11.5px}
+
+/* 连接路径 */
+.path{display:flex;align-items:center;padding:24px 18px 22px;border-radius:10px;background:var(--field);overflow-x:auto}
+.node{position:relative;flex:0 1 176px;min-width:150px;background:var(--raised);border-radius:9px;box-shadow:var(--shadow-node);padding:10px 11px 11px;transition:box-shadow .16s}
+.node.jump:hover{box-shadow:var(--shadow-node),0 0 0 1px var(--border-control-hover)}
+.node.cur{box-shadow:0 0 0 1.5px var(--accent),0 0 0 5px var(--accent-halo)}
+.node.local{flex:0 1 120px;min-width:88px;background:transparent;box-shadow:inset 0 0 0 1px var(--border-control)}
+.node.target{flex:0 1 150px;min-width:112px;background:transparent;box-shadow:none;outline:1px dashed var(--border-control-hover);outline-offset:-1px}
+.node-top{display:flex;align-items:center;gap:7px;height:20px}
+.node-kind{font-size:10.5px;font-weight:600;letter-spacing:.3px;color:var(--text-3)}
+.node-flag{position:absolute;top:-9px;left:10px;height:17px;padding:0 7px;border-radius:9px;background:var(--accent);color:#fff;font-size:10.5px;font-weight:600;line-height:17px;letter-spacing:.2px}
+.nstate{margin-left:auto;width:18px;height:18px;border-radius:50%;display:grid;place-items:center}
+.nstate.ok{background:var(--success);color:#fff}
+.nstate.fail{background:var(--danger);color:#fff}
+.nstate.run{color:var(--accent)}
+.node-name{margin-top:8px;font-size:13px;font-weight:500;line-height:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.node-sub{font:11.5px/15px var(--font-mono);letter-spacing:-.2px;color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.node.target .node-name,.node.local .node-name{color:var(--text-strong)}
+.node.target .node-sub,.node.local .node-sub{font-family:var(--font-ui);letter-spacing:0;color:var(--text-3)}
+.wire{flex:1 1 44px;min-width:52px;position:relative;height:40px;display:flex;align-items:center;padding:0 6px;color:var(--wire)}
+.wire-line{position:relative;display:block;width:100%;height:1.5px;background:currentColor;border-radius:1px}
+.wire-line::after{content:"";position:absolute;right:0;top:50%;width:6px;height:6px;border-top:1.5px solid currentColor;border-right:1.5px solid currentColor;transform:translate(-.5px,-50%) rotate(45deg)}
+.wire-label{position:absolute;left:50%;bottom:calc(50% + 5px);transform:translateX(-50%);font-size:10.5px;color:var(--text-3);white-space:nowrap}
+.wire.idle{color:var(--text-4)}
+.wire.idle .wire-line,.wire.fail .wire-line{background:repeating-linear-gradient(90deg,currentColor 0 4px,transparent 4px 8px)}
+.wire.flow{color:var(--accent)}
+.wire.flow .wire-line{background:repeating-linear-gradient(90deg,currentColor 0 6px,transparent 6px 10px);animation:flow .45s linear infinite}
+.wire.flow .wire-label{color:var(--accent-text)}
+@keyframes flow{to{background-position:10px 0}}
+.wire.ok{color:var(--success)}
+.wire.fail{color:var(--danger)}
+
+.result{margin-top:10px;min-height:38px;border-radius:8px;padding:9px 10px 9px 12px;display:flex;align-items:center;gap:9px}
+.result.idle{color:var(--text-2);padding-left:2px;min-height:0;padding-top:0;padding-bottom:0;font-size:12px}
+.result.idle .ic{color:var(--text-3)}
+.result.run{background:var(--accent-subtle);color:var(--accent-text)}
+.result.ok{background:var(--success-subtle)}
+.result.ok>.ic{color:var(--success)}
+.result.ok b{color:var(--success-text);font-weight:600}
+.result.fail{background:var(--danger-subtle);align-items:flex-start}
+.result.fail>.ic{color:var(--danger);margin-top:1px}
+.result.fail b{color:var(--danger-text);font-weight:600;display:block}
+.result.fail code{display:block;margin-top:2px;font:11.5px/16px var(--font-mono);color:var(--text-strong);user-select:text}
+.r-detail{color:var(--text-strong)}
+.r-time{color:var(--text-3);font-size:11.5px}
+
+/* 配置 */
+.kv{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:28px}
+.kv-row{display:flex;align-items:center;gap:12px;min-height:36px;padding:7px 0;border-bottom:1px solid var(--border-subtle)}
+.kv-row dt{width:72px;flex:none;color:var(--text-2)}
+.kv-row dd{margin:0;min-width:0;display:flex;align-items:center;gap:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kv-row dd .ic{color:var(--text-2)}
+.chip{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 6px 0 3px;border-radius:6px;background:var(--control);transition:background .16s}
+.chip:hover{background:var(--control-strong)}
+.chip .tile{width:18px;height:18px;border-radius:5px}
+.chip .ic.dim{color:var(--text-3)}
+.note{margin-top:12px;display:flex;align-items:flex-start;gap:7px;color:var(--text-2);font-size:12px;line-height:17px}
+.note>.ic{color:var(--text-3);margin-top:1.5px}
+
+/* 引用 */
+.refs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;align-items:start}
+.ref-group{border-radius:9px;box-shadow:inset 0 0 0 1px var(--border-subtle);padding:6px}
+.ref-gtitle{display:flex;align-items:center;gap:6px;padding:4px 6px 6px;color:var(--text-2);font-size:11.5px;font-weight:500}
+.ref-gtitle span{color:var(--text-4);font-size:11px}
+.ref-row{display:flex;align-items:center;gap:9px;height:32px;padding:0 6px;border-radius:6px;transition:background .16s}
+.ref-row:hover{background:var(--hover)}
+.ref-name{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ref-meta{color:var(--text-2);font-size:12px;white-space:nowrap}
+.ref-go{color:var(--text-4);opacity:0;transition:opacity .16s}
+.ref-row:hover .ref-go{opacity:1}
+.refs-empty{display:flex;align-items:center;gap:8px;padding:12px 14px;border-radius:9px;box-shadow:inset 0 0 0 1px var(--border-subtle);color:var(--text-2)}
+.refs-empty .ic{color:var(--success)}
+
+/* ---------- 空状态 ---------- */
+.empty{flex:1;min-height:0;display:grid;place-items:center}
+.empty-inner{width:560px;text-align:center}
+.empty-art{display:flex;align-items:center;justify-content:center;margin-bottom:22px}
+.empty-art .dash{width:56px;height:0;border-top:1.5px dashed var(--border-control-hover)}
+.empty-art .tile.hero{width:52px;height:52px;border-radius:14px;background:var(--accent-subtle);color:var(--accent)}
+.empty-art .tile.end{width:36px;height:36px;border-radius:10px}
+.empty h2{font-size:15px;font-weight:600}
+.empty p{margin:8px auto 0;max-width:440px;color:var(--text-2);line-height:19px}
+.choices{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:24px;text-align:left}
+.choice{display:flex;gap:11px;align-items:flex-start;padding:14px;border-radius:10px;box-shadow:inset 0 0 0 1px var(--border-control);transition:box-shadow .16s,background .16s}
+.choice:hover{background:var(--hover);box-shadow:inset 0 0 0 1px var(--border-control-hover)}
+.choice b{display:block;font-size:13px;font-weight:600}
+.choice span{display:block;margin-top:3px;color:var(--text-2);font-size:12px;line-height:17px}
+
+/* ---------- 菜单 / 弹窗 / 提示 ---------- */
+.layer{position:absolute;inset:0;pointer-events:none;z-index:20}
+.layer>*{pointer-events:auto}
+.menu{position:absolute;width:232px;padding:5px;border-radius:12px;background:var(--raised);box-shadow:var(--shadow-popover);animation:pop .14s ease-out}
+@keyframes pop{from{opacity:0;transform:translateY(-3px) scale(.98)}}
+.mi{width:100%;min-height:30px;padding:5px 8px;border-radius:7px;display:flex;align-items:center;gap:9px}
+.mi:hover{background:var(--hover)}
+.mi .ic{color:var(--icon)}
+.mi .mi-text{flex:1;min-width:0}
+.mi .mi-sub{display:block;color:var(--text-2);font-size:11.5px;line-height:15px}
+.mi .mi-check{color:var(--accent)}
+.mi.danger,.mi.danger .ic{color:var(--danger-text)}
+.mi.danger:hover{background:var(--danger-subtle)}
+.mi.dis{opacity:.42;pointer-events:none}
+.msep{height:1px;margin:4px 6px;background:var(--border-divider)}
+.mhead{padding:6px 8px 4px;color:var(--text-2);font-size:11.5px;font-weight:500}
+
+.scrim{position:absolute;inset:0;background:var(--scrim);display:grid;place-items:center;z-index:30}
+.scrim.enter{animation:fade .16s ease-out}
+@keyframes fade{from{opacity:0}}
+.dialog{width:560px;max-height:calc(100% - 64px);overflow:auto;background:var(--card);border-radius:12px;box-shadow:var(--shadow-dialog)}
+.scrim.enter .dialog{animation:zoom .18s cubic-bezier(.2,.9,.3,1)}
+.dialog.sm{width:440px}
+@keyframes zoom{from{opacity:0;transform:scale(.97)}}
+.dlg-head{display:flex;align-items:center;gap:10px;padding:16px 14px 6px 20px}
+.dlg-head h3{flex:1;font-size:15px;font-weight:600}
+.dlg-body{padding:12px 20px 4px;display:flex;flex-direction:column;gap:12px}
+.dlg-foot{display:flex;align-items:center;gap:8px;padding:16px 20px 18px}
+.foot-hint{color:var(--text-3);font-size:11.5px}
+.dlg-text{color:var(--text-strong);line-height:19px}
+.frow{display:flex;gap:12px;align-items:flex-start}
+.frow>label{width:76px;flex:none;text-align:right;line-height:28px;color:var(--text-2)}
+.fctl{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
+.inline{display:flex;gap:8px;align-items:center}
+.inp{height:28px;width:100%;padding:0 9px;border-radius:7px;border:1px solid var(--border-control);background:var(--card);outline:0;transition:border-color .16s,box-shadow .16s}
+.inp:hover{border-color:var(--border-control-hover)}
+.inp:focus{border-color:var(--accent);box-shadow:0 0 0 3.5px var(--accent-halo)}
+.inp::placeholder{color:var(--text-ph)}
+.inp.mono{font-size:12px}
+.inp.port{width:84px;flex:none}
+.selbox{position:relative}
+.selbox select{appearance:none;-webkit-appearance:none;height:28px;width:100%;padding:0 30px 0 9px;border-radius:7px;border:1px solid var(--border-control);background:var(--card);outline:0}
+.selbox select:hover{border-color:var(--border-control-hover)}
+.selbox select:focus{border-color:var(--accent);box-shadow:0 0 0 3.5px var(--accent-halo)}
+.selbox .ic{position:absolute;right:9px;top:50%;transform:translateY(-50%);color:var(--text-2);pointer-events:none}
+.help{color:var(--text-2);font-size:11.5px;line-height:16px}
+.seg-cards{display:grid;grid-template-columns:1fr 1fr;gap:3px;padding:3px;border-radius:10px;background:var(--control)}
+.seg-card{display:flex;gap:9px;align-items:center;padding:8px 10px;border-radius:8px;transition:background .16s}
+.seg-card:hover{background:var(--control-strong)}
+.seg-card.on{background:var(--raised);box-shadow:var(--shadow-seg)}
+.seg-card b{display:block;font-weight:600}
+.seg-card span{display:block;color:var(--text-2);font-size:11.5px;line-height:15px}
+.seg-sm{display:inline-flex;align-self:flex-start;padding:2px;border-radius:7px;background:var(--control);gap:2px}
+.seg-sm button{height:24px;padding:0 12px;border-radius:5px;color:var(--text-muted);font-weight:500}
+.seg-sm button.on{background:var(--raised);color:var(--text);box-shadow:var(--shadow-seg)}
+.check{display:inline-flex;align-items:center;gap:7px;color:var(--text-strong);font-size:12px}
+.check input{margin:0;accent-color:var(--accent)}
+.rprev{display:flex;align-items:center;flex-wrap:wrap;gap:5px;padding:9px 10px;border-radius:8px;background:var(--field)}
+.rchip{height:24px;padding:0 8px 0 4px;border-radius:6px;display:inline-flex;align-items:center;gap:6px;background:var(--raised);box-shadow:var(--shadow-node);font-size:12px;white-space:nowrap}
+.rchip .tile{width:16px;height:16px;border-radius:4px}
+.rchip.self{box-shadow:0 0 0 1.5px var(--accent)}
+.rchip.ghost{background:transparent;box-shadow:none;outline:1px dashed var(--border-control-hover);outline-offset:-1px;color:var(--text-2);padding-left:8px}
+.rprev>.ic{color:var(--text-4)}
+.banner{display:flex;align-items:flex-start;gap:8px;padding:9px 12px;border-radius:8px;line-height:18px}
+.banner .ic{margin-top:1px}
+.banner.warn{background:var(--warning-subtle);color:var(--warning-text)}
+.banner.err{background:var(--danger-subtle);color:var(--danger-text)}
+.dlg-icon{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;background:var(--danger-subtle);color:var(--danger)}
+.ref-mini{border-radius:9px;box-shadow:inset 0 0 0 1px var(--border-subtle);padding:4px}
+.ref-mini .ref-row{height:30px}
+
+.toast{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);padding:8px 14px;border-radius:10px;background:rgba(30,30,32,.92);color:#fff;font-size:12px;box-shadow:0 4px 12px rgba(0,0,0,.18);animation:pop .16s ease-out;z-index:40;white-space:nowrap}
+
+/* ---------- 草图说明 ---------- */
+.notes{width:1320px;margin:26px auto 0;display:grid;grid-template-columns:1.35fr 1fr;gap:16px}
+.notes section{background:var(--card);border-radius:12px;box-shadow:inset 0 0 0 .5px var(--border-card);padding:18px 20px}
+.notes h2{font-size:13px;font-weight:600;margin-bottom:10px}
+.notes ol,.notes ul{margin:0;padding-left:18px;color:var(--text-strong);line-height:20px}
+.notes li+li{margin-top:6px}
+.notes b{font-weight:600;color:var(--text)}
+.notes code{font:11.5px var(--font-mono);background:var(--control);padding:1px 5px;border-radius:4px}
+.notes .tag{display:inline-block;margin-left:6px;font-size:10.5px;font-weight:600;padding:0 6px;border-radius:9px;background:var(--warning-subtle);color:var(--warning-text);vertical-align:1px}
+</style>
+</head>
+<body>
+
+<div class="sketchbar">
+  <h1>连接网关 · 设计草图</h1>
+  <span class="cap">基于 Burrow 现有设计令牌 · 数据为虚构演示数据</span>
+  <span class="grow"></span>
+  <span class="cap">外观</span>
+  <div class="seg" id="theme-seg">
+    <button data-act="theme" data-v="light">浅色</button>
+    <button data-act="theme" data-v="dark">深色</button>
+  </div>
+  <span class="cap">场景</span>
+  <div class="seg" id="scene-seg">
+    <button data-act="scene" data-v="list">已有网关</button>
+    <button data-act="scene" data-v="empty">空状态</button>
+  </div>
+</div>
+
+<div class="window" id="win">
+  <div class="titlebar"><i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i></div>
+  <div class="wbody">
+    <nav class="rail" id="rail"></nav>
+    <main class="main" id="main"></main>
+  </div>
+  <div class="layer" id="menu-layer"></div>
+  <div id="modal-layer"></div>
+  <div id="toast-layer"></div>
+</div>
+
+<div class="notes">
+  <section>
+    <h2>相对现有实现的主要调整</h2>
+    <ol>
+      <li><b>主从布局</b>：左侧沿用「远程会话」侧栏的分组列表（SSH 网关 / SOCKS5 代理、搜索、底部计数），右侧显示选中网关详情；页面不再只是一张卡片里的平铺列表。</li>
+      <li><b>默认出口放到顶栏</b>：与 MCP 页顶栏同构，直接显示默认出口的实际路径和「跟随默认」的会话数，切换默认不用再找表单行。</li>
+      <li><b>连接路径可视化</b>：本机 → 上游 → 本网关 → 目标主机，多级网关一目了然；上游节点和配置中的上游都可点击跳转。</li>
+      <li><b>测试结果内联</b>：不再弹窗。测试时连线流动，只走到本网关为止，与实际测试范围一致（不访问目标主机）。<code>tokyo-edge</code> 演示失败态。</li>
+      <li><b>引用分组可见</b>：应用设置、主机与站点、下游网关、运行中四类分组列出；删除确认直接列出需要解除的引用。</li>
+      <li><b>编辑弹窗</b>：类型使用卡片式分段（同会话弹窗的协议选择）；SOCKS5 地址与端口同行，认证显式二选一；上游选项禁用会成环的网关，并实时预览路径。</li>
+    </ol>
+  </section>
+  <section>
+    <h2>落地到 MyGo 时需要的数据</h2>
+    <ul>
+      <li>「使用中」与运行中引用：沿用 <code>gatewayReferences</code> 中的运行时判断（运行中的 SSH 分组、文件会话、传输任务）。</li>
+      <li>「跟随默认 N 个会话」：统计 <code>Gateway</code> 为空的主机与站点。</li>
+      <li><code>gatewayReferences</code> 目前返回字符串，需要改为带类别和目标 ID 的结构，才能分组展示和跳转。<span class="tag">需改动</span></li>
+      <li>测试结果按网关 ID 暂存在 <code>gatewayUI</code>，不落库；离开页面时仍取消测试。<span class="tag">需改动</span></li>
+      <li>侧栏图标由 <code>server</code> 换为 lucide <code>route</code>，需补充图标资源。<span class="tag">需改动</span></li>
+      <li>列表、路径节点和弹窗都能用现有 <code>Card</code> / <code>ListRow</code> / <code>IconTile</code> / <code>Segmented{Cards}</code> / <code>Badge</code> / <code>Banner</code> 组合；路径连线需要一个小的自绘组件。</li>
+    </ul>
+  </section>
+</div>
+
+<script>
+/* ---------- 图标（lucide 线条风格，1.75 线宽） ---------- */
+const I = {
+  terminal:'<path d="m7 11 2-2-2-2"/><path d="M11 13h4"/><rect width="18" height="18" x="3" y="3" rx="2"/>',
+  folderSync:'<path d="M9 20H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v.5"/><path d="M12 10v4h4"/><path d="m12 14 1.535-1.605a5 5 0 0 1 8 1.5"/><path d="M22 22v-4h-4"/><path d="m22 18-1.535 1.605a5 5 0 0 1-8-1.5"/>',
+  route:'<circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/>',
+  mcp:'<path d="M3.5 11.6 11 4.1a2.7 2.7 0 0 1 3.8 3.8L9.2 13.5"/><path d="m9.3 13.4 5.6-5.6a2.7 2.7 0 0 1 3.8 3.8l-6.6 6.6a.8.8 0 0 0 0 1.1l1.4 1.4"/><path d="M12.9 6.2 7.4 11.7a2.7 2.7 0 0 0 3.8 3.8l5.5-5.5"/>',
+  settings:'<path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/>',
+  server:'<rect width="20" height="8" x="2" y="2" rx="2"/><rect width="20" height="8" x="2" y="14" rx="2"/><path d="M6 6h.01"/><path d="M6 18h.01"/>',
+  globe:'<circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/>',
+  laptop:'<path d="M18 5a2 2 0 0 1 2 2v8.526a2 2 0 0 0 .212.897l1.068 2.127a1 1 0 0 1-.9 1.45H3.62a1 1 0 0 1-.9-1.45l1.068-2.127A2 2 0 0 0 4 15.526V7a2 2 0 0 1 2-2z"/><path d="M20.054 15.987H3.946"/>',
+  folder:'<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',
+  activity:'<path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"/>',
+  plus:'<path d="M5 12h14"/><path d="M12 5v14"/>',
+  search:'<path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/>',
+  play:'<path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z"/>',
+  pencil:'<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/>',
+  ellipsis:'<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
+  chevronDown:'<path d="m6 9 6 6 6-6"/>',
+  chevronRight:'<path d="m9 18 6-6-6-6"/>',
+  arrowRight:'<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
+  check:'<path d="M20 6 9 17l-5-5"/>',
+  x:'<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+  circleCheck:'<circle cx="12" cy="12" r="10"/><path d="m16 9-5.5 5.5L8 12"/>',
+  circleAlert:'<circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/>',
+  info:'<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',
+  lock:'<rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+  loader:'<path d="M21 12a9 9 0 1 1-6.219-8.56"/>',
+  refresh:'<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>',
+  trash:'<path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
+};
+const ic = (n, s = 16, cls = '') =>
+  `<svg class="ic ${cls}" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${I[n]}</svg>`;
+
+/* ---------- 演示数据（RFC 5737 文档地址） ---------- */
+const HOSTS = {
+  bastion:      { name:'bastion',      user:'deploy', addr:'203.0.113.10', port:22, auth:'托管私钥 · ED25519', keepalive:'30 秒' },
+  'db-jump':    { name:'db-jump',      user:'ops',    addr:'192.0.2.30',   port:22, auth:'密码 · 已保存',      keepalive:'60 秒' },
+  'edge-tokyo': { name:'edge-tokyo',   user:'deploy', addr:'192.0.2.18',   port:22, auth:'SSH agent',          keepalive:'关闭' },
+  'prod-web-01':{ name:'prod-web-01',  user:'deploy', addr:'192.0.2.10',   port:22, auth:'托管私钥 · ED25519', keepalive:'30 秒' },
+  'home-lab':   { name:'home-lab',     user:'ops',    addr:'192.0.2.17',   port:22, auth:'密码 · 已保存',      keepalive:'30 秒' },
+};
+const KIND = {
+  ssh:   { label:'SSH',    group:'SSH 网关',    icon:'terminal', cls:'k-ssh' },
+  socks5:{ label:'SOCKS5', group:'SOCKS5 代理', icon:'globe',    cls:'k-socks' },
+};
+let G = [
+  { id:'bastion-hk',   name:'bastion-hk',   kind:'ssh',    host:'bastion',    upstream:'office-socks', ms:182 },
+  { id:'db-jump',      name:'db-jump',      kind:'ssh',    host:'db-jump',    upstream:'bastion-hk',   ms:247 },
+  { id:'tokyo-edge',   name:'tokyo-edge',   kind:'ssh',    host:'edge-tokyo', upstream:'',             fail:true },
+  { id:'office-socks', name:'office-socks', kind:'socks5', addr:'198.51.100.20', port:1080, user:'ops', pwSaved:true, upstream:'', ms:36 },
+  { id:'lab-proxy',    name:'lab-proxy',    kind:'socks5', addr:'192.0.2.50',    port:7890, user:'',    pwSaved:false, upstream:'', ms:12 },
+];
+const HOST_REFS = {
+  'bastion-hk':   [['prod-web-01','SSH'],['prod-web-02','SSH'],['cdn-origin','SSH'],['prod-web-01','SFTP']],
+  'db-jump':      [['prod-db-master','SSH'],['prod-db-master','SFTP']],
+  'office-socks': [['home-lab','SSH']],
+  'tokyo-edge':   [['qa-runner','SFTP']],
+};
+const RUNTIME = {
+  'bastion-hk':   ['终端、传输或可恢复标签'],
+  'db-jump':      ['文件会话或传输任务'],
+  'office-socks': ['终端、传输或可恢复标签'],
+};
+const FOLLOW_DEFAULT = 9;
+
+/* ---------- 状态 ---------- */
+const S = {
+  theme: matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light',
+  scene: 'list', selected: 'bastion-hk', def: 'bastion-hk',
+  query: '', collapsed: {}, tests: {}, menu: null, modal: null,
+};
+const timers = {};
+
+/* ---------- 数据工具 ---------- */
+const gw = id => G.find(g => g.id === id);
+const visible = () => S.scene === 'empty' ? [] : G;
+const hostport = g => g.kind === 'ssh' ? `${HOSTS[g.host].addr}:${HOSTS[g.host].port}` : `${g.addr}:${g.port}`;
+const addr = g => g.kind === 'ssh' ? `${HOSTS[g.host].user}@${hostport(g)}` : hostport(g);
+function routeOf(id) {
+  const out = [], seen = new Set();
+  for (let cur = gw(id); cur && !seen.has(cur.id); cur = cur.upstream ? gw(cur.upstream) : null) {
+    seen.add(cur.id); out.unshift(cur);
+  }
+  return out;
+}
+const inUse = id => (RUNTIME[id] || []).length > 0;
+function wouldLoop(candidate, self) {
+  if (!self) return false;
+  return routeOf(candidate).some(h => h.id === self);
+}
+function refsOf(id) {
+  const out = [];
+  if (S.def === id) out.push({ group:'应用设置', icon:'settings', name:'应用默认出口', meta:`跟随默认的 ${FOLLOW_DEFAULT} 个会话` });
+  (HOST_REFS[id] || []).forEach(([n, p]) => out.push({ group:'主机与站点', icon: p === 'SSH' ? 'terminal' : 'folder', name:n, meta: p === 'SSH' ? 'SSH 主机' : 'SFTP 站点' }));
+  G.filter(g => g.upstream === id).forEach(g => out.push({ group:'下游网关', icon:KIND[g.kind].icon, cls:KIND[g.kind].cls, name:g.name, meta:'以本网关为上游', go:g.id }));
+  (RUNTIME[id] || []).forEach(t => out.push({ group:'运行中', icon:'activity', name:t, meta:'关闭后自动解除' }));
+  return out;
+}
+
+/* ---------- 渲染：侧栏 ---------- */
+function renderRail() {
+  const btn = (icon, label, on) => `<button class="rail-btn${on ? ' on' : ''}" title="${label}" data-act="toast" data-msg="草图只包含网关页">${ic(icon, 18)}</button>`;
+  document.getElementById('rail').innerHTML =
+    btn('terminal', 'SSH') + btn('folderSync', 'SFTP / FTP') +
+    `<button class="rail-btn on" title="网关">${ic('route', 18)}</button>` +
+    btn('mcp', 'MCP') + '<div class="grow"></div>' + btn('settings', '设置');
+}
+
+/* ---------- 渲染：顶栏 ---------- */
+function topbarHTML() {
+  const def = S.scene === 'empty' ? null : gw(S.def);
+  const list = visible();
+  const picker = def
+    ? `<span class="tile xs ${KIND[def.kind].cls}">${ic(KIND[def.kind].icon, 12)}</span><b>${def.name}</b><span class="kind">${KIND[def.kind].label}</span>`
+    : `<span class="tile xs k-local">${ic('laptop', 12)}</span><b>直连</b>`;
+  const trail = def
+    ? ['本机', ...routeOf(def.id).map(h => h.name)].map((n, i) => (i ? ic('chevronRight', 12) : '') + `<span class="${i ? 'mono' : ''}">${n}</span>`).join('')
+    : '<span>连接直接从本机发出</span>';
+  return `<section class="card topbar">
+    <div class="tb-title">${ic('route', 16)}应用默认出口</div>
+    <button class="picker${S.menu && S.menu.kind === 'default' ? ' open' : ''}" data-act="pick-default" ${list.length ? '' : 'disabled'}>${picker}${ic('chevronDown', 13, 'chev')}</button>
+    <div class="trail">${trail}</div>
+    <span class="grow"></span>
+    <div class="stats">
+      <span class="stat">跟随默认<b>${FOLLOW_DEFAULT}</b>个会话</span>
+      <span class="stat">网关<b>${list.length}</b></span>
+      <span class="stat">使用中<b class="${list.some(g => inUse(g.id)) ? 'ok' : ''}">${list.filter(g => inUse(g.id)).length}</b></span>
+    </div>
+  </section>`;
+}
+
+/* ---------- 渲染：列表 ---------- */
+function listBodyHTML() {
+  const q = S.query.trim().toLowerCase();
+  const items = visible().filter(g => !q || g.name.toLowerCase().includes(q) || addr(g).toLowerCase().includes(q));
+  if (!items.length) return `<div class="list-empty">没有匹配「${S.query.replace(/</g, '&lt;')}」的网关</div>`;
+  return ['ssh', 'socks5'].map(kind => {
+    const rows = items.filter(g => g.kind === kind);
+    if (!rows.length) return '';
+    const collapsed = S.collapsed[kind] && !q;
+    return `<div class="ghead" data-act="collapse" data-kind="${kind}">${ic(collapsed ? 'chevronRight' : 'chevronDown', 12)}${KIND[kind].group}<span class="n">${rows.length}</span></div>` +
+      (collapsed ? '' : rows.map(rowHTML).join(''));
+  }).join('');
+}
+function rowHTML(g) {
+  const k = KIND[g.kind], hops = routeOf(g.id).length;
+  return `<div class="row${g.id === S.selected ? ' sel' : ''}" data-act="select" data-id="${g.id}">
+    <div class="tile ${k.cls}">${ic(k.icon, 15)}${inUse(g.id) ? '<i class="pres" title="使用中"></i>' : ''}</div>
+    <div class="row-main"><div class="row-name">${g.name}</div><div class="row-sub">${addr(g)}</div></div>
+    <div class="row-side">${S.def === g.id ? '<span class="pill">默认</span>' : ''}${hops > 1 ? `<span class="hops" title="经 ${hops - 1} 级上游">${ic('route', 11)}${hops} 跳</span>` : ''}</div>
+  </div>`;
+}
+function listHTML() {
+  const list = visible();
+  return `<aside class="card list">
+    <div class="list-head"><h2>网关</h2><button class="ibtn filled" data-act="new" title="新增网关  ⌘N">${ic('plus', 15)}</button></div>
+    <label class="search">${ic('search', 14)}<input id="q" placeholder="搜索网关、地址" value="${S.query}" autocomplete="off"><span class="kbd">⌘F</span></label>
+    <div class="list-body" id="list-body">${listBodyHTML()}</div>
+    <div class="list-foot">${ic('server', 14)}${list.length} 个网关 · ${list.filter(g => inUse(g.id)).length} 个使用中</div>
+  </aside>`;
+}
+
+/* ---------- 渲染：详情 ---------- */
+function detailHTML() {
+  const g = gw(S.selected);
+  if (!g) return '';
+  const k = KIND[g.kind], refs = refsOf(g.id), t = S.tests[g.id] || { status:'idle' };
+  return `<section class="card detail">
+    <header class="d-head">
+      <div class="tile lg ${k.cls}">${ic(k.icon, 20)}</div>
+      <div class="d-title">
+        <div class="d-name-row"><h2>${g.name}</h2><span class="badge neutral">${k.label}</span>${S.def === g.id ? '<span class="badge run">默认出口</span>' : ''}${inUse(g.id) ? '<span class="badge ok"><i></i>使用中</span>' : ''}</div>
+        <div class="d-sub mono">${addr(g)}</div>
+      </div>
+      <div class="d-actions">
+        <button class="btn" data-act="test" data-id="${g.id}" ${t.status === 'running' ? 'disabled' : ''}>${ic('play', 12)}测试连接</button>
+        <button class="btn" data-act="edit" data-id="${g.id}">${ic('pencil', 13)}编辑</button>
+        <button class="ibtn filled" data-act="more" data-id="${g.id}" title="更多操作">${ic('ellipsis', 16)}</button>
+      </div>
+    </header>
+    <div class="d-body">
+      <section>
+        <div class="sec-head"><h3>连接路径</h3><span class="sec-sub">终端、文件传输和 MCP 经此网关时的出站顺序</span></div>
+        ${pathHTML(g, t)}
+        ${resultHTML(g, t)}
+      </section>
+      <section>
+        <div class="sec-head"><h3>配置</h3></div>
+        ${configHTML(g)}
+      </section>
+      <section>
+        <div class="sec-head"><h3>引用</h3><span class="count">${refs.length}</span><span class="grow"></span><span class="sec-sub">${refs.length ? '删除网关前需先解除全部引用' : ''}</span></div>
+        ${refsHTML(refs)}
+      </section>
+    </div>
+  </section>`;
+}
+function pathHTML(g, t) {
+  const route = routeOf(g.id), st = t.status, parts = [nodeHTML({ local:true })];
+  route.forEach((hop, i) => {
+    const prev = route[i - 1];
+    const label = !prev ? '直连' : prev.kind === 'ssh' ? 'SSH 通道' : '经代理';
+    const last = i === route.length - 1;
+    const wire = st === 'running' ? 'flow' : st === 'ok' ? 'ok' : st === 'fail' && last ? 'fail' : '';
+    parts.push(wireHTML(label, wire));
+    const cur = hop.id === g.id;
+    const state = st === 'ok' ? 'ok' : st === 'running' && cur ? 'running' : st === 'fail' && cur ? 'fail' : '';
+    parts.push(nodeHTML({ g:hop, cur, state }));
+  });
+  parts.push(wireHTML(g.kind === 'ssh' ? 'SSH 通道' : '经代理', 'idle'));
+  parts.push(nodeHTML({ target:true }));
+  return `<div class="path">${parts.join('')}</div>`;
+}
+function wireHTML(label, state) {
+  return `<div class="wire ${state}"><span class="wire-label">${label}</span><i class="wire-line"></i></div>`;
+}
+function nodeHTML(o) {
+  if (o.local) return `<div class="node local"><div class="node-top"><span class="tile xs k-local">${ic('laptop', 12)}</span><span class="node-kind">起点</span></div><div class="node-name">本机</div><div class="node-sub">本地网络</div></div>`;
+  if (o.target) return `<div class="node target"><div class="node-top"><span class="tile xs k-ghost">${ic('server', 12)}</span><span class="node-kind">终点</span></div><div class="node-name">目标主机</div><div class="node-sub">由主机或站点决定</div></div>`;
+  const g = o.g, k = KIND[g.kind];
+  const state = o.state === 'running' ? `<span class="nstate run">${ic('loader', 14, 'spin')}</span>`
+    : o.state === 'ok' ? `<span class="nstate ok">${ic('check', 11)}</span>`
+    : o.state === 'fail' ? `<span class="nstate fail">${ic('x', 11)}</span>` : '';
+  return `<div class="node ${o.cur ? 'cur' : 'jump'}" ${o.cur ? '' : `data-act="select" data-id="${g.id}" title="查看 ${g.name}"`}>
+    <div class="node-top"><span class="tile xs ${k.cls}">${ic(k.icon, 12)}</span><span class="node-kind">${k.label}</span>${o.cur ? '<span class="node-flag">本网关</span>' : ''}${state}</div>
+    <div class="node-name">${g.name}</div><div class="node-sub" title="${addr(g)}">${hostport(g)}</div>
+  </div>`;
+}
+function resultHTML(g, t) {
+  const via = routeOf(g.id).slice(0, -1).map(h => h.name);
+  if (t.status === 'running') return `<div class="result run">${ic('loader', 14, 'spin')}<span>正在${via.length ? `经 ${via.join(' → ')} ` : ''}连接 ${g.name}…</span><span class="grow"></span><button class="btn plain sm" data-act="cancel-test" data-id="${g.id}">取消</button></div>`;
+  if (t.status === 'ok') return `<div class="result ok">${ic('circleCheck', 15)}<b>连接成功 · ${t.ms} ms</b><span class="r-detail">${t.detail}</span><span class="grow"></span><span class="r-time">刚刚</span><button class="btn plain sm" data-act="test" data-id="${g.id}">${ic('refresh', 12)}重新测试</button></div>`;
+  if (t.status === 'fail') return `<div class="result fail">${ic('circleAlert', 15)}<div><b>${t.summary}</b><code>${t.detail}</code></div><span class="grow"></span><button class="btn plain sm" data-act="test" data-id="${g.id}">${ic('refresh', 12)}重新测试</button></div>`;
+  const scope = g.kind === 'ssh' ? '检查 SSH 握手、主机信任与认证' : '检查 SOCKS5 协商与认证方式';
+  return `<div class="result idle">${ic('info', 13)}<span>测试会${via.length ? '经上游' : '直接'}连接本网关，${scope}；不访问目标主机。</span></div>`;
+}
+function upstreamChip(g) {
+  const u = g.upstream && gw(g.upstream);
+  if (!u) return '直连';
+  return `<button class="chip" data-act="select" data-id="${u.id}"><span class="tile ${KIND[u.kind].cls}">${ic(KIND[u.kind].icon, 11)}</span>${u.name}${ic('chevronRight', 12, 'dim')}</button>`;
+}
+function configHTML(g) {
+  let rows, note;
+  if (g.kind === 'ssh') {
+    const h = HOSTS[g.host];
+    rows = [
+      ['源主机', `<button class="chip" data-act="toast" data-msg="跳转到 SSH 页并定位主机「${h.name}」"><span class="tile k-local">${ic('terminal', 11)}</span>${h.name}${ic('chevronRight', 12, 'dim')}</button>`],
+      ['地址', `<span class="mono">${addr(g)}</span>`],
+      ['认证', h.auth],
+      ['Keepalive', h.keepalive],
+      ['上游网关', upstreamChip(g)],
+      ['连接复用', '多个目标共享同一条 SSH 连接'],
+    ];
+    note = `地址、认证与 Keepalive 取自 SSH 主机「${h.name}」，修改请编辑该主机。网关不执行其初始命令，也不继承它的网关设置。<button class="link" data-act="toast" data-msg="打开主机「${h.name}」的编辑窗口">编辑主机</button>`;
+  } else {
+    rows = [
+      ['地址', `<span class="mono">${hostport(g)}</span>`],
+      ['认证', g.user ? '用户名密码' : '无认证'],
+      ['用户名', g.user ? `<span class="mono">${g.user}</span>` : '<span style="color:var(--text-3)">—</span>'],
+      ['密码', g.user ? (g.pwSaved ? `${ic('lock', 12)}已保存在 Vault` : '连接时输入') : '<span style="color:var(--text-3)">—</span>'],
+      ['上游网关', upstreamChip(g)],
+      ['连接方式', '每个目标单独建立连接'],
+    ];
+    note = '目标主机名交由代理解析；FTP / FTPS 经网关时仅支持被动模式。';
+  }
+  return `<dl class="kv" style="margin:0">${rows.map(([k, v]) => `<div class="kv-row"><dt>${k}</dt><dd>${v}</dd></div>`).join('')}</dl>
+    <div class="note">${ic('info', 13)}<span>${note}</span></div>`;
+}
+function refRowHTML(r) {
+  const act = r.go ? `data-act="select" data-id="${r.go}"` : `data-act="toast" data-msg="跳转到「${r.name}」"`;
+  return `<div class="ref-row" ${act}><span class="tile sm ${r.cls || 'k-local'}">${ic(r.icon, 12)}</span><span class="ref-name">${r.name}</span><span class="ref-meta">${r.meta}</span>${ic('chevronRight', 13, 'ref-go')}</div>`;
+}
+function refsHTML(refs) {
+  if (!refs.length) return `<div class="refs-empty">${ic('circleCheck', 15)}<span>没有会话、网关或运行中的连接引用此网关，可以直接删除。</span></div>`;
+  const groups = ['应用设置', '主机与站点', '下游网关', '运行中'].map(name => [name, refs.filter(r => r.group === name)]).filter(([, rs]) => rs.length);
+  return `<div class="refs">${groups.map(([name, rs]) =>
+    `<div class="ref-group"><div class="ref-gtitle">${name}<span>${rs.length}</span></div>${rs.map(refRowHTML).join('')}</div>`).join('')}</div>`;
+}
+
+/* ---------- 渲染：空状态 ---------- */
+function emptyHTML() {
+  return `<section class="card empty"><div class="empty-inner">
+    <div class="empty-art">
+      <span class="tile end k-local">${ic('laptop', 17)}</span><i class="dash"></i>
+      <span class="tile hero">${ic('route', 24)}</span><i class="dash"></i>
+      <span class="tile end k-ghost">${ic('server', 17)}</span>
+    </div>
+    <h2>还没有连接网关</h2>
+    <p>网关决定连接从哪里出发。添加 SSH 跳板或 SOCKS5 代理后，可以在主机和文件站点中选择经由哪个网关，也可以设为应用默认出口。</p>
+    <div class="choices">
+      <button class="choice" data-act="new" data-kind="ssh"><span class="tile k-ssh">${ic('terminal', 15)}</span><div><b>添加 SSH 网关</b><span>复用已保存的 SSH 主机作为跳板，可继续串联上游</span></div></button>
+      <button class="choice" data-act="new" data-kind="socks5"><span class="tile k-socks">${ic('globe', 15)}</span><div><b>添加 SOCKS5 代理</b><span>填写代理地址，支持无认证或用户名密码认证</span></div></button>
+    </div>
+  </div></section>`;
+}
+
+function renderMain() {
+  if (S.scene !== 'empty' && !gw(S.selected)) S.selected = G[0] ? G[0].id : '';
+  const body = S.scene === 'empty' || !G.length ? emptyHTML() : `<div class="split">${listHTML()}${detailHTML()}</div>`;
+  document.getElementById('main').innerHTML = topbarHTML() + body;
+  document.querySelectorAll('#theme-seg button').forEach(b => b.classList.toggle('on', b.dataset.v === S.theme));
+  document.querySelectorAll('#scene-seg button').forEach(b => b.classList.toggle('on', b.dataset.v === S.scene));
+}
+
+/* ---------- 菜单 ---------- */
+function renderMenu() {
+  const layer = document.getElementById('menu-layer');
+  if (!S.menu) { layer.innerHTML = ''; return; }
+  const m = S.menu;
+  let html = '';
+  if (m.kind === 'default') {
+    const opt = (id, icon, cls, name, sub) => `<button class="mi" data-act="set-default" data-id="${id}"><span class="tile xs ${cls}">${ic(icon, 12)}</span><span class="mi-text">${name}<span class="mi-sub">${sub}</span></span>${S.def === id ? ic('check', 14, 'mi-check') : ''}</button>`;
+    html = '<div class="mhead">新连接默认经由</div>' + opt('', 'laptop', 'k-local', '直连', '不经过网关') + '<div class="msep"></div>' +
+      G.map(g => opt(g.id, KIND[g.kind].icon, KIND[g.kind].cls, g.name, ['本机', ...routeOf(g.id).map(h => h.name)].join(' → '))).join('');
+  } else {
+    const g = gw(m.id), isDef = S.def === g.id;
+    html = `<button class="mi" data-act="test" data-id="${g.id}">${ic('play', 14)}<span class="mi-text">测试连接</span></button>
+      <button class="mi" data-act="edit" data-id="${g.id}">${ic('pencil', 14)}<span class="mi-text">编辑网关…</span></button>
+      <button class="mi${isDef ? ' dis' : ''}" data-act="set-default" data-id="${g.id}">${ic('route', 14)}<span class="mi-text">${isDef ? '已是应用默认出口' : '设为应用默认出口'}</span></button>
+      <div class="msep"></div>
+      <button class="mi danger" data-act="delete" data-id="${g.id}">${ic('trash', 14)}<span class="mi-text">删除网关…</span></button>`;
+  }
+  layer.innerHTML = `<div class="menu" style="left:${m.x}px;top:${m.y}px;${m.kind === 'default' ? 'width:280px' : ''}">${html}</div>`;
+}
+function openMenu(kind, el, id) {
+  const r = el.getBoundingClientRect(), w = document.getElementById('win').getBoundingClientRect();
+  const width = kind === 'default' ? 280 : 232;
+  const x = kind === 'default' ? r.left - w.left : r.right - w.left - width;
+  S.menu = { kind, id, x, y: r.bottom - w.top + 4 };
+  renderMenu();
+  if (kind === 'default') el.classList.add('open');
+}
+function closeMenu() {
+  if (!S.menu) return;
+  S.menu = null; renderMenu();
+  document.querySelectorAll('.picker.open').forEach(p => p.classList.remove('open'));
+}
+
+/* ---------- 弹窗 ---------- */
+const HOST_OPTIONS = Object.keys(HOSTS);
+function draftFrom(g, kind) {
+  if (g) return { id:g.id, isNew:false, kind:g.kind, name:g.name, host:g.host || HOST_OPTIONS[0], addr:g.addr || '', port:String(g.port || 1080), auth:g.user ? 'password' : 'none', user:g.user || '', pwSaved:!!g.pwSaved, clearPw:false, upstream:g.upstream || '' };
+  return { id:null, isNew:true, kind:kind || 'ssh', name:'', host:HOST_OPTIONS[0], addr:'', port:'1080', auth:'none', user:'', pwSaved:false, clearPw:false, upstream:'' };
+}
+function routePreviewHTML(d) {
+  const chain = d.upstream && gw(d.upstream) ? routeOf(d.upstream) : [];
+  const arrow = ic('arrowRight', 12);
+  const chip = g => `<span class="rchip"><span class="tile ${KIND[g.kind].cls}">${ic(KIND[g.kind].icon, 10)}</span>${g.name}</span>`;
+  return `<div class="rprev"><span class="rchip"><span class="tile k-local">${ic('laptop', 10)}</span>本机</span>${chain.map(g => arrow + chip(g)).join('')}${arrow}<span class="rchip self"><span class="tile ${KIND[d.kind].cls}">${ic(KIND[d.kind].icon, 10)}</span><span id="rp-name">${d.name.trim() || '新网关'}</span></span>${arrow}<span class="rchip ghost">目标主机</span></div>`;
+}
+function editDialogHTML(m) {
+  const d = m.draft;
+  const segCard = (kind, title, sub) => `<button class="seg-card${d.kind === kind ? ' on' : ''}" data-act="draft-kind" data-v="${kind}"><span class="tile sm ${KIND[kind].cls}">${ic(KIND[kind].icon, 13)}</span><span><b>${title}</b><span>${sub}</span></span></button>`;
+  const row = (label, body) => `<div class="frow"><label>${label}</label><div class="fctl">${body}</div></div>`;
+  const select = (f, opts) => `<div class="selbox"><select data-f="${f}">${opts}</select>${ic('chevronDown', 13)}</div>`;
+  let fields;
+  if (d.kind === 'ssh') {
+    fields = row('SSH 主机', select('host', HOST_OPTIONS.map(id => `<option value="${id}" ${d.host === id ? 'selected' : ''}>${HOSTS[id].name}　${HOSTS[id].user}@${HOSTS[id].addr}:${HOSTS[id].port}</option>`).join('')) +
+      '<div class="help">地址、认证与 Keepalive 取自该主机；不执行其初始命令，也不继承它的网关设置。</div>');
+  } else {
+    fields = row('代理地址', `<div class="inline"><input class="inp mono" data-f="addr" value="${d.addr}" placeholder="主机名或 IP"><input class="inp mono port" data-f="port" value="${d.port}" placeholder="端口"></div>`) +
+      row('认证', `<div class="seg-sm"><button class="${d.auth === 'none' ? 'on' : ''}" data-act="draft-auth" data-v="none">无认证</button><button class="${d.auth === 'password' ? 'on' : ''}" data-act="draft-auth" data-v="password">用户名密码</button></div>`) +
+      (d.auth === 'password'
+        ? row('用户名', `<input class="inp" data-f="user" value="${d.user}" autocomplete="off">`) +
+          row('密码', `<input class="inp" type="password" data-f="pw" placeholder="${d.pwSaved ? '已保存在 Vault · 留空保持不变' : '留空则连接时输入'}" autocomplete="new-password">` +
+            (d.pwSaved ? `<label class="check"><input type="checkbox" data-f="clearPw" ${d.clearPw ? 'checked' : ''}>清除已保存的密码</label>` : '<div class="help">保存的密码经 Vault 加密存储。</div>'))
+        : '');
+  }
+  const upstreamOpts = `<option value="">直连（本机网络）</option>` + G.filter(g => g.id !== d.id).map(g => {
+    const loop = wouldLoop(g.id, d.id);
+    return `<option value="${g.id}" ${d.upstream === g.id ? 'selected' : ''} ${loop ? 'disabled' : ''}>${g.name} · ${KIND[g.kind].label}${loop ? '（会形成环路）' : ''}</option>`;
+  }).join('');
+  return `<div class="dialog" role="dialog" aria-label="${d.isNew ? '新增网关' : '编辑网关'}">
+    <div class="dlg-head"><h3>${d.isNew ? '新增网关' : `编辑网关「${gw(d.id).name}」`}</h3><button class="ibtn" data-act="close" title="关闭">${ic('x', 15)}</button></div>
+    <div class="dlg-body">
+      ${row('类型', `<div class="seg-cards">${segCard('ssh', 'SSH 网关', '复用已保存的 SSH 主机')}${segCard('socks5', 'SOCKS5 代理', '经代理服务器转发连接')}</div>`)}
+      ${row('名称', `<input class="inp" data-f="name" value="${d.name}" placeholder="例如 bastion-hk" autocomplete="off">`)}
+      ${fields}
+      ${row('上游网关', select('upstream', upstreamOpts) + '<div class="help">本网关自身经由哪个出口建立连接。</div>')}
+      ${row('路径预览', routePreviewHTML(d))}
+      ${m.error ? `<div class="frow"><label></label><div class="fctl"><div class="banner err">${ic('circleAlert', 14)}<span>${m.error}</span></div></div></div>` : ''}
+    </div>
+    <div class="dlg-foot"><span class="foot-hint">⌘↩ 保存</span><span class="grow"></span><button class="btn" data-act="close">取消</button><button class="btn primary" data-act="save">保存</button></div>
+  </div>`;
+}
+function deleteDialogHTML(m) {
+  const g = gw(m.id), refs = refsOf(g.id);
+  const body = refs.length
+    ? `<div class="banner warn">${ic('circleAlert', 14)}<span>仍有 ${refs.length} 项引用。请先将它们改为其他网关或直连，再删除此网关。</span></div>
+       <div class="ref-mini">${refs.map(r => refRowHTML({ ...r, meta:r.group })).join('')}</div>`
+    : `<p class="dlg-text">删除后不可恢复。${g.kind === 'socks5' && g.pwSaved ? '已保存的 SOCKS5 密码会一并从 Vault 移除。' : '没有配置或运行中的连接受影响。'}</p>`;
+  return `<div class="dialog sm" role="dialog" aria-label="删除网关">
+    <div class="dlg-head"><span class="dlg-icon">${ic('trash', 15)}</span><h3>删除网关「${g.name}」？</h3></div>
+    <div class="dlg-body">${body}</div>
+    <div class="dlg-foot"><span class="grow"></span><button class="btn" data-act="close">取消</button><button class="btn danger" data-act="confirm-delete" data-id="${g.id}" ${refs.length ? 'disabled' : ''}>删除</button></div>
+  </div>`;
+}
+function renderModal(enter = false) {
+  const layer = document.getElementById('modal-layer');
+  if (!S.modal) { layer.innerHTML = ''; return; }
+  layer.innerHTML = `<div class="scrim${enter ? ' enter' : ''}" data-act="scrim">${S.modal.type === 'edit' ? editDialogHTML(S.modal) : deleteDialogHTML(S.modal)}</div>`;
+}
+function openEdit(g, kind) {
+  closeMenu();
+  S.modal = { type:'edit', draft:draftFrom(g, kind), error:'' };
+  renderModal(true);
+  const name = document.querySelector('.dialog [data-f="name"]');
+  if (name) { name.focus(); name.setSelectionRange(name.value.length, name.value.length); }
+}
+function saveDraft() {
+  const m = S.modal, d = m.draft;
+  const name = d.name.trim(), port = Number(d.port);
+  if (!name) m.error = '请填写网关名称';
+  else if (G.some(g => g.name === name && g.id !== d.id)) m.error = `已存在名为「${name}」的网关`;
+  else if (d.kind === 'socks5' && !d.addr.trim()) m.error = '请填写 SOCKS5 代理地址';
+  else if (d.kind === 'socks5' && !(port >= 1 && port <= 65535)) m.error = 'SOCKS5 端口应为 1–65535';
+  else m.error = '';
+  if (m.error) { renderModal(); return; }
+  const value = { name, kind:d.kind, upstream:d.upstream };
+  if (d.kind === 'ssh') Object.assign(value, { host:d.host, addr:undefined, port:undefined, user:undefined, pwSaved:undefined });
+  else Object.assign(value, { host:undefined, addr:d.addr.trim(), port, user:d.auth === 'password' ? d.user.trim() : '', pwSaved:d.auth === 'password' && !d.clearPw && (d.pwSaved || !!d.pw) });
+  if (d.isNew) {
+    const id = name.toLowerCase().replace(/[^a-z0-9-]+/g, '-') + '-' + Math.random().toString(36).slice(2, 6);
+    G.push({ id, ms:120, ...value });
+    S.selected = id;
+    S.scene = 'list';
+  } else {
+    Object.assign(gw(d.id), value);
+    delete S.tests[d.id];
+  }
+  S.modal = null;
+  renderModal(); renderMain();
+  toast(d.isNew ? `已添加网关「${name}」` : '已保存');
+}
+
+/* ---------- 测试 ---------- */
+function startTest(id) {
+  const g = gw(id);
+  clearTimeout(timers[id]);
+  S.tests[id] = { status:'running' };
+  timers[id] = setTimeout(() => {
+    S.tests[id] = g.fail
+      ? { status:'fail', summary:'网关连接失败', detail:`dial tcp ${hostport(g)}: i/o timeout` }
+      : { status:'ok', ms:g.ms || 120, detail: g.kind === 'ssh' ? 'SSH 握手与认证成功' : g.user ? 'SOCKS5 握手与认证成功' : 'SOCKS5 握手成功，无需认证' };
+    renderMain();
+  }, 1100 + routeOf(id).length * 450);
+  renderMain();
+}
+
+/* ---------- 提示 ---------- */
+let toastTimer;
+function toast(msg) {
+  const layer = document.getElementById('toast-layer');
+  layer.innerHTML = `<div class="toast">${msg}</div>`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { layer.innerHTML = ''; }, 1800);
+}
+
+/* ---------- 交互 ---------- */
+function act(name, el, e) {
+  if (el.disabled || el.classList.contains('dis')) return;
+  const id = el.dataset.id;
+  switch (name) {
+    case 'theme': S.theme = el.dataset.v; document.documentElement.dataset.theme = S.theme; renderMain(); break;
+    case 'scene': S.scene = el.dataset.v; closeMenu(); renderMain(); break;
+    case 'select': S.selected = id; closeMenu(); renderMain(); break;
+    case 'collapse': S.collapsed[el.dataset.kind] = !S.collapsed[el.dataset.kind]; document.getElementById('list-body').innerHTML = listBodyHTML(); break;
+    case 'pick-default': S.menu && S.menu.kind === 'default' ? closeMenu() : openMenu('default', el); break;
+    case 'more': S.menu && S.menu.kind === 'more' && S.menu.id === id ? closeMenu() : openMenu('more', el, id); break;
+    case 'set-default': S.def = id; closeMenu(); renderMain(); toast(id ? `应用默认出口已改为「${gw(id).name}」` : '应用默认出口已改为直连'); break;
+    case 'test': closeMenu(); startTest(id); break;
+    case 'cancel-test': clearTimeout(timers[id]); delete S.tests[id]; renderMain(); toast('测试已取消'); break;
+    case 'new': openEdit(null, el.dataset.kind); break;
+    case 'edit': openEdit(gw(id)); break;
+    case 'delete': closeMenu(); S.modal = { type:'delete', id }; renderModal(true); break;
+    case 'confirm-delete':
+      G = G.filter(g => g.id !== id);
+      if (S.def === id) S.def = '';
+      S.modal = null; renderModal(); renderMain(); toast('已删除网关'); break;
+    case 'close': S.modal = null; renderModal(); break;
+    case 'scrim': if (e.target === el) { S.modal = null; renderModal(); } break;
+    case 'save': saveDraft(); break;
+    case 'draft-kind': S.modal.draft.kind = el.dataset.v; S.modal.error = ''; renderModal(); break;
+    case 'draft-auth': S.modal.draft.auth = el.dataset.v; renderModal(); break;
+    case 'toast': closeMenu(); toast(el.dataset.msg); break;
+  }
+}
+document.addEventListener('click', e => {
+  const a = e.target.closest('[data-act]');
+  const keepMenu = e.target.closest('.menu') || (a && (a.dataset.act === 'more' || a.dataset.act === 'pick-default'));
+  if (S.menu && !keepMenu) closeMenu();
+  if (a) act(a.dataset.act, a, e);
+});
+document.addEventListener('input', e => {
+  if (e.target.id === 'q') { S.query = e.target.value; document.getElementById('list-body').innerHTML = listBodyHTML(); return; }
+  const f = e.target.dataset.f;
+  if (!f || !S.modal || S.modal.type !== 'edit') return;
+  const d = S.modal.draft;
+  if (f === 'clearPw') d.clearPw = e.target.checked;
+  else d[f] = e.target.value;
+  if (f === 'name') { const n = document.getElementById('rp-name'); if (n) n.textContent = d.name.trim() || '新网关'; }
+  if (f === 'upstream' || f === 'host') renderModal();
+});
+document.addEventListener('keydown', e => {
+  const mod = e.metaKey || e.ctrlKey;
+  if (e.key === 'Escape') { if (S.menu) closeMenu(); else if (S.modal) { S.modal = null; renderModal(); } return; }
+  if (mod && e.key === 'Enter' && S.modal && S.modal.type === 'edit') { e.preventDefault(); saveDraft(); return; }
+  if (mod && e.key.toLowerCase() === 'n' && !S.modal) { e.preventDefault(); openEdit(null); return; }
+  if (mod && e.key.toLowerCase() === 'f' && !S.modal) { const q = document.getElementById('q'); if (q) { e.preventDefault(); q.focus(); } }
+});
+
+document.documentElement.dataset.theme = S.theme;
+renderRail();
+renderMain();
+</script>
+</body>
+</html>

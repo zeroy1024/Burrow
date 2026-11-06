@@ -430,6 +430,8 @@ func expectedKind(id string) string {
 	switch {
 	case parts[0] == "session" && parts[2] == "credential":
 		return "session_password"
+	case parts[0] == "gateway" && parts[2] == "credential":
+		return "gateway_password"
 	case parts[0] == "key" && parts[2] == "private":
 		return "private_key"
 	case parts[0] == "key" && parts[2] == "passphrase":

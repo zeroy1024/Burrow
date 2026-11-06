@@ -28,13 +28,16 @@ type storedSession struct {
 }
 
 type catalogSnapshot struct {
-	hosts       []host
-	groups      []*hostGroup
-	groupValues []hostGroup
+	gateways       []gatewayConfig
+	defaultGateway string
+	hosts          []host
+	groups         []*hostGroup
+	groupValues    []hostGroup
 }
 
 func (a *app) snapshotCatalog() catalogSnapshot {
 	snapshot := catalogSnapshot{
+		gateways: slices.Clone(a.gateways), defaultGateway: a.defaultGateway,
 		hosts: slices.Clone(a.hosts), groups: slices.Clone(a.groups),
 		groupValues: make([]hostGroup, len(a.groups)),
 	}
@@ -46,6 +49,7 @@ func (a *app) snapshotCatalog() catalogSnapshot {
 }
 
 func (a *app) restoreCatalog(snapshot catalogSnapshot) {
+	a.gateways, a.defaultGateway = snapshot.gateways, snapshot.defaultGateway
 	a.hosts, a.groups = slices.Clone(snapshot.hosts), slices.Clone(snapshot.groups)
 	for i, group := range a.groups {
 		*group = snapshot.groupValues[i]
@@ -74,6 +78,7 @@ func (a *app) loadCatalog() error {
 }
 
 func (a *app) emptyCatalog() {
+	a.gateways, a.defaultGateway = nil, ""
 	a.hosts, a.keys = []host{}, []managedKey{}
 	a.groups = []*hostGroup{}
 	a.savedWorkspace = nil
@@ -102,12 +107,8 @@ func (a *app) readCatalog() error {
 		if s.ID != p.ID || s.KeyID != p.KeyID {
 			return errors.New("profile identity does not match database references")
 		}
-		jump := ""
-		if s.SSH != nil {
-			jump = s.SSH.JumpHostID
-		}
-		if jump != p.JumpID {
-			return errors.New("profile jump reference does not match database")
+		if gatewayReference(s.Gateway) != p.GatewayID {
+			return errors.New("profile gateway reference does not match database")
 		}
 		group, exists := groupIndex[p.GroupID]
 		if !exists {
@@ -153,6 +154,20 @@ func (a *app) readCatalog() error {
 	if err := validateSessionCatalog(a.hosts, a.keys); err != nil {
 		return err
 	}
+	a.defaultGateway = c.DefaultGatewayID
+	for _, record := range c.Gateways {
+		var g gatewayConfig
+		if err := json.Unmarshal(record.Value, &g); err != nil {
+			return err
+		}
+		if g.ID != record.ID || g.SSHProfileID != record.SSHProfileID || g.UpstreamID != record.UpstreamID {
+			return errors.New("gateway references do not match database")
+		}
+		a.gateways = append(a.gateways, g)
+	}
+	if err := a.validateGateways(); err != nil {
+		return err
+	}
 	if c.Workspace != nil {
 		saved, err := decodeWorkspace(*c.Workspace)
 		if err != nil {
@@ -174,6 +189,9 @@ func (a *app) catalogSnapshotData() (store.Catalog, error) {
 		return store.Catalog{}, err
 	}
 	c := store.Catalog{}
+	if err := a.gatewayCatalogValues(&c); err != nil {
+		return c, err
+	}
 	for _, k := range a.keys {
 		c.Keys = append(c.Keys, store.Key{PublicKey: k.PublicKey, ID: k.ID, Name: k.Name, Kind: k.Type, Fingerprint: k.Fingerprint, SecretID: k.SecretID, Comment: k.Comment, Bits: k.Bits, CreatedAt: k.CreatedAt.Format(time.RFC3339Nano)})
 	}
@@ -197,11 +215,7 @@ func (a *app) catalogSnapshotData() (store.Catalog, error) {
 			if err != nil {
 				return c, err
 			}
-			jump := ""
-			if h.session.SSH != nil {
-				jump = h.session.SSH.JumpHostID
-			}
-			c.Profiles = append(c.Profiles, store.Profile{ID: h.session.ID, GroupID: g.stableID, Position: position, KeyID: h.session.KeyID, JumpID: jump, Value: data})
+			c.Profiles = append(c.Profiles, store.Profile{ID: h.session.ID, GroupID: g.stableID, Position: position, KeyID: h.session.KeyID, GatewayID: gatewayReference(h.session.Gateway), Value: data})
 		}
 	}
 	if len(c.Profiles) != len(a.hosts) {

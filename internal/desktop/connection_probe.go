@@ -39,12 +39,11 @@ func (a *app) prepareConnectionTest(h host, password, passphrase string, passphr
 	h = sshHostSnapshot(h)
 	var plan sshDialPlan
 	var planErr error
-	if h.protocol != "ftp" {
-		plan, planErr = a.captureSSHPlan(h)
-	}
+	plan, planErr = a.captureSSHPlan(h)
 	return func(parent context.Context) connectionTestResult {
 		timeout := theme.Current().Motion.Duration.Test
-		if h.protocol != "ftp" {
+		interactive := h.protocol != "ftp" || h.session.Auth == "password" && password == ""
+		if interactive || len(plan.route) > 0 {
 			// Interactive authentication must not inherit the prototype's ten
 			// second UI budget while the user is answering server challenges.
 			timeout = 2 * time.Minute
@@ -55,9 +54,28 @@ func (a *app) prepareConnectionTest(h host, password, passphrase string, passphr
 		err := planErr
 		if err == nil {
 			if h.protocol == "ftp" {
-				err = testFTP(ctx, h, password, &result)
+				var dial gatewayDialFunc
+				var release func()
+				dial, release, err = a.gatewayDialer(ctx, plan)
+				if err == nil {
+					defer release()
+					if password == "" && h.session.Auth != "anonymous" {
+						answer := a.askSSH(ctx, &sshPrompt{title: "输入 FTP 密码", address: h.user + "@" + h.address})
+						if answer.accepted {
+							password = answer.secret
+						} else {
+							err = errSSHConnectCanceled
+						}
+					}
+					if err == nil {
+						err = testFTP(ctx, h, password, &result, dial)
+					}
+				}
 			} else {
-				override := sshSecretsOverride{password: &password}
+				override := sshSecretsOverride{}
+				if password != "" || h.session.PasswordSaved {
+					override.password = &password
+				}
 				if passphraseEdited || passphrase != "" {
 					override.passphrase = &passphrase
 				}
@@ -151,7 +169,7 @@ func connectionErrorSummary(err error) string {
 		return "主机密钥已变更"
 	case errors.Is(err, context.DeadlineExceeded):
 		return "连接超时"
-	case errors.Is(err, context.Canceled):
+	case errors.Is(err, context.Canceled), errors.Is(err, errSSHConnectCanceled):
 		return "测试已取消"
 	case errors.As(err, &cert), errors.As(err, &unknown):
 		return "证书不受信任"
@@ -173,7 +191,7 @@ func closeOnCancel(ctx context.Context, conn net.Conn) func() bool {
 	return context.AfterFunc(ctx, func() { conn.Close() })
 }
 
-func testFTP(ctx context.Context, h host, password string, result *connectionTestResult) error {
+func testFTP(ctx context.Context, h host, password string, result *connectionTestResult, dial gatewayDialFunc) error {
 	options := h.session.Files
 	if options == nil {
 		return errors.New("缺少 FTP 设置")
@@ -183,7 +201,8 @@ func testFTP(ctx context.Context, h host, password string, result *connectionTes
 		user, password = "anonymous", "anonymous@"
 	}
 	client, err := fileclient.DialFTP(ctx, fileclient.FTPConfig{
-		Host: h.address, Port: h.port, User: user, Password: password,
+		DialContext: dial,
+		Host:        h.address, Port: h.port, User: user, Password: password,
 		TLSMode: options.FTPTLS, Mode: options.FTPMode, Encoding: options.Encoding,
 	})
 	if err != nil {

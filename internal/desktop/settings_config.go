@@ -280,6 +280,9 @@ func (a *app) openSettings() {
 	if a.settingsUI.open {
 		return
 	}
+	if a.section == sectionGateways {
+		a.cancelGatewayTest()
+	}
 	a.settingsUI.returnSection = a.section
 	if a.section == sectionFiles {
 		if session := a.currentFileSession(); session != nil {

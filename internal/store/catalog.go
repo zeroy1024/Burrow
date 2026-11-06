@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 )
@@ -22,9 +23,14 @@ type Key struct {
 }
 
 type Profile struct {
-	ID, GroupID, KeyID, JumpID string
-	Position                   int
-	Value                      []byte
+	ID, GroupID, KeyID, GatewayID string
+	Position                      int
+	Value                         []byte
+}
+
+type Gateway struct {
+	ID, SSHProfileID, UpstreamID string
+	Value                        []byte
 }
 
 type Endpoint struct {
@@ -36,11 +42,13 @@ type Workspace struct {
 	Endpoints []Endpoint
 }
 type Catalog struct {
-	Groups       []Group
-	Profiles     []Profile
-	Keys         []Key
-	Workspace    *Workspace
-	VaultChanges *VaultChanges
+	Gateways         []Gateway
+	DefaultGatewayID string
+	Groups           []Group
+	Profiles         []Profile
+	Keys             []Key
+	Workspace        *Workspace
+	VaultChanges     *VaultChanges
 }
 
 // EndpointID makes immutable connection snapshots independent of profile edits.
@@ -69,19 +77,37 @@ func (s *Store) ReadCatalog(ctx context.Context) (Catalog, error) {
 	if err := closeRows(rows); err != nil {
 		return c, err
 	}
-	rows, err = tx.QueryContext(ctx, "SELECT id,group_id,position,coalesce(key_id,''),coalesce(jump_id,''),value FROM profiles ORDER BY group_id,position")
+	rows, err = tx.QueryContext(ctx, "SELECT id,group_id,position,coalesce(key_id,''),coalesce(gateway_id,''),value FROM profiles ORDER BY group_id,position")
 	if err != nil {
 		return c, err
 	}
 	for rows.Next() {
 		var p Profile
-		if err := rows.Scan(&p.ID, &p.GroupID, &p.Position, &p.KeyID, &p.JumpID, &p.Value); err != nil {
+		if err := rows.Scan(&p.ID, &p.GroupID, &p.Position, &p.KeyID, &p.GatewayID, &p.Value); err != nil {
 			rows.Close()
 			return c, err
 		}
 		c.Profiles = append(c.Profiles, p)
 	}
 	if err := closeRows(rows); err != nil {
+		return c, err
+	}
+	rows, err = tx.QueryContext(ctx, "SELECT id,coalesce(ssh_profile_id,''),coalesce(upstream_id,''),value FROM gateways ORDER BY rowid")
+	if err != nil {
+		return c, err
+	}
+	for rows.Next() {
+		var g Gateway
+		if err := rows.Scan(&g.ID, &g.SSHProfileID, &g.UpstreamID, &g.Value); err != nil {
+			rows.Close()
+			return c, err
+		}
+		c.Gateways = append(c.Gateways, g)
+	}
+	if err := closeRows(rows); err != nil {
+		return c, err
+	}
+	if err := tx.QueryRowContext(ctx, "SELECT coalesce(default_id,'') FROM gateway_settings WHERE id=1").Scan(&c.DefaultGatewayID); err != nil {
 		return c, err
 	}
 	rows, err = tx.QueryContext(ctx, "SELECT id,name,kind,fingerprint,secret_id,comment,bits,created_at,public_key FROM managed_keys ORDER BY created_at,id")
@@ -151,7 +177,7 @@ func (s *Store) SaveCatalog(ctx context.Context, c Catalog) error {
 	}
 	// The catalog is small and its order is a single user operation. Replace it
 	// atomically; immutable endpoints and task rows are never cascaded away.
-	for _, table := range []string{"profiles", "catalog_groups", "managed_keys"} {
+	for _, table := range []string{"profiles", "gateways", "catalog_groups", "managed_keys"} {
 		if _, err := tx.ExecContext(ctx, "DELETE FROM "+table); err != nil {
 			return err
 		}
@@ -167,9 +193,17 @@ func (s *Store) SaveCatalog(ctx context.Context, c Catalog) error {
 		}
 	}
 	for _, p := range c.Profiles {
-		if _, err := tx.ExecContext(ctx, "INSERT INTO profiles VALUES(?,?,?,?,?,?)", p.ID, p.GroupID, p.Position, nullable(p.KeyID), nullable(p.JumpID), string(p.Value)); err != nil {
+		if _, err := tx.ExecContext(ctx, "INSERT INTO profiles VALUES(?,?,?,?,?,?)", p.ID, p.GroupID, p.Position, nullable(p.KeyID), nullable(p.GatewayID), string(p.Value)); err != nil {
 			return err
 		}
+	}
+	for _, g := range c.Gateways {
+		if _, err := tx.ExecContext(ctx, "INSERT INTO gateways VALUES(?,?,?,?)", g.ID, nullable(g.SSHProfileID), nullable(g.UpstreamID), string(g.Value)); err != nil {
+			return err
+		}
+	}
+	if _, err := tx.ExecContext(ctx, "UPDATE gateway_settings SET default_id=? WHERE id=1", nullable(c.DefaultGatewayID)); err != nil {
+		return err
 	}
 	if c.Workspace != nil {
 		if err := saveWorkspace(ctx, tx, c.Workspace); err != nil {
@@ -190,7 +224,32 @@ func saveEndpoints(ctx context.Context, tx *sql.Tx, table string, values []Endpo
 		if _, err := tx.ExecContext(ctx, "INSERT INTO endpoints(id,key_id,value) VALUES(?,?,?) ON CONFLICT(id) DO NOTHING", e.ID, nullable(e.KeyID), string(e.Value)); err != nil {
 			return err
 		}
+		if err := saveEndpointKeys(ctx, tx, e.ID, e.Value); err != nil {
+			return err
+		}
 		if _, err := tx.ExecContext(ctx, "INSERT INTO "+table+"(endpoint_id) VALUES(?) ON CONFLICT DO NOTHING", e.ID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func saveEndpointKeys(ctx context.Context, tx *sql.Tx, id string, value []byte) error {
+	var endpoint struct {
+		GatewayRoute []struct {
+			SSH *struct {
+				KeyID string `json:"keyId"`
+			} `json:"ssh"`
+		} `json:"gatewayRoute"`
+	}
+	if err := json.Unmarshal(value, &endpoint); err != nil {
+		return err
+	}
+	for _, hop := range endpoint.GatewayRoute {
+		if hop.SSH == nil || hop.SSH.KeyID == "" {
+			continue
+		}
+		if _, err := tx.ExecContext(ctx, "INSERT INTO endpoint_keys VALUES(?,?) ON CONFLICT DO NOTHING", id, hop.SSH.KeyID); err != nil {
 			return err
 		}
 	}

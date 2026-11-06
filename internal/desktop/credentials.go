@@ -376,9 +376,19 @@ func managedKeyType(raw any, pub ssh.PublicKey) (string, int) {
 
 func (a *app) keyUseCount(id string) int {
 	references := map[string]bool{}
+	if a.gatewayPool.keyInUse(id) {
+		references["gateway/"+id] = true
+	}
 	add := func(config sessionConfig, capturedKey string) {
 		if config.KeyID == id || capturedKey == id {
 			references[config.ID] = true
+		}
+		if config.GatewayRoute != nil {
+			for _, hop := range *config.GatewayRoute {
+				if hop.SSH != nil && hop.SSH.KeyID == id {
+					references[hop.SSH.ID] = true
+				}
+			}
 		}
 	}
 	for _, h := range a.hosts {

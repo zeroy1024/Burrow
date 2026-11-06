@@ -54,6 +54,10 @@ func (a *app) newSSHGroup(endpoint host) *sshConnectionGroup {
 	a.nextConnection++
 	endpoint = sshHostSnapshot(endpoint)
 	plan, err := a.captureSSHPlan(endpoint)
+	if err == nil {
+		route := plan.route
+		endpoint.session.GatewayRoute = &route
+	}
 	return &sshConnectionGroup{id: a.nextConnection, endpoint: endpoint, plan: plan, planErr: err}
 }
 
@@ -68,6 +72,11 @@ func (a *app) startSSHSession(session *remoteSession, refresh bool) {
 		endpoint, id, _ := a.latestSessionEndpoint(session.endpoint, session.temporary)
 		session.endpoint, session.config, session.host = endpoint, endpoint.session, id
 		session.connection = a.reconnectSSHGroup(session.connection, endpoint)
+		if session.connection.planErr == nil {
+			route := session.connection.plan.route
+			session.endpoint.session.GatewayRoute = &route
+			session.config = session.endpoint.session
+		}
 	}
 	ctx, cancel := context.WithCancel(a.ctx)
 	run := &sshRuntime{ctx: ctx, cancel: cancel}
@@ -384,10 +393,17 @@ func (a *app) reconnectSSHGroup(previous *sshConnectionGroup, endpoint host) *ss
 		return previous
 	}
 	a.nextConnection++
+	if err == nil {
+		route := plan.route
+		endpoint.session.GatewayRoute = &route
+	}
 	return &sshConnectionGroup{id: a.nextConnection, endpoint: cloneHostEndpoint(endpoint), plan: plan, planErr: err}
 }
 
 func sameSSHPlan(left, right sshDialPlan) bool {
+	if gatewayRuntimeKey(left.route, left.steps, left.gatewayScope) != gatewayRuntimeKey(right.route, right.steps, right.gatewayScope) {
+		return false
+	}
 	if left.trust != right.trust || len(left.steps) != len(right.steps) {
 		return false
 	}

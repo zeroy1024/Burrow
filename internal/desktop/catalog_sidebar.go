@@ -196,7 +196,7 @@ func (a *app) catalogHostMenu(c *ui.Context, id hostID) []uikit.MenuEntry {
 	if a.section == sectionFiles {
 		connectLabel, editLabel, deleteLabel = "连接站点", "编辑站点", "删除站点"
 	}
-	return []uikit.MenuEntry{
+	menu := []uikit.MenuEntry{
 		{ID: "connect", Label: localize(c, connectLabel), Icon: uikit.IconTerminal, OnChoose: func() {
 			a.openCatalogHost(id)
 			if a.section == sectionFiles {
@@ -237,6 +237,17 @@ func (a *app) catalogHostMenu(c *ui.Context, id hostID) []uikit.MenuEntry {
 			a.page().addHostOpen = true
 		}},
 	}
+	if h.protocol == "" || h.protocol == "sftp" {
+		label := "快捷添加到 SFTP…"
+		if h.protocol == "sftp" {
+			label = "快捷添加到 SSH…"
+		}
+		menu = slices.Insert(menu, 3, uikit.MenuEntry{
+			ID: "add-other-protocol", Label: localize(c, label), Icon: uikit.IconPlus,
+			OnChoose: func() { a.startOtherProtocolDraft(id) },
+		})
+	}
+	return menu
 }
 
 func (a *app) catalogHostRow(c *ui.Context, slot catalogSlot) ui.Element {

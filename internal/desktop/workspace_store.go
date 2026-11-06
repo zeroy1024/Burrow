@@ -198,7 +198,7 @@ func validateStoredWorkspace(saved *storedWorkspace, hosts []host, keys []manage
 		return errors.New("unsupported workspace version")
 	}
 	switch saved.Section {
-	case sectionSSH, sectionFiles, sectionMCP:
+	case sectionSSH, sectionFiles, sectionMCP, sectionGateways:
 	default:
 		return errors.New("invalid workspace section")
 	}
@@ -236,11 +236,13 @@ func validateStoredWorkspace(saved *storedWorkspace, hosts []host, keys []manage
 		return nil
 	}
 	connections := map[int]bool{}
+	connectionRoutes := map[int]*[]gatewayHop{}
 	for _, connection := range saved.Connections {
 		if connection.ID <= 0 || connections[connection.ID] {
 			return errors.New("invalid or duplicate workspace connection id")
 		}
 		connections[connection.ID] = true
+		connectionRoutes[connection.ID] = connection.Endpoint.GatewayRoute
 		files := connection.Endpoint.Protocol == "sftp"
 		if connection.Endpoint.Protocol == "ftp" {
 			return errors.New("FTP cannot use a shared SSH connection")
@@ -252,6 +254,16 @@ func validateStoredWorkspace(saved *storedWorkspace, hosts []host, keys []manage
 	validateConnection := func(stored storedWorkspaceSession) error {
 		if stored.Connection > 0 && !connections[stored.Connection] {
 			return errors.New("workspace session references an unknown connection")
+		}
+		if stored.Connection > 0 {
+			if stored.Endpoint.GatewayRoute != nil {
+				if err := validateGatewayRoute(*stored.Endpoint.GatewayRoute); err != nil {
+					return err
+				}
+			}
+			if !sameGatewayRoute(stored.Endpoint.GatewayRoute, connectionRoutes[stored.Connection]) {
+				return errors.New("workspace session gateway route differs from its connection")
+			}
 		}
 		if stored.Endpoint.Protocol == "ftp" && stored.Connection != 0 {
 			return errors.New("FTP workspace has an SSH connection reference")

@@ -16,20 +16,21 @@ import (
 )
 
 type sessionConfig struct {
-	ID               string       `json:"id"`
-	Auth             string       `json:"auth"`
-	KeyID            string       `json:"keyId,omitempty"`
-	PortEdited       bool         `json:"portEdited"`
-	SSH              *sshOptions  `json:"ssh,omitempty"`
-	Files            *fileOptions `json:"files,omitempty"`
-	PasswordSaved    bool         `json:"passwordSaved,omitempty"`
-	PasswordRevision string       `json:"passwordRevision,omitempty"`
-	CreatedAt        time.Time    `json:"createdAt"`
-	UpdatedAt        time.Time    `json:"updatedAt"`
+	Gateway          string        `json:"gateway,omitempty"`
+	GatewayRoute     *[]gatewayHop `json:"gatewayRoute,omitempty"`
+	ID               string        `json:"id"`
+	Auth             string        `json:"auth"`
+	KeyID            string        `json:"keyId,omitempty"`
+	PortEdited       bool          `json:"portEdited"`
+	SSH              *sshOptions   `json:"ssh,omitempty"`
+	Files            *fileOptions  `json:"files,omitempty"`
+	PasswordSaved    bool          `json:"passwordSaved,omitempty"`
+	PasswordRevision string        `json:"passwordRevision,omitempty"`
+	CreatedAt        time.Time     `json:"createdAt"`
+	UpdatedAt        time.Time     `json:"updatedAt"`
 }
 
 type sshOptions struct {
-	JumpHostID  string   `json:"jumpHostId,omitempty"`
 	KeepAlive   int      `json:"keepAlive"`
 	InitCommand string   `json:"initCommand,omitempty"`
 	TermScheme  string   `json:"termScheme,omitempty"`
@@ -243,17 +244,10 @@ func validateSessionProfile(h host, byID map[string]host, keyIDs map[string]bool
 		if !validPlatformOverride(options.Platform) {
 			return errors.New("invalid remote platform")
 		}
-		seen := map[string]bool{h.session.ID: true}
-		for next := options.JumpHostID; next != ""; {
-			jump, ok := byID[next]
-			if !ok || jump.protocol != "" || jump.session.SSH == nil {
-				return errors.New("invalid SSH jump host")
-			}
-			if seen[next] {
-				return errors.New("SSH jump host cycle")
-			}
-			seen[next] = true
-			next = jump.session.SSH.JumpHostID
+	}
+	if h.session.GatewayRoute != nil {
+		if err := validateGatewayRoute(*h.session.GatewayRoute); err != nil {
+			return err
 		}
 	}
 	if options := h.session.Files; options != nil {
