@@ -156,11 +156,11 @@ func dockerIntegrationSnapshot() {
         LocalOpen, ActiveRemote, DragActive, FileDragActive, PaneDragActive, SettingsOpen bool
         FileDragPendingDirectory, FileDragPendingDisconnect, FileDragCancelRequested bool
         FileDragEntryPaths []string
-        SettingsRecording, CatalogError, Locale string
+        SettingsRecording, CatalogError, Locale, AppName string
     }{Prompts: len(a.sshPrompts), Tabs: len(a.tabs), FileTabs:len(a.fileSessions), Section:int(a.section),
       ActiveSection:int(a.activeSection()), Transfers:len(a.transfers.tasks), LocalOpen:a.files.localOpen,
       ActiveRemote:a.files.activeRemote, ClosedTabs:len(a.closedTabs), SettingsOpen:a.settingsUI.open,
-      Locale:mygo.App.Locale(),
+      Locale:mygo.App.Locale(), AppName:mygo.App.Name(),
       SettingsRecording:a.settingsUI.recording, Sessions:[]sessionInfo{}, FileSessions:[]fileSessionInfo{},
       TransferTasks:[]transferInfo{}, FileDragEntryPaths:[]string{},
       SSHProfiles:dockerIntegrationProfiles(a, sectionSSH), FileProfiles:dockerIntegrationProfiles(a, sectionFiles),
@@ -680,8 +680,9 @@ class Driver:
         self.call("menu", dict(path=["Integration", name]))
 
     def quit(self):
-        locale = self.snapshot()["Locale"]
-        label = "退出Burrow" if locale == "zh-Hans" else "Quit Burrow"
+        state = self.snapshot()
+        name = state["AppName"]
+        label = "退出" + name if state["Locale"] == "zh-Hans" else "Quit " + name
         self.call("menu", dict(path=["Burrow", label]))
 
     def snapshot(self):

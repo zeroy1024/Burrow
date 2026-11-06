@@ -98,9 +98,9 @@ func (a *app) aboutSettings(c *ui.Context) {
 			ui.Image(c, burrowIcon).Size(t.C.Modal.IconTile*2, t.C.Modal.IconTile*2)
 			uikit.Text(c, "Burrow", uikit.TextProps{Style: uikit.TextTitle})
 			ui.Row(c).Gap(t.Space.N8).AlignItems(ui.Center).Children(func() {
-				uikit.Text(c, "0.1.2", uikit.TextProps{Tone: uikit.ToneSecondary})
+				uikit.Text(c, "0.1.3", uikit.TextProps{Tone: uikit.ToneSecondary})
 				uikit.Button(c, localize(c, "复制"), uikit.ButtonProps{}).OnClick(func() {
-					if err := mygo.Clipboard.Write(transfer.TextData("Burrow 0.1.2")); err != nil {
+					if err := mygo.Clipboard.Write(transfer.TextData("Burrow 0.1.3")); err != nil {
 						a.settingsUI.notice = err.Error()
 					}
 				})
