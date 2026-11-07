@@ -1,0 +1,15 @@
+[extend]
+useDefault = true
+
+[[rules]]
+id = "generic-api-key"
+
+[[rules.allowlists]]
+description = "Authentication method wording in English documentation, not a credential."
+condition = "AND"
+regexTarget = "secret"
+regexes = ['''^plain/encrypted$''']
+paths = [
+    '''^dev/ssh-integration/README\.md$''',
+    '''^docs/platform-support\.md$''',
+]
