@@ -35,7 +35,7 @@
 ## Features
 
 - **SSH workspace**: tabs, grouped splits, movable and maximizable panes. Splits in one session share an SSH connection while each Shell runs independently. Supports passwords, plain and encrypted private keys, and SSH agent.
-- **Connection gateways**: manage SSH / SOCKS5 exits and multihop routes for terminals, file transfers, and MCP. Set an app default or choose a gateway per connection.
+- **Connection gateways**: manage SSH / SOCKS5 / [WireGuard](docs/wireguard.md) exits and multihop routes for terminals, file transfers, and MCP. Set an app default or choose a gateway per connection.
 - **Two-pane file management**: browse and transfer between local and remote directories over SFTP, FTP, and explicit or implicit FTPS. Search, create, rename, delete, and resolve name conflicts.
 - **Transfer queue**: upload and download files or directories with concurrency, pause, resume, cancellation, and retry. Tasks are isolated by file tab and can be restored offline after quitting.
 - **Server status**: inspect Linux CPU, memory, network, processes, and host information. Root disk capacity is available when the server provides the required SFTP capabilities.

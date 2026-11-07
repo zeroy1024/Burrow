@@ -9,6 +9,7 @@
 | [main.go](../main.go) | App entry point |
 | [internal/desktop](../internal/desktop/) | Page composition, sessions, connection scheduling, persistence, credentials, and task lifecycle |
 | [internal/sshclient](../internal/sshclient/) | SSH connections, authentication, host trust, Shell/Exec/subsystems, and connection leases |
+| [internal/wggateway](../internal/wggateway/) | Pure user-space WireGuard/netstack, strict single-peer import, tunnel DNS, and authenticated probes |
 | [internal/fileclient](../internal/fileclient/) | Local, SFTP, and FTP/FTPS file operations and optional capabilities |
 | [internal/vault](../internal/vault/) | Credential encryption, unlock/data key lifecycle, protection transitions, and paired backups |
 | [internal/store](../internal/store/) | SQLite schema, transactions, host trust, and consistent backups |
@@ -30,6 +31,8 @@ Saved entries describe future connections; SSH and file catalogs are separate. A
 SSH transports and business channels are separate. Splits open independent Shell channels on the same connection. Moving panes, regrouping, and dragging them back into tabs preserves terminal objects. Closing one channel leaves sibling channels alive; the last consumer releases the shared connection.
 
 Entry points: [ssh_sessions.go](../internal/desktop/ssh_sessions.go), [ssh_terminal.go](../internal/desktop/ssh_terminal.go), [file_connections.go](../internal/desktop/file_connections.go), and [pane_drag.go](../internal/desktop/pane_drag.go).
+
+WireGuard transports are shared by client/peer identity across terminal, transfer, MCP, and test scopes. Matching settings share one UDP device; incompatible settings for an active identity produce an error until its consumers close. Each consumer owns a lease, and the final release closes the device and in-memory stack. This differs from scoped SSH transports because independent WireGuard devices with the same identity can compete for the peer endpoint. See [WireGuard gateways](wireguard.md).
 
 ## Startup and unlock
 

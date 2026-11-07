@@ -64,6 +64,17 @@ func (a *app) prepareGatewayTest(id string, progress *gatewayTestProgress) (func
 					result.Detail = locales.Deferred(locales.MessageSshHandshakeAndAuthenticationSucceeded)
 					err = errors.Join(connection.Close(), connection.Wait())
 				}
+			} else if gateway.Kind == "wireguard" {
+				var stop func()
+				tunnel, release, openErr := a.acquireWGGateway(ctx, gateway)
+				stop, err = release, openErr
+				if err == nil {
+					err = tunnel.Probe(ctx)
+					result.Detail = locales.Deferred(locales.WgHandshakeOK)
+				}
+				if stop != nil {
+					stop()
+				}
 			} else {
 				var auth *proxy.Auth
 				auth, err = a.socksGatewayAuth(ctx, gateway)

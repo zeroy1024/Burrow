@@ -14,7 +14,7 @@ Deleting a saved host or site closes the saved sessions associated with that ent
 
 ## Connection gateways
 
-**Gateways** is a separate page below File Transfer in the app rail, rather than a Settings category. It manages SSH / SOCKS5 gateways and the app default. The header shows the default exit and its resolved route; the sidebar groups gateways by type, and the detail pane shows the selected route, configuration, and references.
+**Gateways** is a separate page below File Transfer in the app rail, rather than a Settings category. It manages SSH / SOCKS5 / WireGuard gateways and the app default. The header shows the default exit and its resolved route; the sidebar groups gateways by type, and the detail pane shows the selected route, configuration, and references.
 
 On this page, `⌘N` (`Ctrl+N` on Windows/Linux) adds a gateway and `⌘F` searches gateways. Session close and switch shortcuts do not operate on background terminal tabs.
 
@@ -25,6 +25,8 @@ An SSH gateway references a saved SSH host's address, authentication, and Keepal
 A host following the app default connects directly if it is itself on that default route, for example when it is the source host of the default SSH gateway. Explicit routes through the host itself, or mutually upstream gateways, form loops. They are disabled in selection and rejected on save.
 
 Several targets can share an SSH gateway connection. Closing one terminal or file session releases only its own channels. SOCKS5 establishes a separate connection for each target. The selected exit handles target hostnames; the first gateway address is reached over the local network.
+
+WireGuard uses an app-local user-space IP stack and ordinary UDP sockets. It does not create a system TUN or modify system routes, DNS, or firewall rules. A WireGuard gateway is the first hop and can precede SSH or SOCKS5. It supports one peer, manual entry, and strict `.conf` import; private keys and optional preshared keys are encrypted in Vault. See [WireGuard gateways](wireguard.md) for configuration, DNS, sharing, and test boundaries.
 
 FTP / FTPS through a gateway requires passive mode. Its control and data connections follow the same route. Active mode remains available for direct connections.
 

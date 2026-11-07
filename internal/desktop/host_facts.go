@@ -33,6 +33,12 @@ type hostFactsProbe struct {
 func hostFactsKey(plan sshDialPlan) string {
 	var target strings.Builder
 	for _, hop := range plan.route {
+		if hop.WG != nil {
+			config := *hop.WG
+			config.CredentialRevision = ""
+			data, _ := json.Marshal(config)
+			fmt.Fprintf(&target, "wireguard %s\n", data)
+		}
 		if hop.SOCKS != nil {
 			fmt.Fprintf(&target, "socks5 %q %d\n", hop.SOCKS.Address, hop.SOCKS.Port)
 		}

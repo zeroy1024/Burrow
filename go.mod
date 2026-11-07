@@ -14,18 +14,16 @@ require (
 	golang.org/x/net v0.60.0
 	golang.org/x/sys v0.49.0
 	golang.org/x/text v0.43.0
+	golang.zx2c4.com/wireguard v0.0.0-20261024220952-b3bc704ef0ee
 	modernc.org/sqlite v1.61.1
 	mvdan.cc/sh/v3 v3.14.1
 )
-
-replace github.com/egoist/mygo/sshdesk-terminal => ./third_party/mygo-terminal
-
-replace github.com/pkg/sftp => ./third_party/pkg-sftp
 
 require (
 	github.com/dustin/go-humanize v1.1.0 // indirect
 	github.com/ebitengine/purego v0.11.1 // indirect
 	github.com/go-text/typesetting v0.3.5 // indirect
+	github.com/google/btree v1.1.2 // indirect
 	github.com/google/jsonschema-go v0.4.3 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/kr/fs v0.1.0 // indirect
@@ -39,7 +37,13 @@ require (
 	golang.org/x/oauth2 v0.35.0 // indirect
 	golang.org/x/sync v0.24.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
+	golang.zx2c4.com/wintun v0.0.0-20230126152724-0fa3db229ce2 // indirect
+	gvisor.dev/gvisor v0.0.0-20250503011706-39ed1f5ac29c // indirect
 	modernc.org/libc v1.79.0 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.12.1 // indirect
 )
+
+replace github.com/egoist/mygo/sshdesk-terminal => ./third_party/mygo-terminal
+
+replace github.com/pkg/sftp => ./third_party/pkg-sftp

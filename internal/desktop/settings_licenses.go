@@ -63,6 +63,9 @@ var shLicense string
 //go:embed licenses/simple-icons.txt
 var simpleIconsLicense string
 
+//go:embed licenses/wireguard.txt
+var wireguardLicense string
+
 var burrowIcon = func() *ui.Bitmap {
 	bitmap, err := ui.DecodeBitmap(assets.IconPNG)
 	if err != nil {
@@ -74,6 +77,7 @@ var burrowIcon = func() *ui.Bitmap {
 func dependencyNotices() []struct{ name, license, text string } {
 	return []struct{ name, license, text string }{
 		{"MyGo", "MIT", mygoLicense},
+		{"WireGuard / gVisor netstack", "MIT / Apache-2.0", wireguardLicense},
 		{locales.MessageGhosttyVtAndNativeDependencies(), "MIT / Apache-2.0 / BSD-3-Clause / Unicode-3.0", ghosttyLicense},
 		{locales.MessagePkgSftpAndKrFs(), "BSD-2-Clause / BSD-3-Clause", sftpLicense},
 		{locales.MessageGoStandardLibraryGolangOrgXSys(), "BSD-3-Clause", goLicense},

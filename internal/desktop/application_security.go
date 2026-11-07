@@ -526,6 +526,9 @@ func (a *app) securitySettingsMatch() bool {
 
 func (a *app) clearSecurityInputs() {
 	a.security.password = ""
+	if d := a.gatewayUI.draft; d != nil {
+		d.wg.private, d.wg.psk = "", ""
+	}
 	if d := a.security.dialog; d != nil {
 		d.current, d.password, d.confirm = "", "", ""
 	}

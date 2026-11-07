@@ -31,6 +31,10 @@ Windows named pipes use pinned `go-winio v0.6.4`; its license appears in About. 
 
 The current i18n change passed existing tests, race, English-environment tests, vet, local builds, and Windows amd64/arm64 cross-builds and vet. Catalog checks cover English/Chinese keys, arguments, and missed source text. This does not establish acceptance of native language switching, English layouts, system dialogs, or accessibility. See [interface languages](i18n.md) for maintenance and checks.
 
+## WireGuard validation
+
+The user-space WireGuard change passed local Go builds/vet and Linux amd64 plus Windows amd64/arm64 cross-builds/vet. A loopback-only `-race` probe verified real PSK handshakes, IPv4/IPv6 TCP data, tunnel DNS, Allowed IPs, close/reopen, encrypted Vault storage, shared terminal/MCP/test leases, conflicting-identity rejection, and final-release cleanup. No native GUI or Windows/Linux runtime acceptance was performed. The implementation creates no OS TUN and does not configure OS routes, DNS, or firewall rules. See [WireGuard gateways](wireguard.md).
+
 ## Windows native acceptance
 
 The following still require an actual Windows session; cross-compilation cannot replace them:

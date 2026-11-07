@@ -11,6 +11,7 @@ This directory describes how Burrow currently works and how to develop it. Docum
 | [First steps](getting-started.md) | Running the app, the first SSH connection, file sites, and workspace operations |
 | [Platform support](platform-support.md) | macOS, Windows, and Linux outputs and native acceptance status |
 | [Sessions and settings](session-settings.md) | Catalogs, authentication, advanced options, shortcuts, and app preferences |
+| [WireGuard gateways](wireguard.md) | App-local tunnels, configuration import, DNS, credentials, and route constraints |
 | [Terminal and color schemes](terminal-themes.md) | Fonts, colors, cursor, scrollback, and terminal rendering |
 | [File management and transfers](file-transfer.md) | Uploads, downloads, conflicts, task ownership, resume, and recovery |
 | [Linux monitoring](monitoring.md) | Metrics, sampling scope, and unavailable states |

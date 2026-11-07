@@ -5004,13 +5004,13 @@ func (msgs Messages) MessageNoGatewaysYet() string {
 	return Catalog.Format(msgs.locale, "messageNoGatewaysYet", nil)
 }
 
-// MessageGatewaysRouteYourConnectionsAddAnSshJumpHostOrSocks5ProxyThen says "网关决定连接从哪里出发。添加 SSH 跳板或 SOCKS5 …"
+// MessageGatewaysRouteYourConnectionsAddAnSshJumpHostOrSocks5ProxyThen says "网关为连接选择出口。添加 SSH、SOCKS5 或 WireGuard 网关，再应用到主机或站点。"
 // in the language the app shows.
 func MessageGatewaysRouteYourConnectionsAddAnSshJumpHostOrSocks5ProxyThen() string {
 	return In(i18n.Locale()).MessageGatewaysRouteYourConnectionsAddAnSshJumpHostOrSocks5ProxyThen()
 }
 
-// MessageGatewaysRouteYourConnectionsAddAnSshJumpHostOrSocks5ProxyThen says "网关决定连接从哪里出发。添加 SSH 跳板或 SOCKS5 …"
+// MessageGatewaysRouteYourConnectionsAddAnSshJumpHostOrSocks5ProxyThen says "网关为连接选择出口。添加 SSH、SOCKS5 或 WireGuard 网关，再应用到主机或站点。"
 // in the language of msgs.
 func (msgs Messages) MessageGatewaysRouteYourConnectionsAddAnSshJumpHostOrSocks5ProxyThen() string {
 	return Catalog.Format(msgs.locale, "messageGatewaysRouteYourConnectionsAddAnSshJumpHostOrSocks5ProxyThen", nil)
@@ -15850,4 +15850,564 @@ func MonitorCoreCount(count int) string { return In(i18n.Locale()).MonitorCoreCo
 // in the language of msgs.
 func (msgs Messages) MonitorCoreCount(count int) string {
 	return Catalog.Format(msgs.locale, "monitorCoreCount", map[string]any{"count": count})
+}
+
+// WgGateway says "WireGuard 网关"
+// in the language the app shows.
+func WgGateway() string { return In(i18n.Locale()).WgGateway() }
+
+// WgGateway says "WireGuard 网关"
+// in the language of msgs.
+func (msgs Messages) WgGateway() string {
+	return Catalog.Format(msgs.locale, "wgGateway", nil)
+}
+
+// WgAdd says "添加 WireGuard"
+// in the language the app shows.
+func WgAdd() string { return In(i18n.Locale()).WgAdd() }
+
+// WgAdd says "添加 WireGuard"
+// in the language of msgs.
+func (msgs Messages) WgAdd() string {
+	return Catalog.Format(msgs.locale, "wgAdd", nil)
+}
+
+// WgDescription says "通过应用内 WireGuard 隧道连接，不更改系统网络。"
+// in the language the app shows.
+func WgDescription() string { return In(i18n.Locale()).WgDescription() }
+
+// WgDescription says "通过应用内 WireGuard 隧道连接，不更改系统网络。"
+// in the language of msgs.
+func (msgs Messages) WgDescription() string {
+	return Catalog.Format(msgs.locale, "wgDescription", nil)
+}
+
+// WgUserSpace says "纯用户态；不创建系统网卡，不修改系统路由、DNS 或防火墙。"
+// in the language the app shows.
+func WgUserSpace() string { return In(i18n.Locale()).WgUserSpace() }
+
+// WgUserSpace says "纯用户态；不创建系统网卡，不修改系统路由、DNS 或防火墙。"
+// in the language of msgs.
+func (msgs Messages) WgUserSpace() string {
+	return Catalog.Format(msgs.locale, "wgUserSpace", nil)
+}
+
+// WgEndpoint says "Peer 地址"
+// in the language the app shows.
+func WgEndpoint() string { return In(i18n.Locale()).WgEndpoint() }
+
+// WgEndpoint says "Peer 地址"
+// in the language of msgs.
+func (msgs Messages) WgEndpoint() string {
+	return Catalog.Format(msgs.locale, "wgEndpoint", nil)
+}
+
+// WgAddresses says "隧道地址"
+// in the language the app shows.
+func WgAddresses() string { return In(i18n.Locale()).WgAddresses() }
+
+// WgAddresses says "隧道地址"
+// in the language of msgs.
+func (msgs Messages) WgAddresses() string {
+	return Catalog.Format(msgs.locale, "wgAddresses", nil)
+}
+
+// WgAddressHelp says "填写带前缀长度的地址，以逗号分隔，例如 10.0.0.2/32。"
+// in the language the app shows.
+func WgAddressHelp() string { return In(i18n.Locale()).WgAddressHelp() }
+
+// WgAddressHelp says "填写带前缀长度的地址，以逗号分隔，例如 10.0.0.2/32。"
+// in the language of msgs.
+func (msgs Messages) WgAddressHelp() string {
+	return Catalog.Format(msgs.locale, "wgAddressHelp", nil)
+}
+
+// WgAllowedIPs says "Allowed IPs"
+// in the language the app shows.
+func WgAllowedIPs() string { return In(i18n.Locale()).WgAllowedIPs() }
+
+// WgAllowedIPs says "Allowed IPs"
+// in the language of msgs.
+func (msgs Messages) WgAllowedIPs() string {
+	return Catalog.Format(msgs.locale, "wgAllowedIPs", nil)
+}
+
+// WgDNS says "隧道 DNS"
+// in the language the app shows.
+func WgDNS() string { return In(i18n.Locale()).WgDNS() }
+
+// WgDNS says "隧道 DNS"
+// in the language of msgs.
+func (msgs Messages) WgDNS() string {
+	return Catalog.Format(msgs.locale, "wgDNS", nil)
+}
+
+// WgDNSHelp says "仅用于隧道内域名解析；DNS 地址须包含在 Allowed IPs 中。不填写时只支持 IP 目标。"
+// in the language the app shows.
+func WgDNSHelp() string { return In(i18n.Locale()).WgDNSHelp() }
+
+// WgDNSHelp says "仅用于隧道内域名解析；DNS 地址须包含在 Allowed IPs 中。不填写时只支持 IP 目标。"
+// in the language of msgs.
+func (msgs Messages) WgDNSHelp() string {
+	return Catalog.Format(msgs.locale, "wgDNSHelp", nil)
+}
+
+// WgMTU says "MTU"
+// in the language the app shows.
+func WgMTU() string { return In(i18n.Locale()).WgMTU() }
+
+// WgMTU says "MTU"
+// in the language of msgs.
+func (msgs Messages) WgMTU() string {
+	return Catalog.Format(msgs.locale, "wgMTU", nil)
+}
+
+// WgKeepalive says "持久保活（秒）"
+// in the language the app shows.
+func WgKeepalive() string { return In(i18n.Locale()).WgKeepalive() }
+
+// WgKeepalive says "持久保活（秒）"
+// in the language of msgs.
+func (msgs Messages) WgKeepalive() string {
+	return Catalog.Format(msgs.locale, "wgKeepalive", nil)
+}
+
+// WgListenPort says "本地 UDP 端口"
+// in the language the app shows.
+func WgListenPort() string { return In(i18n.Locale()).WgListenPort() }
+
+// WgListenPort says "本地 UDP 端口"
+// in the language of msgs.
+func (msgs Messages) WgListenPort() string {
+	return Catalog.Format(msgs.locale, "wgListenPort", nil)
+}
+
+// WgListenHelp says "0 表示使用系统分配的临时端口。"
+// in the language the app shows.
+func WgListenHelp() string { return In(i18n.Locale()).WgListenHelp() }
+
+// WgListenHelp says "0 表示使用系统分配的临时端口。"
+// in the language of msgs.
+func (msgs Messages) WgListenHelp() string {
+	return Catalog.Format(msgs.locale, "wgListenHelp", nil)
+}
+
+// WgPeerKey says "Peer 公钥"
+// in the language the app shows.
+func WgPeerKey() string { return In(i18n.Locale()).WgPeerKey() }
+
+// WgPeerKey says "Peer 公钥"
+// in the language of msgs.
+func (msgs Messages) WgPeerKey() string {
+	return Catalog.Format(msgs.locale, "wgPeerKey", nil)
+}
+
+// WgClientKey says "客户端公钥"
+// in the language the app shows.
+func WgClientKey() string { return In(i18n.Locale()).WgClientKey() }
+
+// WgClientKey says "客户端公钥"
+// in the language of msgs.
+func (msgs Messages) WgClientKey() string {
+	return Catalog.Format(msgs.locale, "wgClientKey", nil)
+}
+
+// WgPrivateKey says "WireGuard 私钥"
+// in the language the app shows.
+func WgPrivateKey() string { return In(i18n.Locale()).WgPrivateKey() }
+
+// WgPrivateKey says "WireGuard 私钥"
+// in the language of msgs.
+func (msgs Messages) WgPrivateKey() string {
+	return Catalog.Format(msgs.locale, "wgPrivateKey", nil)
+}
+
+// WgPSK says "预共享密钥（可选）"
+// in the language the app shows.
+func WgPSK() string { return In(i18n.Locale()).WgPSK() }
+
+// WgPSK says "预共享密钥（可选）"
+// in the language of msgs.
+func (msgs Messages) WgPSK() string {
+	return Catalog.Format(msgs.locale, "wgPSK", nil)
+}
+
+// WgImport says "导入 .conf…"
+// in the language the app shows.
+func WgImport() string { return In(i18n.Locale()).WgImport() }
+
+// WgImport says "导入 .conf…"
+// in the language of msgs.
+func (msgs Messages) WgImport() string {
+	return Catalog.Format(msgs.locale, "wgImport", nil)
+}
+
+// WgChooseConfig says "导入 WireGuard 客户端配置"
+// in the language the app shows.
+func WgChooseConfig() string { return In(i18n.Locale()).WgChooseConfig() }
+
+// WgChooseConfig says "导入 WireGuard 客户端配置"
+// in the language of msgs.
+func (msgs Messages) WgChooseConfig() string {
+	return Catalog.Format(msgs.locale, "wgChooseConfig", nil)
+}
+
+// WgConfigLine says "WireGuard 配置第 %d 行无效。"
+// in the language the app shows.
+func WgConfigLine() string { return In(i18n.Locale()).WgConfigLine() }
+
+// WgConfigLine says "WireGuard 配置第 %d 行无效。"
+// in the language of msgs.
+func (msgs Messages) WgConfigLine() string {
+	return Catalog.Format(msgs.locale, "wgConfigLine", nil)
+}
+
+// WgUnsupportedSetting says "WireGuard 配置第 %d 行含不支持的设置；系统配置和脚本指令不可导入。"
+// in the language the app shows.
+func WgUnsupportedSetting() string { return In(i18n.Locale()).WgUnsupportedSetting() }
+
+// WgUnsupportedSetting says "WireGuard 配置第 %d 行含不支持的设置；系统配置和脚本指令不可导入。"
+// in the language of msgs.
+func (msgs Messages) WgUnsupportedSetting() string {
+	return Catalog.Format(msgs.locale, "wgUnsupportedSetting", nil)
+}
+
+// WgSinglePeer says "配置必须包含一个 Interface 和一个 Peer。"
+// in the language the app shows.
+func WgSinglePeer() string { return In(i18n.Locale()).WgSinglePeer() }
+
+// WgSinglePeer says "配置必须包含一个 Interface 和一个 Peer。"
+// in the language of msgs.
+func (msgs Messages) WgSinglePeer() string {
+	return Catalog.Format(msgs.locale, "wgSinglePeer", nil)
+}
+
+// WgInvalidKey says "WireGuard 密钥必须为非零的 32 字节 Base64 值。"
+// in the language the app shows.
+func WgInvalidKey() string { return In(i18n.Locale()).WgInvalidKey() }
+
+// WgInvalidKey says "WireGuard 密钥必须为非零的 32 字节 Base64 值。"
+// in the language of msgs.
+func (msgs Messages) WgInvalidKey() string {
+	return Catalog.Format(msgs.locale, "wgInvalidKey", nil)
+}
+
+// WgMissingPrivateKey says "请填写或导入 WireGuard 私钥。"
+// in the language the app shows.
+func WgMissingPrivateKey() string { return In(i18n.Locale()).WgMissingPrivateKey() }
+
+// WgMissingPrivateKey says "请填写或导入 WireGuard 私钥。"
+// in the language of msgs.
+func (msgs Messages) WgMissingPrivateKey() string {
+	return Catalog.Format(msgs.locale, "wgMissingPrivateKey", nil)
+}
+
+// WgInvalidAddress says "请填写有效的隧道地址和前缀长度。"
+// in the language the app shows.
+func WgInvalidAddress() string { return In(i18n.Locale()).WgInvalidAddress() }
+
+// WgInvalidAddress says "请填写有效的隧道地址和前缀长度。"
+// in the language of msgs.
+func (msgs Messages) WgInvalidAddress() string {
+	return Catalog.Format(msgs.locale, "wgInvalidAddress", nil)
+}
+
+// WgInvalidEndpoint says "请填写有效的 Peer 域名或 IP 和端口，IPv6 地址需使用方括号。"
+// in the language the app shows.
+func WgInvalidEndpoint() string { return In(i18n.Locale()).WgInvalidEndpoint() }
+
+// WgInvalidEndpoint says "请填写有效的 Peer 域名或 IP 和端口，IPv6 地址需使用方括号。"
+// in the language of msgs.
+func (msgs Messages) WgInvalidEndpoint() string {
+	return Catalog.Format(msgs.locale, "wgInvalidEndpoint", nil)
+}
+
+// WgInvalidAllowedIPs says "请填写至少一个有效的 Allowed IPs 网段。"
+// in the language the app shows.
+func WgInvalidAllowedIPs() string { return In(i18n.Locale()).WgInvalidAllowedIPs() }
+
+// WgInvalidAllowedIPs says "请填写至少一个有效的 Allowed IPs 网段。"
+// in the language of msgs.
+func (msgs Messages) WgInvalidAllowedIPs() string {
+	return Catalog.Format(msgs.locale, "wgInvalidAllowedIPs", nil)
+}
+
+// WgInvalidDNS says "隧道 DNS 必须使用有效的单播 IP 地址，不支持搜索域。"
+// in the language the app shows.
+func WgInvalidDNS() string { return In(i18n.Locale()).WgInvalidDNS() }
+
+// WgInvalidDNS says "隧道 DNS 必须使用有效的单播 IP 地址，不支持搜索域。"
+// in the language of msgs.
+func (msgs Messages) WgInvalidDNS() string {
+	return Catalog.Format(msgs.locale, "wgInvalidDNS", nil)
+}
+
+// WgDNSOutsideAllowedIPs says "隧道 DNS 地址必须包含在 Allowed IPs 中。"
+// in the language the app shows.
+func WgDNSOutsideAllowedIPs() string { return In(i18n.Locale()).WgDNSOutsideAllowedIPs() }
+
+// WgDNSOutsideAllowedIPs says "隧道 DNS 地址必须包含在 Allowed IPs 中。"
+// in the language of msgs.
+func (msgs Messages) WgDNSOutsideAllowedIPs() string {
+	return Catalog.Format(msgs.locale, "wgDNSOutsideAllowedIPs", nil)
+}
+
+// WgInvalidMTU says "MTU 必须介于 1280 和 65535 之间。"
+// in the language the app shows.
+func WgInvalidMTU() string { return In(i18n.Locale()).WgInvalidMTU() }
+
+// WgInvalidMTU says "MTU 必须介于 1280 和 65535 之间。"
+// in the language of msgs.
+func (msgs Messages) WgInvalidMTU() string {
+	return Catalog.Format(msgs.locale, "wgInvalidMTU", nil)
+}
+
+// WgInvalidKeepalive says "保活间隔必须介于 0 和 65535 秒之间。"
+// in the language the app shows.
+func WgInvalidKeepalive() string { return In(i18n.Locale()).WgInvalidKeepalive() }
+
+// WgInvalidKeepalive says "保活间隔必须介于 0 和 65535 秒之间。"
+// in the language of msgs.
+func (msgs Messages) WgInvalidKeepalive() string {
+	return Catalog.Format(msgs.locale, "wgInvalidKeepalive", nil)
+}
+
+// WgInvalidListenPort says "本地 UDP 端口必须介于 0 和 65535 之间。"
+// in the language the app shows.
+func WgInvalidListenPort() string { return In(i18n.Locale()).WgInvalidListenPort() }
+
+// WgInvalidListenPort says "本地 UDP 端口必须介于 0 和 65535 之间。"
+// in the language of msgs.
+func (msgs Messages) WgInvalidListenPort() string {
+	return Catalog.Format(msgs.locale, "wgInvalidListenPort", nil)
+}
+
+// WgCredentialChanged says "已保存的 WireGuard 凭据已改变，请重新连接以使用当前配置。"
+// in the language the app shows.
+func WgCredentialChanged() string { return In(i18n.Locale()).WgCredentialChanged() }
+
+// WgCredentialChanged says "已保存的 WireGuard 凭据已改变，请重新连接以使用当前配置。"
+// in the language of msgs.
+func (msgs Messages) WgCredentialChanged() string {
+	return Catalog.Format(msgs.locale, "wgCredentialChanged", nil)
+}
+
+// WgRouteFirst says "WireGuard 必须位于路由第一跳，且一条路由只能包含一个 WireGuard 网关。"
+// in the language the app shows.
+func WgRouteFirst() string { return In(i18n.Locale()).WgRouteFirst() }
+
+// WgRouteFirst says "WireGuard 必须位于路由第一跳，且一条路由只能包含一个 WireGuard 网关。"
+// in the language of msgs.
+func (msgs Messages) WgRouteFirst() string {
+	return Catalog.Format(msgs.locale, "wgRouteFirst", nil)
+}
+
+// WgConflictingIdentity says "同一 WireGuard 身份正使用不同配置。请先关闭相关连接或停止连接测试，再使用新配置。"
+// in the language the app shows.
+func WgConflictingIdentity() string { return In(i18n.Locale()).WgConflictingIdentity() }
+
+// WgConflictingIdentity says "同一 WireGuard 身份正使用不同配置。请先关闭相关连接或停止连接测试，再使用新配置。"
+// in the language of msgs.
+func (msgs Messages) WgConflictingIdentity() string {
+	return Catalog.Format(msgs.locale, "wgConflictingIdentity", nil)
+}
+
+// WgNoDNS says "此 WireGuard 网关未配置隧道 DNS，请配置 DNS 或使用目标 IP 地址。"
+// in the language the app shows.
+func WgNoDNS() string { return In(i18n.Locale()).WgNoDNS() }
+
+// WgNoDNS says "此 WireGuard 网关未配置隧道 DNS，请配置 DNS 或使用目标 IP 地址。"
+// in the language of msgs.
+func (msgs Messages) WgNoDNS() string {
+	return Catalog.Format(msgs.locale, "wgNoDNS", nil)
+}
+
+// WgTargetOutsideAllowedIPs says "目标地址不在 WireGuard Allowed IPs 中，或没有可用的地址族。"
+// in the language the app shows.
+func WgTargetOutsideAllowedIPs() string { return In(i18n.Locale()).WgTargetOutsideAllowedIPs() }
+
+// WgTargetOutsideAllowedIPs says "目标地址不在 WireGuard Allowed IPs 中，或没有可用的地址族。"
+// in the language of msgs.
+func (msgs Messages) WgTargetOutsideAllowedIPs() string {
+	return Catalog.Format(msgs.locale, "wgTargetOutsideAllowedIPs", nil)
+}
+
+// WgHandshake says "WireGuard 握手失败：%w"
+// in the language the app shows.
+func WgHandshake() string { return In(i18n.Locale()).WgHandshake() }
+
+// WgHandshake says "WireGuard 握手失败：%w"
+// in the language of msgs.
+func (msgs Messages) WgHandshake() string {
+	return Catalog.Format(msgs.locale, "wgHandshake", nil)
+}
+
+// WgSetup says "无法建立 WireGuard 隧道：%w"
+// in the language the app shows.
+func WgSetup() string { return In(i18n.Locale()).WgSetup() }
+
+// WgSetup says "无法建立 WireGuard 隧道：%w"
+// in the language of msgs.
+func (msgs Messages) WgSetup() string {
+	return Catalog.Format(msgs.locale, "wgSetup", nil)
+}
+
+// WgDial says "WireGuard 目标连接失败：%w"
+// in the language the app shows.
+func WgDial() string { return In(i18n.Locale()).WgDial() }
+
+// WgDial says "WireGuard 目标连接失败：%w"
+// in the language of msgs.
+func (msgs Messages) WgDial() string {
+	return Catalog.Format(msgs.locale, "wgDial", nil)
+}
+
+// WgKeepKeys says "已加密保存在 Vault；留空保持不变。"
+// in the language the app shows.
+func WgKeepKeys() string { return In(i18n.Locale()).WgKeepKeys() }
+
+// WgKeepKeys says "已加密保存在 Vault；留空保持不变。"
+// in the language of msgs.
+func (msgs Messages) WgKeepKeys() string {
+	return Catalog.Format(msgs.locale, "wgKeepKeys", nil)
+}
+
+// WgRemovePSK says "移除预共享密钥"
+// in the language the app shows.
+func WgRemovePSK() string { return In(i18n.Locale()).WgRemovePSK() }
+
+// WgRemovePSK says "移除预共享密钥"
+// in the language of msgs.
+func (msgs Messages) WgRemovePSK() string {
+	return Catalog.Format(msgs.locale, "wgRemovePSK", nil)
+}
+
+// WgHandshakeOK says "WireGuard 身份握手已验证；目标服务的可达性需通过主机或站点连接测试确认。"
+// in the language the app shows.
+func WgHandshakeOK() string { return In(i18n.Locale()).WgHandshakeOK() }
+
+// WgHandshakeOK says "WireGuard 身份握手已验证；目标服务的可达性需通过主机或站点连接测试确认。"
+// in the language of msgs.
+func (msgs Messages) WgHandshakeOK() string {
+	return Catalog.Format(msgs.locale, "wgHandshakeOK", nil)
+}
+
+// WgShared says "终端、传输和 MCP 共享同一隧道"
+// in the language the app shows.
+func WgShared() string { return In(i18n.Locale()).WgShared() }
+
+// WgShared says "终端、传输和 MCP 共享同一隧道"
+// in the language of msgs.
+func (msgs Messages) WgShared() string {
+	return Catalog.Format(msgs.locale, "wgShared", nil)
+}
+
+// WgFirstHop says "通过本机网络建立 WireGuard；可作为 SSH 或 SOCKS5 的上游。"
+// in the language the app shows.
+func WgFirstHop() string { return In(i18n.Locale()).WgFirstHop() }
+
+// WgFirstHop says "通过本机网络建立 WireGuard；可作为 SSH 或 SOCKS5 的上游。"
+// in the language of msgs.
+func (msgs Messages) WgFirstHop() string {
+	return Catalog.Format(msgs.locale, "wgFirstHop", nil)
+}
+
+// WgConfigTooLarge says "WireGuard 配置不能超过 1 MiB。"
+// in the language the app shows.
+func WgConfigTooLarge() string { return In(i18n.Locale()).WgConfigTooLarge() }
+
+// WgConfigTooLarge says "WireGuard 配置不能超过 1 MiB。"
+// in the language of msgs.
+func (msgs Messages) WgConfigTooLarge() string {
+	return Catalog.Format(msgs.locale, "wgConfigTooLarge", nil)
+}
+
+// WgGenerate says "生成私钥"
+// in the language the app shows.
+func WgGenerate() string { return In(i18n.Locale()).WgGenerate() }
+
+// WgGenerate says "生成私钥"
+// in the language of msgs.
+func (msgs Messages) WgGenerate() string {
+	return Catalog.Format(msgs.locale, "wgGenerate", nil)
+}
+
+// WgRuntimeClosed says "WireGuard 隧道已关闭。"
+// in the language the app shows.
+func WgRuntimeClosed() string { return In(i18n.Locale()).WgRuntimeClosed() }
+
+// WgRuntimeClosed says "WireGuard 隧道已关闭。"
+// in the language of msgs.
+func (msgs Messages) WgRuntimeClosed() string {
+	return Catalog.Format(msgs.locale, "wgRuntimeClosed", nil)
+}
+
+// WgKeyMismatch says "WireGuard 私钥与保存的客户端公钥不一致。"
+// in the language the app shows.
+func WgKeyMismatch() string { return In(i18n.Locale()).WgKeyMismatch() }
+
+// WgKeyMismatch says "WireGuard 私钥与保存的客户端公钥不一致。"
+// in the language of msgs.
+func (msgs Messages) WgKeyMismatch() string {
+	return Catalog.Format(msgs.locale, "wgKeyMismatch", nil)
+}
+
+// WgSameKeys says "Peer 公钥不能与客户端公钥相同。"
+// in the language the app shows.
+func WgSameKeys() string { return In(i18n.Locale()).WgSameKeys() }
+
+// WgSameKeys says "Peer 公钥不能与客户端公钥相同。"
+// in the language of msgs.
+func (msgs Messages) WgSameKeys() string {
+	return Catalog.Format(msgs.locale, "wgSameKeys", nil)
+}
+
+// WgSecretHelp says "私钥和预共享密钥会在保存时加密写入 Vault。"
+// in the language the app shows.
+func WgSecretHelp() string { return In(i18n.Locale()).WgSecretHelp() }
+
+// WgSecretHelp says "私钥和预共享密钥会在保存时加密写入 Vault。"
+// in the language of msgs.
+func (msgs Messages) WgSecretHelp() string {
+	return Catalog.Format(msgs.locale, "wgSecretHelp", nil)
+}
+
+// WgDeleteKeys says "保存的 WireGuard 密钥也会从 Vault 移除。"
+// in the language the app shows.
+func WgDeleteKeys() string { return In(i18n.Locale()).WgDeleteKeys() }
+
+// WgDeleteKeys says "保存的 WireGuard 密钥也会从 Vault 移除。"
+// in the language of msgs.
+func (msgs Messages) WgDeleteKeys() string {
+	return Catalog.Format(msgs.locale, "wgDeleteKeys", nil)
+}
+
+// WgReadCredential says "无法读取 WireGuard 凭据：%w"
+// in the language the app shows.
+func WgReadCredential() string { return In(i18n.Locale()).WgReadCredential() }
+
+// WgReadCredential says "无法读取 WireGuard 凭据：%w"
+// in the language of msgs.
+func (msgs Messages) WgReadCredential() string {
+	return Catalog.Format(msgs.locale, "wgReadCredential", nil)
+}
+
+// WgUnsupportedNetwork says "WireGuard 不支持目标网络类型：%s"
+// in the language the app shows.
+func WgUnsupportedNetwork() string { return In(i18n.Locale()).WgUnsupportedNetwork() }
+
+// WgUnsupportedNetwork says "WireGuard 不支持目标网络类型：%s"
+// in the language of msgs.
+func (msgs Messages) WgUnsupportedNetwork() string {
+	return Catalog.Format(msgs.locale, "wgUnsupportedNetwork", nil)
+}
+
+// WgPSKHelp says "可选；留空会保留原有密钥，点击「移除预共享密钥」可明确清除。"
+// in the language the app shows.
+func WgPSKHelp() string { return In(i18n.Locale()).WgPSKHelp() }
+
+// WgPSKHelp says "可选；留空会保留原有密钥，点击「移除预共享密钥」可明确清除。"
+// in the language of msgs.
+func (msgs Messages) WgPSKHelp() string {
+	return Catalog.Format(msgs.locale, "wgPSKHelp", nil)
 }

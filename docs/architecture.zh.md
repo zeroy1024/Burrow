@@ -9,6 +9,7 @@
 | [main.go](../main.go) | 应用入口 |
 | [internal/desktop](../internal/desktop/) | 页面组合、会话、连接调度、持久化、凭据与任务生命周期 |
 | [internal/sshclient](../internal/sshclient/) | SSH 连接、认证、主机信任、Shell/Exec/子系统与连接租约 |
+| [internal/wggateway](../internal/wggateway/) | 纯用户态 WireGuard/netstack、严格的单 Peer 导入、隧道 DNS 与身份握手验证 |
 | [internal/fileclient](../internal/fileclient/) | 本地、SFTP、FTP/FTPS 文件操作及可选能力 |
 | [internal/vault](../internal/vault/) | 凭据加密、解锁密钥和数据密钥生命周期、保护设置转换与配套备份 |
 | [internal/store](../internal/store/) | SQLite schema、事务、主机信任与一致备份 |
@@ -30,6 +31,8 @@
 SSH transport 与业务 channel 分离。同一会话分屏在原连接上新建独立 Shell channel，窗格移动、组合拆分和拖回标签保留原终端对象。单 channel 关闭不结束兄弟 channel；最后消费者释放共享连接。
 
 主要入口：[ssh_sessions.go](../internal/desktop/ssh_sessions.go)、[ssh_terminal.go](../internal/desktop/ssh_terminal.go)、[file_connections.go](../internal/desktop/file_connections.go) 和 [pane_drag.go](../internal/desktop/pane_drag.go)。
+
+WireGuard 传输按客户端/Peer 身份在终端、传输、MCP 和测试之间共享。相同配置复用同一个 UDP 设备；同一身份仍在使用时，其他不兼容配置会报错，需先关闭相关使用者。每个使用者持有引用，最后释放时关闭设备及内存网络栈。此处与按作用域隔离的 SSH 传输不同，避免同一 WireGuard 身份的多个设备争抢对端地址。见 [WireGuard 网关](wireguard.zh.md)。
 
 ## 启动与解锁
 

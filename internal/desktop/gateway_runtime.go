@@ -38,10 +38,11 @@ type gatewayTransport struct {
 // Unlike view-owned target groups, these transports are shared by independent
 // targets. The mutex owns the registry and leases; I/O never holds it.
 type gatewayPool struct {
-	mu      sync.Mutex
-	entries map[string]*gatewayTransport
-	uses    map[string]int
-	keyUses map[string]int
+	mu        sync.Mutex
+	entries   map[string]*gatewayTransport
+	wireguard map[string]*wgGatewayTransport
+	uses      map[string]int
+	keyUses   map[string]int
 }
 
 func (p *gatewayPool) retainRoute(route []gatewayHop) func() {
@@ -171,6 +172,11 @@ func gatewayRuntimeKey(route []gatewayHop, steps []sshDialStep, scope string) st
 	sshIndex := 0
 	for _, hop := range route {
 		fmt.Fprintf(&identity, "%q %q\n", hop.ID, hop.Kind)
+		if hop.WG != nil {
+			data, _ := json.Marshal(hop.WG)
+			fmt.Fprintf(&identity, "%s\n", data)
+			continue
+		}
 		if hop.Kind == "socks5" {
 			s := hop.SOCKS
 			fmt.Fprintf(&identity, "%q %d %q %t %q\n", s.Address, s.Port, s.Username, s.PasswordSaved, s.PasswordRevision)
@@ -201,6 +207,28 @@ func (a *app) gatewayDialer(ctx context.Context, plan sshDialPlan) (gatewayDialF
 	sshIndex := 0
 	for index, hop := range plan.route {
 		upstream := dial
+		if hop.Kind == "wireguard" {
+			if plan.hopProgress != nil {
+				plan.hopProgress(index, false)
+			}
+			tunnel, stop, err := a.acquireWGGateway(ctx, hop)
+			if err == nil && plan.hopProgress != nil {
+				err = tunnel.Probe(ctx)
+			}
+			if err != nil {
+				if stop != nil {
+					stop()
+				}
+				release()
+				return nil, nil, locales.Errorf(locales.MessageGateway, hop.Name, err)
+			}
+			releases = append(releases, stop)
+			dial = tunnel.DialContext
+			if plan.hopProgress != nil {
+				plan.hopProgress(index, true)
+			}
+			continue
+		}
 		if hop.Kind == "ssh" {
 			step := plan.steps[sshIndex]
 			sshIndex++

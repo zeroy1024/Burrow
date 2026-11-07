@@ -76,6 +76,8 @@ Legacy upgrades show a one-time migration action at first launch and may require
 
 Managed private keys are decrypted into memory for authentication without connection-time temporary key files. Use **Export Private Key…** to choose a file explicitly. Import source files remain untouched.
 
+WireGuard private keys and optional preshared keys share a WireGuard-specific encrypted Vault record whose ID, kind, and revision are authenticated. Ordinary gateway metadata and connection snapshots contain public configuration and credential revisions only. See [WireGuard gateways](wireguard.md).
+
 ## Host trust
 
 SSH callbacks query the database. The client does not invoke system OpenSSH or read `.ssh/known_hosts`. Trust records are separate from catalog entries; editing/deleting an entry does not automatically clear trust.

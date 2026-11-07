@@ -16,12 +16,14 @@ import (
 	"sshdesk/internal/theme"
 	"sshdesk/internal/uikit"
 	"sshdesk/internal/vault"
+	"sshdesk/internal/wggateway"
 )
 
-var gatewayKinds = []string{"ssh", "socks5"}
+var gatewayKinds = []string{"ssh", "socks5", "wireguard"}
 
 type gatewayDraft struct {
-	initial                        [8]string
+	initial                        [19]string
+	wg                             wireguardDraft
 	editing                        bool
 	value                          gatewayConfig
 	port, password                 string
@@ -33,8 +35,8 @@ type gatewayDraft struct {
 	modal                          uikit.ModalController
 }
 
-func (d *gatewayDraft) inputValues() [8]string {
-	values := [8]string{d.value.Name, d.value.Kind, "", d.value.SSHProfileID, "", "", d.port, strconv.Itoa(d.auth)}
+func (d *gatewayDraft) inputValues() [19]string {
+	values := [19]string{d.value.Name, d.value.Kind, "", d.value.SSHProfileID, "", "", d.port, strconv.Itoa(d.auth)}
 	if d.value.Kind == "socks5" {
 		values[2] = d.value.UpstreamID
 	}
@@ -43,6 +45,12 @@ func (d *gatewayDraft) inputValues() [8]string {
 		if d.auth == 1 {
 			values[5] = d.value.SOCKS.Username
 		}
+	}
+	if d.value.WG != nil {
+		values[8], values[9] = d.value.WG.Endpoint, d.value.WG.PublicKey
+		values[10], values[11], values[12] = d.wg.addresses, d.wg.allowed, d.wg.dns
+		values[13], values[14], values[15] = d.wg.mtu, d.wg.keepalive, d.wg.listenPort
+		values[16], values[17], values[18] = d.wg.private, d.wg.psk, strconv.FormatBool(d.wg.removePSK)
 	}
 	return values
 }
@@ -185,6 +193,9 @@ func (a *app) gatewayHost(g gatewayConfig) (host, hostID, bool) {
 // gatewayEndpoint is the gateway's own host and port; gatewayAddress adds the
 // SSH user.
 func (a *app) gatewayEndpoint(g gatewayConfig) string {
+	if g.Kind == "wireguard" {
+		return g.WG.Endpoint
+	}
 	if g.Kind == "ssh" {
 		if h, _, ok := a.gatewayHost(g); ok {
 			return h.address + ":" + strconv.Itoa(h.port)
@@ -204,6 +215,9 @@ func (a *app) gatewayAddress(g gatewayConfig) string {
 }
 
 func gatewayKindLabel(kind string) string {
+	if kind == "wireguard" {
+		return "WireGuard"
+	}
 	if kind == "ssh" {
 		return "SSH"
 	}
@@ -212,6 +226,9 @@ func gatewayKindLabel(kind string) string {
 
 func gatewayKindLook(kind string) (*ui.SVG, color.NRGBA) {
 	choices := theme.Current().Color.AccentChoices
+	if kind == "wireguard" {
+		return routeIcon, choices.Purple
+	}
 	if kind == "ssh" {
 		return terminalIcon, choices.Blue
 	}
@@ -371,6 +388,14 @@ func (a *app) startGatewayDraft(g gatewayConfig, deleting bool) {
 		}
 	}
 	a.gatewayUI.draft = &gatewayDraft{value: g, port: port, auth: auth, deleting: deleting}
+	if g.WG != nil {
+		config := cloneWGConfig(*g.WG)
+		a.gatewayUI.draft.value.WG = &config
+		a.gatewayUI.draft.wg = newWireguardDraft(config)
+	} else if g.Kind == "wireguard" {
+		a.gatewayUI.draft.value.WG = &wggateway.Config{MTU: 1420}
+		a.gatewayUI.draft.wg = newWireguardDraft(*a.gatewayUI.draft.value.WG)
+	}
 	a.gatewayUI.draft.initial = a.gatewayUI.draft.inputValues()
 	a.gatewayUI.draft.editing = slices.ContainsFunc(a.gateways, func(value gatewayConfig) bool { return value.ID == g.ID })
 	a.gatewayUI.open = true
@@ -519,6 +544,7 @@ func (a *app) gatewayEmptyState(c *ui.Context) {
 				}
 				choice("ssh", locales.MessageAddSshGateway(), locales.MessageUseASavedSshHostAsAJumpHostWithOptionalUpstreamGateways())
 				choice("socks5", locales.MessageAddSocks5Proxy(), locales.MessageEnterAProxyAddressWithOptionalUsernameAndPasswordAuthentication())
+				choice("wireguard", locales.WgAdd(), locales.WgDescription())
 			})
 		})
 	})
@@ -573,6 +599,9 @@ func (a *app) gatewayListBody(c *ui.Context) {
 					title := locales.MessageSshGateway()
 					if kind == "socks5" {
 						title = locales.MessageSocks5Proxy()
+					}
+					if kind == "wireguard" {
+						title = locales.WgGateway()
 					}
 					group := uikit.SiderGroup(c, uikit.SiderGroupProps{
 						Key: "gateway-group-" + kind, Title: title, Count: len(items), Open: &open, Chevron: chevronIcon,
@@ -633,7 +662,6 @@ func (a *app) gatewayRow(c *ui.Context, g gatewayConfig) {
 	if row.Clicked() {
 		a.selectGateway(g.ID)
 	}
-	uikit.ContextMenuOn(c, row, a.gatewayMenu(g))
 	hops := len(a.gatewayChain(g.ID))
 	isDefault := a.defaultGateway == g.ID
 	row.Children(func() {
@@ -668,6 +696,10 @@ func (a *app) gatewayRow(c *ui.Context, g gatewayConfig) {
 				}
 			})
 		}
+		more := uikit.SiderMore(c, row, uikit.SiderMoreProps{
+			Icon: moreIcon, Label: locales.ActionsForName(g.Name),
+		})
+		uikit.RowMenuOn(c, row, more, a.gatewayMenu(g))
 	})
 }
 
@@ -790,6 +822,9 @@ func (a *app) gatewayRoute(c *ui.Context, g gatewayConfig) {
 				if chain[index-1].Kind == "ssh" {
 					label = locales.MessageSshTunnel()
 				}
+				if chain[index-1].Kind == "wireguard" {
+					label = "WireGuard"
+				}
 			}
 			// Each hop lights once the test has connected through it.
 			link, mark := test.link(hop.ID)
@@ -799,6 +834,9 @@ func (a *app) gatewayRoute(c *ui.Context, g gatewayConfig) {
 		label := locales.MessageViaProxy()
 		if g.Kind == "ssh" {
 			label = locales.MessageSshTunnel()
+		}
+		if g.Kind == "wireguard" {
+			label = "WireGuard"
 		}
 		// The test stops at this gateway, so the last leg stays an outline.
 		gatewayRouteLink(c.Key("link-target"), label, gatewayLinkTarget, reduced)
@@ -1061,6 +1099,18 @@ func (a *app) gatewayFacts(c *ui.Context, g gatewayConfig) {
 			{label: locales.MessageConnectionSharing(), value: locales.MessageMultipleTargetsShareOneSshConnection()},
 		}
 		note = locales.GatewaySourceSettings(h.name)
+	} else if g.Kind == "wireguard" {
+		facts = []fact{
+			{label: locales.WgEndpoint(), value: g.WG.Endpoint, mono: true},
+			{label: locales.WgAddresses(), value: strings.Join(g.WG.Addresses, ", "), mono: true},
+			{label: locales.WgAllowedIPs(), value: strings.Join(g.WG.AllowedIPs, ", "), mono: true},
+			{label: locales.WgDNS(), value: strings.Join(g.WG.DNS, ", "), mono: true},
+			{label: locales.WgPeerKey(), value: g.WG.PublicKey, mono: true},
+			{label: locales.WgClientKey(), value: g.WG.ClientPublicKey, mono: true},
+			{label: locales.WgMTU(), value: strconv.Itoa(g.WG.MTU), mono: true},
+			{label: locales.MessageConnectionSharing(), value: locales.WgShared()},
+		}
+		note = locales.WgUserSpace() + " " + locales.WgFirstHop()
 	} else {
 		auth, user, password := locales.MessageNoAuthentication(), "—", "—"
 		if g.SOCKS.Username != "" {
@@ -1303,6 +1353,7 @@ func (a *app) gatewayDialog(c *ui.Context) {
 	}
 	if !state.open {
 		d.password = ""
+		d.wg.private, d.wg.psk = "", ""
 		state.draft = nil
 	}
 }
@@ -1327,6 +1378,9 @@ func (a *app) gatewayDeleteDialog(c *ui.Context, d *gatewayDraft) {
 			message := locales.MessageThisCannotBeUndone()
 			if d.value.SOCKS != nil && d.value.SOCKS.PasswordSaved {
 				message += locales.MessageTheSavedSocks5PasswordWillAlsoBeRemovedFromVault()
+			}
+			if d.value.WG != nil {
+				message += " " + locales.WgDeleteKeys()
 			}
 			uikit.Text(c, message, uikit.TextProps{Tone: uikit.ToneSecondary})
 		}
@@ -1383,7 +1437,7 @@ func (a *app) gatewayEditDialog(c *ui.Context, d *gatewayDraft) {
 				uikit.Button(
 					c,
 					locales.CommonSave(),
-					uikit.ButtonProps{Variant: uikit.ButtonPrimary, Kbd: "↩"},
+					uikit.ButtonProps{Variant: uikit.ButtonPrimary, Kbd: "↩", Disabled: d.wg.importing},
 				).Padding(0, p.ButtonPaddingX).Shrink(0).
 					OnClick(func() { a.saveGateway(d) })
 			})
@@ -1396,12 +1450,16 @@ func (a *app) gatewayEditDialog(c *ui.Context, d *gatewayDraft) {
 			kind := slices.Index(gatewayKinds, d.value.Kind)
 			ui.Column(c).FillWidth().Shrink(0).Padding(0, p.BodyPaddingX, t.Space.N8, p.BodyPaddingX).Children(func() {
 				uikit.Segmented(c.Key("gateway-kind"), &kind, []uikit.SegItem{
-					{Label: locales.MessageSshGateway(), IconSVG: terminalIcon, IconTone: uikit.ToneAccent, Detail: locales.MessageUseASavedSshHost()},
-					{Label: locales.MessageSocks5Proxy(), IconSVG: globeIcon, IconTone: uikit.ToneTertiary, Detail: locales.MessageRouteConnectionsThroughAProxyServer()},
+					{Label: "SSH", IconSVG: terminalIcon, IconTone: uikit.ToneAccent},
+					{Label: "Socks5", IconSVG: globeIcon, IconTone: uikit.ToneTertiary},
+					{Label: "WireGuard", IconSVG: routeIcon, IconTone: uikit.ToneAccent},
 				}, uikit.SegmentedProps{Label: locales.MessageGatewayType(), Fill: true, Cards: true})
 			})
 			if gatewayKinds[kind] != d.value.Kind {
 				d.value.Kind, d.errorText = gatewayKinds[kind], locales.Text{}
+				if d.value.Kind == "wireguard" {
+					d.value.UpstreamID = ""
+				}
 			}
 			uikit.FormSection(c, "", func() { a.gatewayDraftFields(c, d) }).
 				Padding(t.Space.N8, p.BodyPaddingX, t.Space.N16, p.BodyPaddingX)
@@ -1476,6 +1534,8 @@ func (a *app) gatewayDraftFields(c *ui.Context, d *gatewayDraft) {
 				uikit.Text(c, "· "+selection, uikit.TextProps{Tone: uikit.ToneSecondary}).SingleLine().Ellipsis("…").MinWidth(0)
 			})
 		})
+	} else if d.value.Kind == "wireguard" {
+		a.wireguardDraftFields(c, d)
 	} else {
 		if d.value.SOCKS == nil {
 			d.value.SOCKS = &socksGateway{Port: 1080}
@@ -1609,16 +1669,23 @@ func (a *app) gatewayRoutePreview(c *ui.Context, d *gatewayDraft) ui.Element {
 }
 
 func (a *app) saveGateway(d *gatewayDraft) {
-	if a.catalogSaving {
+	if a.catalogSaving || d.wg.importing {
 		return
 	}
 	g := d.value
-	g.Name = strings.TrimSpace(g.Name)
 	items := []vault.PlainItem{}
 	deleted := []string{}
 	if g.Kind == "ssh" {
-		g.SOCKS, g.UpstreamID = nil, ""
+		g.SOCKS, g.WG, g.UpstreamID = nil, nil, ""
+	} else if g.Kind == "wireguard" {
+		var err error
+		g, items, err = a.prepareWireguardSave(d)
+		if err != nil {
+			d.errorText = locales.ErrorText(err)
+			return
+		}
 	} else {
+		g.WG = nil
 		g.SSHProfileID = ""
 		options := *g.SOCKS
 		options.Port, _ = strconv.Atoi(d.port)
@@ -1656,6 +1723,15 @@ func (a *app) saveGateway(d *gatewayDraft) {
 	if g.Kind == "ssh" {
 		deleted = append(deleted, gatewayCredentialKey(g.ID))
 	}
+	if g.Kind == "wireguard" {
+		deleted = append(deleted, gatewayCredentialKey(g.ID))
+	} else {
+		deleted = append(deleted, wgCredentialKey(g.ID))
+	}
+	g.Name = strings.TrimSpace(g.Name)
+	for _, item := range items {
+		defer clear(item.Data)
+	}
 	index := slices.IndexFunc(a.gateways, func(value gatewayConfig) bool { return value.ID == g.ID })
 	previous := a.gateways
 	a.gateways = slices.Clone(previous)
@@ -1690,6 +1766,7 @@ func (a *app) saveGateway(d *gatewayDraft) {
 		a.gatewayUI.results = nil
 		a.selectGateway(g.ID)
 		d.password = ""
+		d.wg.private, d.wg.psk = "", ""
 		d.modal.Close()
 	})
 }
@@ -1699,7 +1776,7 @@ func (a *app) deleteGateway(d *gatewayDraft) {
 		d.errorText = locales.Deferred(locales.MessageTheGatewayIsStillReferenced)
 		return
 	}
-	changes, err := a.vault.Prepare(nil, []string{gatewayCredentialKey(d.value.ID)})
+	changes, err := a.vault.Prepare(nil, []string{gatewayCredentialKey(d.value.ID), wgCredentialKey(d.value.ID)})
 	if err != nil {
 		d.errorText = locales.ErrorText(err)
 		return

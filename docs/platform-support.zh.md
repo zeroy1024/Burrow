@@ -31,6 +31,10 @@ Windows 命名管道使用固定 `go-winio v0.6.4`，其许可证随应用「关
 
 当前 i18n 改动已通过现有测试、race、英文环境测试、vet、本机构建及 Windows amd64/arm64 交叉编译与 vet，语言资源检查覆盖中英文键、参数和源代码遗漏文案。这些结果不代表原生语言切换、英文布局、系统弹窗或读屏已验收。维护与检查方式见[界面语言](i18n.zh.md)。
 
+## WireGuard 验证
+
+用户态 WireGuard 变更已通过本机 Go 构建/vet，以及 Linux amd64、Windows amd64/arm64 交叉构建/vet。本机回环 `-race` 探针已验证真实 PSK 握手、IPv4/IPv6 TCP 数据、隧道 DNS、Allowed IPs、关闭后重建、Vault 加密存储、终端/MCP/测试共享引用、冲突身份拒绝及最后引用释放后的清理。未执行原生 GUI 或 Windows/Linux 运行验收。实现不创建系统 TUN，不配置系统路由、DNS 或防火墙规则。见 [WireGuard 网关](wireguard.zh.md)。
+
 ## Windows 原生验收
 
 下列项目仍需在实际 Windows 会话中完成，不能由交叉编译替代：

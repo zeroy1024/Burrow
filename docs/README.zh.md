@@ -11,6 +11,7 @@
 | [首次使用](getting-started.zh.md) | 运行应用、第一次 SSH 连接、打开文件站点与工作区操作 |
 | [平台支持](platform-support.zh.md) | macOS、Windows、Linux 的构建产物及运行验收状态 |
 | [会话与设置](session-settings.zh.md) | 目录、认证、高级选项、快捷键和应用偏好 |
+| [WireGuard 网关](wireguard.zh.md) | 应用内隧道、配置导入、DNS、凭据与路由限制 |
 | [终端与配色](terminal-themes.zh.md) | 字体、配色、光标、回滚及终端显示行为 |
 | [文件管理与传输](file-transfer.zh.md) | 上传下载、重名处理、任务归属、继续与恢复 |
 | [Linux 监控](monitoring.zh.md) | 指标含义、采样范围与不可用状态 |

@@ -11,6 +11,8 @@ This page records current boundaries. Validation applies only to the code versio
 - App UI and business messages support English, Simplified Chinese, and System. Historical free text and raw system, third-party, and remote diagnostics retain their original content. Some native system text updates only after restarting. Native language switching, English layouts, and accessibility behavior have not been accepted; see [interface languages](i18n.md).
 - The app has no automatic update service. About shows the current version and licenses.
 
+WireGuard currently supports a single peer as the first route hop, app-local DNS with IP servers, and passive FTP/FTPS. It does not manage OS VPN interfaces or network settings, execute imported hooks, support DNS search domains, or nest WireGuard after another gateway. See [WireGuard gateways](wireguard.md).
+
 ## Transfers and recovery
 
 - Checkpoints are saved at safe points and throttled intervals. After forced termination or power loss, recovery uses only the last successfully committed state that can be verified against real files.

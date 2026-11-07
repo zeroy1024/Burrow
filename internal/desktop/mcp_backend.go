@@ -17,6 +17,7 @@ import (
 	"sshdesk/internal/mcpserver"
 	"sshdesk/internal/sshclient"
 	"sshdesk/internal/store"
+	"sshdesk/internal/wggateway"
 )
 
 type mcpDesktop struct {
@@ -99,7 +100,8 @@ func (b *mcpDesktop) captureConnections() ([]mcpserver.Connection, error) {
 			Protocol, Host, User, Auth, KeyID, Revision, KeyFingerprint string
 			Port                                                        int
 			Files                                                       *fileOptions
-			SOCKS                                                       *socksGateway `json:",omitempty"`
+			SOCKS                                                       *socksGateway     `json:",omitempty"`
+			WireGuard                                                   *wggateway.Config `json:",omitempty"`
 		}
 		makeIdentity := func(endpoint host) identity {
 			var options *fileOptions
@@ -125,6 +127,10 @@ func (b *mcpDesktop) captureConnections() ([]mcpserver.Connection, error) {
 		chain := make([]identity, 0, len(plan.route)+1)
 		sshIndex := 0
 		for _, hop := range plan.route {
+			if hop.WG != nil {
+				chain = append(chain, identity{WireGuard: hop.WG})
+				continue
+			}
 			if hop.Kind == "socks5" {
 				chain = append(chain, identity{SOCKS: hop.SOCKS})
 				continue
