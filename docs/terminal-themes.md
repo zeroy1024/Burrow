@@ -1,40 +1,42 @@
-# 终端与配色
+# Terminal and color schemes
 
-## 字体与光标
+[English](terminal-themes.md) | [简体中文](terminal-themes.zh.md)
 
-在设置的「终端」分类调整字体、字号、行高、光标形状及闪烁。全新配置默认使用 JetBrains Mono 13px、19px 行高、闪烁的块状光标；字体回退到 Menlo 和系统等宽字体。
+## Fonts and cursor
 
-字体、光标和终端背景偏好独立于配色，切换配色不会重置这些选项。远程程序可以通过终端控制序列改变光标样式。
+In **Settings → Terminal**, adjust font, size, line height, cursor shape, and blinking. New configurations use JetBrains Mono 13px, a 19px line height, and a blinking block cursor, with Menlo and the system monospace font as fallbacks.
 
-## 配色与背景
+Font, cursor, and background preferences are independent of the color scheme. Changing a scheme does not reset them. Remote programs may change cursor style with terminal control sequences.
 
-内置 Catppuccin Latte、Catppuccin Mocha、Dracula 和 Nord。可固定一套配色，或跟随应用外观并分别指定浅色与深色配色；会话高级设置也可指定配色。
+## Colors and background
 
-终端背景有两种来源：
+Built-in schemes are Catppuccin Latte, Catppuccin Mocha, Dracula, and Nord. Fix one scheme or follow the app appearance with separate light/dark selections. Session advanced settings can also choose a scheme.
 
-| 选项 | 行为 |
+Terminal background has two sources:
+
+| Option | Behavior |
 |---|---|
-| 配色自带背景 | 使用该配色的背景，是默认选项 |
-| 与卡片底色一致 | 使用应用卡片底色，文字仍使用终端配色；需自行确认文字可读性 |
+| Scheme background | Use the scheme's background; this is the default |
+| Match card | Use the app card background while retaining terminal text colors; check readability yourself |
 
-可导入 Ghostty 格式的配色文件。导入文件保存在应用的 `themes/` 目录，启动时重新读取，具体位置见[数据与凭据](storage.md)。内置配色许可证可在「关于」中查看。
+Import Ghostty-format color scheme files. Scheme names, original filenames, and source bytes are saved in SQLite's `themes` table and reloaded on startup. See [data and credentials](storage.md). Built-in scheme licenses are available in About.
 
-当前终端公开主题接口接入 ANSI 0–15 色；16–255 色使用终端默认索引色表。导入文件中自定义的 16–255 号颜色可被解析器保留，但不会传入原生终端；真彩色输出保留自身 RGB 值。
+The native terminal theme interface receives ANSI colors 0–15. Indices 16–255 retain the terminal's default indexed palette. The parser can retain imported overrides for those indices, but they are not passed to the native terminal. True-color output keeps its own RGB values.
 
-## 历史回滚
+## Scrollback
 
-默认回滚上限为 4000 个物理显示行，自动换行后的行分别计数。修改上限会同步到已经打开的 SSH 终端，包括后台标签，不会重新连接。
+The default limit is 4000 physical display lines, counting wrapped lines separately. Changing it updates open SSH terminals, including background tabs, without reconnecting.
 
-Ghostty 按页淘汰历史，实际保留量存在页级误差。缩小上限可能立即丢弃最旧历史；增大上限只允许保留后续输出，不能找回已淘汰的内容。
+Ghostty evicts history by page, so actual retention has a page-level error margin. Lowering the limit may discard old history immediately. Raising it allows more future output to be retained but cannot restore evicted content.
 
-终端没有独立字距设置或「粗体提亮」开关。原生终端和应用其他区域的滚动条都采用半透明胶囊、滚动/贴边显示与淡出，但参数并非完全相同。
+There is no separate letter-spacing setting or bold-bright toggle. The native terminal and shared app scrollbars both use translucent capsules, scrolling/edge visibility, and fading, but their parameters differ.
 
-## 分屏显示与毛玻璃
+## Splits and frosted bars
 
-分屏标题栏、状态栏和文字区域使用同一终端背景来源。正文网格的水平边距及与上下栏的布局间距为 `C.Pane.ContentSide`，当前为 8px。
+Split headers, status bars, and text areas share the terminal background source. `C.Pane.ContentSide`, currently 8px, controls horizontal grid padding and spacing around the top/bottom bars.
 
-启用透明效果且浏览到相邻历史行时，背景文字连续补画经过栏前间距及正文底部不足一行的剩余区域；这些位置在滚动时不强制留白。模糊仅覆盖标题栏、状态栏各自的高度，正文视口和远端 PTY 行列数仍由原网格计算。
+With transparency enabled and adjacent history available, background text is drawn continuously through the bar gaps and the partial-row remainder at the bottom. Scrolling does not force these regions blank. Blur covers only the header/status bar heights. The original grid still determines the text viewport and remote PTY rows/columns.
 
-可见窗格的拖动预览优先使用按下时捕获的正文。不可见来源或捕获失败时使用独立终端状态快照，该备用方式不能保证历史中部的逐像素位置一致。
+Drag previews prefer terminal content captured on pointer press. Hidden sources or capture failures use an independent terminal-state snapshot; this fallback cannot guarantee pixel alignment in the middle of history.
 
-实现入口为 [ssh_terminal.go](../internal/desktop/ssh_terminal.go)、[terminal.go](../internal/desktop/terminal.go) 和[本地终端扩展说明](../third_party/mygo-terminal/FORK.md)。已知验证边界见[已知限制](limitations.md)。
+Entry points: [ssh_terminal.go](../internal/desktop/ssh_terminal.go), [terminal.go](../internal/desktop/terminal.go), and the [terminal fork notes](../third_party/mygo-terminal/FORK.md). See [known limitations](limitations.md) for acceptance boundaries.

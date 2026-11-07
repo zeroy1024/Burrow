@@ -1,10 +1,12 @@
-# MCP 真实协议与任务生命周期联调
+# Real MCP protocol and task lifecycle integration
 
-驱动经过真实本机 MCP HTTP、生产 `mcpDesktop` 适配器、原生窗口线程、既有连接管理和传输队列，最终访问隔离 Docker SSH/SFTP/FTP/FTPS 服务。传输内容通过独立服务器读取和 SHA-256 核对，使用 `-race` 构建；不使用替代后端，不做截图或视觉设计验收。
+[English](README.md) | [简体中文](README.zh.md)
 
-## 启动夹具
+The driver traverses real local MCP HTTP, production `mcpDesktop`, native window threads, connection management, and transfer queues to isolated Docker SSH/SFTP/FTP/FTPS services. Independent server reads and SHA-256 verify content. Builds use `-race`, with no substitute backend, screenshots, or visual acceptance.
 
-先按 [本机协议联调说明](../ssh-integration/README.md) 运行 SSH 启动器，将最后一行 JSON 的目录写入 `SSHDESK_TEST_DIR`，并设置 `SSHDESK_TEST_ADDRESS`。所有临时凭据与证书保持在 `0700` 夹具目录，不能提交到仓库。
+## Start fixtures
+
+Follow [local protocol integration](../ssh-integration/README.md). Set `SSHDESK_TEST_DIR` from the final JSON directory and set `SSHDESK_TEST_ADDRESS`. Temporary credentials/certificates stay in the `0700` fixture directory and must not be committed.
 
 ```sh
 python3 -B scripts/ssh-integration-server.py
@@ -13,11 +15,11 @@ python3 -B scripts/ssh-integration-server.py --ftps
 python3 -B scripts/ssh-integration-server.py --ftps --implicit
 ```
 
-FTPS 始终校验临时 CA 和主机名，不安装系统证书，不使用 `InsecureSkipVerify`。只在测试 overlay 中为原有 `FTPConfig.TLSConfig` 注入本轮 CA。被动端口仅发布到回环地址；连续取消会短时占用多个数据连接，因此夹具预留足够端口，不能将端口耗尽误记为产品续传失败。
+FTPS verifies the temporary CA and hostname without installing system certificates or using `InsecureSkipVerify`. Only the test overlay injects that run's CA into existing `FTPConfig.TLSConfig`. Passive ports bind to loopback. Repeated cancellation briefly occupies several data connections, so fixtures reserve enough ports; port exhaustion must not be reported as a product resume failure.
 
-## 运行原生 MCP 场景
+## Run native MCP scenarios
 
-先构建当前平台的 `Burrow.app` 资源模板，或用 `--template` 指定已有应用包。需已解锁、可获得键盘焦点的 macOS 会话：
+Build a current-platform `Burrow.app` resource template or pass an existing bundle with `--template`. An unlocked, focusable macOS session is required:
 
 ```sh
 GOCACHE=/private/tmp/sshdesk-go-build mise exec -- python3 -B -u scripts/mcp-integration-ui.py \
@@ -25,41 +27,41 @@ GOCACHE=/private/tmp/sshdesk-go-build mise exec -- python3 -B -u scripts/mcp-int
   --template /absolute/path/to/Burrow.app
 ```
 
-生产 UI 不变。现有原生集成 overlay 提供独立 SQLite 数据目录、临时凭据 provider 和仅测试构建存在的控制菜单；暂停/继续还会直接操作实际 MCP 详情按钮。协议调用带完整 MCP 版本元数据与认证头。调试输出只记录 FTP 动词和响应码，不记录参数、密码、密钥或文件正文。
+Production UI stays unchanged. The native overlay supplies isolated SQLite data, a temporary credential provider, and test-build-only menus. Pause/resume also use actual MCP detail buttons. Protocol calls include full version metadata/authentication headers. Diagnostics log FTP verbs/response codes only, never arguments, passwords, keys, or file bodies.
 
-覆盖 SSH 首次信任、输出/退出码、超时与 HTTP 断线取消（新旧 MCP 协议）、无 PTY/不运行终端初始化命令；命令/文件策略与历史快照；四种文件协议的读写、覆盖、目录上传下载；客户端未解码任务 ID 前断开后的任务发现；原生暂停继续、排队/运行取消、来源目录消失后的清理；密钥停用/撤销、授权缩减与跨 Key 隔离；服务停用/开启；审计写故障下禁止新执行但保留取消；正常退出及强制进程崩溃后的离线恢复、人工继续和内容校验。
+Coverage includes first SSH trust; output/exit status; timeout and HTTP-disconnect cancellation for new/old MCP versions; no PTY/terminal initial command; command/file policies and historical snapshots; all four file protocols, overwrite and directory transfers; task discovery after disconnecting before decoding an ID; native pause/resume, queued/running cancellation, cleanup after source directory loss; key disable/revoke, grant reduction, cross-key isolation; service stop/start; audit failure blocking new execution while preserving cancellation; and offline recovery, manual resume, and content verification after normal quit or forced crash.
 
-每轮报告位于夹具目录的 `mcp-native-run-*/report.json`；失败保留各阶段日志和只读节点/模型诊断，不能仅凭构建成功、应用启动或部分场景通过认定完整联调完成。`--reuse-run` 只用于开发中复用已隔离的配置定位问题；最终全量验收必须使用全新配置。`--scenario lifecycle` 可缩小已知生命周期问题的复现范围。
+Each run writes `mcp-native-run-*/report.json` under the fixture directory. Failure retains phase logs and read-only node/model diagnostics. Build success, app startup, or partial scenario success does not establish complete integration. `--reuse-run` is only for investigating a known issue in an already isolated config; final full acceptance requires fresh data. `--scenario lifecycle` narrows lifecycle reproductions.
 
-`--scenario recovery` 单独检查正常退出和强制崩溃后的恢复，报告会注明所选场景，不代表其余场景通过。
+`--scenario recovery` checks normal/forced-crash recovery separately. Its report names the selected scenario and does not establish others.
 
-与原协议 Docker 测试分别运行，避免干扰连接计数与端口容量。停止服务时仅使用本轮 metadata 中的准确容器名，不操作其他容器或用户站点。
+Run separately from protocol Docker tests to avoid counter/port interference. Stop only exact container names from this run's metadata, never unrelated containers or user sites.
 
-## 2026-11-03 已完成验证
+## Validation completed on 2026-11-03
 
-本轮在 macOS arm64、全新隔离 SQLite 和凭据目录下，运行默认 `all` 场景：**30/30 通过**。真实 MCP HTTP 使用 `2026-07-28` 与 `2025-06-18` 取消语义；服务器为本机 OpenSSH/internal-sftp 与 vsftpd，显式/隐式 FTPS 保持证书、主机名和数据通道会话复用检查。
+The default `all` scenario passed **30/30** on macOS arm64 with fresh isolated SQLite/credential directories. Real MCP HTTP used cancellation semantics for `2026-07-28` and `2025-06-18`. Servers were local OpenSSH/internal-sftp and vsftpd. Explicit/implicit FTPS retained certificate, hostname, and data-channel session reuse checks.
 
-| 范围 | 本轮实际观察 |
+| Area | Observed in that run |
 |---|---|
-| SSH | 首次信任；无 PTY/无终端初始化副作用；stdout/stderr 分离；非零退出码；超时及两个协议版本的 HTTP 断线取消 |
-| 授权与策略 | 命令远端副作用被拦；历史规则删除后快照保留；SFTP 创建/覆盖区别和 REALPATH 别名保护；只读及本地来源范围拒绝；慢速读取中收紧策略后不返回正文 |
-| 四种文件协议 | UTF-8 列表和文本读写；创建冲突不覆盖；替换；目录上传下载含中文、嵌套和空文件；服务端独立 SHA-256 校验；不可信 FTPS 证书被拒 |
-| 任务与撤权 | 响应未解码前断线仍可发现已接受任务；实际详情按钮暂停/继续；排队/运行取消；本地来源目录消失后的远端清理；Key 停用、启用、撤销；连接授权缩减仅取消受影响任务；其他 Key/连接工作保持独立 |
-| 服务与审计 | 服务关闭保存为暂停、开启不自动继续；故障注入阻止无开始审计的 SSH 业务副作用，仍可取消自有任务，且如实返回审计未落盘 |
-| 应用恢复 | 正常退出/重启保存私有 FTP 覆盖暂存，人工继续前旧 `0600` 目标不变，最终摘要一致；强制终止/重启保持离线，人工继续后摘要一致 |
+| SSH | First trust, no PTY/terminal initial side effects, separate stdout/stderr, nonzero exit code, timeout, and HTTP-disconnect cancellation under both versions |
+| Grants/policies | Remote command side effects blocked; snapshots survive rule deletion; SFTP create/overwrite distinction and REALPATH aliases protected; read-only/local source scope denial; policy tightening during slow reads prevents body return |
+| Four file protocols | UTF-8 lists/text reads/writes; create conflict does not overwrite; replacement; directory transfers with Chinese names, nesting, and empty files; independent server SHA-256; untrusted FTPS certificate rejection |
+| Tasks/revocation | Accepted tasks discoverable before response decoding; real detail-button pause/resume; queued/running cancel; remote cleanup after local source loss; key disable/enable/revoke; grant reduction cancels affected tasks only; other keys/connections remain independent |
+| Service/audit | Stop saves paused tasks; restart does not resume automatically; injected failures prevent SSH effects without start audits while still allowing own-task cancellation and reporting unpersisted audit |
+| App recovery | Normal restart retains private FTP overwrite staging and original `0600` destination before manual resume, with matching final digest; forced-crash restart stays offline and matches digest after manual resume |
 
-完整报告：`/private/tmp/sshdesk-integration-lj9pctsy/mcp-native-run-sm2x49hr/report.json`，`status=passed`、`scenario=all`。同目录四个 `native-app-*.log` 均无 Go race detector 报告。夹具容量缺陷的独立复现记录：`/private/tmp/sshdesk-integration-lj9pctsy/ftp-passive-capacity-evidence.json`；旧 5 端口夹具和失败 part 保留，不作为产品缺陷自动重试。
+Full report: `/private/tmp/sshdesk-integration-lj9pctsy/mcp-native-run-sm2x49hr/report.json`, `status=passed`, `scenario=all`. Four `native-app-*.log` files in that directory had no Go race reports. Independent fixture-capacity evidence is `/private/tmp/sshdesk-integration-lj9pctsy/ftp-passive-capacity-evidence.json`. The old five-port fixture and failed part were retained, without automatically retrying it as a product defect.
 
-另已通过 `go test -race ./...`、`go vet ./...`、macOS 本机构建、Windows amd64 交叉构建，以及带 `-race -tags=integration` 的 `internal/sshclient` 和 `internal/fileclient` 全部协议集成回归（本轮分别 9.250 秒、34.417 秒）。协议回归额外包含错误 CA/主机名拒绝、FTP 私有目录不可接管既有目录及限权失败的归属信息、稳定部分上传验证与续传、16 个并发被动监听容量。
+Also passed: `go test -race ./...`, `go vet ./...`, local macOS build, Windows amd64 cross-build, and all `internal/sshclient` / `internal/fileclient` regressions with `-race -tags=integration` (9.250 s and 34.417 s in that run). Additional coverage included wrong CA/hostname rejection, FTP private-directory takeover prevention and ownership after restricted-permission failure, stable partial-upload verification/resume, and 16 concurrent passive listeners.
 
-原生 Windows、各第三方 AI 客户端界面、真实系统钥匙串、其他服务器实现与生产规模未纳入本轮；原生控制使用现有测试 overlay，不表示做过视觉验收。
+Native Windows, third-party AI client UIs, real system Keychain, other servers, and production scale were not covered. Native control used existing overlays and did not establish visual acceptance.
 
-## 2026-11-04 请求与响应审计增强
+## Request/response audit enhancement on 2026-11-04
 
-增强前的 MCP 功能已提交为 `9bc13ca`。本轮新增 schema v3 的 `mcp_payloads`，保存请求与结构化响应，详情可多行查看和复制命令、stdout/stderr 及 JSON；文件正文与认证信息排除，旧摘要明确区分。
+The earlier MCP implementation was committed as `9bc13ca`. This enhancement added schema v3 `mcp_payloads` for requests/structured responses, with multiline viewing/copy of commands, stdout/stderr, and JSON. File bodies/authentication data are excluded, and older summary-only records are distinguished.
 
-已通过临时 overlay 中的真实本机 HTTP + 官方 SDK + 隔离 SQLite 检查：旧协议初始化、新协议工具发现/ping/调用、未知方法、失败参数、单次工具调用不重复记录、命令输出保留、文件正文省略、认证字段及已知 MCP Key 排除。测试业务适配器使用固定 SSH 输出和本地文件客户端，这项检查不代替真实远端 SSH / FTP 运行验收。
+A temporary overlay with real local HTTP, the official SDK, and isolated SQLite checked old-version initialization, new-version discovery/ping/calls, unknown methods, invalid arguments, single audit per tool call, retained command output, omitted file bodies, and exclusion of authentication fields/known MCP keys. The business adapter used fixed SSH output and local file clients; this does not replace real remote SSH/FTP acceptance.
 
-数据库检查覆盖空库、v1、v2、v3 的升级及重开，已有设置保留、请求/响应独立更新、后续摘要不清空正文、显式 JSON null、清理级联及明细写入失败时开始记录回滚。故障注入还验证审计入口失败时自有任务取消通道仍可用，并明确返回 `audit_persisted=false`。
+Database checks covered fresh/v1/v2/v3 upgrades/reopen, retained settings, independent request/response updates, later summaries not clearing bodies, explicit JSON null, cascading cleanup, and rollback of start records after detail-write failure. Fault injection confirmed own-task cancellation remained available after audit admission failure and returned `audit_persisted=false` explicitly.
 
-本轮启动原生回归时发现 Mac 锁屏，按用户要求跳过原生窗口及完整 Docker 任务回归，未把之前的 30/30 结果当成本轮验证结果。
+The Mac was locked when native regression started. Per the user's instruction, native windows and full Docker task regression were skipped. The earlier 30/30 result was not reused as evidence for this enhancement.

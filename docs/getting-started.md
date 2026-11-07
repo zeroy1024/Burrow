@@ -1,43 +1,47 @@
-# 首次使用
+# First steps
 
-## 运行应用
+[English](getting-started.md) | [简体中文](getting-started.zh.md)
 
-macOS 运行基线为 13 及以上系统；Windows 的构建入口和原生运行验收范围见[平台支持](platform-support.md)。从源码启动、生成应用包的步骤见[开发与构建](development.md)。
+## Run the app
 
-首次启动没有预置主机或文件站点。应用分为 SSH、文件传输和设置三个页面；切换页面会保留已经建立的连接和后台传输。
+macOS requires version 13 or later. See [platform support](platform-support.md) for Windows build entry points and native acceptance scope. See [development and builds](development.md) for running from source and creating app packages.
 
-## 建立第一个 SSH 会话
+The first launch has no preset hosts or file sites. The app provides SSH, File Transfer, Gateways, MCP, and Settings pages. Switching pages preserves established connections and background transfers.
 
-1. 进入 SSH 页面，使用添加入口或 `⌘N` 新建会话。
-2. 填写名称、主机地址、端口和用户名，选择密码、私钥或 SSH agent 认证。需要时可在表单中新增分组。
-3. 可先选择「测试连接」检查认证与服务器可达性，再选择「保存」或「保存并连接」。测试也会实际访问服务器，并遵循正式连接的主机信任规则。
-4. 首次遇到未知主机密钥时，核对服务器指纹后决定是否信任。主机密钥变更或被撤销时，连接会被拒绝。
-5. 连接成功后在终端输入命令。只保存的条目可通过侧栏双击打开。
+Choose English, Simplified Chinese, or System in **Settings → General → Language**. Changes apply immediately without resetting connections, transfers, or form state. Raw system and remote diagnostics, user input, and historical free text retain their original content. See [interface languages](i18n.md).
 
-侧栏单击只聚焦条目，双击新开会话。同一条目可以打开多个独立会话。认证、高级选项与凭据管理见[会话与设置](session-settings.md)。
+## Create your first SSH session
 
-## 使用分屏与标签
+1. Open SSH and use the add action or `⌘N` to create a session.
+2. Enter a name, host address, port, and username. Choose password, private key, or SSH agent authentication. You can create a group in the form.
+3. Optionally choose **Test connection** to check authentication and reachability, then **Save Only** or **Save and Connect**. Testing contacts the server and follows the same host trust rules as a normal connection.
+4. For an unknown host key, verify the fingerprint before trusting it. Changed or revoked host keys are rejected.
+5. Once connected, enter commands in the terminal. Double-click a saved sidebar entry to open it later.
 
-- 选中一个已连接的 SSH 窗格，使用分栏按钮或 `⌘D` 创建独立 Shell；这些 Shell 复用同一 SSH 连接。
-- 拖动窗格或标签调整组合；移动已有窗格保留其终端与连接。
-- 使用窗格上的放大按钮切换单窗格展示，关闭按钮结束对应窗格。
-- `⌘1` 至 `⌘4` 在多分屏时优先切换窗格；`Ctrl+Tab` 和 `Ctrl+Shift+Tab` 始终切换标签。
+A single sidebar click focuses an entry; a double-click opens an independent session. An entry can have several independent sessions. See [sessions and settings](session-settings.md) for authentication, advanced options, and credentials.
 
-关闭一个 Shell 不会关闭同一连接上的其他 Shell。更多快捷键见[会话与设置](session-settings.md#默认快捷键)。
+## Use splits and tabs
 
-## 打开文件站点
+- Select a connected SSH pane and use the split button or `⌘D` to create an independent Shell on the same SSH connection.
+- Drag panes or tabs to regroup them. Moving a pane preserves its terminal and connection.
+- Use maximize to show one pane, or close to end that pane's session.
+- `⌘1` through `⌘4` select panes first in a split workspace. `Ctrl+Tab` and `Ctrl+Shift+Tab` always switch tabs.
 
-1. 切换到文件传输页面，新建 FTP/SFTP 会话。
-2. 选择 SFTP 或 FTP。SFTP 使用 SSH 认证；FTP 按服务器要求设置 TLS、主动或被动模式以及文件名编码。
-3. 填写本地和远程初始目录，保存并连接。
-4. 在双面板之间拖动文件或目录，开始上传或下载；在底部传输栏查看和管理当前标签的任务。
+Closing one Shell does not close other Shells on its connection. More bindings are listed under [default shortcuts](session-settings.md#default-shortcuts).
 
-SSH 与文件页的保存目录各自独立。即使名称和地址相同，也不会自动同步编辑或删除。任务暂停、重名选择及退出恢复见[文件管理与传输](file-transfer.md)。
+## Open a file site
 
-## 关闭与恢复
+1. Open File Transfer and create an FTP/SFTP session.
+2. Choose SFTP or FTP. SFTP uses SSH authentication. For FTP, configure TLS, active/passive mode, and filename encoding as required by the server.
+3. Set initial local and remote directories, then save and connect.
+4. Drag files or directories between the panes to upload or download. Manage the current tab's tasks in the transfer panel below.
 
-点击主窗口的关闭按钮会退出应用：保存工作区与设置、停止 MCP 服务、暂停并保存传输任务，然后关闭所有会话连接。macOS、Windows 和 Linux 使用相同行为。关闭最后一个标签的行为可在设置中单独选择。
+SSH and file catalogs are independent. Matching names or addresses do not synchronize edits or deletion. See [file management and transfers](file-transfer.md) for pausing, conflicts, and recovery after quitting.
 
-使用应用退出菜单退出时，应用会收敛连接和传输并保存状态。开启「启动时恢复会话」后，下次启动恢复工作区及可关联的任务，保持离线；需要手动连接或继续传输。
+## Close and restore
 
-出现连接、续传或监控不可用时，先查看实际错误与[已知限制](limitations.md)。
+Closing the main window quits the app: it saves the workspace and preferences, stops MCP, pauses and saves transfers, and closes all session connections. macOS, Windows, and Linux use the same behavior. The last-tab action is configured separately in Settings.
+
+The Quit menu follows the same shutdown and save process. With **Restore sessions on startup** enabled, the next launch restores the workspace and associated tasks offline. Connect or resume transfers manually.
+
+For connection, resume, or monitoring failures, inspect the actual error and [known limitations](limitations.md).

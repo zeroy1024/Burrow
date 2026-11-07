@@ -1,46 +1,49 @@
-# 文档索引
+# Documentation index
 
-本目录说明 Burrow 当前的使用方式和开发约定。功能说明以当前代码为依据，明确区分已实现能力、计划范围和实际运行的验证结果。
+[English](README.md) | [简体中文](README.zh.md)
 
-## 使用应用
+This directory describes how Burrow currently works and how to develop it. Documentation follows the code and distinguishes implemented behavior, plans, validation actually performed, and outstanding acceptance.
 
-| 文档 | 内容 |
+## Using the app
+
+| Document | Contents |
 |---|---|
-| [首次使用](getting-started.md) | 运行应用、第一次 SSH 连接、打开文件站点与工作区操作 |
-| [平台支持](platform-support.md) | macOS、Windows、Linux 的构建产物及运行验收状态 |
-| [会话与设置](session-settings.md) | 目录、认证、高级选项、快捷键和应用偏好 |
-| [终端与配色](terminal-themes.md) | 字体、配色、光标、回滚及终端显示行为 |
-| [文件管理与传输](file-transfer.md) | 上传下载、重名处理、任务归属、继续与恢复 |
-| [Linux 监控](monitoring.md) | 指标含义、采样范围与不可用状态 |
-| [数据与凭据](storage.md) | 数据目录、加密凭据、应用解锁、迁移和备份 |
-| [已知限制与验证范围](limitations.md) | 平台、协议、恢复和验证边界 |
+| [First steps](getting-started.md) | Running the app, the first SSH connection, file sites, and workspace operations |
+| [Platform support](platform-support.md) | macOS, Windows, and Linux outputs and native acceptance status |
+| [Sessions and settings](session-settings.md) | Catalogs, authentication, advanced options, shortcuts, and app preferences |
+| [Terminal and color schemes](terminal-themes.md) | Fonts, colors, cursor, scrollback, and terminal rendering |
+| [File management and transfers](file-transfer.md) | Uploads, downloads, conflicts, task ownership, resume, and recovery |
+| [Linux monitoring](monitoring.md) | Metrics, sampling scope, and unavailable states |
+| [Data and credentials](storage.md) | Data directories, encrypted credentials, app unlock, migration, and backups |
+| [Known limitations and validation](limitations.md) | Platform, protocol, recovery, and validation boundaries |
 
-## 开发与维护
+## Development and maintenance
 
-| 文档 | 内容 |
+| Document | Contents |
 |---|---|
-| [macOS 签名与解锁](macos-signing.md) | 固定签名身份、钥匙串解锁密钥、跨版本验证及 Touch ID 权限边界 |
-| [开发与构建](development.md) | 工具链、运行、打包、已有检查和联调入口 |
-| [架构与生命周期](architecture.md) | 代码入口、连接与任务所有权、持久化及本地扩展 |
-| [主题与设计令牌](theme-integration.md) | 令牌来源、生成流程和明暗外观接入 |
-| [共享 UI 组件](uikit.md) | 组件职责、状态归属、滚动、拖放和终端容器 |
-| [界面语言](i18n.md) | 简体中文、英文、语言资源、动态提示与完整性检查 |
-| [联调与原生 E2E](../dev/ssh-integration/README.md) | 本机 SSH / FTP 夹具、协议测试及原生驱动 |
-| [应用解锁与凭据存储方案](credential-vault-plan.md) | 默认关闭的启动解锁、同页修改密码、统一加密存储、密钥转换、旧凭据迁移及验收边界 |
-| [参与贡献](../CONTRIBUTING.md) | 修改范围、验证、文档与依赖许可维护 |
-| [安全政策](../SECURITY.md) | 漏洞私密报告与诊断数据边界 |
-| [第三方声明](../THIRD_PARTY_NOTICES.md) | 随应用分发的依赖及素材许可全文 |
+| [macOS signing and unlock](macos-signing.md) | Fixed signing identity, Keychain unlock keys, cross-version checks, and Touch ID boundaries |
+| [Development and builds](development.md) | Toolchain, running, packaging, existing checks, and integration entry points |
+| [Architecture and lifecycle](architecture.md) | Code structure, connection and task ownership, persistence, and local extensions |
+| [Themes and design tokens](theme-integration.md) | Token sources, generation, and light/dark integration |
+| [Shared UI components](uikit.md) | Component responsibilities, state, scrolling, drag and drop, and terminal containers |
+| [Interface languages](i18n.md) | English, Simplified Chinese, catalogs, dynamic messages, and completeness checks |
+| [Integration and native E2E](../dev/ssh-integration/README.md) | Local SSH / FTP fixtures, protocol tests, and native drivers |
+| [App unlock and credential vault design](credential-vault-plan.md) | Optional startup unlock, password changes, encrypted storage, key transitions, migration, and acceptance scope |
+| [Contributing](../CONTRIBUTING.md) | Change scope, validation, documentation, and dependency licenses |
+| [Security policy](../SECURITY.md) | Private vulnerability reports and diagnostic data boundaries |
+| [Third-party notices](../THIRD_PARTY_NOTICES.md) | Original full licenses distributed with the app |
 
-## MCP 接入与工具契约
+## MCP integration and tool contracts
 
-| 文档 | 内容 |
+| Document | Contents |
 |---|---|
-| [MCP Server 功能方案](mcp-server-plan.md) | 已接入功能、认证授权、工具与审计契约、验证记录及后续范围 |
+| [MCP server design](mcp-server-plan.md) | Implemented features, authentication, authorization, tool and audit contracts, validation, and remaining work |
 
-## 文档维护
+## Maintaining documentation
 
-- 修改行为时同步更新对应专题；README 只保留概要和入口。
-- 数据路径与凭据规则统一维护在「数据与凭据」，构建和检查命令统一维护在「开发与构建」。
-- 区分已实现、已运行的验证和仍待验证的行为，不将测试命令存在等同于验证通过。
-- 文档保留当前行为、必要的设计约束和可复现的验证入口。
-- [README 展示图](screenshots/readme/README.md) 使用独立 mock 数据，只用于界面展示，不作为连接、传输或性能验证的证据。
+- Update affected topics when behavior changes. Keep the root README focused on an overview and entry points.
+- Default `.md` files are English; `.zh.md` files beside them are Chinese counterparts. Update both in the same change, including validation status. Each language links to its matching documents; source code, screenshots, commands, and license references keep their original targets.
+- Keep data and credential rules in Data and credentials, and build/check commands in Development and builds.
+- Distinguish implementation, validation actually run, and outstanding acceptance. A test command's existence is not evidence that it passed.
+- Retain current behavior, necessary design constraints, and reproducible validation entry points.
+- [README screenshots](screenshots/readme/README.md) use isolated mock data and demonstrate UI only. They are not evidence of connection, transfer, or performance acceptance.

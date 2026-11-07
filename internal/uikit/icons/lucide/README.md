@@ -1,16 +1,18 @@
-# Lucide 图标素材
+# Lucide icon assets
 
-通用界面图标统一使用 [Lucide](https://lucide.dev/) 官方 SVG，按需收录并随 Go 程序嵌入，运行与构建均无需在线获取图标或引入 JavaScript 包。
+[English](README.md) | [简体中文](README.zh.md)
 
-- 版本：`1.67.0`
-- 上游提交：`4b203ec9b6002fd74fd5dadc8612220e64289305`
-- 素材来源：<https://github.com/lucide-icons/lucide/tree/4b203ec9b6002fd74fd5dadc8612220e64289305/icons>
-- 许可证：[LICENSE](LICENSE)，保留上游完整 ISC 与 Feather 派生图标的 MIT 声明，并在应用“开源许可”中展示。
+Shared UI icons use official [Lucide](https://lucide.dev/) SVGs, selected as needed and embedded in Go. Runtime/builds do not fetch icons online or require a JavaScript package.
 
-SVG 文件保持上游原样，逻辑名称与文件名的对应关系集中在 [iconsource.go](../../iconsource.go) 的 `iconFiles` 中。渲染时保留原始图形，统一使用应用主题的描边宽度、颜色与图标尺寸，并按逻辑名称和描边宽度缓存解析结果。
+- Version: `1.67.0`
+- Upstream commit: `4b203ec9b6002fd74fd5dadc8612220e64289305`
+- Source: <https://github.com/lucide-icons/lucide/tree/4b203ec9b6002fd74fd5dadc8612220e64289305/icons>
+- License: [LICENSE](LICENSE), retaining full upstream ISC and Feather-derived MIT notices, also shown in the app's Open Source Licenses.
 
-新增图标时，从上述固定提交取得对应 SVG，增加 `IconName` 和 `iconFiles` 映射；业务页面通过 `IconSVG`、`Icon` 或 `IconButton` 使用，不再自行拼写通用 SVG 路径。更新版本时同步核对素材、映射、`LucideVersion`、本文件和许可证。
+SVGs remain unchanged. [iconsource.go](../../iconsource.go) maps logical names to filenames in `iconFiles`. Rendering retains geometry and applies theme stroke width, color, and dimensions. Parsed results are cached by logical name/stroke width.
 
-刷新统一使用 `refresh-cw`，重试使用 `rotate-ccw`；侧栏使用 `panel-left`，关闭本地面板使用 `panel-left-close`；分栏与窗格缩放使用 `columns-2`、`maximize-2`、`minimize-2`。设置说明的悬停问号使用 `circle-question-mark`。
+For a new icon, obtain its SVG from the pinned commit and add `IconName`/`iconFiles` mappings. Pages use `IconSVG`, `Icon`, or `IconButton` rather than writing general SVG paths. Version updates must synchronize assets, mappings, `LucideVersion`, this document, and licenses.
 
-Lucide 不收录品牌标识。Burrow 应用图标、操作系统标识和现有 MCP 标识单独保留，品牌图形继续通过 `BrandIcon` 或专用素材入口渲染。
+Refresh uses `refresh-cw`; retry uses `rotate-ccw`. Sidebar controls use `panel-left` and `panel-left-close`. Splitting/maximizing/restoring use `columns-2`, `maximize-2`, and `minimize-2`. Settings help uses `circle-question-mark`.
+
+Lucide excludes brand marks. Burrow, OS, and MCP marks remain separate and render through `BrandIcon` or dedicated asset entry points.

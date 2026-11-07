@@ -1,84 +1,86 @@
-# 服务器监控
+# Server monitoring
 
-监控面板通过当前 SSH 连接采集服务器信息。打开面板后开始采样；关闭面板、切页或隐藏窗口会停止新增采集并取消面板自己的请求，不关闭 Shell 或传输任务。
+[English](monitoring.md) | [简体中文](monitoring.zh.md)
 
-## 远端平台
+The panel collects server information over the current SSH connection. Opening it starts sampling. Closing it, switching pages, or hiding the window stops new samples and cancels the panel's own requests without closing Shells or transfers.
 
-采集按远端平台选用实现，统一输出主机基础信息和监控指标。Linux、macOS、Windows 均采集基础信息；监控指标目前只有 Linux 提供，macOS、Windows 和其他系统的监控面板提示“暂不支持监控”，不执行 Linux 采集脚本或反复报错。
+## Remote platforms
 
-- 自动识别：SSH 服务端标识含 `OpenSSH_for_Windows` 时视为 Windows；否则执行 `uname -snr`，`Linux`、`Darwin` 分别对应 Linux、macOS，`MINGW` / `MSYS` / `CYGWIN` 视为 Windows，其余记为其他系统。`uname` 无法执行时再尝试 Windows 采集命令，成功即为 Windows；仍失败则在测试连接和监控面板提示可手动指定。
-- 手动指定：会话「高级 · 远端系统」可选自动识别、Linux、macOS 或 Windows。指定后不再识别，适用于 Windows 默认 shell 为 WSL / Cygwin、服务端改写了标识等情况。
-- 平台写入主机基础信息。此前保存的记录均来自 Linux 采集，读取时按 Linux 处理。监控首次连接某主机时等待识别完成后开始采样，之后复用已保存的平台。
-- MCP `connections_list` 为 SSH 连接返回 `os`（`linux` / `darwin` / `windows` / `other`），以及同一平台最近一次采集到的 `os_name`、`arch`；Windows 另返回默认 shell `shell`。尚未识别时省略。
+Platform-specific collectors provide a shared host-information and metrics model. Linux, macOS, and Windows provide basic host information; only Linux currently provides monitoring metrics. Other platforms show that monitoring is unsupported without running Linux scripts or repeatedly reporting errors.
 
-## 指标含义
+- Automatic detection: an SSH server ID containing `OpenSSH_for_Windows` selects Windows. Otherwise, `uname -snr` identifies `Linux` and `Darwin`; `MINGW` / `MSYS` / `CYGWIN` select Windows, and other results select Other. If `uname` cannot run, the app tries Windows collection. If both fail, connection tests and monitoring suggest selecting a platform manually.
+- Manual selection: **Session → Advanced → Remote system** offers Auto, Linux, macOS, and Windows. A selection bypasses detection, useful when a Windows default shell is WSL/Cygwin or the server rewrites its identification.
+- The platform is stored with host facts. Earlier records came from Linux collection and are read as Linux. First monitoring of a host waits for detection, then reuses its saved platform.
+- MCP `connections_list` includes SSH `os` (`linux` / `darwin` / `windows` / `other`), the latest same-platform `os_name` and `arch`, and `shell` for Windows. Undetected facts are omitted.
 
-| 指标 | 含义与范围 |
+## Metrics
+
+| Metric | Meaning and scope |
 |---|---|
-| CPU | 两次有效采样之间的聚合使用率，排除 guest 重复计数；空闲包含 iowait |
-| 负载 | 1、5、15 分钟系统负载 |
-| 内存 | `MemTotal - MemAvailable`，不会把全部缓存算作已用 |
-| 网络 | 所选默认路由接口的收发速率，不是所有网卡的合计 |
-| 进程 Top | 区间 CPU 使用率最高的前 4 个可读进程；单核满载为 100%，多线程可超过 100% |
-| 进程数量 | 当前 SSH 账号可见的进程数量，与 Top 的采集预算独立 |
-| 系统信息 | 主机名、内核和发行版使用共享的主机基础信息；运行时间实时采集 |
-| 根盘 | 根挂载的设备/文件系统信息；具备可用 SFTP statvfs 能力时显示容量和使用率 |
+| CPU | Aggregate utilization between valid samples, excluding duplicated guest accounting; idle includes iowait |
+| Load | System load over 1, 5, and 15 minutes |
+| Memory | `MemTotal - MemAvailable`; cache is not all counted as used |
+| Network | Receive/transmit rate on the selected default-route interface, not a sum across interfaces |
+| Top processes | Up to four readable processes with the highest interval CPU use; one full core is 100%, and multithreaded processes may exceed it |
+| Process count | Processes visible to the SSH account, independent of the Top collection budget |
+| System information | Hostname, kernel, and distribution come from shared host facts; uptime is live |
+| Root disk | Root mount device/filesystem and, when SFTP statvfs is available, capacity and utilization |
 
-CPU、网络与进程速率需要两次有效采样建立差分。切换接口、计数回退或进程身份变化时重建相应基线。进程以 PID 和启动时间识别，避免 PID 复用串入旧样本。
+CPU, network, and process rates need two valid samples. Interface changes, counters moving backward, or changed process identities rebuild the corresponding baseline. Processes use PID plus start time to avoid mixing samples after PID reuse.
 
-## 主机基础信息
+## Basic host information
 
-SSH 测试连接成功后识别平台并读取主机名、系统名称与版本、内核和 CPU 架构：
+A successful SSH connection test detects the platform and reads hostname, OS name/version, kernel, and CPU architecture:
 
-| 平台 | 采集方式 | 说明 |
+| Platform | Collection | Notes |
 |---|---|---|
-| Linux | `/bin/sh` 读取 `/proc/sys/kernel/hostname`、`osrelease`、`/etc/os-release`，`uname -m` 取架构 | 系统名为 `PRETTY_NAME` |
-| macOS | `/bin/sh` 执行 `sw_vers -productName / -productVersion`、`uname -n / -r / -m` | 系统名如 `macOS 27.2`，内核为 Darwin 版本 |
-| Windows | `powershell.exe -NoProfile -NonInteractive -EncodedCommand`，经 WMI 读取 `Win32_OperatingSystem`、注册表 `CurrentVersion` 与 `OpenSSH\DefaultShell` | 系统名与 `DisplayVersion` 随系统语言；内核为 `Version.UBR`；架构取 `PROCESSOR_ARCHITECTURE`；默认 shell 未设置时为 `cmd` |
-| 其他系统 | 仅保存 `uname` 结果 | 系统名、主机名与内核版本 |
+| Linux | `/bin/sh` reads `/proc/sys/kernel/hostname`, `osrelease`, `/etc/os-release`; `uname -m` supplies architecture | OS name uses `PRETTY_NAME` |
+| macOS | `/bin/sh` runs `sw_vers -productName / -productVersion` and `uname -n / -r / -m` | OS name such as `macOS 27.2`; kernel uses Darwin version |
+| Windows | `powershell.exe -NoProfile -NonInteractive -EncodedCommand`, using WMI `Win32_OperatingSystem`, registry `CurrentVersion`, and `OpenSSH\DefaultShell` | OS name and `DisplayVersion` follow system language; kernel is `Version.UBR`; architecture uses `PROCESSOR_ARCHITECTURE`; unset shell defaults to `cmd` |
+| Other | Retain `uname` output | OS name, hostname, and kernel |
 
-Windows 脚本兼容 Windows PowerShell 2.0 及以上（不使用 `Get-CimInstance`、`[ordered]`、`ConvertTo-Json`），错误在脚本内捕获并随结果返回，每个字段以 base64 UTF-8 输出以避开控制台代码页；编码命令约 2.6 KB，低于 cmd.exe 命令行上限。Windows 采集需要启动一次 PowerShell，约 1 秒。结果先保留在编辑草稿中，保存会话时写入 SQLite；取消编辑不会修改已保存的信息。每次新建 SSH 连接，在第一个终端就绪后后台刷新并保存一次，同一连接的多个终端共享结果，不依赖监控面板是否打开。
+The Windows script supports Windows PowerShell 2.0+ without `Get-CimInstance`, `[ordered]`, or `ConvertTo-Json`. It captures errors in the script and returns them with the result. Fields use base64 UTF-8 to avoid console code-page issues. The encoded command is about 2.6 KB, below cmd.exe's command-line limit. Starting PowerShell adds roughly one second. Results remain in the edit draft until the session is saved to SQLite; cancelling leaves saved facts unchanged. Each new SSH connection refreshes facts in the background after its first terminal is ready. Terminals on the same connection share them regardless of panel visibility.
 
-会话图标、系统描述和监控面板共用这份数据。图标使用各系统官方 logo 的单色字形（Simple Icons 16.35.0，CC0；Windows 按官方四窗格绘制），按平台和 `/etc/os-release` 的 `ID` 匹配：Ubuntu、Debian、CentOS、Alpine、Fedora、Arch、Red Hat（`rhel`）、Rocky Linux（`rocky`）、AlmaLinux、openSUSE（`opensuse-*`）、Kali、Linux Mint（`linuxmint`）、Raspberry Pi OS（`raspbian`）、deepin，以及 macOS、Windows 和 FreeBSD；其他 Linux 发行版与未识别主机使用通用 Tux。图标底色为品牌色混入卡片色，字形默认用官方色，与底色对比度不足时向黑或白调整（浅色 3:1、深色 4.5:1）。断开连接后仍可查看上次成功的结果；采集时间仅在内部用于判断记录新旧，不在面板显示。运行时间、进程数量以及各项使用率不作为基础信息缓存。
+Session icons, system descriptions, and monitoring share these facts. Monochrome official OS logos use Simple Icons 16.35.0 (CC0), with the Windows four-pane logo drawn directly. Matching uses platform and `/etc/os-release` `ID`: Ubuntu, Debian, CentOS, Alpine, Fedora, Arch, Red Hat (`rhel`), Rocky Linux (`rocky`), AlmaLinux, openSUSE (`opensuse-*`), Kali, Linux Mint (`linuxmint`), Raspberry Pi OS (`raspbian`), deepin, macOS, Windows, and FreeBSD. Other Linux distributions and unknown hosts use Tux. Brand colors mix with the card background; glyphs retain official colors unless adjusted toward black/white to meet contrast thresholds (light 3:1, dark 4.5:1). Last successful facts remain visible offline. Collection time is used internally for freshness, not displayed. Uptime, process counts, and utilization are not cached as host facts.
 
-缓存绑定会话 ID、地址、端口、用户和完整跳板路径，修改目标后不会复用原目标的信息；已经连接的终端仍展示其实际连接目标的信息。基础信息独立存储在数据库的 `hostFacts` 记录中，不更新连接配置的修订时间。旧采集结果不能覆盖更新的记录。
+Facts are bound to session ID, address, port, user, and the complete jump route. Changing a target does not reuse old-target facts; connected terminals still describe their actual target. Separate `hostFacts` database records do not change connection configuration revision timestamps. Older collections cannot overwrite newer records.
 
-采集单次限时 5 秒，失败不影响 SSH 连接，也不清空同一目标已有的成功结果。测试结果和监控面板会显示采集失败原因，数据库读写错误使用现有错误提示。
+A collection has a five-second timeout. Failure does not affect SSH or clear previous successful facts for the same target. Tests and monitoring display failure reasons; database errors use existing error reporting.
 
-## 不可用与权限
+## Unavailable data and permissions
 
-显示 `—` 表示该项尚无有效数据或当前服务器无法提供。单项失败不清空其他有效指标；整个采集失败时，不会继续把旧数值显示为当前值。
+`—` means no valid data yet or an unavailable server capability. One failed metric does not clear other valid metrics. After a whole collection fails, old values are not presented as current.
 
-网络优先选择有效 IPv4 默认路由，否则选择 IPv6。没有明确默认接口、或最低 metric 的默认路由存在歧义时，不会累加桥接、VLAN 或虚拟接口替代。
+Network selection prefers a valid IPv4 default route, otherwise IPv6. Missing default interfaces or ambiguity among lowest-metric routes do not trigger a substitute sum of bridges, VLANs, or virtual interfaces.
 
-进程信息受账号权限、hidepid 和内核配置影响。Top 原始记录超过预算时，整个 Top 暂时不可用，不把截断的子集当作完整排名。
+Process visibility depends on account permissions, hidepid, and kernel configuration. If raw Top data exceeds its budget, the whole Top view is temporarily unavailable rather than presenting a truncated subset as a complete ranking.
 
-根盘容量依赖 SFTP 的 statvfs 扩展，还需确认 SFTP 与 Shell 看到同一个根挂载。服务器不支持 SFTP、没有扩展、被 chroot 隔离或权限不足时，其他监控仍可使用。
+Root capacity requires SFTP statvfs and confirmation that SFTP and Shell see the same root mount. Missing SFTP, missing extensions, chroot isolation, or permissions do not prevent other metrics.
 
-## 延迟与采样周期
+## Latency and sampling intervals
 
-Shell 状态栏延迟独立于监控开关：当前可见终端按连接组共享 SSH 应用层往返时间，每 5 秒刷新；超过 3 秒的结果或 10 秒内没有有效样本时显示未知。它不是 ICMP ping。
+Shell status-bar latency is independent of monitoring. Visible terminals share an SSH application-level round-trip measurement per connection group every five seconds. Results above three seconds, or no valid sample for ten seconds, display as unknown. This is not ICMP ping.
 
-监控主体约每 2 秒采样，单次 Exec 限时 5 秒且只保留一个在途请求；实际间隔包含采集耗时。根盘容量约每 10 秒采样，独立请求限时 3 秒。隐藏窗口或非 SSH 页面不新增延迟采样。
+Main metrics sample roughly every two seconds with a five-second Exec timeout and at most one request in flight; actual intervals include collection time. Root capacity samples roughly every ten seconds with an independent three-second timeout. Hidden windows and non-SSH pages do not start new latency samples.
 
-## 面板展示
+## Panel presentation
 
-面板跟随当前聚焦的终端。顶部卡片显示会话名、系统图标和系统名，状态点区分实时、采集中、采集失败、连接中、连接失败、已断开和未监控，实时状态下每收到一次采样跳动一次；采集失败或部分指标不可用时，原因显示在卡片下方。会话未连接时只保留基础信息，可断开重连的会话提示在终端中按 Enter 重新连接。尚无数值的项目显示骨架占位：首次采样前和速率等待第二次采样时带流光；采集失败、服务器无法提供该项或开启减少动态效果时保持静止。
+The panel follows the focused terminal. Its top card shows session name, OS icon, and system name. Status dots distinguish live, collecting, failed collection, connecting, failed connection, disconnected, and unmonitored states. Live status pulses with each sample; failures and partial unavailability show reasons below the card. Offline sessions retain only host facts, with an Enter-to-reconnect hint when applicable. Metrics without values use skeletons: shimmer before the first sample or while waiting for a second rate sample; static after failures, unsupported metrics, or reduced motion.
 
-- CPU 主数字旁显示 1、5、15 分钟负载，1 分钟负载超过核数时变为警示色。趋势图纵轴按峰值在 5、10、25、50、100% 中取档，档位与峰值写在图下方。
-- 内存、磁盘以百分比为主值，条形使用主题色，达到 70%、90% 时分别变为警示色和危险色。磁盘设备名与文件系统相同时只显示一次。
-- 网络上下行各带迷你趋势，两者共用纵轴。
-- 进程 Top 行底色按单核占用比例绘制，显示为 0.0% 的行降为次要文字。
-- 基础信息可折叠，折叠后标题行仍显示运行时间。
+- CPU shows 1/5/15-minute load beside utilization; one-minute load above core count uses a warning color. The trend axis chooses 5, 10, 25, 50, or 100% from the peak; scale and peak appear below.
+- Memory/disk use percentages and themed bars, warning at 70% and danger at 90%. Identical disk device/filesystem names display once.
+- Upload/download each have a small trend with a shared vertical scale.
+- Top-process row backgrounds reflect one-core utilization; rows rounding to 0.0% use secondary text.
+- Host facts can collapse while the heading retains uptime.
 
-CPU 和网络趋势在客户端保留同一连接最近 60 次有效采样（约 2 分钟），切换到同一连接的其他终端时保留，采集失败或切换连接时清空。
+CPU/network trends retain the latest 60 valid samples per connection, roughly two minutes. Switching to another terminal on the same connection preserves them; collection failure or switching connections clears them.
 
-## 开发说明
+## Development notes
 
-监控主体读取 `/proc/stat`、`loadavg`、`meminfo`、`net/dev`、路由、`uptime`、进程 stat 和 mountinfo。基础信息单独读取 `/proc/sys/kernel/hostname`、`/proc/sys/kernel/osrelease`，并从 `/etc/os-release` 解析字面值。两者共用固定 `/bin/sh` 采集和记录解析机制，除基础信息用 `uname -m` 读取架构外只使用 shell 内建，不调用 `ps`、`top`、`df` 等外部采集工具，也不执行服务器返回的文本。
+Main metrics read `/proc/stat`, `loadavg`, `meminfo`, `net/dev`, routes, `uptime`, process stat, and mountinfo. Host facts separately read `/proc/sys/kernel/hostname`, `/proc/sys/kernel/osrelease`, and literal `/etc/os-release` values. Both use fixed `/bin/sh` collection and record parsing. Except for `uname -m` in basic facts, collection uses shell built-ins, not `ps`, `top`, or `df`, and does not execute text returned by the server.
 
-进程原始记录预算为 512 KiB，全部记录留在既有 1 MiB Exec 输出上限内。根盘容量使用短生命周期的独立 SFTP subsystem，不复用文件浏览或传输 client。
+Raw process records have a 512 KiB budget within the existing 1 MiB Exec output limit. Root capacity uses an independent short-lived SFTP subsystem rather than a browsing/transfer client.
 
-平台实现位于 `internal/hostinfo`：`Collector` 负责基础信息并创建 `Sampler`，`Sampler` 保存计算差分所需的上次样本，统一输出 `Metrics`；平台文件以 `_host.go` 结尾，避免被 Go 当作本机编译目标的构建约束。
+Platform implementations live in `internal/hostinfo`. `Collector` provides facts and creates a `Sampler`; `Sampler` retains differential baselines and outputs `Metrics`. Files end in `_host.go` so Go does not interpret them as local-target build constraints.
 
-源码入口：[hostinfo.go](../internal/hostinfo/hostinfo.go)、[linux_host.go](../internal/hostinfo/linux_host.go)、[darwin_host.go](../internal/hostinfo/darwin_host.go)、[windows_host.go](../internal/hostinfo/windows_host.go)、[host_facts.go](../internal/desktop/host_facts.go)、[status_backend.go](../internal/desktop/status_backend.go) 和 [ssh_latency.go](../internal/desktop/ssh_latency.go)。验证边界统一见[已知限制](limitations.md)。
+Entry points: [hostinfo.go](../internal/hostinfo/hostinfo.go), [linux_host.go](../internal/hostinfo/linux_host.go), [darwin_host.go](../internal/hostinfo/darwin_host.go), [windows_host.go](../internal/hostinfo/windows_host.go), [host_facts.go](../internal/desktop/host_facts.go), [status_backend.go](../internal/desktop/status_backend.go), and [ssh_latency.go](../internal/desktop/ssh_latency.go). See [known limitations](limitations.md) for validation boundaries.

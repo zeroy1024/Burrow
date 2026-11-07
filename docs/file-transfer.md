@@ -1,52 +1,54 @@
-# 文件管理与传输
+# File management and transfers
 
-## 连接与浏览
+[English](file-transfer.md) | [简体中文](file-transfer.zh.md)
 
-文件页面提供本地与远程双面板。远程支持 SFTP、FTP 和 FTPS；保存站点、分组与 SSH 页面各自独立。同一站点可打开多个文件标签。
+## Connect and browse
 
-可通过路径栏、历史和目录条目导航，使用过滤、排序、元数据预览、新建目录、重命名及删除。修改保存站点的初始目录后，已有标签在显式重连时应用变更；初始目录未变时保留当前浏览位置。
+The file page has local and remote panes. Remote connections support SFTP, FTP, and FTPS. Sites and groups are independent of the SSH catalog. One site can have several file tabs.
 
-FTP 支持无 TLS、显式 TLS、隐式 TLS，以及主动/被动模式。TLS 要求可信证书；主动模式要求服务器能够回连本机。文件名编码支持 UTF-8、GBK、GB18030、Big5、Shift_JIS、EUC-KR 和 ISO-8859-1，编码选项不转换文件内容。
+Navigate using the path bar, history, and directory entries. Filter, sort, preview metadata, create directories, rename, and delete entries. After editing a saved site's initial directory, an existing tab applies that change on explicit reconnect. If the initial directory is unchanged, it retains the current browsing location.
 
-## 上传与下载
+FTP supports no TLS, explicit TLS, implicit TLS, and active/passive mode. TLS requires a trusted certificate; active mode requires the server to connect back to this computer. Filename encodings include UTF-8, GBK, GB18030, Big5, Shift_JIS, EUC-KR, and ISO-8859-1. This option does not convert file contents.
 
-在两个面板之间拖动文件或目录，或通过文件选择器添加来源，开始传输。底部传输栏显示当前标签的任务、实际字节、速度与进度，并提供暂停、继续、取消和重试。
+## Upload and download
 
-目录传输先生成真实递归清单；空目录与零字节文件不伪造传输量。符号链接和特殊文件内容不参与传输。目录链接可以显式进入浏览，递归传输和删除不会跟随链接访问目标。
+Drag files or directories between panes, or select sources with the file picker. The transfer panel shows the current tab's tasks, actual bytes, speed, and progress, with pause, resume, cancel, and retry actions.
 
-## 重名处理
+Directory transfers first build a real recursive manifest. Empty directories and zero-byte files do not fabricate transferred bytes. Symbolic links and special-file contents are excluded. Directory links can be entered explicitly, but recursive transfers and deletion do not follow links to their targets.
 
-可选择询问、覆盖、跳过或保留两者。目录覆盖是逐项合并，文件与目录类型不匹配时不能直接覆盖。
+## Name conflicts
 
-「对所有重名项应用」作用于同一批任务及其递归子项。取消重名处理会终止同批尚未完成的任务，保留已完成文件；其他批次继续运行。
+Choose Ask, Overwrite, Skip, or Keep both. Directory overwrite merges entries individually. A file/directory type mismatch cannot be overwritten directly.
 
-写入使用任务专有的 `.part` 暂存文件，内容关闭和最终提交都成功后才标记完成。服务器不支持所需的续传、权限或替换能力时，任务会报告错误，原目标不会被预先删除。FTP 无法提供跨其他客户端的原子条件重命名，详见[已知限制](limitations.md)。
+**Apply this choice to all conflicts** affects the same batch and its recursive children. Cancelling conflict resolution ends that batch's unfinished tasks while retaining completed files. Other batches continue.
 
-Windows 本地权限显示为 ACL，不冒充 Unix 权限位。新暂存文件在创建时使用私有 ACL；覆盖已有本地文件前，复制并核对目标 DACL。禁止覆盖的提交使用句柄关联的原生重命名，文件占用、跨卷或权限不满足时保留明确错误。Windows 不支持的文件名（包括保留名称、尾随点/空格等）在传输清单中拒绝，不自动改名或替换字符。
+Writes use a task-owned `.part` staging file and are marked complete only after closing the contents and committing the destination successfully. Missing resume, permission, or replacement capabilities produce an error; the original destination is not deleted in advance. FTP cannot provide an atomic conditional rename against other clients; see [known limitations](limitations.md).
 
-## 暂停、继续与取消
+Windows local permissions are shown as ACLs rather than Unix mode bits. New staging files receive private ACLs at creation. Before overwriting a local file, its DACL is copied and verified. No-overwrite commits use native rename associated with an open handle. File sharing, cross-volume, or permission failures remain explicit. Unsupported Windows filenames, including reserved names and trailing dots/spaces, are rejected in the manifest rather than silently renamed or rewritten.
 
-| 操作 | 行为 |
+## Pause, resume, and cancel
+
+| Action | Behavior |
 |---|---|
-| 暂停 | 停止当前 I/O，保留清单、部分文件及已确认检查点 |
-| 继续 | 校验源基线和目标部分内容，再从已确认偏移继续；目录还会核对已完成子项 |
-| 取消 | 清理任务拥有的部分文件，已提交的文件保留；清理失败会显示错误并允许重试 |
-| 重试 | 重新执行失败任务，仍遵守端点、冲突和内容校验规则 |
+| Pause | Stop current I/O; retain the manifest, partial files, and confirmed checkpoint |
+| Resume | Verify the source baseline and destination partial content, then continue at the confirmed offset; directories also verify completed children |
+| Cancel | Clean up partial files owned by the task; retain committed files; report cleanup failures and allow retry |
+| Retry | Rerun a failed task under the same endpoint, conflict, and content-verification rules |
 
-连接中断时，服务器可能已经完成重命名但尚未返回结果。恢复会核对暂存文件、最终目标和摘要，无法确认时保留明确错误，不直接重传制造重复副本。
+On disconnection, the server may have completed a rename without returning its result. Recovery checks staging files, final destinations, and digests. If the result remains uncertain, it reports that uncertainty instead of retransmitting blindly and creating duplicate copies.
 
-## 标签与后台任务
+## Tabs and background tasks
 
-队列按文件标签隔离，同一站点新开的标签也从空队列开始。切换页面、切换标签或关闭浏览标签不会取消后台任务；离线标签仍可显示自己的任务。
+Queues are isolated by file tab. Another tab for the same site starts with an empty queue. Switching pages/tabs or closing a browsing tab does not cancel background tasks. Offline tabs can still display their own tasks.
 
-任务保留入队时的端点、跳板和凭据版本，之后编辑保存站点不会把任务改向新地址。旧凭据无法取得时，会请求对应任务所需的凭据。
+Tasks retain the endpoint, jump route, and credential version captured when queued. Editing a saved site does not redirect existing tasks. If an old credential is unavailable, the app asks for the credential required by that task.
 
-存在未关联打开标签的任务时，传输栏提供「找回任务」，按原身份重新打开离线标签。该操作只关联并显示任务，不会自动登录或继续传输。
+When tasks have no associated open tab, **Recover tasks** reopens an offline tab using the original identity. It only associates and displays tasks; it does not log in or resume them automatically.
 
-## 退出与恢复
+## Quit and restore
 
-运行中将清单、已确认偏移和摘要保存到 SQLite；新任务保存后才启动，最终重命名前保存提交意图。正常退出时暂停活动任务，等待 worker 停稳，再保存最终检查点。开启「启动时恢复会话」且原文件标签成功恢复时，任务关联回该标签，保持离线；需要手动继续。
+Manifests, confirmed offsets, and digests are saved in SQLite during operation. New tasks are saved before starting, and commit intent is saved before final rename. Normal shutdown pauses active tasks, waits for workers to stop, and saves final checkpoints. If startup restoration is enabled and the original file tab is restored, tasks reassociate with it offline. Resume them manually.
 
-关闭启动恢复后，新标签不继承旧任务。没有标签身份的旧检查点保留，不能按主机名或地址猜测归属；可通过「找回任务」处理。强制结束进程或断电不保证保存最新进度。
+With startup restoration disabled, new tabs do not inherit old tasks. Old checkpoints without tab identities remain available but are not assigned by guessing a hostname or address. Use **Recover tasks**. Forced termination or power loss does not guarantee that the latest progress was saved.
 
-数据文件及格式版本统一见[数据与凭据](storage.md)，内部连接与提交策略见[架构与生命周期](architecture.md)。
+See [data and credentials](storage.md) for files and format versions, and [architecture and lifecycle](architecture.md) for connection and commit policies.

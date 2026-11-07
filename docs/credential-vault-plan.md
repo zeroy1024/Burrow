@@ -1,509 +1,515 @@
-# 应用解锁与凭据存储方案
+# App unlock and credential vault design
 
-日期：2026-11-05。状态：已接入实现；现有 race 测试、临时数据加密与迁移检查已通过，原生界面和真实系统凭据迁移尚待验收。
+[English](credential-vault-plan.md) | [简体中文](credential-vault-plan.zh.md)
 
-Burrow 将密码、托管私钥和用户选择保存的私钥口令统一加密存入现有 SQLite 数据库，业务凭据留在应用数据库，macOS 正式版仅将自动解锁密钥交给独立的系统钥匙串服务。用户只需决定是否开启「打开应用时需要解锁」：默认关闭，应用自动解锁；开启后，每次启动必须输入应用解锁密码。同一设置页面提供「修改密码」。
+Interface languages: related pages, forms, notifications, and business errors support English, Simplified Chinese, and System. Protocol fields, state codes, authorization decisions, and persisted values remain stable. Historical free text and original diagnostics are not rewritten. See [interface languages](i18n.md).
 
-产品行为以第 1 至第 3 节为准；后续章节定义支撑这些行为的存储、启动、转换和恢复约束。实施过程中不把内部密钥机制扩展成新的用户选项。
+This page records the vault's schema v4 design and acceptance constraints. See [data and credentials](storage.md) for current schema v5 and later gateway migration.
 
-## 1 已确认的产品约定
+Date: 2026-11-05. Status: integrated. Existing race tests and isolated encryption/migration checks passed; native UI and migration of real system credentials still await acceptance.
 
-| 项目 | 行为 |
+Burrow encrypts passwords, managed private keys, and optionally saved passphrases in its existing SQLite database. Business credentials stay there; the macOS release stores only an automatic unlock key in a separate Keychain service. Users choose one setting: **Require unlocking when opening the app**. It is off by default for automatic unlock. When on, each launch requires an app password. The same page offers **Change Password**.
+
+Sections 1–3 define product behavior. Later sections define supporting storage, startup, transition, and recovery constraints. Internal key mechanisms must not become extra user options.
+
+## 1 Confirmed product behavior
+
+| Item | Behavior |
 |---|---|
-| 设置位置 | 设置 → 密钥与凭据，在现有私钥列表上方增加「应用解锁」区域 |
-| 唯一开关 | 打开应用时需要解锁 |
-| 默认值 | 关闭；新用户无需设置密码即可使用 |
-| 关闭时 | 启动后自动解锁，正常进入应用 |
-| 开启时 | 首次设置并确认应用解锁密码；后续每次启动先解锁 |
-| 修改密码 | 仅在开关开启时，于同一页面显示「修改密码…」 |
-| 关闭开关 | 验证当前应用解锁密码后恢复自动解锁，保留已有凭据 |
-| 数据保存 | 两种情况下凭据都加密保存，不存在明文存储模式 |
-| 后端结构 | 共用一套凭据加解密与读写逻辑，仅解锁密钥的取得方式不同 |
-| 更新应用 | 沿用原凭据库、密钥和设置；代码签名及程序版本变化不参与解密 |
-| 锁定边界 | 未解锁时整个应用不可使用，MCP、连接、传输及后台恢复不能绕过 |
+| Location | Settings → Keys & Credentials, with App Unlock above existing private keys |
+| Single switch | Require unlocking when opening the app |
+| Default | Off; new users need no app password |
+| Off | Unlock automatically on startup and enter the app |
+| On | Set/confirm a password once, then unlock before subsequent launches |
+| Change password | Show Change Password… on the same page only while enabled |
+| Disable | Verify the current app password, restore automatic unlock, and retain credentials |
+| Storage | Credentials are encrypted in both cases; no plaintext mode |
+| Backend | One encryption/decryption/read/write implementation; only unlock-key acquisition differs |
+| App updates | Retain vault, keys, and settings; binary versions/code hashes are not decryption inputs |
+| Locked boundary | The entire app is unavailable; MCP, connections, transfers, and recovery cannot bypass unlock |
 
-「打开应用」在第一版指新的应用进程启动。同一进程切回前台、窗口重新显示、最小化恢复或系统唤醒，不重复要求解锁。现有关闭窗口行为仍遵循应用退出流程。
+Opening the app means starting a new process in this version. Foregrounding, showing a window, restoring from minimize, or waking the system within one process does not prompt again. Existing window-close behavior still follows app shutdown.
 
-开启或关闭设置只改变下一次启动的解锁要求，不立即中断当前连接。第一版不增加手动锁定、闲置锁定、系统锁屏自动锁定、Touch ID、密码找回、恢复码、多个凭据库或独立后台解锁接口。
+Changing the switch affects the next startup requirement without immediately interrupting connections. This version adds no manual/idle/system-lock locking, Touch ID, password recovery, recovery codes, multiple vaults, or separate background unlock interface.
 
-这些限制避免把启动解锁扩展成另一套会话管理功能。应用退出后，下一次启动重新执行所选的解锁方式。
+These limits keep startup unlock separate from session management. After quitting, the next launch performs the selected unlock process again.
 
-## 2 设置页面与用户操作
+## 2 Settings and user actions
 
-### 2.1 页面内容
+### 2.1 Page contents
 
-复用「密钥与凭据」页面、设置行、开关和公共模态框，不新增设置分类。
+Reuse Keys & Credentials, settings rows, switches, and shared modals without a new category.
 
-| 控件 | 文案或行为 |
+| Control | Copy or behavior |
 |---|---|
-| 分组标题 | 应用解锁 |
-| 开关 | 打开应用时需要解锁 |
-| 说明 | 开启后，每次启动 Burrow 都需要输入解锁密码。 |
-| 开启后的按钮 | 修改密码… |
-| 已保存密码区域 | 将系统钥匙串相关文案改为「密码和私钥口令加密保存在本机」。 |
+| Group | App Unlock |
+| Switch | Require unlocking when opening the app |
+| Help | Require the unlock password each time Burrow starts. |
+| Enabled action | Change Password… |
+| Saved passwords | Replace system-Keychain wording with passwords/passphrases encrypted on this device |
 
-页面不出现「明文模式」「自动解锁模式」「KEK」「DEK」或加密算法选项。对密码丢失、导出私钥和备份的必要说明放在对应操作中，不在正常连接流程展示实现细节。
+Do not expose Plaintext mode, Automatic unlock mode, KEK, DEK, or algorithm choices. Explain password loss, key export, and backups in their relevant actions rather than normal connection flows.
 
-开关显示最后一次成功提交的状态。点击开启后先填写密码，点击关闭后先验证密码；取消或失败都保持原状态，不让界面先切换成功再回退。
+The switch shows the last successfully committed state. Enabling first requests a password; disabling first verifies it. Cancellation/failure retains the previous state instead of appearing successful and rolling back.
 
-密码表单与会话表单使用相同的字段校验交互：失焦时校验，修改后清除或更新对应错误；提交时检查全部可见字段并聚焦第一个错误项。输入框使用统一错误样式，提示位于对应字段下方；当前密码验证失败也在当前密码下显示。整块提示只用于保存、数据库和文件操作等整体错误。
+Password forms use session-form validation: validate on blur, clear/update affected errors on edits, validate visible fields on submit, and focus the first failure. Use shared error styling and messages below their fields, including wrong-current-password errors. Whole-form banners are for save/database/file failures.
 
-### 2.2 开启启动解锁
+### 2.2 Enable startup unlock
 
-1. 用户点击开关，打开「设置解锁密码」模态框。
-2. 输入「密码」「确认密码」，可切换密码可见性，支持粘贴和密码管理器。
-3. 显示一次必要说明：「请妥善保存解锁密码。忘记后无法恢复已保存的密码和托管私钥。」
-4. 用户确认后，后台完成密钥转换和持久化。处理期间禁用重复提交，保持窗口可响应。
-5. 提交成功后开关开启，显示「修改密码…」；当前应用继续使用，下次启动要求解锁。
+1. Open Set Unlock Password when the switch is clicked.
+2. Enter Password and Confirm password; allow visibility toggling, paste, and password managers.
+3. Explain once that forgetting it prevents recovery of saved passwords and managed private keys.
+4. Confirm to perform key transition/persistence in the background, blocking duplicate submission while keeping the window responsive.
+5. After successful commit, enable the switch and show Change Password…. The current run continues; the next launch requires unlock.
 
-密码规则为至少 6 个、最多 64 个 Unicode 字符（包含边界），允许空格和 Unicode，不强制字符类别，不自动去空格、改大小写或做 Unicode 归一化。确认框按实际输入精确匹配。这是应用解锁密码的规则，不影响 SSH 密码或原有私钥口令。
+Accept 6–64 Unicode characters, inclusive, including spaces. Do not require character classes, trim spaces, change case, or normalize Unicode. Confirmation must match exact input. This rule applies only to app passwords, not SSH passwords or existing key passphrases.
 
-### 2.3 修改密码
+### 2.3 Change password
 
-模态框包含「当前密码」「新密码」「确认新密码」。即使应用当前已解锁，也重新验证当前密码，避免仅依赖内存中的数据密钥确认身份。
+The modal contains Current password, New password, and Confirm new password. Reverify the current password even while unlocked, rather than treating the in-memory data key as identity proof.
 
-新密码通过校验后，在后台完成第 8 节的转换。成功后立即以新密码保护当前凭据库；以后启动使用新密码，现有连接和远端账号密码不变。提交失败保持旧密码有效，不显示成功提示。
+After validation, perform the section 8 transition in the background. Success immediately protects the current vault with the new password; later launches require it. Existing connections and remote passwords are unchanged. On commit failure, the old password remains valid and no success is shown.
 
-### 2.4 关闭启动解锁
+### 2.4 Disable startup unlock
 
-模态框要求输入当前密码，并说明：「关闭后，打开 Burrow 将不再要求输入解锁密码，已保存的凭据会保留。」
+Request the current password and explain that Burrow will stop asking for it while retaining saved credentials.
 
-成功后开关关闭，「修改密码…」隐藏。应用不保留旧应用密码作为备用入口；重新开启时重新设置密码。
+After success, turn the switch off and hide Change Password…. Do not keep the old app password as a backup entry point. Re-enabling sets a password again.
 
-### 2.5 启动解锁界面
+### 2.5 Startup unlock screen
 
-开启设置时，启动仅显示应用名称、密码输入框、显示密码按钮、「解锁」和退出入口。焦点默认进入密码框，回车提交，关闭窗口退出应用。
+When enabled, startup shows only app name, password input, visibility control, Unlock, and Quit. Focus starts in the password field; Enter submits; closing the window quits.
 
-界面不渲染主机、会话、文件列表、历史终端、工作区预览或 MCP 审计。菜单和快捷键只能执行解锁界面允许的操作，不能经 Cmd+数字、最近会话、设置入口、拖放或其他窗口路由进入工作区。
+Do not render hosts, sessions, files, terminal history, workspace previews, or MCP audits. Menus/shortcuts allow only unlock-screen actions. Cmd+number, recent sessions, Settings, drag/drop, or other window routes cannot enter the workspace.
 
-解锁计算在后台执行，一次只运行一个请求。取消或退出后，迟到的后台结果不得打开应用。密码不匹配或密钥封装校验失败统一报告无法解锁；文件不可读、格式不支持等确定的错误单独说明，避免把损坏误报成确定的密码错误。
+Unlock calculation runs in the background, one request at a time. Results arriving after cancellation/quit cannot open the app. Wrong passwords and key-wrapper authentication failures share an unable-to-unlock message. Known unreadable-file/unsupported-format failures have specific messages, avoiding a false diagnosis of definite password error for corruption.
 
-不提供「跳过」「重置后保留原密码」或远端输入解锁密码。忘记密码时可退出并从可解锁的备份恢复；创建新库属于独立的破坏性恢复操作，不在普通解锁失败流程中自动执行。
+There is no Skip, reset-while-preserving-password, or remote password-input path. Users can quit and restore an unlockable backup. Creating a new vault is a separate destructive recovery operation, never an automatic response to ordinary unlock failure.
 
-## 3 启动与应用可用性
+## 3 Startup and availability
 
-现有 [Run](../internal/desktop/app.go) 会在窗口创建前读取目录并恢复工作区、传输，在创建窗口时启动 MCP。主界面的每帧逻辑还会推进传输、监控、快捷键和持久化。这些操作必须放到解锁后的业务启动阶段。
+Before this change, [Run](../internal/desktop/app.go) loaded catalogs/restored workspaces and transfers before window creation, then started MCP. Main-view ticks also advanced transfers, monitoring, shortcuts, and persistence. These operations now belong to business startup after unlock.
 
 ~~~mermaid
 flowchart TD
-    A[启动进程并取得数据目录独占锁] --> B[打开数据库并读取凭据库头]
-    B --> C{是否需要应用密码}
-    C -->|关闭| D[读取本机解锁密钥]
-    C -->|开启| E[显示解锁界面]
-    E --> F[后台派生解锁密钥]
-    D --> G[验证并解开数据密钥]
+    A[Start process and acquire exclusive data lock] --> B[Open DB and read vault metadata]
+    B --> C{App password required?}
+    C -->|Off| D[Read local unlock key]
+    C -->|On| E[Show unlock screen]
+    E --> F[Derive unlock key in background]
+    D --> G[Verify and unwrap data key]
     F --> G
-    G -->|失败| H[保留锁定或显示具体错误]
-    G -->|成功| I[初始化目录和业务状态]
-    I --> J[恢复工作区和暂停的传输记录]
-    J --> K[进入主界面并按配置启动 MCP]
+    G -->|Failure| H[Stay locked or report specific error]
+    G -->|Success| I[Initialize catalog and business state]
+    I --> J[Restore workspace and paused transfers]
+    J --> K[Enter workspace and start configured MCP]
 ~~~
 
-### 3.1 两阶段启动
+### 3.1 Two-phase startup
 
-第一阶段仅初始化数据路径、进程锁、数据库、凭据库头、解锁所需的主题和语言、窗口及退出流程。普通数据读取不能触发连接、恢复任务、启动 MCP 或自动保存。
+Phase one initializes only data paths, process lock, database, vault metadata, unlock theme/language, window, and exit flow. Ordinary reads must not trigger connections, task recovery, MCP, or automatic saving.
 
-第二阶段在成功解锁后执行一次：加载目录和业务设置、恢复工作区和传输记录、初始化 MCP 后端、进入主界面，最后按已有 MCP 启用配置启动监听。重复点击解锁或窗口重新显示不能重复执行该阶段。
+Phase two runs once after unlock: load catalog/business preferences, restore workspace/transfers, initialize MCP, enter the workspace, then start listening if enabled. Repeated unlock clicks or window display cannot rerun it.
 
-恢复行为沿用现有语义：恢复的 SSH 会话仍是尚未连接状态，未完成传输仍按现有逻辑恢复为暂停；解锁成功本身不构成自动连接或继续传输的授权。
+Restored SSH sessions remain disconnected; unfinished transfers remain paused. Unlock success does not authorize automatic connections or transfer resumption.
 
-### 3.2 运行状态
+### 3.2 Runtime states
 
-| 状态 | 允许的行为 |
+| State | Allowed behavior |
 |---|---|
-| Booting | 读取启动必需信息，尚未执行用户业务 |
-| Locked | 输入密码、退出或查看明确的恢复错误 |
-| Unlocking | 等待单次后台解锁结果，禁止重复提交 |
-| Initializing | 解锁已成功，业务状态正在加载 |
-| Ready | 正常使用应用 |
-| ChangingProtection | 设置转换中，暂停新的凭据操作和相关业务变更 |
-| Blocked | 核心密钥、数据格式或提交结果不可用，保留现场并阻止业务继续 |
-| Closing | 停止新工作、完成已有退出流程并释放资源 |
+| Booting | Read required startup data; no user business work |
+| Locked | Enter password, quit, or inspect explicit recovery errors |
+| Unlocking | Wait for one background result; no duplicate submission |
+| Initializing | Unlock succeeded; loading business state |
+| Ready | Normal app use |
+| ChangingProtection | Pause new credential operations and related business changes |
+| Blocked | Key, format, or commit state is unusable; retain evidence and block business |
+| Closing | Stop admissions, complete shutdown, release resources |
 
-状态由应用实例持有，不使用包级全局变量。只有 Ready 可接受新的用户业务；ChangingProtection 对已建立连接的影响见第 8 节。
+The app instance owns state, not package globals. Only Ready accepts new user work. Section 8 describes established connections during ChangingProtection.
 
-### 3.3 后台入口
+### 3.3 Background entry points
 
-启动未解锁时不启动 MCP HTTP 监听，客户端会收到服务尚未可连接的结果。解锁后仍按原来的监听配置启动，不静默更换端口。该设计不新增「解锁 MCP」或传递密码的远端接口。
+MCP HTTP does not listen before unlock, so clients cannot connect yet. After unlock, use existing listener settings without silently changing ports. No Unlock MCP or remote password interface is added.
 
-连接、传输调度和 MCP 桌面后端的公共业务入口统一检查应用是否可用。检查包含无需凭据库的匿名 FTP、外部 ssh-agent、已有连接复用和本地文件操作，不能只在读取秘密时才判断。
+Connection, transfer, and MCP desktop entry points check app availability, including anonymous FTP, external agents, connection reuse, and local file work that do not require Vault secrets. Checking only credential reads is insufficient.
 
-锁定界面不运行主界面的业务 tick。设置转换期间，新 MCP 请求返回明确的暂不可用结果，不静默排队后继续执行；MCP 自身原有的身份、授权、策略和审计仍分别生效。
+The locked screen does not run main-view business ticks. Protection transitions return explicit temporary unavailability to new MCP requests rather than silently queuing them for later execution. Existing MCP authentication, grants, policies, and auditing remain independent.
 
-### 3.4 锁定时退出
+### 3.4 Exit while locked
 
-[persistBeforeClose](../internal/desktop/workspace_store.go) 当前会根据加载错误标志生成工作区和偏好快照。解锁前退出时，不能把尚未初始化的空切片、默认设置或空工作区写回数据库。
+[persistBeforeClose](../internal/desktop/workspace_store.go) builds snapshots using load-error flags. Exiting before unlock must not write uninitialized slices, default preferences, or an empty workspace over saved data.
 
-退出路径必须区分业务初始化是否完成：未进入 Ready 的启动阶段只取消后台计算、释放窗口和数据库资源；不触发工作区、目录、传输或设置快照保存。成功初始化之后按既有退出流程保存。
+The exit path distinguishes completed initialization. Before Ready, cancel calculation and release window/database resources without saving workspace/catalog/transfer/preferences snapshots. After initialization, use normal shutdown saves.
 
-## 4 模块划分
+## 4 Module ownership
 
-只新增 internal/vault，复用现有 store、desktop、localfs 和协议客户端，不增加通用插件式凭据后端或第二个数据库。
+Add only `internal/vault`, reusing store, desktop, localfs, and protocol clients. No generic pluggable credential backend or second database.
 
 ~~~mermaid
 flowchart TD
-    UI[设置与解锁界面] --> APP[Desktop 应用状态与操作协调]
-    MCP[MCP 桌面后端] --> APP
-    APP --> V[Vault 凭据访问和密钥生命周期]
-    V -->|读取密文| S[Store 数据库接口]
-    APP -->|同一事务保存配置和准备好的密文| S
+    UI[Settings and unlock UI] --> APP[Desktop state and coordination]
+    MCP[MCP desktop backend] --> APP
+    APP --> V[Vault credential and key lifecycle]
+    V -->|Read ciphertext| S[Store database interface]
+    APP -->|Commit config and prepared ciphertext together| S
     S --> DB[(burrow.db)]
-    V --> L[macOS 正式版钥匙串或其他构建的私有密钥文件]
-    APP -->|本次认证的密码或签名器| CLIENT[SSH 与文件协议客户端]
+    V --> L[macOS release Keychain or private file keys]
+    APP -->|Password or signer for this authentication| CLIENT[SSH and file protocol clients]
 ~~~
 
-| 模块 | 所有权与职责 |
+| Module | Ownership and responsibility |
 |---|---|
-| internal/vault | 持有当前数据密钥、解锁状态和加密代次；统一读取凭据、准备加密变更、准备安全设置转换、管理本机解锁文件 |
-| internal/store | 定义凭据库头与密文记录结构，完成原子读取、版本检查和事务提交；不持有明文密码或执行密码派生 |
-| internal/desktop | 持有 Vault 实例；负责 UI、应用可用性、业务快照、串行提交和完成通知 |
-| internal/sshclient | 使用本次认证的密码或内存签名器；不查询数据库、不请求应用解锁 |
-| internal/fileclient | 使用本次连接的认证材料；不自行缓存长期解锁密钥 |
-| internal/localfs | 复用现有 Unix 权限和 Windows ACL 处理，保护数据库与本机密钥文件 |
+| internal/vault | Current data key, unlock state, crypto epoch; credential reads, prepared encrypted changes/protection transitions, local key files |
+| internal/store | Metadata/ciphertext structures, atomic reads, version checks, transactions; no plaintext passwords or KDF execution |
+| internal/desktop | Vault instance, UI, availability, business snapshots, serial commits, completion notifications |
+| internal/sshclient | Authentication-scoped password/in-memory signer; no DB lookup or app-unlock requests |
+| internal/fileclient | Current connection's authentication material; no long-lived unlock-key cache |
+| internal/localfs | Existing Unix permissions/Windows ACLs for DB and local key protection |
 
-Vault 是统一的 CredentialStore 能力入口，不额外创建一个同名包装层。其能力包含打开与解锁、读取指定凭据、准备凭据增删改、准备保护设置转换、关闭与释放。只有准备结果可以进入 Store 事务，业务层不直接拼装密文。
+Vault is the unified CredentialStore capability entry point, without another identically named wrapper. It opens/unlocks, reads credentials, prepares insert/update/delete/protection changes, and closes/releases. Only prepared results enter Store transactions; business code does not construct ciphertext.
 
-Store 的密文记录类型不依赖 Vault，防止循环依赖。Vault 可使用 Store 的具体读取接口；准备的变更携带预期加密代次，由 Store 在提交时验证。界面没有直接获得数据密钥或本机解锁密钥的接口。
+Store ciphertext types do not depend on Vault. Vault may use concrete Store read interfaces. Prepared changes include expected crypto epochs checked at commit. UI has no API to obtain data or local unlock keys.
 
-## 5 数据范围与持久化模型
+## 5 Data and persistence
 
-### 5.1 加密范围
+### 5.1 Encryption scope
 
-| 内容 | 新保存方式 |
+| Content | Storage |
 |---|---|
-| 选择保存的 SSH、FTP、FTPS 等连接密码 | 加密凭据记录 |
-| Burrow 托管的私钥原始内容 | 加密凭据记录，不再依赖托管私钥文件 |
-| 选择保存的私钥口令 | 独立加密凭据记录 |
-| 公钥、指纹、名称、类型、位数 | 现有密钥元数据表 |
-| 主机地址、用户名、分组、布局、传输检查点、主机信任 | 现有业务表 |
-| MCP 授权密钥 | 继续只保存摘要和公开前缀，不保存可恢复的完整值 |
-| MCP 审计、命令和配置中的任意文本 | 延续现有存储规则，不自动宣称全部内容被加密 |
+| Saved SSH/FTP/FTPS connection passwords | Encrypted credential records |
+| Complete managed private key bytes | Encrypted records instead of managed key files |
+| Optionally saved passphrases | Separate encrypted records |
+| Public keys, fingerprints, names, types, bit counts | Existing key metadata |
+| Hosts, usernames, groups, layout, checkpoints, trust | Existing business tables |
+| MCP access keys | Digests/public prefixes only, no recoverable full value |
+| Arbitrary audit/command/config text | Existing rules, without claiming all text is encrypted |
 
-应用解锁界面限制应用内访问，数据库仍不是整体加密。主机地址、用户名、初始化命令、环境变量和审计内容在离线读取时仍可能可见。凭据加密不能代替现有日志脱敏和用户对配置内容的保密处理。
+Unlock limits in-app access, not offline reading of an entirely encrypted database. Hosts, users, initial commands, environment variables, and audits may remain visible. Credential encryption does not replace log redaction or confidentiality of configuration contents.
 
-### 5.2 新增表
+### 5.2 Added tables
 
-本次由 schema v3 升级至 v4。结构升级前保存原库的一致性备份，初始化与迁移分别使用明确状态。
+This design upgraded schema v3 to v4. Create a consistent pre-upgrade backup, with initialization and migration as explicit states.
 
-凭据库头 vault_meta 为固定单行，保存：
+The single-row `vault_meta` stores:
 
-| 字段组 | 内容 |
+| Field group | Contents |
 |---|---|
-| 身份与版本 | vault_id、格式版本 |
-| 初始化状态 | pending_init、pending_migration 或 ready |
-| 解锁方式 | local 或 password，仅供内部使用 |
-| 当前加密代次 | crypto_epoch，用于密钥轮换和并发提交校验 |
-| 数据密钥封装 | wrap_nonce、wrapped_dek |
-| 密码派生参数 | password 情况下的算法版本、salt、内存量、迭代次数、并行度 |
-| 自动解锁密钥引用 | local 情况下的 local_key_id；格式 v2 同时记录 file 或 keychain 来源 |
+| Identity/version | vault_id and format version |
+| Initialization | pending_init, pending_migration, or ready |
+| Unlock mode | local or password, internal only |
+| Encryption epoch | crypto_epoch for rotation/concurrent commit validation |
+| Data key wrapper | wrap_nonce, wrapped_dek |
+| Password derivation | Algorithm version, salt, memory, iterations, parallelism |
+| Automatic key reference | local_key_id for local mode; format v2 additionally identifies file/keychain source |
 
-ready 状态必须满足所选解锁方式的完整字段约束。password 头不包含可用的本机密钥引用；local 头不依赖密码派生参数。UI 开关从这份头信息派生，不在普通 preferences 中再保存另一份可独立修改的布尔值。
+Ready must satisfy all fields required by its mode. Password metadata has no usable local key reference; local metadata does not depend on KDF parameters. Derive the UI switch from this record rather than another independently mutable preference boolean.
 
-vault_items 保存：
+`vault_items` stores:
 
-| 字段 | 用途 |
+| Field | Purpose |
 |---|---|
-| secret_id | 稳定的凭据标识 |
-| kind | session_password、private_key 或 key_passphrase |
-| revision | 业务凭据版本，用于校验连接快照 |
-| crypto_epoch | 该记录所使用的数据密钥代次 |
-| nonce | 本次加密产生的随机 nonce |
-| ciphertext | 密文及认证标签 |
+| secret_id | Stable credential ID |
+| kind | session_password, private_key, or key_passphrase |
+| revision | Business credential version for connection snapshots |
+| crypto_epoch | Data-key generation used by the record |
+| nonce | Fresh random encryption nonce |
+| ciphertext | Ciphertext and authentication tag |
 
-沿用已有会话凭据标识语义，例如 `session/<id>/credential`、`key/<id>/passphrase`，新增 `key/<id>/private`。每个逻辑凭据只保留当前记录，不借本次改造增加密码历史或多个版本自动尝试。
+Retain IDs such as `session/<id>/credential` and `key/<id>/passphrase`, adding `key/<id>/private`. Each logical credential has one current record, not password history or automatic attempts across versions.
 
-业务凭据版本与加密代次必须分开：修改远端连接密码改变 PasswordRevision；仅轮换加密密钥不改变 PasswordRevision、主机 ID、私钥 ID 或公钥指纹。
+Separate business revision from encryption epoch: changing a remote password changes PasswordRevision; rotating encryption keys does not change PasswordRevision, host/key IDs, or public fingerprints.
 
-managed_keys 将托管私钥路径依赖改为私钥凭据引用。运行时和业务快照只保存 ID 与版本，不复制密码、私钥或应用解锁信息。
+`managed_keys` replaces private file paths with credential references. Runtime/business snapshots retain IDs and versions, not copied passwords, private keys, or app-unlock material.
 
-### 5.3 自动解锁密钥
+### 5.3 Automatic unlock keys
 
 ~~~text
-应用数据目录/
+app-data-directory/
   burrow.db
   burrow.db.lock
   vault-keys/
     <local-key-id>.key
 ~~~
 
-macOS 正式版使用固定签名访问 `dev.burrow.app.vault-unlock` 钥匙串服务。其他平台、开发版和联调构建使用文件密钥。格式 v2 将 file/keychain 来源加入库头认证数据；原 v1 的认证数据保持不变。由文件迁往钥匙串时先成功读取原密钥，再轮换数据密钥和记录，不在读取失败时尝试另一来源。旧文件作为迁移副本保留。
+The macOS release uses fixed signing for `dev.burrow.app.vault-unlock`. Other platforms and development/integration builds use files. Format v2 authenticates file/keychain source; v1 authenticated data remains unchanged. File-to-Keychain migration first reads the original key successfully, then rotates data keys/records. It does not try another source after failure. Old files remain migration copies.
 
-密钥项目和文件均包含格式版本、vault_id、local_key_id 和随机解锁密钥。文件名由应用生成的 ID 构造，不把数据库中的任意路径直接交给文件系统。
+Items/files contain format version, vault_id, local_key_id, and random unlock key. Filenames use app-generated IDs, not arbitrary paths from the DB.
 
-Unix 目录使用 0700、文件使用 0600；Windows 复用当前账号与 SYSTEM 的私有 ACL。写入新文件时采用独立新名称、排他创建、持久化后再让数据库引用它，不能直接覆盖仍被当前数据库引用的文件。
+Unix directories use 0700 and files 0600; Windows reuses private current-account/SYSTEM ACLs. Write new files under independent names with exclusive creation, make them durable, then update DB references. Do not overwrite a currently referenced file.
 
-本机解锁密钥不进入安装包、源码、mygo.json、日志、命令行参数或环境变量。应用升级不生成替代密钥；数据库已引用的文件丢失或内容不匹配时明确失败，不自动生成新文件掩盖问题。
+Local unlock keys never enter packages, source, mygo.json, logs, CLI arguments, or environment variables. Updates do not create replacements. A missing/mismatched referenced key fails explicitly rather than being hidden by a new file.
 
-开发版与正式版继续使用独立数据目录，每个凭据库生成独立密钥。不会使用硬编码密钥、程序哈希、用户名或机器标识作为解密秘密。
+Development/release directories and vault keys remain independent. Hardcoded keys, program hashes, usernames, and machine identifiers are not decryption secrets.
 
-## 6 密码学设计与保护边界
+## 6 Cryptography and protection boundaries
 
-### 6.1 两层密钥
+### 6.1 Two key layers
 
-数据密钥 DEK 是每个凭据库独立随机生成的 32 字节秘密，用于加密所有凭据记录。
+Each vault has an independent random 32-byte data encryption key (DEK) for all credential records.
 
-解锁密钥 KEK 只用于加密和解开 DEK：
+The key encryption key (KEK) only wraps/unwraps the DEK:
 
-- local：使用 crypto/rand 生成 32 字节 KEK；macOS 正式版写入独立钥匙串项目，其他构建保存到受限权限的本机密钥文件。
-- password：使用用户输入的应用密码与数据库中的随机 salt，通过 Argon2id 派生 32 字节 KEK，不持久化派生结果。
+- local: `crypto/rand` generates 32 bytes, stored in the macOS release's dedicated Keychain item or a private local file elsewhere.
+- In `password` mode, Argon2id derives 32 bytes from input and a random database salt; the result is not persisted.
 
-两种方式的数据库都只保存被 KEK 加密的 DEK，后续读取记录使用完全相同的流程。
+Both databases store only a wrapped DEK and share the same record-read flow.
 
 ~~~text
-本机随机 KEK ───────────────┐
-                           ├─ 解开 wrapped_dek ─ DEK ─ 解密凭据
-输入密码 + salt → Argon2id ─┘
+random local KEK ───────────┐
+                           ├─ unwrap wrapped_dek ─ DEK ─ decrypt credentials
+password + salt → Argon2id ─┘
 ~~~
 
-### 6.2 算法与参数
+### 6.2 Algorithms and parameters
 
-采用已有 golang.org/x/crypto 的 Argon2id 和 chacha20poly1305.NewX。后者为扩展 nonce 的 ChaCha20-Poly1305 认证加密实现，使用 32 字节密钥、24 字节 nonce 和 16 字节认证标签。封装数据密钥和加密凭据记录共用这一原语。
+Use existing `golang.org/x/crypto` Argon2id and `chacha20poly1305.NewX`. XChaCha20-Poly1305 uses a 32-byte key, 24-byte nonce, and 16-byte authentication tag for both data-key wrapping and credential records.
 
-所有密钥、salt、nonce 使用 crypto/rand。每次加密都生成新的随机 nonce，不能从记录 ID、时间或业务版本推导。新密码和修改密码时重新生成至少 16 字节的 salt。
+Generate keys, salts, and nonces with `crypto/rand`. Every encryption gets a fresh nonce, never derived from IDs, timestamps, or business versions. New/changed passwords get a fresh salt of at least 16 bytes.
 
-Argon2id 的初始评估参数为内存 64 MiB、迭代 3 次、并行度 4、输出 32 字节，这是 RFC 9106 的第二组建议参数。实施前在最低支持设备上测量解锁耗时后确定首版参数。文件中持久化实际参数，应用升级不擅自按新的默认参数解密旧数据。
+Initial Argon2id evaluation parameters are 64 MiB memory, three iterations, parallelism four, and 32 output bytes, corresponding to RFC 9106's second recommendation. Measure unlock time on minimum supported hardware before finalizing the first-release parameters. Persist actual parameters; upgrades must not use new defaults to decrypt old data.
 
-凭据库头是外部输入边界。调用 KDF 或 AEAD 前检查支持的格式、参数组合、长度和资源上限，拒绝会导致无界内存分配、无效 nonce 或库函数 panic 的记录。首版只接受明确支持的参数集合，不开放用户自填算法参数。
+Vault metadata is an external input boundary. Before KDF/AEAD calls, validate supported formats, parameter combinations, lengths, and resource limits. Reject unbounded allocation, invalid nonces, or records that would panic library calls. Accept only explicitly supported parameter sets, not user-entered algorithms.
 
-### 6.3 身份绑定
+### 6.3 Identity binding
 
-对密钥封装的认证附加数据绑定用途标识、格式版本、vault_id、解锁方式、crypto_epoch 及对应的 KDF 参数或本机密钥 ID。
+Key-wrapper authenticated data binds purpose, format, vault_id, mode, crypto_epoch, and corresponding KDF parameters or local key ID.
 
-对凭据记录的认证附加数据绑定用途标识、格式版本、vault_id、secret_id、kind、revision 和 crypto_epoch。采用明确的长度编码和固定字段顺序，不依赖无序映射的序列化结果。
+Record authenticated data binds purpose, format, vault_id, secret_id, kind, revision, and crypto_epoch, with explicit lengths/fixed field ordering rather than unordered-map serialization.
 
-这可以检测密文被替换到另一条记录、另一种用途或另一凭据库中的情况。它不提供整库历史回滚检测：攻击者拥有一份完整旧库及其解锁材料时，仍可使用那份旧库。
+This detects ciphertext moved between records, purposes, or vaults. It does not detect whole-database historical rollback: an attacker holding an old complete DB and its unlock material can still use it.
 
-### 6.4 内存与错误
+### 6.4 Memory and errors
 
-输入的应用密码和派生 KEK 在完成解锁或转换后尽早清理可控缓冲区；正常运行只保留当前 DEK。单条凭据按需解密，不在启动时解密全部秘密或把它们放入全局目录模型。
+Clear controllable app-password/derived-KEK buffers promptly after unlock/transition. Normal operation retains only the current DEK. Decrypt credentials on demand, not all secrets at startup or into global catalog models.
 
-短期明文优先使用可清理的字节缓冲区，协议库必须接收 string 或签名器时，只在认证范围内持有。清理输入切片不等于清理库内部所有副本；不承诺 Go GC、操作系统交换空间或进程转储中绝无残留。
+Prefer clearable byte buffers for short-lived plaintext. Strings/signers required by protocol libraries remain authentication-scoped. Clearing input buffers does not clear every library copy or guarantee no remnants in Go GC, swap, or process dumps.
 
-区分凭据不存在、业务版本不匹配、应用尚未解锁、密文完整性失败、格式不支持、I/O 失败。只有确实不存在或业务版本过期时，沿用已有的重新输入远端凭据流程；密文损坏不能被当成「没有保存密码」静默跳过。
+Distinguish missing credentials, business-version mismatch, locked app, integrity failure, unsupported formats, and I/O errors. Only actual absence or expired business versions use existing re-entry flows. Corrupt ciphertext must not silently become an unsaved password.
 
-### 6.5 能保护什么
+### 6.5 What is protected
 
-local 方式使数据库单独泄露时不能直接读取凭据，但同时取得数据库和本机密钥文件即可解密。同一账号下具有相应文件权限的恶意程序也可能读取两者。
+Local mode protects a database-only leak, but DB plus local key file permits decryption. Malicious software under the same account with appropriate file access may read both.
 
-password 方式使数据目录的解密依赖用户密码及 KDF 成本，但仍取决于密码强度，不能防止已经控制当前进程、记录键盘输入或读取已解锁内存的攻击者。
+Password mode adds password/KDF cost to data-directory decryption, but depends on password strength and cannot prevent process control, keylogging, or unlocked-memory reads.
 
-两种方式都不依赖 Apple 代码签名身份。此改造解决运行时钥匙串依赖，不改变 Gatekeeper、公证或其他系统授权。
+Credential encryption and password mode do not use Apple signing as a decryption secret. The macOS release automatic key's Keychain access still depends on its fixed signing identity. Business credentials no longer come from old system credential stores. Gatekeeper, notarization, and other OS permissions are unchanged.
 
-## 7 凭据操作与数据库一致性
+## 7 Credential operations and database consistency
 
-现有 [session_store.go](../internal/desktop/session_store.go) 为系统凭据库和 SQLite 的分离写入提供了备份与补偿。新设计将密文和业务引用一起提交，在相关调用链切换完成后删除这部分不再需要的补偿逻辑。
+[session_store.go](../internal/desktop/session_store.go) previously compensated for separate system-credential/SQLite writes. The new design commits ciphertext and business references together and removes superseded compensation after switching affected call chains.
 
-保存密码时先准备密文及新业务版本，然后在同一个 Store 事务中保存密文、PasswordSaved、PasswordRevision、配置和需要更新的业务快照。只有事务提交成功，UI 才发布对应的内存状态。
+Prepare ciphertext and a new business revision before saving a password. One Store transaction saves ciphertext, PasswordSaved, PasswordRevision, configuration, and affected snapshots. Publish corresponding in-memory state only after commit succeeds.
 
-删除、清除全部密码、私钥创建和私钥删除遵循同样的事务边界。失败时保留原记录及引用，不能出现「界面说已保存，但凭据实际不存在」的中间状态。
+Deletion, Clear All Passwords, private key creation, and deletion use the same transaction boundary. Failure retains records/references; there is no intermediate UI success with missing credentials.
 
-[SaveCatalog](../internal/store/catalog.go) 当前会在事务内删除并重新插入目录表。新增关系不能通过级联删除导致每次保存目录都清空凭据。应显式提交密文变更，按外键要求安排插入与删除顺序。
+[SaveCatalog](../internal/store/catalog.go) rebuilds catalog table entries within transactions. New relationships must not cascade-delete credentials on every catalog save. Commit encrypted changes explicitly and order inserts/deletes for foreign keys.
 
-凭据事务使用现有持久化 worker 排序，不创建第二条数据库写入队列。加密计算、用户交互和私钥解析放在事务外；事务内只校验预期 crypto_epoch 并提交已经准备好的数据。
+Use the existing persistence worker rather than a second write queue. Encryption, user interaction, and key parsing remain outside transactions. Transactions check expected crypto_epoch and commit prepared data only.
 
-已有 PasswordRevision 约束继续生效。旧工作区或传输快照不能自动使用修改后的新密码，也不能通过尝试多个旧密文绕过版本不匹配。
+PasswordRevision constraints remain effective. Old workspace/transfer snapshots cannot silently use a new password or bypass a mismatch by trying multiple old ciphertexts.
 
-## 8 开关切换与修改密码
+## 8 Protection and password transitions
 
-### 8.1 统一采用数据密钥轮换
+### 8.1 Rotate data keys consistently
 
-开启、关闭和修改应用密码都使用同一条转换流程：验证当前身份、准备新的解锁方式、生成新的 DEK、重新加密当前凭据、原子提交库头与全部密文、更新内存状态。
+Enabling, disabling, and changing passwords share one flow: verify identity, prepare the unlock mode, generate a new DEK, re-encrypt current credentials, atomically commit metadata/all ciphertext, then update memory.
 
-仅重新封装同一个 DEK 虽然可以修改密码，但旧库头与旧解锁材料仍可能恢复同一把 DEK，进而解开当前记录。凭据数据量相对有限，本方案选择在这些明确的安全设置变更及文件到钥匙串的存储转换时轮换 DEK，避免这种关系延续。
+Rewrapping the same DEK could change a password, but old metadata/unlock material could still recover that DEK and current records. Credential data is limited in size, so explicit security changes and file-to-Keychain transitions rotate DEKs to sever that relationship.
 
-这只能切断旧密钥对新加密代次的访问。旧备份中已经包含的密码或私钥仍可用旧解锁材料读取；如果这些秘密已经泄露，还必须更换远端密码或 SSH 密钥，不能宣称修改应用密码会撤销它们。
+This cuts old keys off from the new epoch only. Passwords/private keys already in old backups remain readable with old unlock material. Leaked remote passwords/SSH keys still require replacement; changing the app password does not revoke them.
 
-### 8.2 公共转换步骤
+### 8.2 Shared transition steps
 
-1. 验证输入。关闭和修改密码时，通过当前库头重新验证当前应用密码。
-2. 进入 ChangingProtection，暂停新凭据读取、写入和新的业务请求；等已进入的短期凭据操作结束。
-3. 通过现有串行提交机制建立写入边界，取得完整的凭据密文快照及当前 crypto_epoch。已完成认证的 SSH 会话和传输可以继续，持久化检查点仍正常保存；需要新认证的操作暂缓。
-4. 生成新的 DEK 和新的 KEK 或密码派生参数。逐条解密旧记录并加密为新代次，不必同时持有全部明文。
-5. 如果目标是 local，先以新的 local_key_id 保存并回读校验钥匙串项目，或完整写入和持久化本机密钥文件。目标是 password 时不写本机解锁密钥。
-6. 在单个 SQLite 事务中核对旧代次，替换全部密文和库头。凭据 ID 与业务 revision 不变。
-7. 明确提交成功后发布新 DEK、设置状态和 UI，释放旧密钥引用，恢复正常业务准入。
-8. 旧自动解锁文件退出活动引用。清理失败不回滚已成功提交的加密代次，单独报告清理结果；旧文件不能作为备用解锁入口。
+1. Validate input. Disabling/changing passwords verifies the current password against current metadata.
+2. Enter ChangingProtection, stop new credential reads/writes and new business admission, and wait for admitted short credential operations.
+3. Establish a write boundary through existing serial commits and capture complete ciphertext/current crypto_epoch. Authenticated SSH sessions/transfers and checkpoint saves may continue; new authentication waits.
+4. Generate a new DEK and KEK or password parameters. Decrypt/re-encrypt records one at a time without retaining all plaintext together.
+5. For local mode, save/read back a Keychain item under a new local_key_id or fully write/durably store a new file. Password mode writes no local unlock key.
+6. In one SQLite transaction, check the old epoch and replace all ciphertext/metadata, retaining credential IDs/business revisions.
+7. After confirmed commit, publish the new DEK/settings/UI, release old key references, and resume admission.
+8. Retire old automatic file references. Report cleanup separately without rolling back a committed epoch. Old files are not fallback unlock paths.
 
-确认执行前可以取消，取消不会改变当前库。确认后等待后台转换和短事务提交完成，期间禁用重复提交、取消和正常退出，不在中途强制取消并自行宣称已经回滚。
+Users may cancel before confirming, leaving the vault unchanged. After confirmation, wait for background transition and short commit, disabling duplicate submission, cancellation, and normal quit. Do not forcibly cancel halfway and claim rollback.
 
-DB 事务不能原子提交文件系统变化，因此必须采用「先准备新文件，再提交数据库引用」的顺序。禁止先删除旧文件、先覆写活动文件或先更新界面状态。
+SQLite cannot atomically commit filesystem changes. Prepare new files before committing references. Do not delete old files, overwrite active files, or update UI first.
 
-### 8.3 崩溃和失败结果
+### 8.3 Crash and failure outcomes
 
-| 发生位置 | 重启后的权威状态 |
+| Failure point | Authoritative restart state |
 |---|---|
-| 输入或验证阶段 | 原密码和原方式不变 |
-| 新 local 文件已写入，DB 尚未提交 | 仍按旧库头解锁；新文件没有活动引用 |
-| 凭据重新加密中，事务尚未提交 | 原库完整可用 |
-| DB 事务提交成功，UI 尚未更新 | 按新库头解锁 |
-| 旧文件清理失败 | 新库头继续生效，报告非活动文件残留 |
-| 提交结果或新库头无法确认 | 保持阻塞并核对数据库，不能回写旧头或猜测成功 |
+| Input/verification | Original password/mode |
+| New local file written before DB commit | Old metadata still unlocks; new file has no active reference |
+| Re-encryption before transaction commit | Original vault remains intact |
+| Commit succeeds before UI update | New metadata unlocks |
+| Old file cleanup fails | New metadata remains authoritative; report inactive leftovers |
+| Commit/new metadata uncertain | Stay blocked and inspect DB; do not restore old metadata or guess success |
 
-孤立文件只可按确切的本次操作来源识别和处理，不能扫描目录后删除不明来源文件。旧本机密钥、旧数据库和历史备份的回收不等于安全擦除。
+Identify orphan files only by exact operation provenance, not by scanning/deleting unknown files. Recycling old keys, databases, or backups is not secure erasure.
 
-## 9 托管私钥与协议接入
+## 9 Managed keys and protocol integration
 
-托管私钥整体保存为加密记录。导入时保留原私钥字节及其已有的口令加密方式；用户选择保存的原私钥口令另存为加密记录。未保存原私钥口令时，连接仍按原有流程询问；应用解锁密码与 SSH 私钥口令是不同概念。
+Store complete managed private keys as encrypted records. Import retains original bytes and existing passphrase protection. Saved original passphrases are separate encrypted records. Unsaved passphrases still prompt normally; app passwords and SSH key passphrases are distinct.
 
-认证时从 Vault 解密私钥到内存，使用 golang.org/x/crypto/ssh 构造签名器，直接交给 SSH 客户端。修改 [ssh_runtime_config.go](../internal/desktop/ssh_runtime_config.go) 与 [auth.go](../internal/sshclient/auth.go) 的路径依赖，不通过临时文件继续使用旧接口。
+Decrypt keys into memory and build `golang.org/x/crypto/ssh` signers for direct client use. Replace path dependencies in [ssh_runtime_config.go](../internal/desktop/ssh_runtime_config.go) and [auth.go](../internal/sshclient/auth.go), without temporary-file adaptation of old APIs.
 
-FTP/FTPS 继续使用本次认证的密码，并保留已有错误脱敏。审查 [file_connections.go](../internal/desktop/file_connections.go) 中 ftpSecret 的生命周期：它只属于已经解锁的当前应用运行，不持久化到工作区或任务记录，退出时释放。
+FTP/FTPS retain per-authentication passwords and existing error redaction. `ftpSecret` in [file_connections.go](../internal/desktop/file_connections.go) belongs only to the unlocked run, is not persisted in workspace/tasks, and is released on quit.
 
-ssh-agent 的发现、使用和添加仍需用户进入已解锁应用；保留现有显式选项，不默认增加导出行为。已经交给外部 agent 的私钥属于 agent 的生命周期，Burrow 退出或更改应用密码不会使外部 agent 中的密钥失效。
+Agent discovery/use/addition also requires an unlocked app. Retain explicit options without new default export. Keys handed to an external agent belong to that agent's lifecycle; quitting Burrow or changing an app password does not invalidate them.
 
-私钥进入数据库后，原有「在文件管理器中显示」不能指向一个伪造路径。建议以「导出私钥…」替代这项已有能力：用户明确选择目标后才生成文件，保留私钥原有口令保护，采用私有文件权限，已有文件须确认覆盖。普通连接不生成私钥文件。
+After private keys enter SQLite, Show in file manager cannot point at a fabricated path. Replace it with **Export Private Key…**: create a file only after explicit destination selection, preserve original passphrase protection, use private permissions, and confirm overwrite. Normal connections create no private key files.
 
-密钥列表改为显示托管状态，不展示内部密文记录 ID。复制公钥、指纹、重命名和被引用时禁止删除的行为保留。删除托管密钥变为删除数据库记录及元数据，并明确无法通过应用撤销；不再显示文件移到废纸篓的错误语义。
+Show managed status rather than internal ciphertext IDs. Retain public key copying, fingerprints, renaming, and deletion prevention while referenced. Deleting a managed key removes ciphertext/metadata and is explicitly irreversible through the app, rather than claiming to move a file to Trash.
 
-外部导入来源文件不自动移动或删除。旧托管文件和备份仍可能包含原始私钥，迁移完成并不改变这些副本的保护状态。
+Do not move/delete external import source files automatically. Old managed files/backups may contain original private keys; migration does not improve those copies' protection.
 
-## 10 现有用户的一次性迁移
+## 10 One-time migration
 
-### 10.1 迁移范围
+### 10.1 Scope
 
-保留现有目录、ID、分组、设置、工作区、传输、主机信任、MCP 配置与审计。迁移对象仅为现有系统凭据、托管私钥及其存储引用。
+Retain catalogs, IDs, groups, settings, workspaces, transfers, trust, MCP configuration, and audits. Migrate only system credentials, managed private keys, and storage references.
 
-正式版和开发版分别从原命名空间读取，只按数据库中已知的凭据 ID 查询，不枚举或导入其他应用的秘密。跨平台使用各自已有的系统凭据 provider 作为一次性来源。
+Release/development read their original namespaces independently. Query only known credential IDs from the DB, without enumerating/importing other apps' secrets. Each platform's existing provider is a one-time source.
 
-### 10.2 数据库升级与外部读取分开
+### 10.2 Separate schema upgrades from external reads
 
-在持有应用数据目录独占锁期间，结构升级前先生成可恢复的当前数据库一致性备份，再创建新表和显式迁移标记。现有 schema v3 用户进入 pending_migration；真正的新库进入 pending_init。
+Under the exclusive data-directory lock, create a recoverable consistent DB backup before schema upgrades, then add tables/explicit migration markers. Existing schema v3 enters pending_migration; truly new vaults enter pending_init.
 
-Store 的 schema 初始化事务不调用系统凭据服务、不弹授权框、不读取私钥。外部读取由桌面迁移流程协调。
+Store initialization transactions do not call credential services, show authorization, or read key files. Desktop migration coordinates external reads.
 
-ready 库缺少必需头信息或密钥文件时属于损坏或不完整恢复，不能解释为「首次启动」。pending 状态也不启动业务服务。
+Missing required metadata/key files in a ready vault mean corruption or incomplete recovery, not first launch. Pending states do not start business services either.
 
-### 10.3 迁移步骤
+### 10.3 Steps
 
-1. 根据已保存目录和引用整理会话密码、私钥及已记住口令的迁移清单，保留业务版本。
-2. 说明需要一次性读取旧系统凭据，迁移完成后日常使用不再调用它。macOS 在这一阶段仍可能出现旧钥匙串授权提示。
-3. 读取凭据和托管私钥，验证格式与公钥指纹。已过期连接快照沿用原本的版本不匹配行为，不把当前密码改写成旧版本。
-4. 创建独立的 Vault 密钥，使用默认 local 方式准备全部密文并持久化新的本机解锁文件。
-5. 在单个事务中写入库头、密文和新私钥引用，将迁移状态改为 ready。
-6. 重新读取库头和迁移记录，验证解密结果、记录数量及私钥公钥一致后，进入新的正常启动流程。
+1. Build a password/key/saved-passphrase manifest from saved entries/references, retaining business versions.
+2. Explain the one-time read of old system credentials and their removal from normal operation. macOS may still request old Keychain authorization during migration.
+3. Read credentials/managed keys and verify format/public fingerprints. Expired snapshots retain version mismatch behavior; do not relabel current passwords as old revisions.
+4. Create independent Vault keys, prepare ciphertext in default local mode, and durably save new unlock material.
+5. Commit metadata, ciphertext, new private key references, and ready state in one transaction.
+6. Read back metadata/records, verify decryption, counts, and public keys, then enter normal startup.
 
-迁移验证需要原私钥口令时，用户只需临时提供；是否保存该口令继续遵循原来的选择。无法验证的私钥不静默跳过，也不因为完成迁移而强制记住其口令。
+When key verification needs an original passphrase, temporary input is sufficient. Saving remains the user's existing choice. Do not skip unverifiable keys or force passphrase retention to complete migration.
 
-已标记保存但实际丢失的密码、无法读取的私钥和无法解释的版本应明确列出。用户可修复或重新提供数据；任何放弃旧凭据的处理都需要明确确认，不自动跳过、不迁移为空字符串、不修改「已保存」标记制造成功。
+List missing saved passwords, unreadable keys, and unexplained versions explicitly. Users can repair/re-enter data. Discarding old credentials requires explicit confirmation, never silent skips, empty-string migration, or altered saved flags to manufacture success.
 
-首次迁移后开关仍默认关闭。用户随后可以在设置中启用应用解锁；不在迁移中强制创建密码。
+The switch remains off after migration; users can enable startup unlock afterward. Migration does not force password creation.
 
-### 10.4 失败与旧副本
+### 10.4 Failure and retained copies
 
-在新库提交前失败，原系统凭据和原托管文件保持原样。准备好的新本机文件未被 DB 引用时，不改变原凭据归属。提交后验证无法完成时保留现场并阻塞业务，不能偷偷切回旧系统凭据。
+Failure before commit leaves original system credentials/managed files unchanged. An unreferenced prepared key file does not change original ownership. Failure to verify after commit preserves evidence and blocks business rather than silently switching back to old providers.
 
-旧程序不支持新增 schema 时，应明确拒绝打开。回退软件需要恢复升级前的数据库及其原配套文件，不能让旧版本继续写新库。
+Old programs must reject unsupported schemas. Downgrading requires restoring the pre-upgrade database and matching files; old versions cannot continue writing the new vault.
 
-迁移完成不自动删除系统凭据、旧私钥、旧 .pub 或外部原文件。清理是验证迁移成功后的独立确认操作。未清理的副本仍保留原有访问方式，尤其未加口令的旧私钥仍可被直接读取，必须在迁移结果中说明。
+Migration does not delete system credentials, old private keys, `.pub` files, or external originals. Cleanup is a separately confirmed action after verification. Leftover copies keep their old access paths, including directly readable unencrypted old keys; migration results must explain this.
 
-迁移适配器只服务 pending_migration。ready 后不保留系统凭据回退、双写或按读取失败尝试另一来源的逻辑。
+Adapters serve pending_migration only. Ready has no credential fallback, dual writes, or alternate-source retries after reads fail.
 
-## 11 备份与恢复
+## 11 Backup and restore
 
-复用现有 [Store.Backup](../internal/store/store.go) 的 SQLite 一致性快照能力。本次不新增通用备份页面，但应更新存储说明和备份调用约束。
+Reuse [Store.Backup](../internal/store/store.go) for consistent SQLite snapshots. No general backup page is added, but storage documentation and caller contracts must change.
 
-| 当前方式 | 可恢复备份需要包含 | 恢复条件 |
+| Current mode | Required backup contents | Restore requirement |
 |---|---|---|
-| local | Vault.Backup 生成的数据库快照及独立文件密钥，不依赖原机器钥匙串 | 两者完整且匹配 |
-| password | 一致的数据库快照 | 用户知道该备份对应的应用密码 |
+| local | Vault.Backup DB snapshot and independent file key, without the original machine's Keychain | Both complete and matching |
+| password | Consistent DB snapshot | Password corresponding to that backup |
 
-local 的两部分合在一起就是可自动解锁的备份，应作为完整秘密材料保管。只备份数据库会失去自动解锁能力；程序不能在恢复时补造原密钥。
+Local backup parts together form an automatically unlockable secret and require protection accordingly. A DB-only backup lacks automatic unlock; restore cannot recreate the original key.
 
-生成备份时与安全设置转换串行化：在内存数据密钥与数据库快照处于同一代次时，为备份生成独立的文件解锁密钥并重新封装库头；记录版本与代次不变，不能混用其他快照的密钥文件。password 备份不收集无活动引用的旧自动解锁文件。
+Serialize backups with protection transitions. With memory key and DB snapshot in the same epoch, create an independent file key and rewrap backup metadata while retaining record revisions/epochs. Do not mix key files between snapshots. Password backups do not gather inactive old automatic files.
 
-正常退出后复制整个数据目录仍可用，但目录中可能存在旧副本，其保护边界以实际内容为准。运行时不能只复制 burrow.db 而忽略 WAL。
+Copying the whole directory after normal quit is still possible, but old copies may remain and actual contents determine protection. Copying a live `burrow.db` without WAL is invalid.
 
-跨机器恢复使用已有的数据目录权限保护，不绑定原机器硬件。私钥进入数据库后随凭据库恢复；传输实际文件、外部原私钥和外部 ssh-agent 状态仍不包含在数据库备份里。
+Cross-machine restore uses existing directory permission protection, not original hardware binding. Managed private keys restore with the vault; actual transferred files, external originals, and external agent state remain outside database backups.
 
-旧备份继续使用生成该备份时的解锁材料。改变应用密码或关闭启动解锁不重写历史备份，也不提供密码找回后门。
+Old backups use their original unlock material. Changing passwords or disabling startup unlock does not rewrite them or provide a password-recovery backdoor.
 
-## 12 需要修改的现有位置
+## 12 Affected implementation locations
 
-| 位置 | 改动 |
+| Location | Change |
 |---|---|
-| [app.go](../internal/desktop/app.go) | 两阶段启动、全局可用性状态、锁定界面路由、退出分支和解锁后一次性初始化 |
-| [settings.go](../internal/desktop/settings.go)、[credentials_ui.go](../internal/desktop/credentials_ui.go)、[localize.go](../internal/desktop/localize.go) | 应用解锁分组、开关和修改密码交互，搜索词与中英文文案，托管私钥菜单语义 |
-| 新增 internal/vault | 加密原语、库头验证、密钥加载、密文访问、保护设置转换、短期内存生命周期 |
-| [store.go](../internal/store/store.go) 与新增 schema 升级 | 升级前备份、初始化标记、库头和密文表、格式约束 |
-| [catalog.go](../internal/store/catalog.go) | 私钥引用及目录和密文的联合事务，避免重建目录触发级联删凭据 |
-| [data_paths.go](../internal/desktop/data_paths.go) | 保留正式版和开发版隔离；正常路径不再返回 mygo.Secrets 服务 |
-| [session_store.go](../internal/desktop/session_store.go)、[credentials.go](../internal/desktop/credentials.go) | 统一凭据访问、保留业务版本、移除已替代的跨存储补偿 |
-| [ssh_runtime_config.go](../internal/desktop/ssh_runtime_config.go)、[auth.go](../internal/sshclient/auth.go) | 从路径读取切换为内存认证材料，保留交互认证和主机信任 |
-| [file_connections.go](../internal/desktop/file_connections.go)、[transfer_backend.go](../internal/desktop/transfer_backend.go) | 解锁准入及认证缓存生命周期，保持传输暂停恢复语义 |
-| [mcp_data.go](../internal/desktop/mcp_data.go)、[mcp_backend.go](../internal/desktop/mcp_backend.go) | 解锁后初始化与监听启动、业务入口准入、转换期间暂不可用结果 |
-| [workspace_store.go](../internal/desktop/workspace_store.go)、[persistence.go](../internal/desktop/persistence.go) | 未解锁退出不写空快照，沿用串行写入并加入代次校验 |
-| 一次性迁移适配器 | 仅 pending_migration 读取原系统凭据，不进入正常读取链路 |
-| [storage.md](storage.md)、[session-settings.md](session-settings.md)、[architecture.md](architecture.md)、联调脚本 | 实施完成后同步新行为、备份要求及独立测试凭据初始化方式 |
+| [app.go](../internal/desktop/app.go) | Two-phase startup, availability, locked routing, exit branches, once-only business initialization |
+| [settings.go](../internal/desktop/settings.go), [credentials_ui.go](../internal/desktop/credentials_ui.go), unlock module, `internal/locales` | Unlock group/switch/password forms, search/languages, managed-key menus |
+| internal/vault | Crypto, metadata validation, key loading, record access, transitions, short-lived memory |
+| [store.go](../internal/store/store.go) and schema upgrade | Pre-upgrade backup, initialization markers, metadata/ciphertext tables, format constraints |
+| [catalog.go](../internal/store/catalog.go) | Joint config/ciphertext transactions and references, without cascade deletion during catalog rebuild |
+| [data_paths.go](../internal/desktop/data_paths.go) | Release/development isolation; normal paths stop returning mygo.Secrets services |
+| [session_store.go](../internal/desktop/session_store.go), [credentials.go](../internal/desktop/credentials.go) | Unified access, business versions, removal of superseded cross-store compensation |
+| [ssh_runtime_config.go](../internal/desktop/ssh_runtime_config.go), [auth.go](../internal/sshclient/auth.go) | In-memory authentication instead of paths, retaining interaction/trust |
+| [file_connections.go](../internal/desktop/file_connections.go), [transfer_backend.go](../internal/desktop/transfer_backend.go) | Unlock admission/cache lifecycle without changing pause/recovery |
+| [mcp_data.go](../internal/desktop/mcp_data.go), [mcp_backend.go](../internal/desktop/mcp_backend.go) | Post-unlock initialization/listening, admission, temporary transition unavailability |
+| [workspace_store.go](../internal/desktop/workspace_store.go), [persistence.go](../internal/desktop/persistence.go) | No empty snapshots before unlock, existing serial writes with epoch checks |
+| One-time migration adapters | Old provider reads only in pending_migration, outside normal access |
+| [storage.md](storage.md), [session-settings.md](session-settings.md), [architecture.md](architecture.md), integration scripts | Current behavior, paired backups, isolated test credential initialization |
 
-不升级无关依赖，不修改现有主题令牌体系，不把此改造扩大为整库加密、系统安装器签名或通用密码管理器。
+No unrelated dependency upgrades, token redesign, whole-database encryption, installer signing, or general password-manager expansion.
 
-## 13 实施顺序
+## 13 Implementation sequence
 
-| 阶段 | 交付内容 | 完成条件 |
+| Stage | Deliverable | Completion condition |
 |---|---|---|
-| 1 存储与加密核心 | schema 升级、Vault、local 初始化、password 解锁、代次约束 | 独立临时数据目录能完成创建、读取与恢复，失败不覆盖数据 |
-| 2 凭据与私钥接入 | 密码、私钥、口令统一进入密文表，配置联合事务，内存 SSH 签名器 | 正常协议路径不读取系统凭据，不创建连接用临时私钥 |
-| 3 启动与设置 | 一个默认关闭的开关、设置与修改密码、两阶段启动、MCP 与退出准入 | 未解锁无法进入业务，关闭窗口不改写保存状态 |
-| 4 转换与旧数据迁移 | 三种保护设置变更、崩溃收敛、一次性迁移和旧副本说明 | 每个提交边界都有确定的恢复规则，无双写和隐式回退 |
-| 5 集成验收与文档 | 协议回归、备份恢复、平台权限与启动行为核验 | 验收矩阵明确记录通过、失败和未验证项目 |
+| 1 Storage/crypto core | Schema, Vault, local initialization, password unlock, epochs | Create/read/recover in isolated data; failures do not overwrite |
+| 2 Credentials/keys | Unified ciphertext, joint config transactions, in-memory SSH signers | No normal system-credential reads or connection-time key files |
+| 3 Startup/settings | One default-off switch, password creation/change, two phases, MCP/exit admission | No locked business access; locked exit preserves saved state |
+| 4 Transitions/migration | Three protection changes, crash convergence, migration/copy notices | Defined recovery at every commit boundary; no dual writes/implicit fallback |
+| 5 Integration/docs | Protocol regression, backups, permissions, startup checks | Record passed/failed/unverified matrix items |
 
-这些阶段共同构成一个完整功能，不能先发布已强制切换存储却没有迁移、退出保护或备份说明的中间版本。
+Together these form one complete feature. Do not ship forced storage changes without migration, exit protection, or backup instructions.
 
-## 14 验收矩阵
+## 14 Acceptance matrix
 
-以下仍作为完整验收矩阵。当前已通过现有 race 测试及隔离临时数据的加密、轮换、备份恢复和迁移检查；未将此结果等同于全部原生和协议场景验收。新增自动化用例和原生界面验收按明确的验证授权执行。
+This remains the full matrix. Existing race tests and isolated encryption, rotation, backup/restore, and migration checks passed. They do not establish every native/protocol case. New automated cases and native UI acceptance require explicit validation authorization.
 
-### 14.1 用户行为
+### 14.1 User behavior
 
-| 场景 | 预期 |
+| Scenario | Expected |
 |---|---|
-| 全新安装、首次保存凭据、再次启动 | 开关默认关闭，无应用密码提示，凭据可用 |
-| 开启后取消设置密码或确认不一致 | 状态仍关闭，原凭据可用 |
-| 开启成功并退出重启 | 先显示解锁界面，正确密码进入应用 |
-| 输入错误密码、重复点击、计算中退出 | 不进入业务，无并行解锁，迟到结果不启动应用 |
-| 已解锁后切前台或重新显示窗口 | 不重复提示 |
-| 修改密码成功并重启 | 新密码可用，旧密码不能解锁当前库 |
-| 修改或关闭时当前密码错误 | 状态和原密码不变 |
-| 关闭成功并重启 | 自动进入应用，凭据保留，「修改密码」隐藏 |
-| 升级应用二进制但保留数据目录 | 解锁要求和凭据不变，正常路径不出现系统凭据授权 |
+| New install, first saved credential, restart | Default off; no app password prompt; credential usable |
+| Cancel enabling or mismatch confirmation | Still off; original credentials usable |
+| Enable, quit, restart | Unlock screen first; correct password enters app |
+| Wrong password, repeated clicks, quit during derivation | No business entry/parallel unlock; late results cannot open app |
+| Foreground/show after unlock | No repeat prompt |
+| Change password and restart | New password works; old cannot unlock current vault |
+| Wrong current password on change/disable | State/old password unchanged |
+| Disable and restart | Automatic entry; credentials retained; Change Password hidden |
+| Upgrade binary with retained data | Same unlock requirements/credentials; no ordinary legacy credential authorization |
 
-### 14.2 应用边界与协议
+### 14.2 App and protocol boundaries
 
-| 场景 | 预期 |
+| Scenario | Expected |
 |---|---|
-| 锁定时使用菜单、快捷键、拖放和窗口激活 | 无法访问业务页面或启动连接 |
-| 锁定时 MCP 原先配置为启用 | 不监听；解锁后按原配置启动 |
-| 匿名 FTP、外部 agent、本地文件等不需要 Vault 的入口 | 同样受到应用可用性约束 |
-| 解锁成功恢复工作区 | 不额外自动连接 SSH；未完成传输仍暂停 |
-| 未解锁直接退出，再次启动 | 目录、偏好、工作区和传输记录保持原值 |
-| SSH 密码、托管私钥、未保存私钥口令、跳板链、交互认证 | 沿用原有认证行为 |
-| SFTP、FTP、显式和隐式 FTPS、并发传输 | 使用统一凭据来源，既有日志脱敏和连接生命周期有效 |
-| 密码修改后的旧连接快照 | 报告版本不匹配，不使用新密码冒充旧版本 |
-| 更改应用密码时有既有会话或传输 | 已认证连接继续，新认证受控暂停，不丢失检查点 |
+| Menus/shortcuts/drag/window activation while locked | No workspace access or connection |
+| MCP previously enabled while locked | No listener; starts configured after unlock |
+| Anonymous FTP, external agent, local files | Same availability constraints |
+| Workspace restoration after unlock | No new automatic SSH connections; unfinished transfers paused |
+| Quit before unlock and restart | Catalog/preferences/workspace/transfers preserved |
+| Password/key/unsaved passphrase/jump chain/interactive SSH | Existing authentication behavior |
+| SFTP/FTP/explicit and implicit FTPS/concurrency | Unified credentials, existing redaction/lifecycle |
+| Old snapshots after password change | Version mismatch, not new password substituted as old |
+| Protection change with active work | Authenticated work continues; new authentication pauses; checkpoints retained |
 
-### 14.3 密钥与数据一致性
+### 14.3 Key and data consistency
 
-| 场景 | 预期 |
+| Scenario | Expected |
 |---|---|
-| 在临时夹具中检查 DB 和 WAL | 不存在夹具密码、原始私钥或口令明文，不扫描真实用户秘密 |
-| 修改密文、nonce、用途、记录 ID 或加密代次 | 完整性校验或格式校验失败，无静默重建 |
-| 异常 KDF 参数、缺少本机密钥、密钥 ID 不匹配 | 有界失败，不生成替代密钥，不启动业务 |
-| 配置保存、凭据删除和私钥创建期间 DB 写入失败 | 密文和业务引用保持事务一致 |
-| 保护设置转换在各步骤崩溃 | 符合第 8.3 节，不依靠旧密钥文件自动回退 |
-| 使用转换前解锁材料读取新代次 | 不能解开新的密文；旧备份仍按其原材料可读 |
-| 旧凭据缺失、拒绝钥匙串授权或私钥读取失败 | 明确报告迁移阻塞，不伪造迁移成功 |
-| local 与 password 备份跨机器恢复 | 配套材料齐全时可恢复；缺失时明确失败 |
-| 正式版与开发版并存、同目录第二进程启动 | 密钥隔离有效，既有独占锁继续有效 |
-| Unix 与 Windows 文件权限 | 当前账号权限约束成立，失败明确报告 |
+| Inspect temporary fixture DB/WAL | No fixture plaintext passwords/keys/passphrases; no scan of real secrets |
+| Tamper ciphertext/nonce/purpose/ID/epoch | Integrity/format failure; no silent rebuild |
+| Invalid KDF/missing key/mismatched ID | Bounded failure; no replacement keys or business startup |
+| DB write failure during config/delete/key creation | Ciphertext and references remain transactionally consistent |
+| Crash at transition steps | Section 8.3 outcomes, without old-key fallback |
+| Use old unlock material on new epoch | Cannot decrypt new ciphertext; old backups remain readable with their own material |
+| Missing credentials/denied Keychain/unreadable keys | Explicit migration blocker; no fabricated success |
+| Cross-machine local/password backups | Restore with complete matching material; explicit failure otherwise |
+| Concurrent release/development and second process | Isolated keys and effective exclusive lock |
+| Unix/Windows permissions | Current-account constraints and explicit failures |
 
-构建和静态检查通过不能代替原生启动、权限、系统凭据迁移或协议验收。本次实现验证仅使用临时夹具，未操作真实凭据、系统钥匙串或执行原生视觉验收。
+Build/static checks do not replace native startup, permissions, system-credential migration, or protocol acceptance. Implementation checks used temporary fixtures only, not real credentials, system Keychain, or native visuals.
 
-## 15 设计依据
+## 15 Design references
 
-- [当前数据与凭据](storage.md)：SQLite、统一加密凭据、一次性迁移、数据目录和备份边界。
-- [RFC 9106 参数选择](https://www.rfc-editor.org/rfc/rfc9106.html#section-4)：Argon2id 的参数评估依据。
-- [Go chacha20poly1305](https://pkg.go.dev/golang.org/x/crypto/chacha20poly1305)：NewX 的密钥、nonce 与认证加密契约。
-- [OWASP 加密存储](https://cheatsheetseries.owasp.org/cheatsheets/Cryptographic_Storage_Cheat_Sheet.html#encrypting-stored-keys)：数据密钥与解锁密钥分离、用户密码派生 KEK 的设计依据。
-- [Apple 代码签名与钥匙串](https://developer.apple.com/library/archive/technotes/tn2206/_index.html)：现有钥匙串访问身份与应用签名关联的背景。
+- [Current data and credentials](storage.md): SQLite, unified encryption, one-time migration, directories, and backups.
+- [RFC 9106 parameter selection](https://www.rfc-editor.org/rfc/rfc9106.html#section-4): Argon2id evaluation parameters.
+- [Go chacha20poly1305](https://pkg.go.dev/golang.org/x/crypto/chacha20poly1305): NewX key, nonce, and AEAD contracts.
+- [OWASP cryptographic storage](https://cheatsheetseries.owasp.org/cheatsheets/Cryptographic_Storage_Cheat_Sheet.html#encrypting-stored-keys): separating data/unlock keys and password-derived KEKs.
+- [Apple code signing and Keychain](https://developer.apple.com/library/archive/technotes/tn2206/_index.html): signing-related access identity background.
 
-固定签名身份、部署要求和真实系统权限验证另见[macOS 签名与解锁](macos-signing.md)。
+See [macOS signing and unlock](macos-signing.md) for fixed identity, deployment, and actual OS permission validation.

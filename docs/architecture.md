@@ -1,74 +1,81 @@
-# 架构与生命周期
+# Architecture and lifecycle
 
-## 代码入口
+[English](architecture.md) | [简体中文](architecture.zh.md)
 
-| 位置 | 职责 |
+## Code entry points
+
+| Location | Responsibility |
 |---|---|
-| [main.go](../main.go) | 应用入口 |
-| [internal/desktop](../internal/desktop/) | 页面组合、会话、连接调度、持久化、凭据与任务生命周期 |
-| [internal/sshclient](../internal/sshclient/) | SSH 连接、认证、主机信任、Shell/Exec/子系统与连接租约 |
-| [internal/fileclient](../internal/fileclient/) | 本地、SFTP、FTP/FTPS 文件操作及可选能力 |
-| [internal/vault](../internal/vault/) | 凭据加密、解锁密钥和数据密钥生命周期、保护设置转换与配套备份 |
-| [internal/store](../internal/store/) | SQLite schema、事务、主机信任与一致备份 |
-| [internal/mcpserver](../internal/mcpserver/) | 本机 Streamable HTTP、密钥校验、授权与策略检查、工具和审计入口 |
-| [internal/localfs](../internal/localfs/) | 平台文件规则：私有创建、Windows 句柄重命名与 ACL |
-| [internal/uikit](../internal/uikit/) | 共享展示组件与 UI 状态 |
-| [internal/theme](../internal/theme/) | 应用语义令牌、组件令牌及生成产物 |
-| [internal/termtheme](../internal/termtheme/) | Ghostty 配色解析、内置配色及终端偏好 |
-| [third_party/mygo-terminal](../third_party/mygo-terminal/) | 原生终端视图与最小本地扩展 |
-| [third_party/pkg-sftp](../third_party/pkg-sftp/) | SFTP 私有暂存文件创建扩展 |
+| [main.go](../main.go) | App entry point |
+| [internal/desktop](../internal/desktop/) | Page composition, sessions, connection scheduling, persistence, credentials, and task lifecycle |
+| [internal/sshclient](../internal/sshclient/) | SSH connections, authentication, host trust, Shell/Exec/subsystems, and connection leases |
+| [internal/fileclient](../internal/fileclient/) | Local, SFTP, and FTP/FTPS file operations and optional capabilities |
+| [internal/vault](../internal/vault/) | Credential encryption, unlock/data key lifecycle, protection transitions, and paired backups |
+| [internal/store](../internal/store/) | SQLite schema, transactions, host trust, and consistent backups |
+| [internal/mcpserver](../internal/mcpserver/) | Local Streamable HTTP, key validation, authorization, policies, tools, and auditing |
+| [internal/localfs](../internal/localfs/) | Platform file rules: private creation, Windows handle rename, and ACLs |
+| [internal/locales](../internal/locales/) | English/Chinese ARB/ICU catalogs, typed functions, retained messages, and localizable errors |
+| [internal/uikit](../internal/uikit/) | Shared presentation components and UI state |
+| [internal/theme](../internal/theme/) | App semantic/component tokens and generated output |
+| [internal/termtheme](../internal/termtheme/) | Ghostty color parsing, built-in schemes, and terminal preferences |
+| [third_party/mygo-terminal](../third_party/mygo-terminal/) | Native terminal view and minimal local extensions |
+| [third_party/pkg-sftp](../third_party/pkg-sftp/) | Private SFTP staging file creation extension |
 
-应用组合 UI 与业务，UIKit 只消费主题、显示数据和回调；网络、文件、凭据和后台任务由应用及协议层持有。
+The app composes UI and business behavior. UIKit consumes themes, display data, and callbacks; the app and protocol layers own network, file, credential, and background task lifecycles.
 
-## 保存条目、运行会话与连接
+## Saved entries, running sessions, and connections
 
-保存条目描述下次如何连接，SSH 和文件目录分别维护。运行会话持有建立时的端点和认证快照，编辑目录不会静默修改活跃连接的身份。
+Saved entries describe future connections; SSH and file catalogs are separate. A running session retains its endpoint and authentication snapshot. Catalog edits do not silently change an active connection's identity.
 
-SSH transport 与业务 channel 分离。同一会话分屏在原连接上新建独立 Shell channel，窗格移动、组合拆分和拖回标签保留原终端对象。单 channel 关闭不结束兄弟 channel；最后消费者释放共享连接。
+SSH transports and business channels are separate. Splits open independent Shell channels on the same connection. Moving panes, regrouping, and dragging them back into tabs preserves terminal objects. Closing one channel leaves sibling channels alive; the last consumer releases the shared connection.
 
-主要入口：[ssh_sessions.go](../internal/desktop/ssh_sessions.go)、[ssh_terminal.go](../internal/desktop/ssh_terminal.go)、[file_connections.go](../internal/desktop/file_connections.go) 和 [pane_drag.go](../internal/desktop/pane_drag.go)。
+Entry points: [ssh_sessions.go](../internal/desktop/ssh_sessions.go), [ssh_terminal.go](../internal/desktop/ssh_terminal.go), [file_connections.go](../internal/desktop/file_connections.go), and [pane_drag.go](../internal/desktop/pane_drag.go).
 
-## 启动与解锁
+## Startup and unlock
 
-进程先取得独占锁并打开数据库，加载解锁界面的主题和语言。新库默认创建本机自动解锁材料；开启启动解锁的库等待输入密码，旧库等待一次性迁移。解锁成功后只执行一次业务初始化，再恢复工作区、加载任务并按设置启动 MCP。
+The process takes an exclusive lock, opens the database, and loads the unlock view's theme and language. A new vault creates local automatic unlock material by default. Password-protected vaults wait for a password; legacy vaults wait for one-time migration. Business initialization runs once after unlock, then restores the workspace, loads tasks, and starts MCP if enabled.
 
-未解锁只构建启动界面，不执行主界面的业务 tick；菜单、连接、MCP HTTP 准入和任务接受入口受应用状态约束。未初始化退出只释放资源，不将空目录、默认设置或空工作区覆盖到数据库。
+While locked, only startup UI is built; business ticks do not run. Menus, connections, MCP HTTP admission, and task admission are gated by app state. Exiting before initialization releases resources without overwriting saved catalogs, preferences, or workspaces with empty defaults.
 
-自动解锁的文件/钥匙串来源记录在库头并受认证加密保护，缺失钥匙串项不会回退旧文件。可移植备份从内存数据密钥生成独立的文件封装。
+The automatic unlock source, file or Keychain, is recorded in authenticated vault metadata. A missing Keychain item does not fall back to an old file. Portable backups use the in-memory data key to create an independent file wrapper.
 
-设置切换和密码修改走现有持久化 worker，轮换数据密钥和全部密文后原子提交。转换期间拒绝新的业务准入，已认证的连接和任务继续，检查点仍可保存。无法确认提交结果或业务初始化失败时阻止继续使用，避免用部分初始化状态恢复并保存重复工作区。
+Protection changes and password changes use the existing persistence worker. They rotate the data key, re-encrypt all records, and commit atomically. New business admissions are refused during transition, while authenticated connections, running tasks, and checkpoints continue. An uncertain commit or failed business initialization prevents further use, avoiding restoration or saving of duplicate workspaces from partial state.
 
-## 页面、窗口与任务
+## Pages, windows, and tasks
 
-SSH、文件传输、MCP、设置互斥构建当前页面，页面挂载不拥有业务任务生命周期。切页保留连接、目录历史、终端滚动与传输；关闭设置只清临时 UI，复用窗口生命周期内的稳定句柄。工作区可保存并恢复 SSH、文件或 MCP 的页面选择；设置页仍为临时页面。
+SSH, File Transfer, MCP, and Settings build the current page exclusively; mounting a page does not own business tasks. Switching preserves connections, directory history, terminal scrollback, and transfers. Closing Settings clears temporary UI while reusing stable window-lifetime handles. Workspace state can restore SSH, file, or MCP page selection; Settings remains temporary.
 
-关闭主窗口与应用退出使用同一流程，所有平台都会保存工作区与设置、停止 MCP 服务、暂停并保存传输任务，再关闭会话连接并退出进程。关闭最后标签的行为按偏好单独处理。
+Closing the main window and quitting share one process on every platform: save the workspace and settings, stop MCP, pause and save transfers, close session connections, then exit. Last-tab behavior is a separate preference.
 
-传输任务使用独立上下文和协议 client/subsystem。任务按文件标签身份分组，浏览视图关闭或站点配置改变不改向后台任务。执行与保存入口为 [transfer_backend.go](../internal/desktop/transfer_backend.go)、[transfer_store.go](../internal/desktop/transfer_store.go) 和 [workspace_store.go](../internal/desktop/workspace_store.go)。
+Transfers use independent contexts and protocol clients/subsystems. Tasks are grouped by file-tab identity. Closing a browsing view or editing a site does not redirect them. Entry points: [transfer_backend.go](../internal/desktop/transfer_backend.go), [transfer_store.go](../internal/desktop/transfer_store.go), and [workspace_store.go](../internal/desktop/workspace_store.go).
 
-## 文件一致性与持久化
+## File consistency and persistence
 
-- 写入通过任务独有的 `.part`，关闭和最终提交成功才完成；继续时检查源基线、部分内容摘要及目录中已完成项。
-- 目标冲突由真实元数据决定。应用内协调相同/重叠目标；本地目标对大小写和 Unicode 规范等价作保守协调。
-- 本地上传源、下载目标和相应清理使用固定目录句柄约束解析，递归不跟随符号链接。SFTP 私有暂存文件在创建请求中原子指定权限，确认后才发送内容。
-- 结构化数据集中到 SQLite。目录和工作区使用事务，设置和布局防抖写入；传输 worker 在安全点提交清单、摘要和重命名意图。读取失败阻止覆盖，不自动重建数据库。
-- 密码、托管私钥与已保存私钥口令统一由 Vault 加密后写入数据库；密文与配置在同一事务提交，端点快照继续绑定业务凭据版本。旧系统凭据仅供一次性迁移；macOS 正式版的自动解锁密钥使用独立钥匙串服务，其他平台及开发版使用文件。数据格式和目录统一见[数据与凭据](storage.md)。
+- Writes use task-owned `.part` files and complete only after close and final commit succeed. Resume checks source baselines, partial-content digests, and completed directory items.
+- Destination conflicts use real metadata. The app coordinates identical/overlapping targets; local targets conservatively account for case and Unicode normalization equivalence.
+- Local upload sources, download destinations, and cleanup resolve beneath retained directory handles. Recursion does not follow symbolic links. SFTP private staging permissions are specified in the creation request, before content is sent.
+- Structured data lives in SQLite. Catalog/workspace changes use transactions; settings/layout saves are debounced. Transfer workers commit manifests, digests, and rename intent at safe points. Read failures block overwrite rather than rebuilding the database.
+- Vault encrypts passwords, managed private keys, and saved passphrases into the database. Ciphertext and configuration commit together; endpoint snapshots retain business credential versions. Legacy system credentials are migration sources only. The macOS release automatic unlock key has a separate Keychain service; other platforms and development builds use files. See [data and credentials](storage.md) for formats and locations.
 
-Unix 的本地元数据与权限位和 Windows 的 ACL 通过平台文件隔离；Windows 本地 client 提供 `PermissionPreserver`，供提交阶段复制并验证目标 ACL。私有文件创建与原生访问集中在 `localfs`，不在队列业务中加入 Win32 调用。SSH agent 同样拆分为 Unix socket / Windows 本机命名管道，复用原认证生命周期。
+Platform files isolate Unix metadata/mode bits and Windows ACLs. The Windows local client implements `PermissionPreserver` to copy and verify destination ACLs at commit. Private creation and native access live in `localfs`; queue logic does not embed Win32 calls. SSH agent uses separate Unix socket and local Windows named pipe entry points while sharing authentication lifecycle.
 
-用户可见的恢复和失败语义见[文件管理与传输](file-transfer.md)，协议能力不足的行为见[已知限制](limitations.md)。
+See [file management and transfers](file-transfer.md) for user-visible recovery/failure semantics and [known limitations](limitations.md) for missing protocol capabilities.
 
-## 终端与本地依赖
+## Interface languages
 
-Ghostty 维护终端状态，MyGo 绘制文字网格、选区、光标及原生滚动条。应用保留窗格布局、焦点、输入绑定、配色和上下栏；网格按正文实际字体和像素尺寸计算，并通知远端 PTY。
+The app reuses MyGo's language state and catalog generator. `mygo.json` declares `internal/locales`, with Simplified Chinese as the source and complete English resources. Language preferences use stable BCP 47 tags or an empty value for System. Menus and MCP presentation snapshots refresh on changes. Retained errors/notices store message functions and arguments for display-time formatting; business errors preserve their chains. Display copy is not an MCP filter, grant, or protocol value. See [interface languages](i18n.md).
 
-`ViewportBackdrop` 读取同一帧的相邻历史行，按网格坐标连续补画到栏下；它不创建第二个终端，不移动真实视口。毛玻璃作为覆盖层绘制。显示行为见[终端与配色](terminal-themes.md)。
+## Terminal and local dependencies
 
-[go.mod](../go.mod) 用 `replace` 接入两个本地模块，主 MyGo 仍固定 v0.7.3：
+Ghostty maintains terminal state; MyGo draws the grid, selection, cursor, and native scrollbar. The app owns pane layout, focus, input bindings, colors, and top/bottom bars. Actual font metrics and pixel size determine grid dimensions and remote PTY size.
 
-| 本地模块 | 扩展及维护依据 |
+`ViewportBackdrop` draws adjacent history lines continuously beneath the bars using the same frame's grid coordinates. It does not create another terminal or move the real viewport. Blur is an overlay. See [terminal and color schemes](terminal-themes.md).
+
+[go.mod](../go.mod) replaces two local modules while the main MyGo dependency remains pinned to v0.7.3:
+
+| Local module | Extension and maintenance basis |
 |---|---|
-| `mygo-terminal` | 实时回滚上限、栏下历史补画与固定 Ghostty ABI；见 [FORK.md](../third_party/mygo-terminal/FORK.md) |
-| `pkg-sftp` | `Client.OpenFileMode` 在创建时传入权限；见 [FORK.md](../third_party/pkg-sftp/FORK.md) |
+| `mygo-terminal` | Live scrollback limits, history backdrop, and pinned Ghostty ABI; see [FORK.md](../third_party/mygo-terminal/FORK.md) |
+| `pkg-sftp` | `Client.OpenFileMode` sets permissions during creation; see [FORK.md](../third_party/pkg-sftp/FORK.md) |
 
-保留上游许可证、资源 manifest 和来源说明。主题与组件约定见[主题接入](theme-integration.md)及[UIKit](uikit.md)。
+Upstream licenses, resource manifests, and source attribution are retained. See [theme integration](theme-integration.md) and [UIKit](uikit.md) for component conventions.

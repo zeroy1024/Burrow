@@ -1,22 +1,24 @@
-# 主题与设计令牌
+# Themes and design tokens
 
-## 来源与生成产物
+[English](theme-integration.md) | [简体中文](theme-integration.zh.md)
 
-[internal/theme/tokens_src.py](../internal/theme/tokens_src.py) 是应用设计令牌的唯一来源，定义原始色板、语义值、深色覆盖和组件映射。
+## Sources and generated output
 
-| 文件 | 用途 |
+[internal/theme/tokens_src.py](../internal/theme/tokens_src.py) is the single source for app design tokens: primitive palettes, semantic values, dark overrides, and component mappings.
+
+| File | Purpose |
 |---|---|
-| `tokens_src.py` | 令牌来源 |
-| `gen.py` | 生成 `theme.go` 与 `tokens.json` |
-| `mdgen.py` | 生成 [tokens.md](../internal/theme/tokens.md) |
-| `theme.go` | 应用使用的 Go 类型、浅/深主题及组件映射 |
-| `accent.go` | 强调色适配 |
+| `tokens_src.py` | Token source |
+| `gen.py` | Generates `theme.go` and `tokens.json` |
+| `mdgen.py` | Generates English [tokens.md](../internal/theme/tokens.md) and Chinese [tokens.zh.md](../internal/theme/tokens.zh.md) |
+| `theme.go` | Go types, light/dark themes, and component mappings consumed by the app |
+| `accent.go` | Accent adaptation |
 
-三层关系为 `palette → semantic → component`。界面优先读取组件令牌，缺少时使用语义令牌，不直接读取原始色板。
+The layers are `palette → semantic → component`. UI reads component tokens first, then semantic tokens when needed, rather than reading the primitive palette directly.
 
-## 修改与生成
+## Edit and generate
 
-先编辑 `tokens_src.py`，然后从仓库根目录执行：
+Edit `tokens_src.py`, then run from the repository root:
 
 ```sh
 (
@@ -27,22 +29,24 @@
 )
 ```
 
-检查来源和派生产物的差异，再运行[相应检查](development.md#已有检查)。不要只改 `theme.go`、`tokens.json`、`tokens.md`，否则下次生成会覆盖变更。
+English token descriptions live in `tokens_docs.en.json`. Update them with new/changed Chinese descriptions; missing translations fail documentation generation.
 
-## 外观与组件适配
+Inspect changes in both source and generated files, then run [appropriate checks](development.md#existing-checks). Do not edit only `theme.go`, `tokens.json`, or `tokens.md`; generation will overwrite those changes.
 
-每次根视图构建通过 [uikit.Install](../internal/uikit/theme.go) 将当前语义颜色映射到 MyGo 主题。浅色、深色、跟随系统及强调色由应用设置控制；组件在构建时读取 `theme.Current()`。
+## Appearance and component adaptation
 
-颜色转换、多层阴影、动效和原生主题适配集中在 UIKit；阴影按令牌层序反向追加，保留首层在上的语义。减少动态效果由应用与系统偏好共同参与，布局位移和展示透明度分别处理。
+Each root view build calls [uikit.Install](../internal/uikit/theme.go) to map current semantic colors into MyGo's theme. App preferences control light/dark/system appearance and accent. Components read `theme.Current()` while building.
 
-新增颜色、尺寸或动效时，在来源中定义语义，再建立组件映射；同一交互的渲染、命中区域、行数计算和拖动预览使用一致的几何来源。
+UIKit centralizes color conversion, layered shadows, motion, and native theme adaptation. Shadow layers are appended in reverse so the first layer remains on top. App and system reduced-motion preferences both participate; layout movement and presentation opacity are handled separately.
 
-## 应用主题与终端配色
+For new colors, dimensions, or motion, define semantics in the source and map components to them. Rendering, hit areas, row calculations, and drag previews of one interaction must use consistent geometry sources.
 
-应用主题负责导航、控件、窗格及布局；[internal/termtheme](../internal/termtheme/) 负责终端前景、背景、ANSI 色、光标与选区。二者独立，切换应用明暗不会重置字体或固定终端配色。
+## App themes and terminal colors
 
-`TerminalBackground` 决定终端实际底色，正文铺底、栏下补画和渐隐着色必须一致。`TerminalChrome` 按实际背景选择周边 UI 的明暗与中性文字颜色；缓存与强调色失效由应用持有。
+App themes control navigation, controls, panes, and layout. [internal/termtheme](../internal/termtheme/) controls terminal foreground/background, ANSI colors, cursor, and selection. Changing app appearance does not reset fonts or a fixed terminal scheme.
 
-终端布局间距由 `C.Pane.ContentSide` 提供。上/下模糊只覆盖各自栏的高度；历史文字补画范围按实际网格边界确定，不能把栏边缘直接当作文字裁剪边界。
+`TerminalBackground` selects the actual terminal background. Text backing, backdrop under bars, and fade tint must match it. `TerminalChrome` chooses surrounding UI appearance and neutral text from the actual background. The app owns cache and accent invalidation.
 
-组件职责见[共享 UI 组件](uikit.md)。
+`C.Pane.ContentSide` supplies terminal spacing. Top/bottom blur covers only its own bar height. History backdrop uses actual grid boundaries; bar edges must not be treated as text clip boundaries.
+
+See [shared UI components](uikit.md) for component responsibilities.

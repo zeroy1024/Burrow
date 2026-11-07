@@ -1,5 +1,7 @@
-# README 原生展示构建
+# Native README gallery build
 
-使用当前应用组件和静态 mock 数据，生成独立的 `Burrow Gallery.app`，用于 README 展示图。数据源为 [scene.go.txt](scene.go.txt)，后缀有意避开 `.go`，仅由 [prepare.py](prepare.py) 通过 Go overlay 编入临时应用，不参与普通构建和测试。
+[English](README.md) | [简体中文](README.zh.md)
 
-运行方式、场景快捷键和截图数据边界见[展示图说明](../../docs/screenshots/readme/README.md)。临时构建与 SDK 配置保留在脚本输出的 `/private/tmp/burrow-readme-gallery-*` 目录中，方便复现；不会替换现有 Burrow 安装或读取真实连接配置。
+Build a separate `Burrow Gallery.app` with current components and static mock data for README screenshots. [scene.go.txt](scene.go.txt) intentionally avoids `.go`; only [prepare.py](prepare.py) includes it through a temporary Go overlay, outside ordinary builds/tests.
+
+See [screenshot notes](../../docs/screenshots/readme/README.md) for commands, scene shortcuts, and data boundaries. Temporary builds/SDK settings remain under the script's printed `/private/tmp/burrow-readme-gallery-*` directory for reproduction. Existing Burrow installs and real connection settings are not replaced/read.

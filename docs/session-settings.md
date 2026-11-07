@@ -1,88 +1,93 @@
-# 会话与设置
+# Sessions and settings
 
-## 保存目录与运行会话
+[English](session-settings.md) | [简体中文](session-settings.zh.md)
 
-SSH 页面和文件传输页面分别维护条目、分组、顺序与折叠状态。两侧可保存同名条目，互不联动。
+## Saved catalogs and running sessions
 
-SSH 主机右键菜单的「快捷添加到 SFTP…」和 SFTP 站点的「快捷添加到 SSH…」会打开另一协议的新增窗口，预填名称、地址、原端口、用户名、认证方式、私钥选择和连接网关。目标协议专属选项使用新增默认值，保存后生成独立 ID；保存的密码按独立凭据写入，托管私钥继续引用同一把密钥。FTP / FTPS 不提供该入口。
+SSH and File Transfer maintain their own entries, groups, order, and collapsed state. Both catalogs may contain entries with the same name without affecting each other.
 
-「保存」只更新目录；「保存并连接」同时新开会话。侧栏单击聚焦，双击新开独立会话。编辑地址或认证配置不会把已经运行的连接改向另一个服务器，后台传输也保留入队时的端点与凭据版本。
+**Quick add to SFTP…** on an SSH host and **Quick add to SSH…** on an SFTP site open a new-session form for the other protocol. They prefill the name, address, original port, username, authentication, private key, and connection gateway. Protocol-specific fields use new-session defaults. Saving creates an independent ID and password credential; a managed private key continues to reference the same key. FTP / FTPS does not offer this action.
 
-删除目录条目不等于关闭已经打开的会话。被网关引用的 SSH 主机、正在使用的托管密钥等依赖会按实际引用关系限制删除。
+**Save Only** updates the catalog; **Save and Connect** also opens a new session. A single sidebar click focuses an entry, and a double-click opens an independent session. Editing an address or authentication settings does not redirect an active connection. Background transfers keep the endpoint and credential version captured when queued.
 
-## 连接网关
+Deleting a catalog entry does not necessarily close its open sessions. Actual references prevent deletion of dependencies such as SSH hosts used by gateways or managed keys still in use.
 
-左侧应用栏的「网关」位于文件传输下方，是独立页面。该页管理 SSH / SOCKS5 网关及应用默认网关，设置页不增加网关分类。页面顶栏显示应用默认出口及其实际路径；左侧按类型分组列出网关，右侧显示选中网关的连接路径、配置和引用。
+## Connection gateways
 
-网关页的 `⌘N`（Windows/Linux 为 `Ctrl+N`）新增网关，`⌘F` 搜索网关；关闭和切换会话的快捷键不会作用于后台终端标签。
+**Gateways** is a separate page below File Transfer in the app rail, rather than a Settings category. It manages SSH / SOCKS5 gateways and the app default. The header shows the default exit and its resolved route; the sidebar groups gateways by type, and the detail pane shows the selected route, configuration, and references.
 
-主机和文件站点的「连接网关」可以选择跟随应用默认、直连或指定网关。默认出口初始为直连；修改配置只影响后续建连，运行会话与传输任务保留捕获的路径和凭据版本。终端、文件浏览、后台传输、连接测试和 MCP 使用相同的出口规则；网关失败会明确报错，不自动改为直连。
+On this page, `⌘N` (`Ctrl+N` on Windows/Linux) adds a gateway and `⌘F` searches gateways. Session close and switch shortcuts do not operate on background terminal tabs.
 
-SSH 网关引用已保存 SSH 主机的地址、认证信息和 Keepalive，不执行终端初始命令。它不单独设置上游，而是沿用该主机自己的「连接网关」，经网关到达这台主机与直接连接它走同一条路径，与 OpenSSH 递归解析 `ProxyJump` 主机配置的方式一致；修改该主机的连接网关会同时改变以它为源的网关。SOCKS5 网关可单独选择上游，支持无认证和用户名密码认证，保存的密码进入加密 Vault。两种网关可组合使用。
+Hosts and file sites can follow the app default, connect directly, or use a specific gateway. The initial app default is direct. Edits affect later connections; running sessions and transfers retain their captured routes and credential versions. Terminals, file browsing, background transfers, connection tests, and MCP share the same routing rules. Gateway failure is reported; it does not silently switch to a direct connection.
 
-跟随应用默认的主机若本身位于默认出口的路径上（例如默认出口正是以它为源的 SSH 网关），该主机直接连接；显式选择会经过主机自身的网关、或网关之间互为上游的配置形成环路，选项中不可选，保存时也会拒绝。
+An SSH gateway references a saved SSH host's address, authentication, and Keepalive settings without running its initial command. Its upstream route comes from that host's own **Connection gateway** setting, so reaching the host as a gateway follows the same route as connecting to it directly. This is consistent with recursive `ProxyJump` host configuration in OpenSSH. Changing the source host's gateway also changes gateways based on it. A SOCKS5 gateway can choose its own upstream gateway and supports no authentication or username/password authentication. Saved passwords enter the encrypted Vault. Both gateway types can be combined.
 
-SSH 网关连接可被多个目标共享，关闭单个终端或文件会话只释放自己的通道。SOCKS5 的目标连接分别建立。目标主机名交由所选出口处理，第一跳网关地址通过本机网络连接。
+A host following the app default connects directly if it is itself on that default route, for example when it is the source host of the default SSH gateway. Explicit routes through the host itself, or mutually upstream gateways, form loops. They are disabled in selection and rejected on save.
 
-FTP / FTPS 经网关时仅支持被动模式，控制和数据连接经过同一路径；主动模式保留直连能力。
+Several targets can share an SSH gateway connection. Closing one terminal or file session releases only its own channels. SOCKS5 establishes a separate connection for each target. The selected exit handles target hostnames; the first gateway address is reached over the local network.
 
-网关页点击「测试」会直接连接本网关，SSH 检查握手、主机信任及认证，SOCKS5 检查协议协商及配置的认证方式；有上游时经上游访问。测试无需选择目标主机，连接路径按跳显示已连通、正在连接和失败的节点，失败提示指明失败的那一跳；结果仅在本次运行内保留，保存任一网关后清除；取消或离开页面会停止测试。目标服务器的可达性由主机/站点的「测试连接」验证。
+FTP / FTPS through a gateway requires passive mode. Its control and data connections follow the same route. Active mode remains available for direct connections.
 
-默认设置、目录条目、下游网关或运行/可恢复会话及传输仍引用的网关不能直接删除。
+A gateway test connects to the gateway itself: SSH checks the handshake, host trust, and authentication; SOCKS5 checks negotiation and the configured authentication method. Upstream gateways are used when configured. No target host is required. The route marks proven, connecting, and failed hops, and errors identify the failed hop. Results last for the current run and are cleared when any gateway is saved. Cancelling or leaving the page stops the test. Use the host/site's **Test connection** action to check target reachability.
 
-旧 SSH 跳板配置在数据库升级时一次性转为 SSH 网关，保留多级路径；已有传输按原先捕获的跳板快照迁移。MCP 连接身份包含完整网关路径，等价的旧 SSH 路径保留原身份判定，实际出口或认证变化后需重新确认授权。
+A gateway cannot be deleted while referenced by defaults, catalog entries, downstream gateways, running or recoverable sessions, or transfers.
 
-## 认证与高级选项
+Database upgrades convert legacy SSH jump configurations into SSH gateways once, preserving multihop paths. Existing transfers migrate their captured jump snapshots. MCP connection identity includes the complete gateway route. Equivalent legacy SSH routes preserve identity checks; actual routing or authentication changes require authorization to be confirmed again.
 
-| 协议 | 认证与配置 |
+## Authentication and advanced options
+
+| Protocol | Authentication and configuration |
 |---|---|
-| SSH | 密码、托管私钥、加密私钥、SSH agent；连接网关、环境变量、初始命令、Keepalive 和会话终端配色 |
-| SFTP | SSH 认证与连接网关；初始本地/远程目录及文件名编码 |
-| FTP / FTPS | 用户名和密码或匿名；无 TLS、显式 TLS、隐式 TLS；主动/被动模式、初始目录和文件名编码 |
+| SSH | Password, managed or encrypted private key, SSH agent; gateway, environment variables, initial command, Keepalive, and session terminal colors |
+| SFTP | SSH authentication and gateway; initial local/remote directories and filename encoding |
+| FTP / FTPS | Username/password or anonymous; no TLS, explicit TLS, or implicit TLS; active/passive mode, initial directories, and filename encoding |
 
-「测试连接」使用真实协议。SSH/SFTP 与正式连接共用主机信任和认证规则；SFTP 还检查子系统及目标目录。未知主机需要交互确认，修改表单或关闭弹窗会取消测试。FTP TLS 使用证书验证，不提供忽略证书错误的连接方式。
+**Test connection** uses the real protocol. SSH/SFTP share normal host trust and authentication rules; SFTP also checks the subsystem and target directory. Unknown hosts require confirmation. Editing the form or closing the dialog cancels the test. FTP TLS verifies certificates and provides no option to ignore certificate errors.
 
-设置中的「密钥与凭据」支持导入私钥、生成 Ed25519 / RSA（4096 位）密钥、查看指纹和复制公钥。导入会将私钥加密保存到应用数据库，可通过「导出私钥…」取出；引用中的密钥不能直接删除。保存位置与凭据规则见[数据与凭据](storage.md)。
+**Keys & Credentials** supports private key import, Ed25519 / RSA (4096-bit) generation, fingerprints, and public key copying. Imported private keys are encrypted in the app database and can be retrieved with **Export Private Key…**. Referenced keys cannot be deleted directly. See [data and credentials](storage.md).
 
-macOS/Linux 的 agent 使用 `SSH_AUTH_SOCK` Unix socket。Windows 默认连接本机 `\\.\pipe\openssh-ssh-agent`；若设置 `SSH_AUTH_SOCK`，必须指向本机命名管道。认证与设置页的 agent 检测使用同一入口，不连接远程管道，也不自动启动或配置系统 agent 服务。
+On macOS/Linux, agent access uses the `SSH_AUTH_SOCK` Unix socket. Windows defaults to the local `\\.\pipe\openssh-ssh-agent` pipe. If `SSH_AUTH_SOCK` is set on Windows, it must name a local named pipe. Authentication and the agent check in Settings use the same entry point. They do not connect to remote pipes or start/configure the system agent service.
 
-## 应用设置
+## App settings
 
-设置修改即时生效，并在短暂防抖后保存；保存失败会显示错误。
+Settings apply immediately and save after a short debounce. Save failures are reported.
 
-| 分类 | 主要内容 |
+| Category | Main settings |
 |---|---|
-| 通用 | 语言、启动恢复、关闭最后一个标签的行为、活动连接关闭确认 |
-| 外观 | 浅色/深色/跟随系统、强调色、减少动态效果、窗口半透明 |
-| 终端 | [字体、配色、光标与回滚](terminal-themes.md) |
-| 文件传输 | 默认本地目录、并发数和重名策略 |
-| 快捷键 | 按分组录制绑定（Esc 或点击其他位置取消，Delete 清除）、冲突替换、单项及全部恢复默认 |
-| 密钥与凭据 | 应用启动解锁、修改解锁密码、托管密钥和已保存凭据 |
-| 关于 | 版本和开源许可证 |
+| General | Language, startup restoration, last-tab behavior, and active-connection close confirmation |
+| Appearance | Light/dark/system, accent, reduced motion, and window translucency |
+| Terminal | [Fonts, colors, cursor, and scrollback](terminal-themes.md) |
+| File Transfer | Default local directory, concurrency, and name conflict policy |
+| Keyboard Shortcuts | Record bindings by group; Esc or clicking elsewhere cancels, Delete clears; replace conflicts or reset individual/all bindings |
+| Keys & Credentials | Startup unlock, password changes, managed keys, and saved credentials |
+| About | Version and open source licenses |
 
-全新配置默认开启启动恢复和活动连接关闭确认；关闭最后一个标签时保留窗口。默认传输并发数为 3，重名策略为询问，本地目录为用户主目录。已有配置沿用保存值。
+**General → Language** offers English, Simplified Chinese, and System. It applies immediately and saves in existing preferences. Menus, business messages, and accessibility labels use the current language. System and remote diagnostics, user-assigned names, and historical free text retain their original content. Some native system dialog text may follow the app language only after restarting. See [interface languages](i18n.md) for resources and validation boundaries.
 
-系统开启「降低透明度」时，应用会关闭半透明效果。设置页支持搜索；离开设置不会断开终端或取消传输。
+New configurations enable startup restoration and active-connection confirmation, and keep the window when the last tab closes. Transfer concurrency defaults to 3, conflicts to Ask, and the local directory to the user's home. Existing configurations retain saved values.
 
-## 默认快捷键
+System reduced transparency disables app translucency. Settings supports search. Leaving Settings does not disconnect terminals or cancel transfers.
 
-| 操作 | 默认绑定 |
+## Default shortcuts
+
+| Action | Default binding |
 |---|---|
-| 新建当前页面的会话 | `⌘N` |
-| 关闭当前分屏或标签 | `⌘W` |
-| 重新打开关闭的标签 | `⌘⇧T` |
-| 切换第 1–4 个分屏或标签 | `⌘1`–`⌘4` |
-| 上一个 / 下一个分屏或标签 | `⌘[` / `⌘]` |
-| 始终切换上一个 / 下一个标签 | `Ctrl+Shift+Tab` / `Ctrl+Tab` |
-| 显示或隐藏侧栏 | `⌘\` |
-| SSH / 文件传输页面 | `⌘⌥1` / `⌘⌥2` |
-| 拆分 SSH 窗格 | `⌘D` |
-| 搜索当前页面 | `⌘F` |
-| 打开设置 | `⌘,` |
+| New session on the current page | `⌘N` |
+| Close the current pane or tab | `⌘W` |
+| Reopen a closed tab | `⌘⇧T` |
+| Select pane or tab 1–4 | `⌘1`–`⌘4` |
+| Previous / next pane or tab | `⌘[` / `⌘]` |
+| Always select previous / next tab | `Ctrl+Shift+Tab` / `Ctrl+Tab` |
+| Toggle sidebar | `⌘\` |
+| SSH / File Transfer page | `⌘⌥1` / `⌘⌥2` |
+| Split SSH pane | `⌘D` |
+| Search current page | `⌘F` |
+| Open Settings | `⌘,` |
 
-表中使用 macOS 显示方式；Windows 的命令修饰键为 Ctrl，界面会显示 `Ctrl+N`、`Ctrl+D` 等对应提示。多分屏时，数字和前后切换绑定优先作用于窗格；单窗格和文件页作用于标签。可录制的绑定以设置页为准，源码入口为 [settings_shortcuts.go](../internal/desktop/settings_shortcuts.go)。
+The table uses macOS notation. Windows uses Ctrl for the command modifier, with labels such as `Ctrl+N` and `Ctrl+D`. Number and previous/next bindings select panes first when split, and tabs in a single pane or file view. The Settings page is authoritative for recordable bindings; source: [settings_shortcuts.go](../internal/desktop/settings_shortcuts.go).
 
+## App unlock
 
-「打开应用时需要解锁」默认关闭。开启时设置应用解锁密码，以后每次启动先解锁；开启后同页显示「修改密码…」。修改或关闭都要求当前密码，取消或失败保持原设置。此密码与远端登录密码、私钥口令分别管理，不修改服务器认证信息。
+**Require unlocking when opening the app** is off by default. Enabling it sets an app unlock password and requires it on subsequent launches. **Change Password…** then appears on the same page. Changing or disabling it requires the current password; cancellation or failure preserves the previous setting. This password is separate from remote login passwords and private key passphrases, and does not modify server authentication.
 
-应用在同一次运行中只解锁一次，不因切换窗口或唤醒重复询问。所有凭据在关闭此开关时也保持加密，只是由本机密钥自动解锁；备份与恢复要求见[数据与凭据](storage.md)。
+The app unlocks once per process run; switching windows or waking the system does not prompt again. Credentials remain encrypted when startup unlock is off and are unlocked by a local key. See [data and credentials](storage.md) for backup and recovery requirements.

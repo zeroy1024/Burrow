@@ -1,93 +1,95 @@
-# 数据与凭据
+# Data and credentials
 
-## 默认数据位置
+[English](storage.md) | [简体中文](storage.zh.md)
 
-结构化业务数据统一保存在 `burrow.db`，使用 SQLite schema v5。已有 v1 / v2 / v3 数据库先生成升级前的一致性备份，再升级结构并执行一次性凭据迁移；v4 升级前生成 `.before-gateways-<时间>.bak`，在同一事务转换旧跳板配置、工作区和传输快照及其哈希引用，保留原有业务数据。应用数据目录为：
+## Default data locations
 
-| 系统 | 正式版 | 开发版 |
+Structured business data lives in `burrow.db`, using SQLite schema v5. Existing v1/v2/v3 databases receive a consistent pre-upgrade backup, then schema upgrades and one-time credential migration. Before upgrading v4, a `.before-gateways-<timestamp>.bak` is created; one transaction converts legacy jump settings, workspace/transfer snapshots, and hash references while retaining business data. App data directories are:
+
+| System | Release | Development |
 |---|---|---|
 | macOS | `~/Library/Application Support/Burrow/` | `~/Library/Application Support/Burrow Dev/` |
 | Windows | `%LOCALAPPDATA%\Burrow\` | `%LOCALAPPDATA%\Burrow Dev\` |
-| Linux | `$XDG_DATA_HOME/Burrow/`，未设置时为 `~/.local/share/Burrow/` | 对应 `Burrow Dev/` |
+| Linux | `$XDG_DATA_HOME/Burrow/`, or `~/.local/share/Burrow/` if unset | Corresponding `Burrow Dev/` directory |
 
-普通 `go run` 和 MyGo 开发包使用开发版命名空间；正式打包使用 Burrow。两个目录各自持有独立的加密凭据库和解锁密钥。原 `dev.burrow.app` 与 `dev.burrow.app.dev` 系统凭据服务仅在一次性迁移时读取。macOS 正式版另使用 `dev.burrow.app.vault-unlock` 保存自动解锁密钥；开发版与联调仍使用文件密钥。测试使用临时目录，原生 E2E 通过 overlay 使用独立目录和凭据 provider。
+Ordinary `go run` and MyGo development packages use the development namespace; release packages use Burrow. Each directory has an independent encrypted vault and unlock key. The old `dev.burrow.app` and `dev.burrow.app.dev` credential services are read only during migration. The macOS release additionally uses `dev.burrow.app.vault-unlock` for automatic unlock keys; development/integration builds keep file keys. Tests use temporary directories; native E2E uses an overlay with isolated data and credential providers.
 
-同一数据库同时只允许一个 Burrow 进程持有，防止两个界面用各自的旧内存快照互相覆盖。`burrow.db.lock` 是操作系统锁的载体，正常退出或进程结束会释放锁；不需要删除这个文件。
+Only one Burrow process may hold a database at a time, preventing stale in-memory snapshots in separate windows from overwriting each other. `burrow.db.lock` carries an OS lock, which is released on normal exit or process termination. The file does not need to be deleted.
 
-## 保存内容与边界
+## Stored content and boundaries
 
-| 位置 | 内容 |
+| Location | Contents |
 |---|---|
-| SQLite `catalog_groups` / `profiles` | 分组、稳定 ID、排序、连接配置及凭据版本引用 |
-| SQLite `gateways` / `gateway_settings` | SSH / SOCKS5 网关、SSH 源主机与 SOCKS5 上游引用及应用默认出口 |
-| SQLite `managed_keys` | 公钥原文、密钥名称、类型、指纹及私钥凭据引用等元数据 |
-| SQLite `settings` | 唯一一份应用及终端设置、快捷键、文件面板偏好 |
-| SQLite `workspace` / `endpoints` | 布局、焦点、文件标签路径及独立的连接快照 |
-| SQLite `endpoint_keys` | 连接快照中网关私钥的引用，保护恢复和传输仍需要的托管密钥 |
-| SQLite `transfer_*` | 批次、标签归属、端点/网关路径快照、任务、递归清单、提交状态及检查点 |
-| SQLite `host_keys` | 规范化主机名/IP、端口、完整公钥、算法、撤销标记与确认时间 |
-| SQLite `themes` | 导入配色的名称、原文件名和原始字节，保留来源及许可注释 |
-| SQLite `settings` 的 `mcp` 条目 | MCP 启用状态、监听 Host / Port 和审计保留周期 |
-| SQLite `mcp_keys` / `mcp_policies` | MCP 密钥摘要、连接授权、本地目录范围及拦截策略 |
-| SQLite `mcp_operations` / `mcp_files` | 操作、目标与命中规则快照、生命周期及逐文件原始事件 |
-| SQLite `mcp_payloads` | 按操作 ID 关联的 MCP 请求与响应，详情按需读取；随对应审计记录级联清理 |
-| SQLite `mcp_tasks` / 原有 `transfer_*` | MCP 任务归属与现有传输清单；接受任务前在同一事务提交 |
-| SQLite `vault_meta` / `vault_items` | 解锁参数、被封装的数据密钥，以及会话/网关密码、托管私钥和已保存私钥口令的密文 |
-| macOS 正式版的登录钥匙串 | 关闭启动解锁时的一份随机解锁密钥，按凭据库 ID 和密钥 ID 绑定；不保存远端密码或私钥 |
-| `vault-keys/<id>.key` | Windows、Linux、开发/联调及可移植备份的随机解锁密钥；开启应用密码后没有活动引用 |
-| 原系统凭据和 `keys/` | 仅作为迁移来源；迁移完成不自动删除旧副本，不再用于正常连接 |
-| 实际传输目标 | 下载/上传内容与未完成的 `.part` |
+| SQLite `catalog_groups` / `profiles` | Groups, stable IDs, ordering, connection settings, and credential-version references |
+| SQLite `gateways` / `gateway_settings` | SSH / SOCKS5 gateways, source host/upstream references, and the app default exit |
+| SQLite `managed_keys` | Public key text, name, type, fingerprint, and private credential references |
+| SQLite `settings` | One set of app/terminal settings, shortcuts, and file-pane preferences |
+| SQLite `workspace` / `endpoints` | Layout, focus, file-tab paths, and independent connection snapshots |
+| SQLite `endpoint_keys` | Gateway private key references in snapshots, protecting managed keys needed for recovery/transfers |
+| SQLite `transfer_*` | Batches, tab ownership, endpoint/gateway route snapshots, tasks, recursive manifests, commit state, and checkpoints |
+| SQLite `host_keys` | Normalized hostname/IP, port, complete public key, algorithm, revocation flag, and confirmation time |
+| SQLite `themes` | Imported scheme names, original filenames, and source bytes with attribution/license comments |
+| SQLite `settings` entry `mcp` | MCP enabled state, listening Host/Port, and audit retention |
+| SQLite `mcp_keys` / `mcp_policies` | Access key digests, connection grants, local directory scope, and interception policies |
+| SQLite `mcp_operations` / `mcp_files` | Operations, target/rule snapshots, lifecycle, and raw per-file events |
+| SQLite `mcp_payloads` | Requests/responses associated by operation ID, loaded on demand and deleted with their audits |
+| SQLite `mcp_tasks` / existing `transfer_*` | MCP task ownership and transfer manifests, committed together before task acceptance |
+| SQLite `vault_meta` / `vault_items` | Unlock parameters, wrapped data key, and ciphertext for session/gateway passwords, managed private keys, and saved passphrases |
+| macOS release login Keychain | A random unlock key when startup unlock is off, bound to vault ID/key ID; no remote passwords or private keys |
+| `vault-keys/<id>.key` | Random unlock keys for Windows, Linux, development/integration, and portable backups; no active reference when app password unlock is enabled |
+| Old system credentials and `keys/` | Migration sources only; old copies are retained and no longer used for normal connections |
+| Actual transfer destinations | Uploaded/downloaded content and unfinished `.part` files |
 
-连接凭据仅以密文写入 SQLite；文件读写正文、终端屏幕/回滚输出和监控曲线不保存。数据库没有整体加密；站点地址、用户名、路径、环境变量和初始命令等配置应按私有数据处理，勿把秘密写入环境变量或命令配置。
+Connection credentials enter SQLite only as ciphertext. File read/write bodies, terminal screens/scrollback, and monitoring curves are not persisted. The database is not encrypted as a whole. Treat site addresses, usernames, paths, environment variables, and initial commands as private data; do not put secrets in environment or command settings.
 
-MCP 授权密钥完整值只在创建时交给界面，数据库仅保存 SHA-256 摘要和公开前缀。MCP 审计保存命令原文、请求参数、结构化响应及 stdout/stderr；不采集认证请求头，常见认证字段隐藏，文件正文用省略标记及字节数替代。命令和输出本身可能含敏感数据，不能保证自动识别全部秘密。
+A complete MCP access key is handed to the UI only at creation. The database stores its SHA-256 digest and public prefix. MCP audits retain command text, request parameters, structured responses, and stdout/stderr. Authentication headers are not collected; common authentication fields are redacted, and file bodies are replaced with omission markers and byte counts. Commands and output can themselves contain sensitive data; automatic detection cannot identify every secret.
 
-文件正文省略针对 `files_read` / `files_write` 的文本参数与结果；通过 SSH 命令读取文件产生的内容仍属于 stdout，不能自动识别成文件正文后剔除。
+File-body omission applies to text parameters/results of `files_read` and `files_write`. File contents read through an SSH command remain stdout and cannot automatically be identified and removed as file bodies.
 
-列表仅读取操作摘要，大段请求/响应放在 `mcp_payloads`，仅展开详情时加载并在后台整理。旧记录仍可查看原摘要，未记录的历史响应正文无法补回。单次响应采集上限为 32 MiB，超过时记录大小及截断标记，不将截断 JSON 当作完整正文保存。
+Lists load operation summaries only. Large request/response data lives in `mcp_payloads`, is loaded when details expand, and is processed in the background. Old records retain their available summaries; missing historical response bodies cannot be reconstructed. Response capture is limited to 32 MiB per response. Larger responses retain size/truncation metadata rather than saving truncated JSON as a complete body.
 
-缓存与日志保留独立边界。macOS 使用系统 Cache/Logs 目录；Windows 分别使用数据根下的 `cache/`、`logs/`；Linux 缓存使用系统 XDG 缓存目录。MyGo 仍管理系统语言偏好，在 Windows/Linux 可能生成 SDK 的 `locale` 文件；应用设置以数据库为准。
+Caches and logs have separate locations. macOS uses system Cache/Logs directories; Windows uses `cache/` and `logs/` under the data root; Linux caches follow XDG. MyGo still manages system language preferences and may create its `locale` file on Windows/Linux. App preferences in the database remain authoritative.
 
-## 一致性与恢复
+## Consistency and recovery
 
-数据库访问集中在 [internal/store](../internal/store/)，使用 `database/sql + modernc.org/sqlite`，不依赖系统 SQLite 或 CGo。开启外键、WAL、`synchronous=FULL` 和 5 秒 busy timeout，每个 Store 仅保留一个数据库连接。
+[internal/store](../internal/store/) centralizes `database/sql + modernc.org/sqlite` access without system SQLite or CGo. Foreign keys, WAL, `synchronous=FULL`, and a five-second busy timeout are enabled. Each Store keeps one database connection.
 
-分组、条目、密钥元数据及关联工作区在事务内提交。UI 先构造不可变快照，数据库写入在后台串行执行；保存失败会报告错误，目录操作恢复内存快照。设置及布局采用 300ms 防抖，关闭/退出前显式保存。
+Groups, profiles, key metadata, and associated workspace changes commit in transactions. UI creates immutable snapshots and database writes run serially in the background. Save failures are reported, and catalog operations restore their in-memory snapshot. Settings/layout saves use a 300ms debounce and are explicitly flushed before closing/quitting.
 
-新任务先保存再启动。传输 worker 独占清单，在安全点写入已确认偏移与 SHA-256 摘要；连续写入按约 1 秒或 4 MiB 的间隔保存，最终重命名前先保存提交意图，暂停/完成/取消与退出另行保存。崩溃恢复使用最近成功提交的检查点，仍需核对实际源、`.part` 和目标，不能保证恢复最后一字节。
+New tasks are saved before starting. A transfer worker exclusively owns its manifest and saves confirmed offsets and SHA-256 digests at safe points. Continuous writes checkpoint at roughly one-second or 4 MiB intervals. Commit intent is saved before final rename; pause/completion/cancellation/shutdown save separately. Crash recovery uses the last successful checkpoint and still verifies the actual source, `.part`, and destination. The final byte is not guaranteed to be recoverable.
 
-凭据密文、版本引用和目录配置在同一事务提交。安全设置变更轮换数据密钥，重新加密全部凭据后原子替换库头与密文；业务密码版本保持不变。新本机密钥文件先完整写入和持久化，再由数据库引用；文件系统和远端操作仍不属于 SQLite 事务。Unix 私有文件使用 `0600`、目录使用 `0700`，Windows 复用当前账号与 SYSTEM 的私有 ACL。
+Credential ciphertext, version references, and catalog settings commit together. Security changes rotate the data key and atomically replace metadata/ciphertext after re-encryption, preserving business password versions. New local key files are fully written and made durable before database references change. Filesystem and remote operations are outside SQLite transactions. Unix files use `0600`, directories `0700`; Windows uses private ACLs for the current account and SYSTEM.
 
-读取失败、损坏或不支持的 schema 会明确报错，不自动删除或重建数据库。schema 版本记录于 `PRAGMA user_version`；未来升级须新增明确的 schema 升级实现。
+Read failures, corruption, or unsupported schemas produce explicit errors rather than deleting/rebuilding the database. `PRAGMA user_version` records the schema; future upgrades require explicit migration implementations.
 
-## 应用解锁
+## App unlock
 
-设置 → 密钥与凭据提供「打开应用时需要解锁」，默认关闭。关闭时自动读取解锁密钥（macOS 正式版使用钥匙串，其他构建使用本机文件）；开启后每次启动输入应用解锁密码，同页可以修改密码或验证当前密码后关闭。密码长度为 6–64 个字符（包含边界，按 Unicode 字符计数），不自动去空格或做 Unicode 归一化。
+**Settings → Keys & Credentials → Require unlocking when opening the app** is off by default. Automatic mode reads an unlock key from Keychain in macOS release builds or a local file elsewhere. Enabling it requires an app password on each launch. The same page changes the password or disables protection after checking the current password. Passwords are 6–64 Unicode characters, inclusive; spaces are not trimmed and Unicode normalization is not applied.
 
-凭据始终使用独立随机数据密钥和认证加密。应用密码通过 Argon2id 派生解锁密钥，密码和派生结果不落盘；自动解锁使用独立随机密钥：macOS 正式版交给传统登录钥匙串，其他构建保存为私有文件。凭据库头格式 v2 将来源绑定到认证数据；v1 文件密钥仍可读取，macOS 正式版会在成功解锁后轮换数据密钥并明确迁移到钥匙串。具体算法、密钥轮换和失败约束见[应用解锁与凭据存储方案](credential-vault-plan.md)。
+Credentials always use an independent random data key and authenticated encryption. Argon2id derives the unlock key from an app password; neither password nor derived result is persisted. Automatic unlock uses a separate random key in the macOS release login Keychain or a private local file for other builds. Vault metadata v2 authenticates the key source. v1 file keys remain readable; macOS releases rotate the data key after successful unlock and explicitly migrate to Keychain. See [vault design](credential-vault-plan.md) for algorithms, rotation, and failure rules.
 
-未解锁时只显示解锁界面，不恢复工作区、不调度连接与传输、不监听 MCP。未解锁退出不保存空工作区或默认设置。解锁后沿用既有恢复规则：SSH 不自动连接，未完成传输仍暂停。切回前台、系统唤醒或同一进程重新显示窗口不重复解锁。
+While locked, the app shows only unlock UI: no workspace restoration, connection/transfer scheduling, or MCP listener. Exiting while locked does not save an empty workspace or default settings. Unlock follows existing recovery rules: SSH remains disconnected and unfinished transfers paused. Returning to the foreground, waking, or showing another window in the same process does not prompt again.
 
-自动解锁保护数据库单独泄露的情况；文件方式下同时取得数据库和本机密钥文件即可解密。macOS 钥匙串方式的访问由系统和固定代码签名身份控制。应用密码保护仍取决于密码强度，也不能防止已控制进程、记录输入或读取已解锁内存的攻击者。数据库中的主机、用户名和审计等元数据没有整体加密。
+Automatic unlock protects against a database-only leak. With file keys, possession of both database and key file permits decryption. macOS Keychain access depends on the system and fixed signing identity. Password protection depends on password strength and cannot protect against an attacker controlling the process, recording input, or reading unlocked memory. Hosts, usernames, audits, and other metadata are not encrypted as a whole.
 
-旧版升级会在首次启动显示一次性迁移入口，可能需要旧系统凭据授权。已保存密码丢失时可明确重新输入；加密私钥需要原私钥口令，临时提供的口令不会因此被强制保存。成功后不再读取旧系统凭据命名空间；macOS 正式版仅访问新的自动解锁密钥服务。旧私钥、旧系统凭据与升级前备份仍保留，确认迁移后应单独处理这些副本。
+Legacy upgrades show a one-time migration action at first launch and may require old credential-store authorization. Missing saved passwords can be re-entered explicitly. Encrypted private keys require their original passphrases; temporary entry does not force passphrase saving. Normal use stops reading old credential namespaces afterward; macOS releases access only the new automatic unlock service. Old private keys, system credentials, and pre-upgrade backups remain. Handle these copies separately after confirming migration.
 
-托管私钥在认证时解密到内存，不生成连接用临时私钥文件；需要文件时通过「导出私钥…」明确选择目标。导入来源文件保持原样。
+Managed private keys are decrypted into memory for authentication without connection-time temporary key files. Use **Export Private Key…** to choose a file explicitly. Import source files remain untouched.
 
-## 主机信任
+## Host trust
 
-SSH 客户端通过回调查询数据库，不调用系统 OpenSSH，也不读系统 `.ssh/known_hosts`。信任记录独立于保存条目，删除或编辑一个条目不会自动清除主机信任。
+SSH callbacks query the database. The client does not invoke system OpenSSH or read `.ssh/known_hosts`. Trust records are separate from catalog entries; editing/deleting an entry does not automatically clear trust.
 
-未知主机需要用户确认指纹。确认期间不持有数据库事务；写入时再次检查，防止其他连接先保存了不同的密钥。已变更和已撤销的密钥拒绝连接，不能用「首次信任」确认覆盖。
+Unknown hosts require fingerprint confirmation. No database transaction is held while waiting. On write, trust is checked again in case another connection stored a different key first. Changed and revoked keys are rejected and cannot be overwritten through first-trust confirmation.
 
-## 旧格式与备份
+## Legacy formats and backups
 
-本次直接启用新数据模型，不读取、迁移或双写旧 `sessions.json`、`prefs.json`、`files.json`、`terminal.json`、`transfers.json`、`catalog.json`、`themes/` 和 `known_hosts`。已有磁盘文件保持原样，需在新版本重新配置；不提供旧格式自动回退。
+The new model does not read, migrate, or dual-write old `sessions.json`, `prefs.json`, `files.json`, `terminal.json`, `transfers.json`, `catalog.json`, `themes/`, or `known_hosts`. Existing files remain untouched and require reconfiguration in the new version. There is no automatic legacy-format fallback.
 
-文件自动解锁或应用密码方式可先正常退出，再复制整个数据目录。macOS 正式版的钥匙串密钥不在数据目录中，仅复制目录不能保证跨机器恢复，应使用 Vault 的配套备份。运行中不能仅复制 `burrow.db` 而忽略 WAL；store 层提供 `Backup`，通过 SQLite `VACUUM INTO` 生成一致的独立数据库，当前没有备份界面。
+For file automatic unlock or password mode, quit normally before copying the entire data directory. The macOS release Keychain key is outside that directory; copying it alone does not guarantee recovery on another machine. Use a paired Vault backup. Do not copy a live `burrow.db` while ignoring WAL. Store's `Backup` uses SQLite `VACUUM INTO` for a consistent standalone database; there is currently no backup UI.
 
-数据库备份包含加密凭据和托管私钥。关闭启动解锁时，Vault 的 `Backup` 为数据库快照生成独立的文件解锁密钥，并重新封装备份库头，保留凭据记录版本和代次；备份可以脱离原 Mac 的钥匙串恢复。开启时需要备份当时的应用密码。已解锁会话使用内存数据密钥生成备份，不依赖重新读取原钥匙串项目。Store 层的 `Backup` 仍只生成数据库。
+Database backups include encrypted credentials and managed private keys. With startup unlock off, Vault's `Backup` creates an independent file unlock key and rewraps backup metadata while preserving credential versions and generations. The backup can be restored without the original Mac's Keychain. Password-mode backups require the password used when the backup was created. An unlocked session creates backups from its in-memory data key without rereading the original Keychain item. Store's `Backup` alone creates only the database.
 
-历史备份继续使用其生成时的解锁材料。更改应用密码不会重写旧备份，也无法撤回已经泄露的远端密码或私钥。忘记密码且没有可解锁备份时，应用不能找回原凭据。实际传输文件、`.part`、外部原私钥和外部 ssh-agent 内容仍需分别处理。详情见[文件管理与传输](file-transfer.md)。
+Old backups keep their original unlock material. Password changes do not rewrite them or revoke leaked remote passwords/private keys. Without the password or an unlockable backup, the app cannot recover credentials. Actual transferred files, `.part` files, original external private keys, and external ssh-agent contents require separate handling. See [file management and transfers](file-transfer.md).
 
-macOS 的固定自签名、证书备份和跨版本验证见[macOS 签名与解锁](macos-signing.md)。Touch ID 的受保护钥匙串能力需另行验证，不会用普通本机文件密钥加一个指纹界面冒充硬件密钥保护。
+See [macOS signing and unlock](macos-signing.md) for fixed self-signing, certificate backups, and cross-version checks. Protected Touch ID Keychain access needs separate validation; an ordinary file key plus a fingerprint UI is not hardware-backed key protection.

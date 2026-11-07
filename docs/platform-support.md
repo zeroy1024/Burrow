@@ -1,40 +1,46 @@
-# 平台支持与验收状态
+# Platform support and acceptance
 
-共用 SSH、传输队列、会话和持久化逻辑，系统差异通过平台文件及 MyGo 的原生接口实现。构建成功、能够启动和功能验收分别记录。
+[English](platform-support.md) | [简体中文](platform-support.zh.md)
 
-## 当前目标
+SSH, transfer queues, sessions, and persistence share implementations. Platform files and MyGo native interfaces isolate OS differences. Successful builds, startup, and functional acceptance are recorded separately.
 
-| 系统 / 架构 | 构建与产物 | 原生验证状态 |
+## Current targets
+
+| System / architecture | Builds and outputs | Native validation status |
 |---|---|---|
-| macOS arm64 | APP、DMG、ZIP；系统基线为 macOS 13；发布标签 CI 上传 DMG | 已有测试/race、静态检查及标准打包；GitHub 托管构建需配置签名 Secret 并远端验证，Gitea host runner 尚待配置 |
-| macOS amd64 | 同一构建入口保留该目标 | 本次未在 Intel 机器运行 |
-| Windows amd64 / arm64 | 发布标签 CI 生成 UPX 压缩后的 NSIS 安装程序，包含对应 `ghostty-vt.dll`；本地入口保留便携 ZIP | 尚无 Windows 原生运行结果；最低系统版本、UPX 运行兼容性及杀软情况待原生验证确认 |
-| Linux amd64 | 已有目标编译检查；构建入口复用 MyGo | 未验证发行版依赖、X11/Wayland、系统凭据及桌面交互 |
-| Linux arm64 | 构建入口可选择 | 本次未验证 |
+| macOS arm64 | APP, DMG, ZIP; macOS 13 baseline; tag CI uploads a DMG | Existing tests/race, static checks, and standard packaging; GitHub-hosted builds require signing Secrets and remote verification; Gitea host runner configuration remains outstanding |
+| macOS amd64 | Retained by the same build entry point | Not run on an Intel machine in this validation |
+| Windows amd64 / arm64 | Tag CI generates UPX-compressed NSIS installers with matching `ghostty-vt.dll`; local builds retain portable ZIPs | No native Windows runtime results; minimum OS version, UPX compatibility, and antivirus behavior need native acceptance |
+| Linux amd64 | Target compilation checked; build entry point reuses MyGo | Distribution dependencies, X11/Wayland, system credentials, and desktop interactions unverified |
+| Linux arm64 | Selectable build target | Not validated in this run |
 
-构建方式与产物位置见[开发与构建](development.md)。Windows 打包主机需要 UPX 5.3.0 或更新版本；本机构建由 MyGo 准备 NSIS，交叉构建安装程序需主机提供 `makensis`。GitHub 标签工作流使用托管 `ubuntu-24.04` 和 Apple Silicon `macos-15`，macOS 签名身份通过仓库 Secret 导入临时钥匙串；Gitea 继续使用 `ubuntu-latest` 与另行配置的 `macos-arm64:host`。工作流配置存在不表示标签触发、附件上传或原生运行已经通过，远端结果需分别记录。
+See [development and builds](development.md) for commands and output paths. Windows packaging hosts require UPX 5.3.0 or later. Native Windows builds have MyGo prepare NSIS; cross-building installers requires `makensis` on the host. GitHub tag workflows use hosted `ubuntu-24.04` and Apple Silicon `macos-15`, importing the macOS signing identity from repository Secrets into a temporary Keychain. Gitea retains `ubuntu-latest` and a separately configured `macos-arm64:host` runner. Workflow configuration is not evidence of successful tag execution, artifact upload, or native runtime acceptance; record remote results separately.
 
-## 已接入的平台差异
+## Integrated platform differences
 
-- 本地文件元数据隔离：Unix 使用 uid/gid 和 mode，Windows 显示 ACL，避免引用不存在的 `syscall.Stat_t`。
-- Windows 私有文件在创建时设置当前账号与 SYSTEM 的受保护 DACL；已有暂存文件写入前收紧访问规则，下载覆盖前复制并验证目标 DACL。
-- 文件打开和重命名基于已持有的目录/文件句柄，不通过「先检查不存在再重命名」实现禁止覆盖；文件名按目标系统组件规则校验。
-- agent 认证和检测共用平台连接入口：Unix socket 或 Windows 本机命名管道，保留原超时、关闭及取消机制。
-- SQLite 使用纯 Go 驱动，Windows 数据位于 `%LOCALAPPDATA%`，与缓存分目录；开发/正式目录和凭据服务隔离。
-- 凭据存储使用 MyGo 接口；快捷键、系统窗口按钮预留区和普通关窗行为按平台处理。
+- Local metadata isolates Unix uid/gid/mode and Windows ACLs without referencing nonexistent `syscall.Stat_t` fields.
+- Windows private files are created with a protected DACL for the current account and SYSTEM. Existing staging files have access restricted before writing. Download overwrite copies and verifies the destination DACL first.
+- Opens and renames use retained directory/file handles rather than check-then-rename for no-overwrite commits. Filename components are validated for the destination system.
+- Agent authentication and detection use the same platform entry point: Unix socket or local Windows named pipe, preserving timeout, closure, and cancellation behavior.
+- SQLite uses a pure Go driver. Windows data resides in `%LOCALAPPDATA%`, separate from caches. Development/release data and credential services are isolated.
+- System credential access uses MyGo. Shortcuts, native window-button insets, and ordinary window closing are handled per platform.
 
-Windows 命名管道使用固定 `go-winio v0.6.4`，其许可证随应用「关于」展示；没有升级主 MyGo 或 Ghostty。
+Windows named pipes use pinned `go-winio v0.6.4`; its license appears in About. The main MyGo and Ghostty versions were not upgraded.
 
-## Windows 原生验收
+## Interface language validation
 
-下列项目仍需在实际 Windows 会话中完成，不能由交叉编译替代：
+The current i18n change passed existing tests, race, English-environment tests, vet, local builds, and Windows amd64/arm64 cross-builds and vet. Catalog checks cover English/Chinese keys, arguments, and missed source text. This does not establish acceptance of native language switching, English layouts, system dialogs, or accessibility. See [interface languages](i18n.md) for maintenance and checks.
 
-- 启动 EXE/解压便携包，检查 DLL 加载、显示缩放、窗口按钮、最小化与任务栏恢复。
-- SSH 密码、普通/加密私钥、agent、首次信任与主机密钥变更拒绝。
-- 终端输入、IME、复制粘贴、分屏焦点、窗口 resize 及关闭单窗格隔离。
-- SFTP/FTP 上传下载，新目标提交、覆盖与保留两者，权限/文件占用错误，以及暂停、继续、取消和退出恢复。
-- 私钥和暂存文件 ACL、覆盖后目标 ACL，路径替换、保留名称及不支持文件名的错误行为。
-- Credential Manager 保存/读取，SQLite 文件锁、WAL 与私有 ACL，正常退出及重启后离线恢复。
-- 使用生成的 EXE 安装程序验证安装、快捷方式、升级、卸载及数据保留。
+## Windows native acceptance
 
-现有原生 E2E 启动器使用 macOS `.app` 和自动化 overlay，尚未迁移为 Windows 驱动。验证结果应记录实际提交、系统版本、架构和未覆盖项，规则见[验证范围](limitations.md#验证如何解读)。
+The following still require an actual Windows session; cross-compilation cannot replace them:
+
+- Start the EXE or portable package; check DLL loading, scaling, window buttons, minimizing, and taskbar restoration.
+- SSH password, plain/encrypted private key, agent, first trust, and changed-host-key rejection.
+- Terminal input, IME, copy/paste, split focus, resize, and isolated pane closure.
+- SFTP/FTP upload/download, new destination commit, overwrite and Keep both, permission/file-sharing errors, pause/resume/cancel, and recovery after quitting.
+- Private key/staging ACLs, destination ACLs after overwrite, path replacement, reserved names, and unsupported filename errors.
+- Credential Manager access, SQLite locks/WAL/private ACLs, normal shutdown, and offline restoration after restart.
+- Installation, shortcuts, upgrade, uninstallation, and retained data using the generated installer.
+
+Existing native E2E launchers use macOS `.app` bundles and an automation overlay; they have not been ported to Windows. Record the actual commit, OS version, architecture, and uncovered cases. See [interpreting validation](limitations.md#interpreting-validation).

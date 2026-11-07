@@ -1,47 +1,49 @@
-# 已知限制与验证范围
+# Known limitations and validation scope
 
-本页记录当前能力的边界。验证结果只适用于实际运行的代码版本、环境和场景，不自动代表后续版本或其他平台已通过。
+[English](limitations.md) | [简体中文](limitations.zh.md)
 
-## 平台与界面
+This page records current boundaries. Validation applies only to the code version, environment, and scenarios actually run. It does not automatically establish acceptance for later versions or other platforms.
 
-- macOS 运行基线为 13 及以上系统；Windows amd64/arm64 已接入编译、EXE/便携 ZIP 打包，原生运行尚待 Windows 环境验证。Linux 暂有编译检查，不承诺桌面运行可用，具体见[平台支持](platform-support.md)。
-- Linux 监控要求远端提供相应 `/proc` 数据；根盘容量额外依赖可用的 SFTP statvfs 扩展及一致的根挂载。
-- 中英文设置已接入，部分工作区及动态文案仍为中文。
-- 应用没有自动更新服务。当前版本与许可证可在「关于」查看。
+## Platforms and UI
 
-## 传输与恢复
+- macOS requires version 13 or later. Windows amd64/arm64 has compilation and EXE/portable ZIP packaging entry points; native runtime acceptance requires a Windows environment. Linux has compilation checks without a guarantee of desktop runtime support. See [platform support](platform-support.md).
+- Linux monitoring requires suitable remote `/proc` data. Root disk capacity also requires usable SFTP statvfs support and a matching root mount.
+- App UI and business messages support English, Simplified Chinese, and System. Historical free text and raw system, third-party, and remote diagnostics retain their original content. Some native system text updates only after restarting. Native language switching, English layouts, and accessibility behavior have not been accepted; see [interface languages](i18n.md).
+- The app has no automatic update service. About shows the current version and licenses.
 
-- 运行中按安全点及节流间隔保存检查点；强制结束或断电只能恢复最近成功提交且经真实文件核验的状态。
-- 续传需要服务器提供相应能力。FTP 不支持 REST 或目标不满足权限/提交要求时，会明确失败。
-- FTP 不具备跨其他客户端的原子条件重命名；预检不能排除外部程序在最终提交前后的并发修改。
-- 覆盖会保留并确认已知目标权限；能力不足、权限未知或无法安全创建私有暂存文件时，可能拒绝覆盖。
-- 符号链接与特殊文件内容不参与传输。目录链接可以显式浏览，递归传输和删除不跟随它们。
-- 启动恢复保持离线；没有原标签身份的旧任务不会按站点名称猜测归属。可通过「找回任务」重新关联并处理。
+## Transfers and recovery
 
-完整行为见[文件管理与传输](file-transfer.md)。
+- Checkpoints are saved at safe points and throttled intervals. After forced termination or power loss, recovery uses only the last successfully committed state that can be verified against real files.
+- Resuming requires server capabilities. FTP without REST, or a destination that cannot meet permission/commit requirements, reports a failure.
+- FTP cannot provide an atomic conditional rename against other clients. Preflight checks cannot eliminate external changes around final commit.
+- Overwriting preserves and verifies known destination permissions. Missing capabilities, unknown permissions, or inability to create private staging files safely may prevent it.
+- Symbolic links and special-file contents are not transferred. Directory links can be browsed explicitly; recursive transfers and deletion do not follow them.
+- Startup restoration stays offline. Tasks lacking their original tab identity are not assigned by guessing a site name; use **Recover tasks** to reassociate them.
 
-## 终端
+See [file management and transfers](file-transfer.md) for the complete behavior.
 
-- 回滚按物理显示行计数，但历史页整体淘汰会产生误差，不能承诺严格等于设置值；增大上限不能恢复已淘汰历史。
-- 导入主题的自定义 16–255 号索引色没有传入原生终端，仍使用终端默认索引色表。
-- 原生终端滚动条与共享 UIKit 滚动条风格一致，尺寸与显隐时长不同。
-- 拖动预览的备用 Snapshot 不提供历史视口位置，不能保证历史中部逐像素同位。
+## Terminal
 
-对应使用说明见[终端与配色](terminal-themes.md)。
+- Scrollback counts physical display lines, but eviction of whole history pages introduces an error margin. The retained amount is not guaranteed to equal the setting exactly. Raising the limit cannot recover evicted history.
+- Custom imported colors at indices 16–255 are not passed to the native terminal; it retains its default indexed palette there.
+- The native terminal scrollbar and shared UIKit scrollbars have a consistent style but different dimensions and visibility durations.
+- The fallback drag Snapshot lacks a historical viewport position and cannot guarantee pixel-for-pixel alignment in the middle of history.
 
-## 验证如何解读
+See [terminal and color schemes](terminal-themes.md).
 
-| 验证方式 | 可以说明什么 | 不能替代什么 |
+## Interpreting validation
+
+| Method | What it establishes | What it does not replace |
 |---|---|---|
-| Go 构建、vet、普通测试 | 对应包能构建，通过静态检查及已有断言 | 真实服务器兼容性、原生窗口交互和视觉表现 |
-| 本机协议集成测试 | 指定 SSH/SFTP/FTP 夹具中的协议和文件行为 | 未运行服务器、网络和文件系统的行为 |
-| 原生 E2E 驱动 | 实际执行的窗口输入、终端及传输断言 | 未覆盖场景、系统钥匙串和视觉验收 |
-| 软件渲染截图 | 对应样本的绘制和布局 | 原生 GPU、系统窗口和真实认证行为 |
+| Go build, vet, ordinary tests | Affected packages compile and pass static checks and existing assertions | Real server compatibility, native window interactions, or visuals |
+| Local protocol integration tests | Protocol and file behavior in the specified SSH/SFTP/FTP fixtures | Untested servers, networks, or filesystems |
+| Native E2E driver | Window input, terminal, and transfer assertions actually executed | Uncovered scenarios, system Keychain behavior, or visual acceptance |
+| Software-rendered screenshots | Rendering and layout of the sample | Native GPU, system windows, or real authentication |
 
-集成测试因缺少环境变量而跳过，不算协议验证通过。已有普通测试没有覆盖全部监控解析/调度及 statvfs 路径；历史监控记录未完成 Linux/OpenWrt 成功采集的端到端验证。
+Integration tests skipped for missing environment variables do not count as protocol acceptance. Existing ordinary tests do not cover every monitoring parser/scheduler or statvfs path. Historical monitoring records did not complete an end-to-end successful Linux/OpenWrt collection check.
 
-Windows 的 ACL、句柄重命名、agent、系统凭据、窗口交互和安装/卸载尚未在原生环境验收；本地文件现有专项测试仅在 macOS/Linux 运行。交叉构建和 PE/ZIP 资源检查不作为这些功能通过的证据。
+Windows ACLs, handle-based rename, agent, system credentials, window interactions, and installation/uninstallation have not received native acceptance. Existing local filesystem tests were run only on macOS/Linux. Cross-builds and PE/ZIP resource checks do not establish these behaviors.
 
-最近的 ShellCard 滚动边缘修复通过已有测试、静态检查和构建，尚未进行原生 GPU 视觉复测。设备、服务器和视觉结果应按实际运行单独记录，不能由历史日志或代码存在推定通过。
+Recent ShellCard scroll-edge fixes passed existing tests, static checks, and builds, but have not received another native GPU visual check. Record device, server, and visual results separately; do not infer them from old logs or the presence of code.
 
-检查命令见[开发与构建](development.md)，受控夹具和原生驱动见[联调说明](../dev/ssh-integration/README.md)。
+See [development and builds](development.md) for commands, and [integration instructions](../dev/ssh-integration/README.md) for controlled fixtures and native drivers.

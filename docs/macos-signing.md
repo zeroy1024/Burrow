@@ -1,82 +1,84 @@
-# macOS 签名与解锁
+# macOS signing and unlock
 
-Burrow 的 macOS 正式包使用固定自签名身份。业务密码、托管私钥和口令继续加密保存在 SQLite；系统钥匙串只保存一份随机的自动解锁密钥。应用密码仍是独立的解锁方式。
+[English](macos-signing.md) | [简体中文](macos-signing.zh.md)
 
-当前身份已创建并固定，私钥位于本机用户默认钥匙串。2026-11-05 的隔离验证已通过：两个不同代码哈希的签名版本保持相同 designated requirement，第二版在禁止再次弹出授权界面的条件下读取第一版的钥匙串夹具成功。Touch ID 硬件可用，但当前自签名探针创建受保护项目返回 -34018，尚未接入指纹解锁。
+Burrow macOS release packages use a fixed self-signed identity. Business passwords, managed private keys, and passphrases remain encrypted in SQLite. The system Keychain stores only a random automatic unlock key. App password unlock remains independent.
 
-## 签名身份
+The current identity is created and pinned, with its private key in the local user's default Keychain. Isolated validation on 2026-11-05 passed: two signed builds with different code hashes retained the same designated requirement; the second read the first's fixture without allowing another authorization dialog. Touch ID hardware was available, but creating a protected item with the self-signed probe returned -34018. Fingerprint unlock is not integrated.
 
-- [mygo.json](../mygo.json) 固定签名证书指纹，避免按名称误选另一张同名证书。
-- [assets/signing/burrow-local.pem](../assets/signing/burrow-local.pem) 只包含公有证书，可以随代码保存。
-- 私钥不进入项目、安装包、提交、配置或日志。初始化时仅在内存生成未加密私钥；短期 PKCS#12 文件使用随机口令加密，口令只在进程中持有。
-- 自签名不是 Developer ID，不提供 Apple 公证或消除 Gatekeeper 检查。
-- 固定签名适用于保持传统登录钥匙串中的应用身份，不会自动获得数据保护钥匙串的受限权限。
+## Signing identity
 
-首次配置：
+- [mygo.json](../mygo.json) pins the certificate fingerprint to avoid selecting a different certificate with the same name.
+- [assets/signing/burrow-local.pem](../assets/signing/burrow-local.pem) contains only the public certificate and may be committed.
+- Private keys never enter the project, package, commit, configuration, or logs. Setup generates the unencrypted key only in memory; temporary PKCS#12 files use a random password held only in the process.
+- Self-signing is not Developer ID, provides no Apple notarization, and does not remove Gatekeeper checks.
+- A fixed identity preserves access identity in the traditional login Keychain; it does not grant restricted data-protection Keychain entitlements.
+
+Initial setup:
 
 ~~~sh
 python3 scripts/setup-macos-signing.py
 python3 scripts/setup-macos-signing.py --check
 ~~~
 
-仓库已经包含公有证书时，脚本只接受该证书对应的已有私钥。构建机缺少私钥时，应导入原签名身份，不能通过删除证书文件或重新生成证书绕过检查。证书初次生成时导入用户默认钥匙串，并仅将系统 codesign 列为允许访问该新私钥的程序。
+When the repository contains a public certificate, the script accepts only its existing matching private key. A build machine missing it must import the original identity, not delete/regenerate the certificate to bypass checks. Initial creation imports into the default user Keychain and allows only system codesign to access the new key.
 
-macOS 首次使用新私钥时可能显示 codesign 的系统授权窗口。由用户本人在系统窗口中输入钥匙串密码并选择始终允许；密码不应发送到聊天、命令行或脚本。此授权仅用于新签名私钥，不需要允许所有应用读取业务凭据。
+First use may show a system codesign authorization dialog. Enter the Keychain password personally in that dialog and choose Always Allow. Do not send the password through chat, command lines, or scripts. This authorizes the new signing key, not unrestricted access to business credentials.
 
-使用「钥匙串访问」导出并妥善备份该证书和私钥的加密 PKCS#12 文件。CI runner 和其他发布构建机必须导入同一身份。GitHub 使用托管 `macos-15` runner，由维护者在仓库配置加密 PKCS#12 的 Base64 和导出口令两项 Secret，任务中导入临时钥匙串；步骤见 [GitHub CI](development.md#github-ci)。Gitea 的 host runner 则预先导入身份并完成 codesign 授权。普通用户只安装签好的应用，不需要导入发布私钥。
+Use Keychain Access to export and securely back up the certificate/private key as encrypted PKCS#12. CI and other release machines must import the same identity. GitHub uses hosted `macos-15`, importing Base64 PKCS#12 and its export password from two repository Secrets into a temporary Keychain; see [GitHub CI](development.md#github-ci). Gitea host runners import the identity and authorize codesign beforehand. Ordinary users install signed packages without importing release private keys.
 
-## 正式版与开发版
+## Release and development builds
 
-[platformUnlockKeys](../internal/desktop/vault_keys_darwin.go) 仅对名称为 Burrow 的打包正式版启用钥匙串服务 dev.burrow.app.vault-unlock。开发版和联调包保持文件密钥和独立数据目录，避免其不断变化的签名影响正式项目。
+[platformUnlockKeys](../internal/desktop/vault_keys_darwin.go) enables `dev.burrow.app.vault-unlock` only for packaged release apps named Burrow. Development/integration builds retain file keys and isolated data, so changing signatures do not affect release items.
 
-正常发布命令及直接 MyGo 构建均使用固定签名；完整 macOS 打包会先检查签名身份，缺失时明确失败。仅为隔离联调构造的临时包继续使用其既有临时签名及测试命名空间。
+Normal release commands and direct MyGo builds use the fixed identity. Full macOS packaging checks it first and fails explicitly if missing. Temporary isolated integration packages retain their existing temporary signing and test namespaces.
 
-Vault 库头格式 v2 将 file 或 keychain 来源绑定到认证数据。已有文件自动解锁库先用原文件解锁，再轮换数据密钥并迁入钥匙串。旧文件保留为迁移副本；新的钥匙串项目缺失或无法读取时不回退旧文件、不生成替代密钥。
+Vault metadata v2 authenticates the file/keychain source. Existing file-mode vaults first unlock with the original file, then rotate data keys and migrate to Keychain. Old files remain as migration copies. Missing/unreadable new Keychain items do not fall back to them or generate replacement keys.
 
-开启或修改应用密码时，当前凭据仍重新加密并轮换数据密钥。旧钥匙串自动解锁项目只在新代次提交并回读确认后删除，清理失败单独报告，不回滚已成功的密码设置。
+Enabling/changing an app password still re-encrypts credentials and rotates the data key. Previous automatic unlock Keychain items are removed only after committing and reading back the new generation. Cleanup failure is reported separately without rolling back a successful password setting.
 
-## 终端动态库与库验证
+## Terminal libraries and library validation
 
-固定签名构建和整包签名校验已可完成，但隔离加载器发现 hardened runtime 会因自签名证书没有 Apple Team ID 而拒绝加载 libghostty-vt，报告进程与动态库的 Team ID 不匹配。不能将「签名成功」等同于终端可以运行。
+Fixed-identity builds and complete-package signature checks succeed. An isolated loader found that hardened runtime rejects libghostty-vt because the self-signed certificate has no Apple Team ID, reporting mismatched process/library Team IDs. Signing success does not establish terminal runtime success.
 
-[应用级权限配置](../assets/macos.entitlements.plist) 使用 com.apple.security.cs.disable-library-validation，保留其他 hardened runtime 限制。该权限允许整个 Burrow 进程加载没有匹配 Team ID 的动态库，作用范围不限于 Ghostty。该例外已获项目所有者明确授权，并由 mygo.json 接入签名配置。
+[App entitlements](../assets/macos.entitlements.plist) enable `com.apple.security.cs.disable-library-validation` while retaining other hardened-runtime restrictions. This permits the entire Burrow process, not just Ghostty, to load libraries without matching Team IDs. The project owner explicitly authorized this exception, which `mygo.json` supplies to signing.
 
-最终权限配置已通过整包签名检查、终端库的实际加载以及真实 MyGo 钥匙串包装密钥的创建、回读、重新打开与退出活动引用后的清理验证，均使用临时数据与独立测试服务。未启动真实 Burrow 工作区或迁移真实业务凭据。
+The final entitlements passed complete-package signature checks, actual terminal-library loading, and creation/readback/reopen/cleanup of real MyGo Keychain wrapping keys after active references ended, using temporary data and isolated services. The real Burrow workspace was not started and business credentials were not migrated.
 
-此例外只解决当前自签名包的终端库加载，不会授予 Touch ID 数据保护钥匙串权限。若保持库验证，需要改用带有效 Apple Team ID 的签名路径，不能靠修改自签名证书字段伪造该权限。
+The exception solves terminal-library loading for the current self-signed package; it does not grant Touch ID data-protection Keychain access. Retaining library validation requires signing with a valid Apple Team ID, not fabricating permission through self-signed certificate fields.
 
-## 可移植备份
+## Portable backups
 
-自动解锁的 Vault.Backup 使用当前内存数据密钥，为一致的数据库快照生成独立的文件解锁密钥并重新封装库头。备份记录保持原版本和代次，不要求另一台机器访问原 Mac 的钥匙串。
+Automatic-mode `Vault.Backup` uses the current in-memory data key to create an independent file unlock key for a consistent database snapshot and rewrap its metadata. Record versions/generations remain unchanged. Another machine need not access the original Mac's Keychain.
 
-因此只复制 macOS 数据目录不再构成完整的跨机器备份。应使用配套备份目录，或在已经启用应用密码的情况下保存数据库及对应密码。现阶段没有新增备份界面。
+Copying only the macOS data directory is therefore not a complete cross-machine backup. Use the paired backup directory, or retain the database/password after enabling app password unlock. There is no new backup UI at present.
 
-## 跨版本验证
+## Cross-version validation
 
 ~~~sh
 python3 scripts/verify-macos-keychain.py
 ~~~
 
-脚本仅在临时目录构造签名探针和专用测试钥匙串，不启动真实 Burrow 或读取现有业务凭据：
+The script creates signed probes and a dedicated test Keychain only in temporary directories. It does not start real Burrow or read business credentials:
 
-1. 编译两个代码哈希不同、应用标识相同的探针包。
-2. 使用固定签名身份签名，核对 designated requirement 完全一致。
-3. 由第一个包向专用测试钥匙串写入已知夹具。
-4. 整包替换为第二个版本，再禁止授权界面读取该夹具；必须直接成功，不能靠再次授权通过。
-5. 只从系统搜索列表移除本次专用测试钥匙串，保留其他项目及并发变更。
+1. Compile two bundles with different code hashes and the same app identifier.
+2. Sign with the fixed identity and verify identical designated requirements.
+3. Write a known fixture from the first bundle to the dedicated test Keychain.
+4. Replace the whole bundle with the second and read with authorization UI prohibited. It must succeed without reauthorization.
+5. Remove only this test Keychain from the system search list, preserving other items and concurrent changes.
 
-临时目录保留验证结果。脚本不输出业务秘密，也不记录临时钥匙串口令。
+Results remain in the temporary directory. Business secrets and the test Keychain password are not logged.
 
-## 当前验证边界
+## Current validation boundaries
 
-2026-11-05 的固定签名探针已确认本机可以使用 Touch ID，biometryType 为 Touch ID。创建生物认证保护项目时返回 -34018，即缺少 entitlement。跨版本普通钥匙串写入与读取的 OSStatus 均为 0，且夹具内容一致。验证没有调用指纹验证，不表示已经实现 Touch ID 解锁。
+The fixed-signature probe on 2026-11-05 reported Touch ID availability with `biometryType` set to Touch ID. Creating a biometric-protected item returned -34018, a missing entitlement. Cross-version ordinary Keychain write/read OSStatus values were both 0 and fixture contents matched. No fingerprint verification ran; this does not establish implemented Touch ID unlock.
 
-受限执行沙箱可能阻断 LocalAuthentication 或钥匙串 XPC 访问，产生 4099 或 -25291。这类结果不能用于认定硬件不支持，验证应在本机登录用户的原生上下文中运行。
+Restricted execution sandboxes may block LocalAuthentication or Keychain XPC and produce 4099 or -25291. Such results do not establish missing hardware. Run validation in the logged-in user's native context.
 
-## Touch ID 的接入条件
+## Conditions for Touch ID integration
 
-固定自签名与 Touch ID 保护密钥的权限不是同一件事。根据 [Apple TN3137](https://developer.apple.com/documentation/technotes/tn3137-on-mac-keychains)，以生物认证保护钥匙串项目需要数据保护钥匙串；其访问组权限需要有效 provisioning profile 授权，自签名证书本身不提供这项授权。
+Fixed self-signing and authorization for a Touch ID-protected key are separate. [Apple TN3137](https://developer.apple.com/documentation/technotes/tn3137-on-mac-keychains) describes the data-protection Keychain required for biometric-protected items. Access-group entitlements require authorization from a valid provisioning profile; self-signed certificates alone do not provide it.
 
-验证脚本读取 LocalAuthentication 的可用性，不触发指纹验证；同时尝试创建一个禁止交互的、受 biometryCurrentSet 保护的隔离钥匙串夹具。若系统拒绝，记录真实 OSStatus，并保留现有应用密码。成功创建的夹具仅清理自身随机账号，不修改其他项目。
+The probe reads LocalAuthentication availability without requesting fingerprint verification. It also tries to create an isolated `biometryCurrentSet` fixture with interaction prohibited. Rejection records the actual OSStatus and retains app-password behavior. Successfully created fixtures clean up only their own random account, not other items.
 
-只有安全密钥路径与跨版本访问都验证后，才增加 Touch ID 设置和解锁入口。不会在普通文件中保存可直接解密的快捷密钥，再用一次指纹对话框替代系统密钥保护。
+Add Touch ID settings and unlock UI only after both the protected-key path and cross-version access are verified. Do not store an easily decryptable shortcut key in an ordinary file and substitute a fingerprint dialog for system key protection.
