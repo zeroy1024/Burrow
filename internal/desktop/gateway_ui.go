@@ -528,6 +528,7 @@ func (a *app) gatewayList(c *ui.Context) {
 func (a *app) gatewayListBody(c *ui.Context) {
 	t := theme.Current()
 	state := &a.gatewayUI
+	arrowAnimation := a.catalogDisplaceAnimation()
 	query := strings.ToLower(strings.TrimSpace(a.page().query))
 	viewport := ui.Box(c).Key("gateway-list-viewport").Grow(1).MinHeight(0).FillWidth().Clip()
 	viewport.Children(func() {
@@ -553,8 +554,9 @@ func (a *app) gatewayListBody(c *ui.Context) {
 					}
 					group := uikit.SiderGroup(c, uikit.SiderGroupProps{
 						Key: "gateway-group-" + kind, Title: title, Count: len(items), Open: &open, Chevron: chevronIcon,
-						Motion: uikit.MotionOverride(a.reduceMotion(c)), DeferPresentation: true,
+						Motion: uikit.MotionOverride(a.reduceMotion(c)), ArrowAnimation: &arrowAnimation, DeferPresentation: true,
 					})
+					group.Root.Transition(a.catalogTransition(catalogGroupDrag))
 					if shown > 0 {
 						group.Root.Margin(t.C.Catalog.GroupGap, 0, 0, 0)
 					}
@@ -588,7 +590,8 @@ func (a *app) gatewayRow(c *ui.Context, g gatewayConfig) {
 	address := a.gatewayAddress(g)
 	row := ui.ButtonBase(c).Key(g.ID).Height(t.C.Catalog.RowHeight).Shrink(0).FillWidth().
 		Padding(0, p.PaddingRight, 0, p.PaddingLeft).Gap(p.Gap).Radius(p.Radius).Role(ui.RoleListItem).
-		Label(g.Name + "，" + address).Selected(selected).FocusRing(false).TextColor(uikit.Color(p.NameColor))
+		Label(g.Name + "，" + address).Selected(selected).FocusRing(false).TextColor(uikit.Color(p.NameColor)).
+		Transition(a.catalogTransition(catalogHostDrag))
 	background := ui.Transparent
 	if selected {
 		background = uikit.Color(p.BgActive)
