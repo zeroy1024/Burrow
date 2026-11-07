@@ -642,6 +642,7 @@ func (a *app) mcpKeysTab(c *ui.Context) {
 
 func (a *app) mcpPoliciesTab(c *ui.Context) {
 	t := theme.Current()
+	connectionIDs := a.mcpConnectionFilterIDs(a.mcp.policyConnFilter)
 	totalAll, totalSSH, totalFiles := len(a.mcp.policies), 0, 0
 	for _, p := range a.mcp.policies {
 		if p.Category == "ssh" {
@@ -664,7 +665,9 @@ func (a *app) mcpPoliciesTab(c *ui.Context) {
 		if a.mcp.policyStateFilter == "disabled" && p.Enabled {
 			continue
 		}
-		if a.mcp.policyConnFilter != "all" && !slices.Contains(p.Connections, a.mcp.policyConnFilter) {
+		if len(connectionIDs) > 0 && !slices.ContainsFunc(p.Connections, func(id string) bool {
+			return slices.Contains(connectionIDs, id)
+		}) {
 			continue
 		}
 		if a.mcp.policyKeyFilter != "all" && !p.AllKeys && !slices.Contains(p.KeyIDs, a.mcp.policyKeyFilter) {

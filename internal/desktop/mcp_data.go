@@ -88,9 +88,7 @@ func (a *app) mcpFilter() store.MCPOperationFilter {
 	if a.mcp.auditKeyFilter != "all" {
 		f.KeyID = a.mcp.auditKeyFilter
 	}
-	if a.mcp.auditConnFilter != "all" {
-		f.ConnectionID = a.mcp.auditConnFilter
-	}
+	f.ConnectionIDs = a.mcpConnectionFilterIDs(a.mcp.auditConnFilter)
 	if a.mcp.auditTypeFilter != "all" {
 		if a.mcp.auditTypeFilter == "策略管理" {
 			f.ActionPrefix = "policy."

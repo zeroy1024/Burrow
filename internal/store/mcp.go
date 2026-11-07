@@ -81,12 +81,13 @@ type MCPTask struct {
 }
 
 type MCPOperationFilter struct {
-	KeyID, ConnectionID, Status, Action string
-	PolicyID, ActionPrefix              string
-	ToolsOnly                           bool
-	Statuses                            []string
-	Since, Until                        time.Time
-	Limit, Offset                       int
+	KeyID, Status, Action  string
+	PolicyID, ActionPrefix string
+	ToolsOnly              bool
+	ConnectionIDs          []string
+	Statuses               []string
+	Since, Until           time.Time
+	Limit, Offset          int
 }
 
 const mcpDateLayout = "2006-01-02T15:04:05.000000000Z"
@@ -508,11 +509,18 @@ func (s *Store) MCPOperations(ctx context.Context, filter MCPOperationFilter) ([
 	where := []string{"1=1"}
 	args := []any{}
 	for _, field := range []struct{ column, value string }{
-		{"key_id", filter.KeyID}, {"connection_id", filter.ConnectionID}, {"status", filter.Status}, {"action", filter.Action},
+		{"key_id", filter.KeyID}, {"status", filter.Status}, {"action", filter.Action},
 	} {
 		if field.value != "" {
 			where = append(where, field.column+"=?")
 			args = append(args, field.value)
+		}
+	}
+	if len(filter.ConnectionIDs) > 0 {
+		placeholders := strings.TrimSuffix(strings.Repeat("?,", len(filter.ConnectionIDs)), ",")
+		where = append(where, "connection_id IN ("+placeholders+")")
+		for _, id := range filter.ConnectionIDs {
+			args = append(args, id)
 		}
 	}
 	if len(filter.Statuses) > 0 {

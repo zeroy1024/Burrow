@@ -35,6 +35,21 @@ func (b *mcpDesktop) groupConnections(connections []mcpserver.Connection) {
 	}
 }
 
+// Audit records and legacy policies retain their source connection IDs.
+func (a *app) mcpConnectionFilterIDs(id string) []string {
+	ids := []string{}
+	if id == "all" {
+		return ids
+	}
+	ids = append(ids, id)
+	for _, c := range a.mcpBackend.connections {
+		if c.CanonicalID == id {
+			ids = append(ids, c.ID)
+		}
+	}
+	return ids
+}
+
 func (a *app) sameMCPSSH(left, right host) bool {
 	l, r := left.session, right.session
 	if left.address != right.address || left.port != right.port || left.user != right.user ||
