@@ -854,7 +854,7 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `size.mcpDrawerWidth` | 500px | ＝ |  |
 | `size.mcpMainMinWidth` | 360px | ＝ |  |
 | `size.mcpRuleModeWidth` | 120px | ＝ | 命令规则匹配方式选择框 |
-| `size.mcpPermissionColumn` | 118px | ＝ | 连接授权矩阵能力列 |
+| `size.mcpPermissionColumn` | 76px | ＝ | 连接授权矩阵能力列 |
 
 ### font
 | token | Light | Dark（derived） | 用途 |
@@ -2417,7 +2417,7 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `mcp.drawerWidth` | `{size.mcpDrawerWidth}` | 500px |  |
 | `mcp.mainMinWidth` | `{size.mcpMainMinWidth}` | 360px |  |
 | `mcp.ruleModeWidth` | `{size.mcpRuleModeWidth}` | 120px | 命令规则匹配方式选择框 |
-| `mcp.permissionColumn` | `{size.mcpPermissionColumn}` | 118px | 连接授权矩阵能力列 |
+| `mcp.permissionColumn` | `{size.mcpPermissionColumn}` | 76px | 连接授权矩阵能力列 |
 
 ### inset
 | token | 引用 | Light 值 | 说明 |

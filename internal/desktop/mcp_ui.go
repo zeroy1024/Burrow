@@ -16,14 +16,15 @@ import (
 )
 
 type mcpKeyGrant struct {
-	EndpointDigest          string
-	ConnectionID            string
-	Name, Subtitle, Warning string
-	SupportsFiles           bool
-	SupportsSSH             bool
-	AllowRead, AllowWrite   bool
-	AllowExec               bool
-	Sources                 []store.MCPGrant
+	EndpointDigest        string
+	ConnectionID          string
+	Name, Warning         string
+	Protocol, Endpoint    string // 原始协议名（ssh/sftp/ftp/ftps）与 user@host:port
+	SupportsFiles         bool
+	SupportsSSH           bool
+	AllowRead, AllowWrite bool
+	AllowExec             bool
+	Sources               []store.MCPGrant
 }
 
 type mcpSecretKey struct {
@@ -151,6 +152,7 @@ type mcpKeyModalDraft struct {
 	modal          uikit.ModalController
 	Open           bool
 	EditingID      string
+	EditingMeta    string // 编辑时的副标题：密钥前缀与创建时间
 	OneTimeView    bool
 	GeneratedKey   string
 	SavedConfirmed bool
@@ -160,6 +162,11 @@ type mcpKeyModalDraft struct {
 	UploadDirs     []string
 	DownloadDirs   []string
 	Scroll         ui.ScrollState
+	// 连接较多时的搜索与「仅看已授权」。GrantedSnapshot 记录开启筛选时已授权的
+	// 连接，取消勾选后该行仍保留，直到重新开启筛选。
+	Query           string
+	OnlyGranted     bool
+	GrantedSnapshot map[string]bool
 }
 
 type mcpKeyConfirmDialog struct {

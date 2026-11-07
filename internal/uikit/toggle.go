@@ -47,6 +47,9 @@ func Switch(c *ui.Context, value *bool, props ToggleProps) ui.Element {
 
 type CheckProps struct {
 	Mixed, Disabled bool
+	// HideLabel keeps label for accessibility only, for a box in a table cell
+	// whose column header already names it.
+	HideLabel bool
 }
 
 func Checkbox(c *ui.Context, value *bool, label string, options ...CheckProps) ui.Element {
@@ -84,7 +87,9 @@ func Checkbox(c *ui.Context, value *bool, label string, options ...CheckProps) u
 				painter.StrokePath(&mark, t.Size.Divider*2, Color(p.Mark))
 			}
 		})
-		ui.Text(c, label).FontSize(t.Font.Size.Body).PassThrough()
+		if !props.HideLabel {
+			ui.Text(c, label).FontSize(t.Font.Size.Body).PassThrough()
+		}
 	})
 	return StyleDisabled(row, props.Disabled)
 }

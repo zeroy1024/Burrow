@@ -1,0 +1,571 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>授权密钥弹窗 · 设计草图</title>
+<style>
+:root{
+  --font-ui:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC",Inter,"Noto Sans CJK SC",system-ui,sans-serif;
+  --font-mono:"JetBrains Mono","SF Mono",Menlo,monospace;
+  --page:#d6d6da; --stage:#c9c9ce;
+  --card:#fff; --raised:#fff; --sunken:#f4f4f5; --field:#fff;
+  --control:#f2f2f4; --control-strong:#ececef;
+  --hover:#f7f7f8; --pressed:#e6e6e9;
+  --border-card:rgba(0,0,0,.06); --border-divider:#f0f0f2;
+  --border-control:#e6e6e9; --border-control-hover:#c7c7cc;
+  --text:#1d1d1f; --text-2:#8e8e93; --text-3:#a1a1a6; --text-4:#c7c7cc; --text-muted:#6e6e73;
+  --text-strong:#3a3a3f; --text-badge:#5b5b62; --text-ph:#c7c7cc; --icon:#6e6e73;
+  --accent:#0a84ff; --accent-hover:#0a6fd6; --accent-text:#0a6fd6; --accent-subtle:#eaf3fe; --accent-halo:rgba(10,132,255,.16);
+  --warning:#f5a623; --warning-text:#b26a00; --warning-subtle:#fdf3e3;
+  --danger:#ff3b30; --danger-text:#d70015; --danger-subtle:#fdecec; --danger-halo:rgba(255,59,48,.14);
+  --ssh-bg:rgba(10,132,255,.10); --ssh-fg:#0a6fd6;
+  --file-bg:rgba(142,92,247,.11); --file-fg:#7444db;
+  --thumb:rgba(0,0,0,.22);
+  --shadow-dialog:0 0 0 .5px rgba(0,0,0,.08),0 18px 48px rgba(0,0,0,.22),0 2px 8px rgba(0,0,0,.06);
+  --shadow-seg:0 1px 2px rgba(0,0,0,.08),0 0 0 .5px rgba(0,0,0,.06);
+  color-scheme:light;
+}
+:root[data-theme="dark"]{
+  --page:#0e0e10; --stage:#141416;
+  --card:#252527; --raised:#2e2e31; --sunken:#2a2a2d; --field:#2a2a2d;
+  --control:#2e2e31; --control-strong:#333336;
+  --hover:#2a2a2d; --pressed:#3a3a3d;
+  --border-card:rgba(255,255,255,.08); --border-divider:#333336;
+  --border-control:#3a3a3d; --border-control-hover:#5a5a5f;
+  --text:#f5f5f7; --text-2:#98989d; --text-3:#6e6e73; --text-4:#4a4a4f; --text-muted:#a1a1a6;
+  --text-strong:#d1d1d6; --text-badge:#c7c7cc; --text-ph:#5a5a5f; --icon:#a1a1a6;
+  --accent-hover:#4da3ff; --accent-text:#4da3ff; --accent-subtle:#16304d; --accent-halo:rgba(10,132,255,.24);
+  --warning:#ffb340; --warning-text:#ffc15c; --warning-subtle:#3d2e12;
+  --danger:#ff453a; --danger-text:#ff6961; --danger-subtle:#3a1d1c; --danger-halo:rgba(255,69,58,.22);
+  --ssh-bg:rgba(10,132,255,.2); --ssh-fg:#6cb4ff;
+  --file-bg:rgba(142,92,247,.24); --file-fg:#b79cff;
+  --thumb:rgba(255,255,255,.24);
+  --shadow-dialog:0 0 0 .5px rgba(255,255,255,.12),0 18px 48px rgba(0,0,0,.55);
+  --shadow-seg:0 1px 2px rgba(0,0,0,.3),0 0 0 .5px rgba(255,255,255,.08);
+  color-scheme:dark;
+}
+
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--page);color:var(--text);font:12.5px/1.45 var(--font-ui);-webkit-font-smoothing:antialiased;min-width:1180px;padding-bottom:48px}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;cursor:default;text-align:inherit}
+input{font:inherit;color:inherit}
+h1,h2,h3,h4,p{margin:0}
+.mono{font-family:var(--font-mono);letter-spacing:-.2px}
+.grow{flex:1 1 auto}
+.ic{flex:none;display:block}
+
+/* ---------- 草图控制条 ---------- */
+.sketchbar{width:1180px;margin:22px auto 14px;display:flex;align-items:center;gap:12px}
+.sketchbar h1{font-size:14px;font-weight:600;white-space:nowrap}
+.sketchbar .cap{color:var(--text-2);font-size:12px;white-space:nowrap}
+.seg{display:inline-flex;padding:2px;border-radius:7px;background:rgba(0,0,0,.07);gap:2px;flex:none}
+:root[data-theme="dark"] .seg{background:rgba(255,255,255,.08)}
+.seg button{height:24px;padding:0 10px;border-radius:5px;color:var(--text-muted);font-weight:500;font-size:12px;white-space:nowrap}
+.seg button.on{background:var(--raised);color:var(--text);box-shadow:var(--shadow-seg)}
+
+/* ---------- 舞台：模拟固定高度的应用窗口，弹窗高度以此封顶 ---------- */
+.stage{position:relative;width:1180px;height:860px;margin:0 auto;padding:40px 0 44px;border-radius:12px;background:var(--stage);display:flex;justify-content:center;align-items:flex-start}
+
+/* ---------- 通用控件 ---------- */
+.btn{height:28px;padding:0 12px;border-radius:7px;background:var(--control);color:var(--text-strong);display:inline-flex;align-items:center;gap:6px;font-weight:500;white-space:nowrap;transition:background .16s}
+.btn:hover{background:var(--control-strong)}
+.btn:active{background:var(--pressed)}
+.btn.primary{background:var(--accent);color:#fff}
+.btn.primary:hover{background:var(--accent-hover)}
+.btn.link{height:24px;padding:0 8px;background:transparent;color:var(--accent-text);font-size:12px}
+.btn.link:hover{background:var(--accent-subtle)}
+.ibtn{width:26px;height:26px;border-radius:6px;display:grid;place-items:center;color:var(--icon);transition:background .16s,color .16s}
+.ibtn:hover{background:var(--hover);color:var(--text)}
+.ibtn.sm{width:22px;height:22px;border-radius:5px}
+.ibtn.danger:hover{background:var(--danger-subtle);color:var(--danger-text)}
+.badge{height:17px;padding:0 6px;border-radius:9px;font-size:10.5px;font-weight:500;display:inline-flex;align-items:center;white-space:nowrap;flex:none;background:var(--control);color:var(--text-badge)}
+.tile{width:24px;height:24px;border-radius:6px;display:grid;place-items:center;flex:none}
+.k-ssh{background:var(--ssh-bg);color:var(--ssh-fg)}
+.k-file{background:var(--file-bg);color:var(--file-fg)}
+.k-dir{background:var(--control);color:var(--icon)}
+.scroll::-webkit-scrollbar{width:11px}
+.scroll::-webkit-scrollbar-thumb{background:var(--thumb);border-radius:6px;border:3px solid transparent;background-clip:content-box}
+.scroll::-webkit-scrollbar-track{background:transparent}
+
+/* ---------- 弹窗：标题与底栏固定，只有正文滚动 ---------- */
+.dialog{width:680px;max-height:100%;background:var(--card);border-radius:14px;box-shadow:var(--shadow-dialog);display:flex;flex-direction:column;overflow:hidden}
+.dlg-head{flex:none;display:flex;align-items:flex-start;gap:12px;padding:20px 16px 12px 20px;border-bottom:1px solid transparent;transition:border-color .16s}
+.dialog.scrolled .dlg-head{border-bottom-color:var(--border-divider)}
+.head-tile{width:36px;height:36px;border-radius:9px;background:var(--control);color:var(--icon);display:grid;place-items:center;flex:none}
+.head-text{flex:1;min-width:0;padding-top:1px}
+.head-text h3{font-size:15px;font-weight:600;line-height:20px}
+.head-text p{margin-top:2px;color:var(--text-2);font-size:12px}
+.dlg-body{flex:1 1 auto;min-height:0;overflow:auto;padding:10px 20px 24px;display:flex;flex-direction:column;gap:26px}
+.dlg-foot{flex:none;display:flex;align-items:center;gap:8px;padding:12px 20px 14px;border-top:1px solid var(--border-divider)}
+.foot-hint{display:flex;align-items:center;gap:6px;color:var(--text-2);font-size:11.5px}
+
+/* 分区：小标题 + 一行说明，靠留白分隔 */
+.sec-head{display:flex;align-items:flex-end;gap:12px;margin-bottom:10px}
+.sec-head .t{flex:1;min-width:0}
+.sec-title{font-size:13px;font-weight:600;line-height:18px}
+.sec-desc{margin-top:2px;color:var(--text-2);font-size:12px;line-height:17px}
+.sec-meta{color:var(--text-2);font-size:12px;white-space:nowrap;padding-bottom:1px}
+.sec-meta b{color:var(--text);font-weight:600}
+.sec-meta.on b{color:var(--accent-text)}
+
+/* 字段 */
+.field-label{display:block;margin-bottom:6px;font-size:12px;font-weight:500;color:var(--text-strong)}
+.inp{height:32px;width:100%;padding:0 10px;border-radius:7px;border:1px solid var(--border-control);background:var(--field);outline:0;transition:border-color .16s,box-shadow .16s}
+.inp:hover{border-color:var(--border-control-hover)}
+.inp:focus{border-color:var(--accent);box-shadow:0 0 0 3.5px var(--accent-halo)}
+.inp::placeholder{color:var(--text-ph)}
+.inp.err{border-color:var(--danger);box-shadow:0 0 0 3.5px var(--danger-halo)}
+.help{margin-top:6px;color:var(--text-2);font-size:11.5px}
+.help.err{color:var(--danger-text)}
+
+/* 分组框：权限表与目录共用。权限表不裁切溢出，否则表头无法吸顶 */
+.group{border:1px solid var(--border-control);border-radius:10px}
+.group.clip{overflow:hidden}
+
+/* 连接多时的搜索与筛选 */
+.perm-tools{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.search{width:240px;height:28px;padding:0 9px;border-radius:7px;border:1px solid var(--border-control);background:var(--field);display:flex;align-items:center;gap:6px;color:var(--text-3);transition:border-color .16s,box-shadow .16s}
+.search:hover{border-color:var(--border-control-hover)}
+.search:focus-within{border-color:var(--accent);box-shadow:0 0 0 3.5px var(--accent-halo)}
+.search input{flex:1;min-width:0;border:0;outline:0;background:transparent;font-size:12px}
+.search input::placeholder{color:var(--text-ph)}
+.chip{height:28px;padding:0 10px;border-radius:7px;background:var(--control);color:var(--text-strong);display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;white-space:nowrap;transition:background .16s,color .16s}
+.chip:hover{background:var(--control-strong)}
+.chip .box{width:13px;height:13px;border-radius:3.5px;border:1px solid var(--border-control-hover);background:var(--card);display:grid;place-items:center;color:#fff}
+.chip .box .ic{opacity:0}
+.chip.on{background:var(--accent-subtle);color:var(--accent-text)}
+.chip.on .box{background:var(--accent);border-color:var(--accent)}
+.chip.on .box .ic{opacity:1}
+.tools-meta{color:var(--text-2);font-size:11.5px}
+
+/* 权限表 */
+.perm-grid{display:grid;grid-template-columns:minmax(0,1fr) repeat(3,76px);column-gap:4px;align-items:center;padding:0 12px}
+/* top 取正文上内边距的负值，吸顶时贴住标题分隔线，不露出底下滚动的行 */
+.perm-head{position:sticky;top:-10px;z-index:2;height:30px;border-radius:9px 9px 0 0;background:var(--sunken);border-bottom:1px solid var(--border-control);color:var(--text-2);font-size:11.5px;font-weight:500}
+.perm-head span+span{text-align:center}
+.perm-rows{border-radius:0 0 9px 9px}
+.perm-rows.inner{max-height:340px;overflow:auto}
+.perm-row{padding-top:9px;padding-bottom:9px;transition:background .12s}
+.perm-row+.perm-row{border-top:1px solid var(--border-divider)}
+.perm-row:hover{background:var(--hover)}
+.perm-row:last-child{border-radius:0 0 9px 9px}
+.perm-empty{padding:18px 12px;text-align:center;color:var(--text-2);font-size:12px}
+.conn{display:flex;align-items:center;gap:10px;min-width:0}
+.conn-main{min-width:0}
+.conn-name{display:flex;align-items:center;gap:6px;font-weight:600;line-height:18px}
+.conn-name span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.conn-sub{display:flex;align-items:center;gap:6px;color:var(--text-2);font-size:11.5px;line-height:16px;white-space:nowrap}
+.conn-sub .proto{font-weight:600;font-size:10.5px;letter-spacing:.3px;color:var(--text-muted)}
+.conn-sub .mono{font-size:11px;overflow:hidden;text-overflow:ellipsis}
+.cell{display:grid;place-items:center}
+.chk{width:16px;height:16px;border-radius:4.5px;border:1px solid var(--border-control-hover);background:var(--card);display:grid;place-items:center;color:#fff;transition:background .12s,border-color .12s}
+.chk:hover{border-color:var(--accent)}
+.chk:focus-visible{outline:0;box-shadow:0 0 0 3px var(--accent-halo)}
+.chk.on{background:var(--accent);border-color:var(--accent)}
+.chk .ic{opacity:0}
+.chk.on .ic{opacity:1}
+.na{color:var(--text-4);font-size:13px}
+.row-warn{grid-column:1/-1;display:flex;align-items:flex-start;gap:6px;margin:7px 0 0 34px;padding:6px 8px;border-radius:6px;background:var(--warning-subtle);color:var(--warning-text);font-size:11.5px;line-height:16px}
+.row-warn .ic{margin-top:1px}
+
+/* 表格下方说明：开启命令执行后转为警告 */
+.note{display:flex;align-items:flex-start;gap:7px;margin-top:10px;color:var(--text-2);font-size:11.5px;line-height:17px}
+.note .ic{margin-top:1px}
+.note.warn{padding:8px 10px;border-radius:8px;background:var(--warning-subtle);color:var(--warning-text)}
+.note.warn b{font-weight:600}
+
+/* 本地目录 */
+.dir-block{padding:10px 8px 10px 12px}
+.dir-block+.dir-block{border-top:1px solid var(--border-divider)}
+.dir-head{display:flex;align-items:center;gap:10px}
+.dir-head .t{flex:1;min-width:0}
+.dir-title{display:flex;align-items:center;gap:6px;font-weight:600;line-height:18px}
+.dir-sub{color:var(--text-2);font-size:11.5px;line-height:16px}
+.dir-list{margin:8px 4px 0 34px;display:flex;flex-direction:column;gap:4px}
+.dir-item{display:flex;align-items:center;gap:8px;height:28px;padding:0 3px 0 9px;border-radius:6px;background:var(--sunken);color:var(--icon)}
+.dir-item .mono{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11.5px;color:var(--text)}
+
+/* 提示条 */
+.toast{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);padding:8px 14px;border-radius:10px;background:rgba(30,30,32,.92);color:#fff;font-size:12px;box-shadow:0 4px 12px rgba(0,0,0,.18);animation:pop .16s ease-out;white-space:nowrap}
+@keyframes pop{from{opacity:0;transform:translate(-50%,4px)}}
+
+/* ---------- 草图说明 ---------- */
+.notes{width:1180px;margin:26px auto 0;display:grid;grid-template-columns:1.35fr 1fr;gap:16px}
+.notes section{background:var(--card);border-radius:12px;box-shadow:inset 0 0 0 .5px var(--border-card);padding:18px 20px}
+.notes h2{font-size:13px;font-weight:600;margin-bottom:10px}
+.notes ol,.notes ul{margin:0;padding-left:18px;color:var(--text-strong);line-height:20px}
+.notes li+li{margin-top:6px}
+.notes b{font-weight:600;color:var(--text)}
+.notes code{font:11.5px var(--font-mono);background:var(--control);padding:1px 5px;border-radius:4px}
+.notes .tag{display:inline-block;margin-left:6px;font-size:10.5px;font-weight:600;padding:0 6px;border-radius:9px;background:var(--warning-subtle);color:var(--warning-text);vertical-align:1px}
+</style>
+</head>
+<body>
+
+<div class="sketchbar">
+  <h1>授权密钥弹窗 · 设计草图</h1>
+  <span class="cap">MCP → 授权密钥</span>
+  <span class="grow"></span>
+  <div class="seg" id="seg-mode"><button data-mode="new" class="on">新增</button><button data-mode="edit">编辑（含警告）</button><button data-mode="many">多连接（18 个）</button></div>
+  <div class="seg" id="seg-scroll" title="条目超出弹窗高度时的滚动方式"><button data-scroll="sticky" class="on">正文滚动 + 吸顶表头</button><button data-scroll="inner">表格内滚动</button></div>
+  <div class="seg" id="seg-theme"><button data-theme="light" class="on">浅色</button><button data-theme="dark">深色</button></div>
+</div>
+
+<div class="stage" id="stage"></div>
+
+<div class="notes">
+  <section>
+    <h2>相对现有实现的主要调整</h2>
+    <ol>
+      <li><b>去掉「第 N 段」徽章</b>：表单不是分步向导，编号没有信息量。改为小标题加一行说明，分区之间只靠留白区分，页面上的蓝色块从 3 条整宽色带减到 0。</li>
+      <li><b>名称字段</b>：标签放在上方，提示放在下方，输入框占满整行，不再和右侧提示挤在同一行。校验出错时，错误信息替换提示行。</li>
+      <li><b>权限矩阵合成一张表</b>：外面只有一个边框，行间用分隔线，不再每行一张卡片，表头也不再单独做一块底色。开关换成复选框，能力列从 118px 收到 76px，连接列不再被截断；「合并 2 条配置」从副标题里拆出来，做成徽章。</li>
+      <li><b>提示跟着状态出现</b>：「默认不授予权限」写进小标题说明，不再用橙色。SFTP 和命令执行的说明放在表格下方；勾选任意「命令执行」后，这条说明变成警告样式并显示连接数。行级警告（连接变更、合并配置）在该行下方完整换行显示。</li>
+      <li><b>汇总计数</b>：小标题右侧显示「已授权 n / N 个连接」，不用逐行去数开关。</li>
+      <li><b>本地目录改成上下两组</b>：每组一行标题、含义和「添加目录」，空状态收成「未添加」徽章。两组都要说的「仍受文件策略限制」只写一次，放在小标题说明里，同时写明「未添加则拒绝该方向的传输」（对应 <code>AuthorizeLocal</code> 现有行为）。</li>
+      <li><b>层级收敛</b>：容器只剩弹窗底色、分组框、目录条目三层。颜色只用在强调色（勾选、添加）和警告上。</li>
+      <li><b>条目多时</b>：弹窗高度封顶，标题和底栏固定，只有正文滚动，正文滚动后标题下方出现分隔线。权限表头在表格范围内吸顶，滚到中间也能看到列名。连接数超过 8 个时显示搜索和「仅看已授权」；开启筛选时记下当时已授权的连接，所以取消勾选后该行不会立刻消失。顶部可以切到「表格内滚动」，对比备选方案。</li>
+    </ol>
+  </section>
+  <section>
+    <h2>落地到 MyGo 时涉及的改动</h2>
+    <ul>
+      <li><code>mcpKeyModal</code>：去掉三个 <code>uikit.Badge</code> 段标题，改用 <code>Text</code> 组成小标题和说明；名称改为标签在上的 <code>FormRow</code>。</li>
+      <li><code>PermissionMatrix</code>：外层改成单个分组框加行分隔线；单元格的 <code>Switch</code> 换成 <code>Checkbox</code>；<code>size.mcpPermissionColumn</code> 从 118 改为 76；<code>Warning</code> 改为单独的换行行。<span class="tag">需改动</span></li>
+      <li>合并数目前拼在 <code>Subtitle</code> 里（<code>mcpGrants</code>），需要拆成独立字段，直接取 <code>len(Sources)</code> 即可。<span class="tag">需改动</span></li>
+      <li>命令执行警告只根据 <code>draft.Grants</code> 里 <code>AllowExec</code> 的数量显示，不涉及后端。</li>
+      <li><code>DirectoryListEditor</code>：改为纵向的「标题行 + 列表」布局，两处调用放进同一个分组框。</li>
+      <li>吸顶表头：弹窗正文目前是 <code>ui.Scroll</code>，不支持吸顶。MyGo 的 <code>ui.List</code> 支持吸顶表头（<code>ListState.Header</code>），需要把正文改成 <code>List</code>，或者自己实现表头固定。<span class="tag">需改动</span></li>
+      <li>表格内滚动（备选）：给表格行区域单独套一个 <code>ui.Scroll</code> 并设最大高度，实现最简单，代价是弹窗里会出现滚动嵌套。</li>
+      <li>搜索与筛选只在界面层过滤 <code>draft.Grants</code>，不涉及后端；显示阈值 8 是占位值，需要按常见窗口高度确定。<span class="tag">待确认</span></li>
+      <li>编辑模式：副标题从 <code>EditingID</code> 改为前缀和创建时间（<code>mcpSecretKey</code> 已有 <code>Prefix</code>、<code>CreatedAt</code>）；底部「明文仅创建时显示」的提示只在新增时显示。<span class="tag">待确认</span></li>
+    </ul>
+  </section>
+</div>
+
+<script>
+/* ---------- 图标（lucide 线条风格，1.75 线宽） ---------- */
+const I = {
+  key:'<path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z"/><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/>',
+  x:'<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+  check:'<path d="M20 6 9 17l-5-5"/>',
+  plus:'<path d="M5 12h14"/><path d="M12 5v14"/>',
+  search:'<path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/>',
+  info:'<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',
+  alert:'<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+  terminal:'<path d="m7 11 2-2-2-2"/><path d="M11 13h4"/><rect width="18" height="18" x="3" y="3" rx="2"/>',
+  folder:'<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',
+  upload:'<path d="M12 3v12"/><path d="m17 8-5-5-5 5"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>',
+  download:'<path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/>',
+  lock:'<rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+};
+const ic = (n, s = 16, sw = 1.75) =>
+  `<svg class="ic" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${I[n]}</svg>`;
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* ---------- 演示数据（RFC 5737 文档地址） ---------- */
+const conn = (name, proto, user, host, port, extra = {}) =>
+  ({ id:name, name, proto, user, host, port, files:true, exec:proto === 'SSH', ...extra });
+const BASE = [
+  conn('build-mac', 'SSH',  'dev',    '192.0.2.31',    22, { merged:2 }),
+  conn('openwrt',   'SSH',  'root',   '192.0.2.254',   22),
+  conn('nas-ftps',  'FTPS', 'backup', '198.51.100.21', 21),
+];
+const MANY = [
+  conn('prod-web-01',     'SSH',  'deploy',  '192.0.2.10',    22),
+  conn('prod-web-02',     'SSH',  'deploy',  '192.0.2.11',    22),
+  conn('prod-db-master',  'SSH',  'ops',     '192.0.2.20',    22),
+  conn('prod-db-replica', 'SSH',  'ops',     '192.0.2.21',    22),
+  conn('staging-api',     'SSH',  'deploy',  '198.51.100.10', 22),
+  conn('staging-worker',  'SSH',  'deploy',  '198.51.100.11', 22),
+  conn('bastion-hk',      'SSH',  'ops',     '203.0.113.10',  22),
+  conn('build-mac',       'SSH',  'dev',     '192.0.2.31',    22, { merged:2 }),
+  conn('openwrt',         'SSH',  'root',    '192.0.2.254',   22),
+  conn('home-lab',        'SSH',  'ops',     '192.0.2.17',    22),
+  conn('edge-tokyo',      'SSH',  'deploy',  '192.0.2.18',    22),
+  conn('cdn-origin',      'SSH',  'deploy',  '203.0.113.40',  22),
+  conn('nas-ftps',        'FTPS', 'backup',  '198.51.100.21', 21),
+  conn('media-ftp',       'FTP',  'media',   '198.51.100.22', 21),
+  conn('archive-ftps',    'FTPS', 'archive', '198.51.100.23', 990),
+  conn('qa-runner',       'SSH',  'qa',      '203.0.113.50',  22),
+  conn('log-collector',   'SSH',  'ops',     '203.0.113.60',  22),
+  conn('legacy-ftp',      'FTP',  'admin',   '198.51.100.30', 21),
+];
+const blank = { error:'', q:'', only:false, onlySet:null };
+const PRESETS = {
+  new: () => ({ ...blank, conns:BASE, name:'', grants:{}, warnings:{}, up:[], down:[] }),
+  edit: () => ({
+    ...blank, conns:BASE, name:'claude-desktop',
+    grants:{ 'build-mac':{ read:true, write:true, exec:true }, 'nas-ftps':{ read:true } },
+    warnings:{
+      'build-mac':'已合并显示；已有文件授权仍使用原 SFTP 配置，新增权限使用 SSH 配置。',
+      'openwrt':'连接信息已变更，原授权已失效；请重新选择权限并保存确认。',
+    },
+    up:['~/Projects/site/dist'], down:['~/Downloads/mcp'],
+  }),
+  many: () => ({
+    ...blank, conns:MANY, name:'ci-runner',
+    grants:{
+      'prod-web-01':{ read:true, write:true }, 'prod-web-02':{ read:true },
+      'staging-api':{ read:true, write:true, exec:true }, 'nas-ftps':{ read:true },
+    },
+    warnings:{ 'edge-tokyo':'连接信息已变更，原授权已失效；请重新选择权限并保存确认。' },
+    up:['~/Projects/site/dist'], down:['~/Downloads/mcp', '~/Documents/backups'],
+  }),
+};
+const SAMPLE_DIRS = {
+  up:['~/Projects/site/dist','~/Documents/exports','~/Desktop/to-upload'],
+  down:['~/Downloads/mcp','~/Documents/backups','~/Desktop/from-remote'],
+};
+// 连接数超过该值时显示搜索与筛选；占位值，需按常见窗口高度确定
+const FILTER_MIN = 8;
+
+const stage = document.getElementById('stage');
+let mode = 'new';
+let scrollMode = 'sticky';
+let S = PRESETS.new();
+let toastTimer = 0;
+
+const grant = id => S.grants[id] || (S.grants[id] = {});
+const granted = id => { const g = S.grants[id]; return !!g && (g.read || g.write || g.exec); };
+
+function visibleConns() {
+  const q = S.q.trim().toLowerCase();
+  return S.conns.filter(c => (!S.only || S.onlySet.has(c.id)) &&
+    (!q || `${c.name} ${c.user}@${c.host}`.toLowerCase().includes(q)));
+}
+
+/* ---------- 渲染 ---------- */
+function checkbox(c, cap, label) {
+  const supported = cap === 'exec' ? c.exec : c.files;
+  if (!supported) {
+    const why = cap === 'exec' ? `${c.proto} 不支持命令执行` : `${c.proto} 不支持文件操作`;
+    return `<span class="cell"><span class="na" title="${why}">—</span></span>`;
+  }
+  const on = !!(S.grants[c.id] || {})[cap];
+  return `<span class="cell"><button class="chk${on ? ' on' : ''}" role="checkbox" aria-checked="${on}"
+    aria-label="${esc(c.name)} ${label}" data-act="toggle" data-id="${c.id}" data-cap="${cap}">${ic('check', 11, 3)}</button></span>`;
+}
+
+function permRows(list) {
+  if (!list.length) return `<div class="perm-empty">没有匹配的连接</div>`;
+  return list.map(c => {
+    const tile = c.exec ? `<span class="tile k-ssh">${ic('terminal', 13)}</span>` : `<span class="tile k-file">${ic('folder', 13)}</span>`;
+    const merged = c.merged ? `<span class="badge" title="同一端点的多条连接配置合并为一行">合并 ${c.merged} 条配置</span>` : '';
+    const warn = S.warnings[c.id] ? `<div class="row-warn">${ic('alert', 13)}<span>${esc(S.warnings[c.id])}</span></div>` : '';
+    return `<div class="perm-grid perm-row">
+      <div class="conn">${tile}
+        <div class="conn-main">
+          <div class="conn-name"><span>${esc(c.name)}</span>${merged}</div>
+          <div class="conn-sub"><span class="proto">${c.proto}</span><span class="mono">${c.user}@${c.host}:${c.port}</span></div>
+        </div>
+      </div>
+      ${checkbox(c, 'read', '文件读取')}${checkbox(c, 'write', '文件写入')}${checkbox(c, 'exec', '命令执行')}
+      ${warn}
+    </div>`;
+  }).join('');
+}
+
+function permTools(shown) {
+  if (S.conns.length <= FILTER_MIN) return '';
+  const meta = S.q.trim() || S.only ? `<span class="tools-meta">显示 ${shown} / ${S.conns.length} 个</span>` : '';
+  return `<div class="perm-tools">
+    <label class="search">${ic('search', 13)}<input id="conn-q" placeholder="搜索名称或地址" value="${esc(S.q)}" autocomplete="off"></label>
+    <button class="chip${S.only ? ' on' : ''}" aria-pressed="${S.only}" data-act="only"><span class="box">${ic('check', 9, 3)}</span>仅看已授权</button>
+    ${meta}
+  </div>`;
+}
+
+function execNote() {
+  const n = S.conns.filter(c => (S.grants[c.id] || {}).exec).length;
+  if (!n) return `<div class="note">${ic('info', 13)}<span>SSH 连接的文件读写通过 SFTP 完成。命令执行可直接读写远端文件，不受上方文件权限约束。</span></div>`;
+  return `<div class="note warn">${ic('alert', 13)}<span>已为 <b>${n}</b> 个连接开启命令执行：命令可直接读写远端文件，不受上方文件权限约束，仅由拦截策略限制。</span></div>`;
+}
+
+function dirBlock(kind) {
+  const list = S[kind];
+  const isUp = kind === 'up';
+  const title = isUp ? '上传来源' : '下载目标';
+  const sub = isUp ? '可从这些目录读取本机文件，上传到远端' : '可将远端文件下载到这些目录';
+  const count = list.length ? `<span class="badge">${list.length} 个</span>` : `<span class="badge">未添加</span>`;
+  const items = list.length ? `<div class="dir-list">${list.map((p, i) =>
+    `<div class="dir-item">${ic('folder', 13)}<span class="mono" title="${esc(p)}">${esc(p)}</span>
+      <button class="ibtn sm danger" title="移除目录" aria-label="移除 ${esc(p)}" data-act="rm-dir" data-kind="${kind}" data-i="${i}">${ic('x', 13)}</button></div>`
+  ).join('')}</div>` : '';
+  return `<div class="dir-block">
+    <div class="dir-head">
+      <span class="tile k-dir">${ic(isUp ? 'upload' : 'download', 13)}</span>
+      <div class="t"><div class="dir-title">${title}${count}</div><div class="dir-sub">${sub}</div></div>
+      <button class="btn link" data-act="add-dir" data-kind="${kind}">${ic('plus', 13)}添加目录</button>
+    </div>${items}
+  </div>`;
+}
+
+function dialogHTML() {
+  const isNew = mode === 'new';
+  const n = S.conns.filter(c => granted(c.id)).length;
+  const list = visibleConns();
+  const title = mode === 'edit' || mode === 'many' ? '编辑授权密钥' : '新增授权密钥';
+  const subtitle = isNew ? '为 MCP 客户端生成访问凭据，并按连接授予权限' : '前缀 7Hq2… · 创建于 2026-10-12';
+  const help = S.error
+    ? `<p class="help err">${esc(S.error)}</p>`
+    : `<p class="help">建议每个客户端使用独立密钥，便于单独停用或撤销。</p>`;
+  const footHint = isNew ? `<span class="foot-hint">${ic('lock', 13)}密钥明文仅在生成后显示一次</span>` : '';
+
+  return `
+  <div class="dialog" role="dialog" aria-label="${title}">
+    <div class="dlg-head">
+      <span class="head-tile">${ic('key', 18)}</span>
+      <div class="head-text"><h3>${title}</h3><p>${subtitle}</p></div>
+      <button class="ibtn" title="关闭" data-act="toast" data-msg="关闭弹窗">${ic('x', 15)}</button>
+    </div>
+
+    <div class="dlg-body scroll">
+      <section>
+        <label class="field-label" for="key-name">密钥名称</label>
+        <input id="key-name" class="inp${S.error ? ' err' : ''}" placeholder="例如：claude-desktop" value="${esc(S.name)}" autocomplete="off">
+        <div id="name-help">${help}</div>
+      </section>
+
+      <section>
+        <div class="sec-head">
+          <div class="t">
+            <h4 class="sec-title">连接权限</h4>
+            <p class="sec-desc">默认不授予任何权限；已授予的操作仍受拦截策略限制。</p>
+          </div>
+          <span class="sec-meta${n ? ' on' : ''}">已授权 <b>${n}</b> / ${S.conns.length} 个连接</span>
+        </div>
+        ${permTools(list.length)}
+        <div class="group">
+          <div class="perm-grid perm-head"><span>连接</span><span>文件读取</span><span>文件写入</span><span>命令执行</span></div>
+          <div class="perm-rows${scrollMode === 'inner' ? ' inner scroll' : ''}">${permRows(list)}</div>
+        </div>
+        ${execNote()}
+      </section>
+
+      <section>
+        <div class="sec-head">
+          <div class="t">
+            <h4 class="sec-title">本地目录</h4>
+            <p class="sec-desc">限定 MCP 传输可使用的本机目录（含子目录），仍受文件策略限制；未添加则拒绝该方向的传输。</p>
+          </div>
+        </div>
+        <div class="group clip">${dirBlock('up')}${dirBlock('down')}</div>
+      </section>
+    </div>
+
+    <div class="dlg-foot">
+      ${footHint}<span class="grow"></span>
+      <button class="btn" data-act="toast" data-msg="取消并关闭">取消</button>
+      <button class="btn primary" data-act="submit">${isNew ? '生成密钥' : '保存密钥'}</button>
+    </div>
+  </div>
+  <div id="toast-slot"></div>`;
+}
+
+// 整块重绘，但保留正文/表格的滚动位置与当前焦点，避免点选或输入时跳动
+function render(resetScroll = false) {
+  const body = stage.querySelector('.dlg-body');
+  const rows = stage.querySelector('.perm-rows');
+  const keep = { body: body ? body.scrollTop : 0, rows: rows ? rows.scrollTop : 0 };
+  const a = document.activeElement;
+  const focus = a && stage.contains(a) ? {
+    sel: a.id ? `#${a.id}` : a.dataset.cap ? `[data-id="${a.dataset.id}"][data-cap="${a.dataset.cap}"]` : null,
+    range: a.tagName === 'INPUT' ? [a.selectionStart, a.selectionEnd] : null,
+  } : null;
+
+  stage.innerHTML = dialogHTML();
+
+  const nb = stage.querySelector('.dlg-body');
+  const nr = stage.querySelector('.perm-rows');
+  if (!resetScroll) { nb.scrollTop = keep.body; nr.scrollTop = keep.rows; }
+  const dlg = stage.querySelector('.dialog');
+  const syncHead = () => dlg.classList.toggle('scrolled', nb.scrollTop > 0);
+  nb.addEventListener('scroll', syncHead, { passive: true });
+  syncHead();
+  if (focus && focus.sel) {
+    const el = stage.querySelector(focus.sel);
+    if (el) {
+      el.focus({ preventScroll: true });
+      if (focus.range) el.setSelectionRange(...focus.range);
+    }
+  }
+}
+
+function toast(msg) {
+  const slot = document.getElementById('toast-slot');
+  slot.innerHTML = `<div class="toast">${esc(msg)}</div>`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { slot.innerHTML = ''; }, 1800);
+}
+
+/* ---------- 交互 ---------- */
+stage.addEventListener('click', e => {
+  const el = e.target.closest('[data-act]');
+  if (!el) return;
+  const { act } = el.dataset;
+  if (act === 'toggle') {
+    const g = grant(el.dataset.id);
+    g[el.dataset.cap] = !g[el.dataset.cap];
+    render();
+  } else if (act === 'only') {
+    S.only = !S.only;
+    // 记下开启筛选时已授权的连接；之后取消勾选不会让该行立刻消失
+    S.onlySet = S.only ? new Set(S.conns.filter(c => granted(c.id)).map(c => c.id)) : null;
+    render();
+  } else if (act === 'add-dir') {
+    const kind = el.dataset.kind;
+    const next = SAMPLE_DIRS[kind].find(p => !S[kind].includes(p));
+    if (!next) return toast('（草图）示例目录已全部添加');
+    S[kind].push(next);
+    render();
+  } else if (act === 'rm-dir') {
+    S[el.dataset.kind].splice(Number(el.dataset.i), 1);
+    render();
+  } else if (act === 'submit') {
+    if (!S.name.trim()) {
+      S.error = '请输入密钥名称';
+      render();
+      document.getElementById('key-name').focus();
+      return;
+    }
+    toast(mode === 'new' ? '（草图）进入「密钥已生成」视图' : '（草图）已保存');
+  } else if (act === 'toast') {
+    toast(`（草图）${el.dataset.msg}`);
+  }
+});
+stage.addEventListener('input', e => {
+  if (e.target.id === 'conn-q') {
+    S.q = e.target.value;
+    render();
+    return;
+  }
+  if (e.target.id !== 'key-name') return;
+  S.name = e.target.value;
+  if (S.error) {
+    // 只更新提示行，避免整块重绘打断输入
+    S.error = '';
+    e.target.classList.remove('err');
+    document.getElementById('name-help').innerHTML = '<p class="help">建议每个客户端使用独立密钥，便于单独停用或撤销。</p>';
+  }
+});
+
+function bindSeg(id, attr, onPick) {
+  const seg = document.getElementById(id);
+  seg.addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    seg.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+    onPick(b.dataset[attr]);
+  });
+}
+bindSeg('seg-mode', 'mode', m => { mode = m; S = PRESETS[m](); render(true); });
+bindSeg('seg-scroll', 'scroll', s => { scrollMode = s; render(true); });
+bindSeg('seg-theme', 'theme', t => { document.documentElement.dataset.theme = t; });
+
+render();
+</script>
+</body>
+</html>

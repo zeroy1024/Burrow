@@ -255,61 +255,93 @@ func Timeline(c *ui.Context, items []TimelineItem) ui.Element {
 }
 
 type PermissionMatrixRow struct {
-	ID, Name, Subtitle         string
-	Warning                    string
+	ID, Name string
+	// Protocol is the raw connection protocol (ssh, sftp, ftp or ftps);
+	// Endpoint is user@host:port.
+	Protocol, Endpoint string
+	Warning            string
+	// Merged counts the saved configurations displayed as this row.
+	Merged                     int
 	AllowRead, AllowWrite      bool
 	AllowExec                  bool
 	SupportsFiles, SupportsSSH bool
 }
 
-// PermissionMatrix renders the 3-column capability switch table (read/write/exec)
-// used in the Secret Key authorization modal.
-func PermissionMatrix(c *ui.Context, rows []PermissionMatrixRow, onToggle func(index int, capability string, enabled bool)) ui.Element {
+// PermissionMatrix renders the read/write/exec checkbox table of the Secret
+// Key authorization modal as one bordered panel with row dividers. empty is
+// shown in place of rows when there are none.
+func PermissionMatrix(c *ui.Context, rows []PermissionMatrixRow, empty string, onToggle func(id, capability string, enabled bool)) ui.Element {
 	t := theme.Current()
 	colW := t.C.Mcp.PermissionColumn
-	return ui.Column(c).FillWidth().Gap(t.Space.N6).Children(func() {
-		ui.Row(c).FillWidth().Height(t.Size.ControlSm).Padding(0, t.Space.N12).
-			Radius(t.Radius.ControlSm).Background(Color(t.Color.Surface.Sunken)).
-			Border(t.Size.Hairline, Color(t.Color.Border.Subtle)).AlignItems(ui.Center).Gap(t.Space.N8).Children(func() {
-			ui.Text(c, "已保存连接").Grow(1).MinWidth(0).FontSize(t.Font.Size.Footnote).
-				FontWeight(t.Font.Weight.Medium).TextColor(Color(t.Color.Text.Secondary))
+	return Inset(c, InsetProps{Raised: true}).FillWidth().Padding(0).Clip().Children(func() {
+		ui.Row(c).FillWidth().Height(t.Size.ControlLg).Padding(0, t.Space.N12).Gap(t.Space.N4).
+			Background(Color(t.Color.Surface.Sunken)).AlignItems(ui.Center).Children(func() {
+			Text(c, "连接", TextProps{Style: TextFootnote, Tone: ToneSecondary}).
+				FontWeight(t.Font.Weight.Medium).Grow(1).MinWidth(0)
 			for _, header := range []string{"文件读取", "文件写入", "命令执行"} {
-				ui.Text(c, header).Width(colW).Shrink(0).FontSize(t.Font.Size.Footnote).
-					FontWeight(t.Font.Weight.Medium).TextColor(Color(t.Color.Text.Secondary)).TextAlign(ui.Center)
+				Text(c, header, TextProps{Style: TextFootnote, Tone: ToneSecondary}).
+					FontWeight(t.Font.Weight.Medium).Width(colW).Shrink(0).TextAlign(ui.Center)
 			}
 		})
+		Divider(c)
+		if len(rows) == 0 {
+			ui.Box(c).FillWidth().Padding(t.Space.N18, t.Space.N12).Center().Children(func() {
+				Text(c, empty, TextProps{Style: TextSmall, Tone: ToneSecondary})
+			})
+			return
+		}
 		for index, row := range rows {
-			rowIdx := index
 			item := row
-			ui.Row(c).Key(item.ID).FillWidth().Padding(t.Space.N8, t.Space.N12).
-				Radius(t.Radius.Control).Background(Color(t.Color.Surface.Card)).
-				Border(t.Size.Hairline, Color(t.Color.Border.Subtle)).AlignItems(ui.Center).Gap(t.Space.N8).Children(func() {
-				ui.Column(c).Grow(1).MinWidth(0).Gap(t.Space.N2).Children(func() {
-					ui.Text(c, item.Name).FontSize(t.Font.Size.Small).FontWeight(t.Font.Weight.Semibold).SingleLine().Ellipsis("…")
-					sub := item.Subtitle
-					tone := ToneTertiary
-					if item.Warning != "" {
-						sub = item.Subtitle + " · " + item.Warning
-						tone = ToneWarning
-					}
-					Text(c, sub, TextProps{Style: TextCaption, Tone: tone}).SingleLine().Ellipsis("…")
-				})
-				renderCell := func(capKey, capLabel string, supported, current bool) {
-					ui.Box(c).Key(capKey).Width(colW).Shrink(0).Center().Children(func() {
-						if !supported {
-							ui.Text(c, "—").FontSize(t.Font.Size.Small).TextColor(Color(t.Color.Text.Muted))
-							return
+			if index > 0 {
+				Divider(c)
+			}
+			ui.Column(c).Key(item.ID).FillWidth().Padding(t.Space.N8, t.Space.N12).Gap(t.Space.N6).Children(func() {
+				ui.Row(c).FillWidth().AlignItems(ui.Center).Gap(t.Space.N4).Children(func() {
+					ui.Row(c).Grow(1).MinWidth(0).AlignItems(ui.Center).Gap(t.Space.N10).Children(func() {
+						kind := ProtocolFTP
+						switch item.Protocol {
+						case "ssh":
+							kind = ProtocolSSH
+						case "sftp":
+							kind = ProtocolSFTP
 						}
-						val := current
-						sw := Switch(c, &val, ToggleProps{Label: item.Name + " " + capLabel})
-						if sw.Changed() && onToggle != nil {
-							onToggle(rowIdx, capKey, val)
-						}
+						ProtocolIcon(c, kind, SizeSm)
+						ui.Column(c).Grow(1).MinWidth(0).Gap(t.Space.N2).Children(func() {
+							ui.Row(c).FillWidth().AlignItems(ui.Center).Gap(t.Space.N6).Children(func() {
+								Text(c, item.Name, TextProps{Style: TextBody}).FontWeight(t.Font.Weight.Semibold).
+									SingleLine().Ellipsis("…").MinWidth(0)
+								if item.Merged > 1 {
+									Badge(c, fmt.Sprintf("合并 %d 条配置", item.Merged), BadgeProps{Tone: ToneMuted})
+								}
+							})
+							ui.Row(c).FillWidth().AlignItems(ui.Center).Gap(t.Space.N6).Children(func() {
+								Text(c, strings.ToUpper(item.Protocol), TextProps{Style: TextCaption, Tone: ToneSecondary}).
+									FontWeight(t.Font.Weight.Semibold).Shrink(0)
+								Text(c, item.Endpoint, TextProps{Style: TextCaption, Tone: ToneSecondary, Mono: true}).
+									SingleLine().Ellipsis("…").MinWidth(0)
+							})
+						})
 					})
+					cell := func(capKey, capLabel string, supported, current bool) {
+						ui.Box(c).Key(capKey).Width(colW).Shrink(0).Center().Children(func() {
+							if !supported {
+								ui.Text(c, "—").FontSize(t.Font.Size.Small).TextColor(Color(t.Color.Text.Muted)).
+									Label(strings.ToUpper(item.Protocol) + " 不支持" + capLabel)
+								return
+							}
+							val := current
+							if Checkbox(c, &val, item.Name+" "+capLabel, CheckProps{HideLabel: true}).Changed() && onToggle != nil {
+								onToggle(item.ID, capKey, val)
+							}
+						})
+					}
+					cell("read", "文件读取", item.SupportsFiles, item.AllowRead)
+					cell("write", "文件写入", item.SupportsFiles, item.AllowWrite)
+					cell("exec", "命令执行", item.SupportsSSH, item.AllowExec)
+				})
+				if item.Warning != "" {
+					Banner(c, item.Warning, BannerProps{Tone: ToneWarning, Icon: IconSVG(IconAlertCircle)})
 				}
-				renderCell("read", "文件读取", item.SupportsFiles, item.AllowRead)
-				renderCell("write", "文件写入", item.SupportsFiles, item.AllowWrite)
-				renderCell("exec", "命令执行", item.SupportsSSH, item.AllowExec)
 			})
 		}
 	})
@@ -388,44 +420,55 @@ func PolicyActionMatrix(c *ui.Context, selected map[string]bool, items []PolicyA
 }
 
 type DirectoryListEditorProps struct {
-	Title, EmptyHint, FooterHint string
-	OnAdd                        func()
-	OnRemove                     func(index int)
+	Title, Description string
+	Icon               IconName
+	OnAdd              func()
+	OnRemove           func(index int)
 }
 
-// DirectoryListEditor renders a bounded local directory allowlist card with add/remove actions.
+// DirectoryListEditor renders one local directory allowlist group: a title row
+// with the count and the add action, then the chosen paths. Callers stack the
+// groups inside one shared panel, separated by a Divider.
 func DirectoryListEditor(c *ui.Context, paths []string, props DirectoryListEditorProps) ui.Element {
 	t := theme.Current()
-	return Inset(c).Grow(1).Basis(0).MinWidth(0).Gap(t.Space.N6).Children(func() {
-		ui.Row(c).FillWidth().AlignItems(ui.Center).Gap(t.Space.N6).Children(func() {
-			ui.Text(c, props.Title).Grow(1).MinWidth(0).FontSize(t.Font.Size.Footnote).
-				FontWeight(t.Font.Weight.Semibold).TextColor(Color(t.Color.Text.Primary)).SingleLine()
-			if Button(c.Key("add"), "+ 添加目录", ButtonProps{Variant: ButtonPlain, Size: SizeSm}).
+	return ui.Column(c).FillWidth().Padding(t.Space.N10, t.Space.N8, t.Space.N10, t.Space.N12).Gap(t.Space.N8).Children(func() {
+		ui.Row(c).FillWidth().AlignItems(ui.Center).Gap(t.Space.N10).Children(func() {
+			IconTile(c, IconTileProps{Size: SizeSm}, func() { Icon(c, props.Icon, IconProps{Size: SizeSm}) })
+			ui.Column(c).Grow(1).MinWidth(0).Gap(t.Space.N2).Children(func() {
+				ui.Row(c).AlignItems(ui.Center).Gap(t.Space.N6).Children(func() {
+					Text(c, props.Title, TextProps{Style: TextBody}).FontWeight(t.Font.Weight.Semibold).SingleLine()
+					count := "未添加"
+					if len(paths) > 0 {
+						count = fmt.Sprintf("%d 个", len(paths))
+					}
+					Badge(c, count, BadgeProps{Tone: ToneMuted})
+				})
+				Text(c, props.Description, TextProps{Style: TextCaption, Tone: ToneSecondary})
+			})
+			if Button(c.Key("add"), "添加目录", ButtonProps{Variant: ButtonPlain, Size: SizeSm, Icon: IconPlus}).
 				TextColor(Color(t.Color.Text.Accent)).Clicked() && props.OnAdd != nil {
 				props.OnAdd()
 			}
 		})
 		if len(paths) == 0 {
-			Inset(c, InsetProps{Raised: true, Compact: true}).FillWidth().Children(func() {
-				Text(c, props.EmptyHint, TextProps{Style: TextCaption, Tone: ToneTertiary})
-			})
-		} else {
+			return
+		}
+		// Paths align with the title text, past the icon tile.
+		ui.Column(c).FillWidth().PaddingStart(t.C.IconTile.SizeSm + t.Space.N10).Gap(t.Space.N4).Children(func() {
 			for idx, dir := range paths {
 				removeIdx := idx
 				dirPath := dir
-				Inset(c, InsetProps{Raised: true, Compact: true}).Key(dirPath).FillWidth().Shrink(0).Children(func() {
-					ui.Row(c).FillWidth().Gap(t.Space.N6).Children(func() {
+				Inset(c, InsetProps{Compact: true}).Key(dirPath).FillWidth().Shrink(0).Padding(t.Space.N2, t.Space.N2, t.Space.N2, t.Space.N8).Children(func() {
+					ui.Row(c).FillWidth().AlignItems(ui.Center).Gap(t.Space.N8).Children(func() {
+						Icon(c, IconFolder, IconProps{Size: SizeSm})
 						Text(c, dirPath, TextProps{Style: TextMono}).Grow(1).MinWidth(0).SingleLine().Ellipsis("…")
-						if Button(c.Key("rm"), "移除", ButtonProps{Variant: ButtonDangerPlain, Size: SizeSm}).Clicked() && props.OnRemove != nil {
+						if IconButton(c, IconClose, IconButtonProps{Key: "rm", Label: "移除目录 " + dirPath, Size: SizeXs}).Clicked() && props.OnRemove != nil {
 							props.OnRemove(removeIdx)
 						}
 					})
 				})
 			}
-		}
-		if props.FooterHint != "" {
-			Text(c, props.FooterHint, TextProps{Style: TextCaption, Tone: ToneTertiary})
-		}
+		})
 	})
 }
 

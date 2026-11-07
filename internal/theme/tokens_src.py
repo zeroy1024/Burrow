@@ -923,7 +923,7 @@ SEM['size'].update({
  'mcpAuditConnectionColumn':D(120),'mcpAuditActionColumn':D(96),'mcpAuditStatusColumn':D(104),'mcpAuditDurationColumn':D(56),
  'mcpPolicyModal':D(720),'mcpKeyModal':D(680),'mcpDialog':D(440),
  'mcpDrawerMinWidth':D(340),'mcpDrawerWidth':D(500),'mcpMainMinWidth':D(360),
- 'mcpRuleModeWidth':D(120,'命令规则匹配方式选择框'),'mcpPermissionColumn':D(118,'连接授权矩阵能力列'),
+ 'mcpRuleModeWidth':D(120,'命令规则匹配方式选择框'),'mcpPermissionColumn':D(76,'连接授权矩阵能力列'),
 })
 COMP['mcp']={
  'tableMinWidth':'size.mcpTableMinWidth',

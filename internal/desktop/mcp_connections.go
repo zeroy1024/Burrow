@@ -2,7 +2,6 @@ package desktop
 
 import (
 	"crypto/subtle"
-	"fmt"
 	"net"
 	"slices"
 	"strconv"
@@ -145,17 +144,13 @@ func (a *app) mcpGrants() []mcpKeyGrant {
 			index = len(grants)
 			indices[id] = index
 			grants = append(grants, mcpKeyGrant{ConnectionID: id, EndpointDigest: primary.Identity, Name: primary.Name,
-				Subtitle:      fmt.Sprintf("%s · %s@%s", strings.ToUpper(primary.Protocol), primary.User, net.JoinHostPort(primary.Host, strconv.Itoa(primary.Port))),
+				Protocol:      primary.Protocol,
+				Endpoint:      primary.User + "@" + net.JoinHostPort(primary.Host, strconv.Itoa(primary.Port)),
 				SupportsFiles: primary.Supports("read"), SupportsSSH: primary.Supports("exec"),
 				Sources: []store.MCPGrant{{ConnectionID: id, EndpointDigest: primary.Identity}}})
 		}
 		if c.ID != id {
 			grants[index].Sources = append(grants[index].Sources, store.MCPGrant{ConnectionID: c.ID, EndpointDigest: c.Identity})
-		}
-	}
-	for i := range grants {
-		if len(grants[i].Sources) > 1 {
-			grants[i].Subtitle += fmt.Sprintf(" · 合并 %d 条配置", len(grants[i].Sources))
 		}
 	}
 	return grants

@@ -3455,7 +3455,7 @@ func lightSemantic() Semantic {
 			McpDrawerWidth:           500,
 			McpMainMinWidth:          360,
 			McpRuleModeWidth:         120,
-			McpPermissionColumn:      118,
+			McpPermissionColumn:      76,
 		},
 		Font: Typography{
 			Family: TypographyFamily{

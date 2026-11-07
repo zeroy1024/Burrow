@@ -756,6 +756,7 @@ func (a *app) openEditMCPKeyModal(id string) {
 			a.mcp.keyModal = mcpKeyModalDraft{
 				Open:         true,
 				EditingID:    k.ID,
+				EditingMeta:  k.Prefix + " · 创建于 " + k.CreatedAt,
 				Name:         k.Name,
 				Grants:       grants,
 				UploadDirs:   slices.Clone(k.UploadDirs),
@@ -815,10 +816,10 @@ func (a *app) mcpKeyModal(c *ui.Context) {
 	t := theme.Current()
 	draft := &a.mcp.keyModal
 	title := "新增授权密钥"
-	subtitle := "设置密钥名称、连接权限与本地目录"
+	subtitle := "为 MCP 客户端生成访问凭据，并按连接授予权限"
 	if draft.EditingID != "" {
 		title = "编辑授权密钥"
-		subtitle = draft.EditingID
+		subtitle = draft.EditingMeta
 	}
 	if draft.OneTimeView {
 		title = "授权密钥已生成"
@@ -847,9 +848,13 @@ func (a *app) mcpKeyModal(c *ui.Context) {
 					}
 					return
 				}
-				uikit.Text(c, "密钥明文仅在创建时显示，请及时复制保存。", uikit.TextProps{
-					Style: uikit.TextCaption, Tone: uikit.ToneTertiary,
-				}).Grow(1)
+				if draft.EditingID == "" {
+					uikit.Text(c, "密钥明文仅在生成后显示一次，请及时复制保存。", uikit.TextProps{
+						Style: uikit.TextCaption, Tone: uikit.ToneTertiary,
+					}).Grow(1)
+				} else {
+					ui.Spacer(c)
+				}
 				if uikit.Button(c, "取消", uikit.ButtonProps{}).Clicked() {
 					parts.RequestDismiss()
 				}
@@ -880,81 +885,170 @@ func (a *app) mcpKeyModal(c *ui.Context) {
 		viewport.Children(func() {
 			scroller := ui.Scroll(c).Fill().TrackScroll(&draft.Scroll).Padding(t.Space.N8, t.C.Modal.BodyPaddingX, t.Space.N16)
 			scroller.Children(func() {
-				ui.Column(c).FillWidth().Gap(t.Space.N14).Children(func() {
-					// 第 1 段 · 名称
-					ui.Column(c).FillWidth().Gap(t.Space.N6).Children(func() {
-						uikit.Badge(c, "第 1 段 · 密钥名称", uikit.BadgeProps{Tone: uikit.ToneAccent})
-						uikit.FormRow(c, "密钥名称", uikit.FormRowProps{Error: draft.NameError}, func() ui.Element {
-							var name ui.Element
-							ui.Row(c).FillWidth().Gap(t.Space.N10).Children(func() {
-								name = uikit.Input(c, &draft.Name, uikit.InputProps{
-									Label: "密钥名称", Placeholder: "例如：claude-desktop", Error: draft.NameError,
-								}).Grow(1)
-								uikit.Text(c, "建议每个客户端使用独立密钥", uikit.TextProps{Style: uikit.TextCaption, Tone: uikit.ToneTertiary})
-							})
-							if name.Changed() && draft.NameError != "" {
-								draft.NameError = ""
-								c.Invalidate()
-							}
-							return name
-						})
-					})
-
-					// 第 2 段 · 连接授权矩阵
-					ui.Column(c).FillWidth().Gap(t.Space.N6).Children(func() {
-						ui.Row(c).FillWidth().AlignItems(ui.Center).Gap(t.Space.N8).Children(func() {
-							uikit.Badge(c, "第 2 段 · 连接授权", uikit.BadgeProps{Tone: uikit.ToneAccent})
-							ui.Spacer(c)
-							uikit.Text(c, "默认不授予权限，启用后仍受拦截策略限制", uikit.TextProps{
-								Style: uikit.TextCaption, Tone: uikit.ToneWarning,
-							})
-						})
-						var matrixRows []uikit.PermissionMatrixRow
-						for _, g := range draft.Grants {
-							matrixRows = append(matrixRows, uikit.PermissionMatrixRow{
-								ID: g.ConnectionID, Name: g.Name, Subtitle: g.Subtitle, Warning: g.Warning,
-								SupportsFiles: g.SupportsFiles, SupportsSSH: g.SupportsSSH,
-								AllowRead: g.AllowRead, AllowWrite: g.AllowWrite, AllowExec: g.AllowExec,
-							})
-						}
-						uikit.PermissionMatrix(c, matrixRows, func(index int, capability string, enabled bool) {
-							if index < 0 || index >= len(draft.Grants) {
-								return
-							}
-							draft.Grants[index].setPermission(capability, enabled)
-						})
-						uikit.Text(c, "SSH 文件操作使用 SFTP。命令执行可能访问远端文件；文件权限仅约束 MCP 文件工具。", uikit.TextProps{
-							Style: uikit.TextCaption, Tone: uikit.ToneSecondary,
-						})
-					})
-
-					// 第 3 段 · 本地目录
-					ui.Column(c).FillWidth().Gap(t.Space.N6).Children(func() {
-						uikit.Badge(c, "第 3 段 · 目录授权", uikit.BadgeProps{Tone: uikit.ToneAccent})
-						ui.Row(c).FillWidth().Gap(t.Space.N10).AlignItems(ui.Stretch).Children(func() {
-							uikit.DirectoryListEditor(c.Key("up-dirs"), draft.UploadDirs, uikit.DirectoryListEditorProps{
-								Title:      "上传来源目录",
-								EmptyHint:  "尚未添加上传目录",
-								FooterHint: "允许从目录及其子目录上传，仍受文件策略限制。",
-								OnAdd:      func() { a.pickMCPDirectory(true) },
-								OnRemove: func(idx int) {
-									draft.UploadDirs = slices.Delete(draft.UploadDirs, idx, idx+1)
-								},
-							})
-							uikit.DirectoryListEditor(c.Key("down-dirs"), draft.DownloadDirs, uikit.DirectoryListEditorProps{
-								Title:      "下载目标目录",
-								EmptyHint:  "尚未添加下载目录",
-								FooterHint: "允许向目录及其子目录下载，仍受文件策略限制。",
-								OnAdd:      func() { a.pickMCPDirectory(false) },
-								OnRemove: func(idx int) {
-									draft.DownloadDirs = slices.Delete(draft.DownloadDirs, idx, idx+1)
-								},
-							})
-						})
-					})
+				// 分区之间只靠留白区分；表单不是分步向导，不再编号。
+				ui.Column(c).FillWidth().Gap(t.Space.N24).Children(func() {
+					a.mcpKeyNameField(c, draft)
+					a.mcpKeyGrantsSection(c, draft)
+					a.mcpKeyDirsSection(c, draft)
 				})
 			})
 			uikit.Scrollbars(c, viewport, scroller, &draft.Scroll, uikit.ScrollbarProps{Label: "密钥授权表单滚动条"})
+		})
+	})
+}
+
+// mcpKeyFilterMin 是密钥弹窗显示连接搜索与「仅看已授权」的连接数下限（超过才显示）。
+const mcpKeyFilterMin = 8
+
+// mcpKeySectionHeader 是密钥弹窗的分区标题：标题加一行说明，trailing 放右侧摘要。
+func mcpKeySectionHeader(c *ui.Context, title, description string, trailing func()) {
+	t := theme.Current()
+	ui.Row(c).FillWidth().AlignItems(ui.End).Gap(t.Space.N12).Children(func() {
+		ui.Column(c).Grow(1).MinWidth(0).Gap(t.Space.N2).Children(func() {
+			uikit.Text(c, title, uikit.TextProps{Style: uikit.TextBodyStrong})
+			uikit.Text(c, description, uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneSecondary})
+		})
+		if trailing != nil {
+			trailing()
+		}
+	})
+}
+
+// mcpKeyNameField 把标签放在输入框上方，说明或错误放在下方。
+func (a *app) mcpKeyNameField(c *ui.Context, draft *mcpKeyModalDraft) {
+	t := theme.Current()
+	ui.Column(c).FillWidth().Gap(t.Space.N6).Role(ui.RoleGroup).Label("密钥名称").Children(func() {
+		var name ui.Element
+		uikit.Text(c, "密钥名称", uikit.TextProps{Style: uikit.TextLabel}).OnClick(func() { name.Focus() })
+		name = uikit.Input(c, &draft.Name, uikit.InputProps{
+			Label: "密钥名称", Placeholder: "例如：claude-desktop", Error: draft.NameError,
+		})
+		if name.Changed() && draft.NameError != "" {
+			draft.NameError = ""
+			c.Invalidate()
+		}
+		if draft.NameError != "" {
+			name.Error(draft.NameError)
+			uikit.FieldMessage(c, draft.NameError, uikit.FieldMessageProps{Tone: uikit.ToneDanger})
+		} else {
+			uikit.FieldMessage(c, "建议每个客户端使用独立密钥，便于单独停用或撤销。", uikit.FieldMessageProps{})
+		}
+	})
+}
+
+func (a *app) mcpKeyGrantsSection(c *ui.Context, draft *mcpKeyModalDraft) {
+	t := theme.Current()
+	granted, execs := 0, 0
+	for _, g := range draft.Grants {
+		if g.AllowRead || g.AllowWrite || g.AllowExec {
+			granted++
+		}
+		if g.AllowExec {
+			execs++
+		}
+	}
+	ui.Column(c).FillWidth().Gap(t.Space.N10).Children(func() {
+		mcpKeySectionHeader(c, "连接权限", "默认不授予任何权限；已授予的操作仍受拦截策略限制。", func() {
+			tone := uikit.ToneSecondary
+			if granted > 0 {
+				tone = uikit.ToneAccent
+			}
+			uikit.Text(c, fmt.Sprintf("已授权 %d / %d 个连接", granted, len(draft.Grants)), uikit.TextProps{
+				Style: uikit.TextFootnote, Tone: tone,
+			}).Shrink(0)
+		})
+
+		filtering := len(draft.Grants) > mcpKeyFilterMin
+		if filtering {
+			ui.Row(c).FillWidth().AlignItems(ui.Center).Gap(t.Space.N12).Children(func() {
+				uikit.SearchField(c.Key("grant-query"), &draft.Query, uikit.SearchProps{
+					Variant: uikit.SearchFilter, Icon: uikit.IconSVG(uikit.IconSearch),
+					Label: "搜索连接", Placeholder: "搜索名称或地址",
+				}).Root.Grow(1).MinWidth(0)
+				if uikit.Checkbox(c.Key("only-granted"), &draft.OnlyGranted, "仅看已授权").Changed() {
+					// 记下开启时已授权的连接，之后取消勾选不会让该行立刻消失。
+					draft.GrantedSnapshot = nil
+					if draft.OnlyGranted {
+						draft.GrantedSnapshot = map[string]bool{}
+						for _, g := range draft.Grants {
+							if g.AllowRead || g.AllowWrite || g.AllowExec {
+								draft.GrantedSnapshot[g.ConnectionID] = true
+							}
+						}
+					}
+				}
+			})
+		}
+
+		query := strings.ToLower(strings.TrimSpace(draft.Query))
+		var rows []uikit.PermissionMatrixRow
+		for _, g := range draft.Grants {
+			if filtering && draft.OnlyGranted && !draft.GrantedSnapshot[g.ConnectionID] {
+				continue
+			}
+			if filtering && query != "" && !strings.Contains(strings.ToLower(g.Name+" "+g.Endpoint), query) {
+				continue
+			}
+			rows = append(rows, uikit.PermissionMatrixRow{
+				ID: g.ConnectionID, Name: g.Name, Protocol: g.Protocol, Endpoint: g.Endpoint,
+				Warning: g.Warning, Merged: len(g.Sources),
+				SupportsFiles: g.SupportsFiles, SupportsSSH: g.SupportsSSH,
+				AllowRead: g.AllowRead, AllowWrite: g.AllowWrite, AllowExec: g.AllowExec,
+			})
+		}
+		empty := "没有匹配的连接"
+		if len(draft.Grants) == 0 {
+			empty = "暂无已保存的连接"
+		}
+		uikit.PermissionMatrix(c, rows, empty, func(id, capability string, enabled bool) {
+			for i := range draft.Grants {
+				if draft.Grants[i].ConnectionID == id {
+					draft.Grants[i].setPermission(capability, enabled)
+					// 标题处的计数与下方命令执行提示在矩阵之前绘制，需要重绘一帧。
+					c.Invalidate()
+					return
+				}
+			}
+		})
+
+		if execs > 0 {
+			uikit.Banner(c, fmt.Sprintf("已为 %d 个连接开启命令执行。命令可直接读写远端文件，不受上方文件权限约束，仍受拦截策略限制。", execs),
+				uikit.BannerProps{Tone: uikit.ToneWarning, Icon: uikit.IconSVG(uikit.IconAlertCircle)})
+		} else {
+			ui.Row(c).FillWidth().AlignItems(ui.Center).Gap(t.Space.N6).Children(func() {
+				uikit.Icon(c, uikit.IconInfo, uikit.IconProps{Size: uikit.SizeXs, Tone: uikit.ToneSecondary})
+				uikit.Text(c, "SSH 连接的文件读写通过 SFTP 完成。命令执行可直接读写远端文件，不受上方文件权限约束。", uikit.TextProps{
+					Style: uikit.TextCaption, Tone: uikit.ToneSecondary,
+				}).Grow(1).MinWidth(0)
+			})
+		}
+	})
+}
+
+func (a *app) mcpKeyDirsSection(c *ui.Context, draft *mcpKeyModalDraft) {
+	t := theme.Current()
+	ui.Column(c).FillWidth().Gap(t.Space.N10).Children(func() {
+		mcpKeySectionHeader(c, "本地目录", "限定 MCP 传输可使用的本机目录（含子目录），仍受文件策略限制；未添加则拒绝该方向的传输。", nil)
+		uikit.Inset(c, uikit.InsetProps{Raised: true}).FillWidth().Padding(0).Clip().Children(func() {
+			uikit.DirectoryListEditor(c.Key("up-dirs"), draft.UploadDirs, uikit.DirectoryListEditorProps{
+				Title:       "上传来源",
+				Description: "可从这些目录读取本机文件，上传到远端",
+				Icon:        uikit.IconUpload,
+				OnAdd:       func() { a.pickMCPDirectory(true) },
+				OnRemove: func(idx int) {
+					draft.UploadDirs = slices.Delete(draft.UploadDirs, idx, idx+1)
+				},
+			})
+			uikit.Divider(c)
+			uikit.DirectoryListEditor(c.Key("down-dirs"), draft.DownloadDirs, uikit.DirectoryListEditorProps{
+				Title:       "下载目标",
+				Description: "可将远端文件下载到这些目录",
+				Icon:        uikit.IconDownload,
+				OnAdd:       func() { a.pickMCPDirectory(false) },
+				OnRemove: func(idx int) {
+					draft.DownloadDirs = slices.Delete(draft.DownloadDirs, idx, idx+1)
+				},
+			})
 		})
 	})
 }
