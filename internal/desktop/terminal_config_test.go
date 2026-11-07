@@ -2,12 +2,14 @@ package desktop
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
 
+	"sshdesk/internal/locales"
 	"sshdesk/internal/termtheme"
 )
 
@@ -122,7 +124,10 @@ func TestImportTerminalThemeRejectsInvalidAndConflictingFiles(t *testing.T) {
 	if err := os.WriteFile(path, []byte("background = #654321\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := a.importTerminalTheme(path); err == nil || !strings.Contains(err.Error(), "同名配色文件") {
+	if err := a.importTerminalTheme(path); err == nil || err.Error() != fmt.Sprintf(
+		locales.MessageAColorSchemeFileNamedAlreadyExistsRenameItBeforeImporting(),
+		"Test Theme",
+	) {
 		t.Fatalf("expected filename conflict, got %v", err)
 	}
 	themes, err := a.store.Themes(t.Context())
@@ -156,7 +161,11 @@ func TestImportTerminalThemeRejectsDuplicateSchemeName(t *testing.T) {
 		if index == 0 && err != nil {
 			t.Fatal(err)
 		}
-		if index == 1 && (err == nil || !strings.Contains(err.Error(), "配色名称")) {
+		if index == 1 && (err == nil || err.Error() != fmt.Sprintf(
+			locales.MessageColorSchemeNameIsAlreadyUsedByFile(),
+			"Duplicate Test Theme",
+			"first",
+		)) {
 			t.Fatalf("expected scheme name conflict, got %v", err)
 		}
 	}

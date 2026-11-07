@@ -3,6 +3,7 @@ package uikit
 import (
 	"fmt"
 
+	"sshdesk/internal/locales"
 	"sshdesk/internal/theme"
 
 	"github.com/egoist/mygo/ui"
@@ -154,6 +155,6 @@ func SelectPopupViewport(c *ui.Context, trigger, panel ui.Element) ui.Element {
 	viewport := ui.Scroll(c).FillWidth().MinHeight(0).MaxHeight(max(0, room-2*padding))
 	scroll := ui.Local(viewport, "uikit.popup.scroll", func() ui.ScrollState { return ui.ScrollState{} })
 	viewport.TrackScroll(scroll)
-	Scrollbars(c, panel, viewport, scroll, ScrollbarProps{Label: "选项滚动条"})
+	Scrollbars(c, panel, viewport, scroll, ScrollbarProps{Label: locales.MessageOptionsScrollbar()})
 	return viewport
 }

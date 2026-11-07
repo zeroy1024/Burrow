@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/egoist/mygo/ui"
+	"sshdesk/internal/locales"
 	"sshdesk/internal/theme"
 )
 
@@ -195,7 +196,7 @@ func TransferRow(c *ui.Context, transfer *Transfer) TransferRowResult {
 		icon, bg, ink = IconAlertCircle, p.ErrBg, p.ErrIcon
 	}
 	progress := func() {
-		Progress(c, ProgressProps{Value: transfer.Value, Tone: progressTone, Motion: transfer.Motion, Label: transfer.Name + "传输进度", Animation: ui.Animation{Spring: Spring(t.C.TransferDock.Grow)}})
+		Progress(c, ProgressProps{Value: transfer.Value, Tone: progressTone, Motion: transfer.Motion, Label: transfer.Name + locales.MessageTransferProgress(), Animation: ui.Animation{Spring: Spring(t.C.TransferDock.Grow)}})
 	}
 	row.Children(func() {
 		TransferIcon(c, IconSVG(icon), bg, ink)
@@ -230,7 +231,7 @@ func TransferRow(c *ui.Context, transfer *Transfer) TransferRowResult {
 				case TransferDone:
 					primary, secondary = transfer.Elapsed, transfer.Completed
 				case TransferFailed:
-					primary, secondary = "传输失败", transfer.Error
+					primary, secondary = locales.MessageTransferFailed2(), transfer.Error
 				}
 				TransferDetail(c, primary, foreground, false)
 				TransferDetail(c, secondary, t.Color.Text.Secondary, true)
@@ -240,22 +241,22 @@ func TransferRow(c *ui.Context, transfer *Transfer) TransferRowResult {
 			if compact && transfer.State == TransferRunning {
 				TransferDetail(c, transfer.Speed, t.Color.Text.Accent, false)
 			} else if transfer.State == TransferQueued {
-				Badge(c, "排队中", BadgeProps{Tone: ToneMuted, Dot: true})
+				Badge(c, locales.MessageQueued(), BadgeProps{Tone: ToneMuted, Dot: true})
 			} else {
 				StatusPill(c, status)
 			}
 		})
 		TransferActions(c).Children(func() {
 			if transfer.State == TransferDone {
-				result.Reveal = TransferAction(c, "reveal", "在文件夹中显示", IconSVG(IconFolder), transfer.Disabled).Clicked()
+				result.Reveal = TransferAction(c, "reveal", locales.MessageShowInFolder(), IconSVG(IconFolder), transfer.Disabled).Clicked()
 				return
 			}
-			icon, label := IconPause, "暂停传输"
+			icon, label := IconPause, locales.MessagePauseTransfer()
 			if transfer.State == TransferPaused {
-				icon, label = IconPlay, "继续传输"
+				icon, label = IconPlay, locales.MessageResumeTransfer()
 			}
 			if transfer.State == TransferFailed {
-				icon, label = IconRetry, "重试传输"
+				icon, label = IconRetry, locales.MessageRetryTransfer()
 			}
 			if TransferAction(c, "toggle-transfer", label, IconSVG(icon), transfer.Disabled).Clicked() {
 				switch transfer.State {
@@ -267,9 +268,9 @@ func TransferRow(c *ui.Context, transfer *Transfer) TransferRowResult {
 					result.Pause = true
 				}
 			}
-			label = "取消传输"
+			label = locales.MessageCancelTransfer()
 			if transfer.State == TransferFailed {
-				label = "移除失败任务"
+				label = locales.MessageRemoveFailedTask()
 			}
 			result.Cancel = TransferAction(c, "remove-transfer", label, IconSVG(IconClose), transfer.Disabled).Clicked()
 		})

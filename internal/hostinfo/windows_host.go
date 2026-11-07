@@ -8,6 +8,8 @@ import (
 	"time"
 	"unicode/utf16"
 	"unicode/utf8"
+
+	"sshdesk/internal/locales"
 )
 
 const windowsFactsMarker = "__BURROW_WINDOWS_FACTS_V2__"
@@ -71,7 +73,7 @@ func (windowsCollector) Facts(ctx context.Context, r Runner, _ Detection) (Facts
 func (windowsCollector) NewSampler(Runner) Sampler { return unsupportedSampler{} }
 
 func parseWindowsFacts(output string, collectedAt time.Time) (Facts, error) {
-	invalid := errors.New("服务器返回了无法识别的 Windows 基础信息")
+	invalid := locales.NewError(locales.MessageTheServerReturnedUnrecognizedWindowsInformation)
 	_, encoded, found := strings.Cut(output, windowsFactsMarker)
 	if !found {
 		return Facts{}, invalid
@@ -86,7 +88,7 @@ func parseWindowsFacts(output string, collectedAt time.Time) (Facts, error) {
 		raw[name] = string(data)
 	}
 	if raw["error"] != "" {
-		return Facts{}, errors.New("读取 Windows 基础信息失败：" + raw["error"])
+		return Facts{}, errors.New(locales.MessageUnableToReadWindowsInformation() + raw["error"])
 	}
 	facts := Facts{Platform: Windows, OSID: "windows", OSName: strings.TrimSpace(raw["caption"]), Hostname: raw["hostname"],
 		OSVersion: raw["display"], Kernel: raw["version"], Arch: raw["arch"], Shell: windowsShell(raw["shell"]), CollectedAt: collectedAt}
@@ -100,7 +102,7 @@ func parseWindowsFacts(output string, collectedAt time.Time) (Facts, error) {
 		facts.Kernel += "." + raw["ubr"]
 	}
 	if !facts.Valid() {
-		return Facts{}, errors.New("无法读取 Windows 主机名或系统版本")
+		return Facts{}, locales.NewError(locales.MessageUnableToReadWindowsHostnameOrSystemVersion)
 	}
 	return facts, nil
 }

@@ -2,9 +2,9 @@ package desktop
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/egoist/mygo/ui"
+	"sshdesk/internal/locales"
 	"sshdesk/internal/termtheme"
 	"sshdesk/internal/theme"
 	"sshdesk/internal/uikit"
@@ -12,35 +12,35 @@ import (
 
 func (a *app) importedThemeUse(name string) string {
 	if name == a.terminal.followLight || name == a.terminal.followDark {
-		return "浅色或深色配色槽正在使用"
+		return locales.MessageUsedByTheLightOrDarkSchemeSlot()
 	}
 	if a.terminal.mode.Kind == termtheme.FixedScheme && a.terminal.mode.Name == name {
-		return "全局终端正在使用"
+		return locales.MessageUsedByTheGlobalTerminal()
 	}
 	for _, h := range a.hosts {
 		if h.session.SSH != nil && termtheme.ParseMode(h.session.SSH.TermScheme) == termtheme.Fixed(name) {
-			return "已保存的会话正在使用"
+			return locales.MessageUsedByASavedSession()
 		}
 	}
 	for _, tab := range a.tabs {
 		for _, session := range tab.root.sessions() {
 			if session.config.SSH != nil && termtheme.ParseMode(session.config.SSH.TermScheme) == termtheme.Fixed(name) {
-				return "已打开的会话正在使用"
+				return locales.MessageUsedByAnOpenSession()
 			}
 		}
 	}
 	for _, closed := range a.closedTabs {
 		if options := closed.endpoint.session.SSH; options != nil && termtheme.ParseMode(options.TermScheme) == termtheme.Fixed(name) {
-			return "可恢复的会话正在使用"
+			return locales.MessageUsedByARecoverableSession()
 		}
 	}
 	for _, group := range a.runtimeSSHGroups() {
 		if options := group.endpoint.session.SSH; options != nil && termtheme.ParseMode(options.TermScheme) == termtheme.Fixed(name) {
-			return "连接快照正在使用"
+			return locales.MessageUsedByAConnectionSnapshot()
 		}
 		for _, step := range group.plan.steps {
 			if options := step.endpoint.session.SSH; options != nil && termtheme.ParseMode(options.TermScheme) == termtheme.Fixed(name) {
-				return "连接快照正在使用"
+				return locales.MessageUsedByAConnectionSnapshot()
 			}
 		}
 	}
@@ -51,13 +51,20 @@ func (a *app) importedThemeUse(name string) string {
 func (a *app) importedThemeMenu(c *ui.Context, name string) func(*ui.Menu) {
 	return func(menu *ui.Menu) {
 		reason := a.importedThemeUse(name)
-		label := "删除配色"
+		label := locales.MessageDeleteScheme()
 		if reason != "" {
-			label += "（" + reason + "）"
+			label = locales.CommonNameWithReason(label, reason)
 		}
 		if menu.Item(label).Disabled(reason != "").Chosen() {
 			if err := a.deleteImportedTheme(name); err != nil {
-				uikit.Toast(c, uikit.ToastProps{Tone: uikit.ToneDanger, Title: "删除配色失败", Detail: err.Error()})
+				uikit.Toast(
+					c,
+					uikit.ToastProps{Tone: uikit.ToneDanger, Title: locales.Deferred(
+						locales.MessageUnableToDeleteColorScheme,
+					), Detail: locales.ErrorText(
+						err,
+					)},
+				)
 			}
 		}
 	}
@@ -65,17 +72,17 @@ func (a *app) importedThemeMenu(c *ui.Context, name string) func(*ui.Menu) {
 
 func (a *app) deleteImportedTheme(name string) error {
 	if a.terminal.importing {
-		return errors.New("正在处理配色")
+		return locales.NewError(locales.MessageProcessingColorScheme)
 	}
 	if termtheme.IsBundled(name) {
-		return errors.New("不能删除内置配色")
+		return locales.NewError(locales.MessageBuiltInSchemesCannotBeDeleted)
 	}
 	if reason := a.importedThemeUse(name); reason != "" {
 		return errors.New(reason)
 	}
 	_, ok := a.terminal.imported[name]
 	if !ok {
-		return fmt.Errorf("找不到配色文件 %q", name)
+		return locales.Errorf(locales.MessageColorSchemeFileNotFound, name)
 	}
 	a.terminal.importing = true
 	a.persist(func() error { return a.store.DeleteTheme(a.ctx, name) }, func(err error) {
@@ -84,7 +91,7 @@ func (a *app) deleteImportedTheme(name string) error {
 			err = termtheme.Unregister(name)
 		}
 		if err != nil {
-			a.persistenceNotice("删除配色失败", err)
+			a.persistenceNotice(locales.MessageUnableToDeleteColorScheme, err)
 			return
 		}
 		delete(a.terminal.imported, name)
@@ -103,6 +110,6 @@ func (a *app) settingsSchemeSelect(c *ui.Context, label string, value *string) b
 				Background(uikit.Color(scheme.Background)).Border(t.Size.Hairline, uikit.Color(t.C.Input.Border)).PassThrough()
 		}})
 	}
-	uikit.Select(c.Key(label), value, options, uikit.SelectProps{Label: localize(c, label)}).Width(t.C.Settings.SelectWidth)
+	uikit.Select(c.Key(value), value, options, uikit.SelectProps{Label: label}).Width(t.C.Settings.SelectWidth)
 	return *value != previous
 }

@@ -7,6 +7,7 @@ import (
 
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
+	"sshdesk/internal/locales"
 	"sshdesk/internal/termtheme"
 	"sshdesk/internal/theme"
 	"sshdesk/internal/uikit"
@@ -272,7 +273,7 @@ func (a *app) cycleTab(direction int) {
 
 func (a *app) installAppMenu() func() {
 	settings := &mygo.MenuItem{
-		Label: localizeTag(mygo.App.Locale(), "设置…"),
+		Label: locales.MessageSettings(),
 		Click: func(*mygo.MenuItem, *mygo.Window) {
 			if !a.businessReady() || a.security.dialog != nil {
 				return
@@ -312,13 +313,13 @@ func (a *app) installAppMenu() func() {
 		}
 	}
 	previous := &mygo.MenuItem{
-		Label: localizeTag(mygo.App.Locale(), "上一个选项卡"), Accelerator: "Ctrl+Shift+Tab", Click: cycle(-1),
+		Label: locales.MessagePreviousTab(), Accelerator: "Ctrl+Shift+Tab", Click: cycle(-1),
 	}
 	next := &mygo.MenuItem{
-		Label: localizeTag(mygo.App.Locale(), "下一个选项卡"), Accelerator: "Ctrl+Tab", Click: cycle(1),
+		Label: locales.MessageNextTab(), Accelerator: "Ctrl+Tab", Click: cycle(1),
 	}
 	tabs := &mygo.MenuItem{
-		Label: localizeTag(mygo.App.Locale(), "选项卡"), Submenu: []*mygo.MenuItem{previous, next},
+		Label: locales.MessageTabs(), Submenu: []*mygo.MenuItem{previous, next},
 	}
 	menu := mygo.NewMenu([]*mygo.MenuItem{
 		{Label: "Burrow", Submenu: []*mygo.MenuItem{
@@ -330,11 +331,12 @@ func (a *app) installAppMenu() func() {
 		{Role: mygo.RoleWindowMenu},
 	})
 	mygo.App.SetMenu(menu)
-	return mygo.App.OnLocaleChanged(func(locale string) {
-		settings.SetLabel(localizeTag(locale, "设置…"))
-		tabs.SetLabel(localizeTag(locale, "选项卡"))
-		previous.SetLabel(localizeTag(locale, "上一个选项卡"))
-		next.SetLabel(localizeTag(locale, "下一个选项卡"))
+	return mygo.App.OnLocaleChanged(func(string) {
+		settings.SetLabel(locales.MessageSettings())
+		tabs.SetLabel(locales.MessageTabs())
+		previous.SetLabel(locales.MessagePreviousTab())
+		next.SetLabel(locales.MessageNextTab())
+		a.refreshLocalizedViews()
 	})
 }
 
@@ -372,21 +374,21 @@ func (a *app) closeTabDialog(c *ui.Context) {
 	fileRequest := a.closeFileRequest
 	paneRequest := a.closePaneRequest
 	var key any = a.closeRequest
-	detail := "关闭此选项卡将结束其中的会话。"
-	button := "关闭选项卡"
+	detail := locales.MessageClosingThisTabWillEndItsSessions()
+	button := locales.MessageCloseTab()
 	if fileRequest != nil {
-		key, detail = fileRequest, "关闭此选项卡将结束文件会话。"
+		key, detail = fileRequest, locales.MessageClosingThisTabWillEndTheFileSession()
 	} else if paneRequest != nil {
-		key, detail, button = paneRequest.session, "关闭此窗格将结束其中的会话。", "关闭窗格"
+		key, detail, button = paneRequest.session, locales.MessageClosingThisPaneWillEndItsSession(), locales.MessageClosePane()
 	}
 	closeRequested := false
 	result := uikit.Modal(c.Key(key), &open, uikit.ModalProps{
-		Title: "关闭活动连接？", Compact: true, Width: t.C.Dialog.GroupWidth,
+		Title: locales.MessageCloseActiveConnection(), Compact: true, Width: t.C.Dialog.GroupWidth,
 		Motion: uikit.MotionOverride(a.reduceMotion(c)),
 	}, func(parts uikit.ModalParts) {
 		uikit.Text(c, detail, uikit.TextProps{})
 		ui.Row(c).Justify(ui.End).Gap(t.Space.N8).Children(func() {
-			uikit.Button(c, "取消", uikit.ButtonProps{}).OnClick(parts.RequestDismiss)
+			uikit.Button(c, locales.CommonCancel(), uikit.ButtonProps{}).OnClick(parts.RequestDismiss)
 			closeRequested = uikit.Button(c, button, uikit.ButtonProps{Variant: uikit.ButtonDanger}).Clicked()
 		})
 	})

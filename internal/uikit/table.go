@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"slices"
 
+	"sshdesk/internal/locales"
 	"sshdesk/internal/theme"
 
 	"github.com/egoist/mygo/ui"
@@ -114,7 +115,7 @@ func TableViewport(c *ui.Context, scroll *ui.ScrollState, props TableViewportPro
 					Padding(props.PaddingY, tableViewportInset(t)).Center().Clip().PassThrough().Children(props.Empty)
 			}
 			Scrollbars(c, viewport, scroller, scroll, ScrollbarProps{
-				Label: props.Label + "滚动条", Horizontal: true, Vertical: true,
+				Label: props.Label + locales.MessageScrollbar(), Horizontal: true, Vertical: true,
 			})
 		})
 		header.Children(func() {
@@ -182,7 +183,7 @@ func DataTable(
 	result := TableResult{Open: -1, Menu: -1, Preview: -1, Delete: -1}
 	parts := TableParts{Columns: columns, State: state}
 	parts.Frame = ui.Box(c).Fill().MinWidth(0).MinHeight(0).Role(ui.RoleTable).Label(props.Label).
-		Description(fmt.Sprintf("%d 行，%d 列，已选 %d 项；支持多选", props.Count, len(columns), state.Selection.Len()))
+		Description(locales.TableSelectionDescription(props.Count, len(columns), state.Selection.Len()))
 	if scroll == nil {
 		scroll = ui.Local(parts.Frame, "uikit.table.scroll", func() ui.ScrollState { return ui.ScrollState{} })
 	}
@@ -240,7 +241,7 @@ func DataTable(
 	parts.Frame.Children(func() {
 		parts.Root = ui.List(c.Key("rows"), &state.List, props.Count).
 			Absolute().Top(props.HeaderHeight).Bottom(props.FooterHeight).Left(0).Right(0).
-			Focusable().FocusRing(false).TrackScroll(scroll).Label(props.Label+"数据行").
+			Focusable().FocusRing(false).TrackScroll(scroll).Label(props.Label+locales.MessageDataRow()).
 			Padding(0, t.C.FilePane.ContentPadding).Gap(t.C.FileList.RowGap)
 		parts.Root.RowWidth(sumColumnWidths(parts.Widths) + 2*t.C.FileList.RowPaddingX + float32(max(0, len(columns)-1))*t.C.FileList.ColumnGap)
 		parts.Root.Rows(func(native ui.ListRow) {
@@ -305,7 +306,7 @@ func DataTable(
 				Translucent: props.Underlay != nil && props.Backdrop != nil})
 		})
 		Scrollbars(c, parts.Frame, parts.Root, scroll, ScrollbarProps{
-			Label: props.Label + "滚动条", Horizontal: true, Vertical: true,
+			Label: props.Label + locales.MessageScrollbar(), Horizontal: true, Vertical: true,
 		})
 	})
 	if wasDragging && !state.dragging {
@@ -403,9 +404,9 @@ func (parts TableParts) Cells(c *ui.Context, values []string) {
 		width := max(0, parts.Widths[index]-column.LeadingWidth)
 		value, font := tableCellContent(column, values[index], width)
 		cell := ui.Text(c, value).Width(width).Shrink(0).Font(font.Family).FontSize(font.Size).FontFeatures(font.Features).SingleLine().Role(ui.RoleCell).
-			Label(column.Title + "：" + values[index]).Value(values[index])
+			Label(column.Title + ": " + values[index]).Value(values[index])
 		if column.RowHeader {
-			cell.Description("行标题 · " + column.Title)
+			cell.Description(locales.MessageRowHeading() + column.Title)
 		}
 		if column.Align == AlignEnd {
 			cell.TextAlign(ui.End).FontFeatures("tnum")
@@ -548,17 +549,17 @@ func (state *TableState) Sorted(column string, modifiers ui.Modifiers) {
 func columnSortLabel(column Column, state *TableState) string {
 	label := column.SortLabel
 	if label == "" {
-		label = "按" + column.Title + "排序"
+		label = locales.TableSortByColumn(column.Title)
 	}
 	if order, priority, sorted := columnOrder(column, state); sorted {
-		direction := "升序"
+		direction := locales.MessageAscending()
 		if order.Descending {
-			direction = "降序"
+			direction = locales.MessageDescending()
 		}
 		if len(state.SortBy) > 1 {
-			return fmt.Sprintf("%s，当前%s，第%d排序条件", label, direction, priority+1)
+			return fmt.Sprintf(locales.MessageCurrentlySortPriority(), label, direction, priority+1)
 		}
-		return fmt.Sprintf("%s，当前%s", label, direction)
+		return fmt.Sprintf(locales.MessageCurrently(), label, direction)
 	}
 	return label
 }

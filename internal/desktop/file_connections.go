@@ -3,7 +3,6 @@ package desktop
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net"
 	"os"
 	"path"
@@ -13,6 +12,7 @@ import (
 	"time"
 
 	"sshdesk/internal/fileclient"
+	"sshdesk/internal/locales"
 	"sshdesk/internal/mcpserver"
 	"sshdesk/internal/sshclient"
 	"sshdesk/internal/uikit"
@@ -103,7 +103,7 @@ func (a *app) openFileClient(ctx context.Context, session *fileSession, complete
 				return
 			}
 			if len(plan.route) > 0 && h.session.Files != nil && h.session.Files.FTPMode == "active" {
-				deliver(nil, errors.New("FTP 主动模式暂不支持连接网关，请选择被动模式"), nil)
+				deliver(nil, locales.NewError(locales.MessageActiveFtpDoesNotSupportGatewaysSelectPassiveMode), nil)
 				return
 			}
 			dial, release, err := a.gatewayDialer(ctx, plan)
@@ -122,7 +122,12 @@ func (a *app) openFileClient(ctx context.Context, session *fileSession, complete
 					}
 				}
 				if err == nil && secret == "" {
-					answer := a.askSSH(ctx, &sshPrompt{title: "输入 FTP 密码", address: user + "@" + net.JoinHostPort(h.address, strconv.Itoa(h.port))})
+					answer := a.askSSH(
+						ctx,
+						&sshPrompt{title: locales.Deferred(
+							locales.MessageEnterFtpPassword,
+						), address: user + "@" + net.JoinHostPort(h.address, strconv.Itoa(h.port))},
+					)
 					if !answer.accepted {
 						err = errSSHConnectCanceled
 					} else {
@@ -241,8 +246,8 @@ func (a *app) startFileSession(session *fileSession, refresh bool) {
 	a.ensureLocalFiles(session)
 	ctx, cancel := context.WithCancel(a.ctx)
 	run := &fileRuntime{ctx: ctx, cancel: cancel, navigation: fileNavigation{historyIndex: -1}}
-	session.runtime, session.state, session.errorText = run, connecting, ""
-	session.remote.loading, session.remote.errorText = true, ""
+	session.runtime, session.state, session.errorText = run, connecting, locales.Text{}
+	session.remote.loading, session.remote.errorText = true, locales.Text{}
 	run.request = a.openFileClient(ctx, session, func(client fileclient.Client, err error) {
 		if session.runtime != run || ctx.Err() != nil {
 			if client != nil {
@@ -252,9 +257,9 @@ func (a *app) startFileSession(session *fileSession, refresh bool) {
 		}
 		if err != nil {
 			cancel()
-			session.state, session.errorText = connectionFailed, err.Error()
+			session.state, session.errorText = connectionFailed, locales.ErrorText(err)
 			if errors.Is(err, errSSHConnectCanceled) || errors.Is(err, context.Canceled) {
-				session.state, session.errorText = disconnected, ""
+				session.state, session.errorText = disconnected, locales.Text{}
 			}
 			session.remote.loading = false
 			return
@@ -268,12 +273,12 @@ func (a *app) startFileSession(session *fileSession, refresh bool) {
 				}
 				if err != nil {
 					cancel()
-					session.state, session.errorText = connectionFailed, err.Error()
+					session.state, session.errorText = connectionFailed, locales.ErrorText(err)
 					session.remote.loading = false
 					return
 				}
 				run.initial = initial
-				session.state, session.errorText, session.connectedAt = connected, "", time.Now()
+				session.state, session.errorText, session.connectedAt = connected, locales.Text{}, time.Now()
 				navigation := run.navigation
 				if navigation.path == "" {
 					navigation = fileNavigation{path: session.remote.path, historyIndex: session.remote.historyIndex}
@@ -296,7 +301,9 @@ func (a *app) startFileSession(session *fileSession, refresh bool) {
 				}
 				publish := func() {
 					if session.runtime == run && ctx.Err() == nil {
-						session.state, session.errorText, session.remote.loading = connectionFailed, "文件连接已断开", false
+						session.state, session.errorText, session.remote.loading = connectionFailed, locales.Deferred(
+							locales.MessageFileConnectionClosed,
+						), false
 					}
 				}
 				if drag := a.files.drag; drag != nil && drag.session == session {
@@ -330,7 +337,7 @@ func (a *app) disconnectFileSession(session *fileSession) {
 		run.cancel()
 		cancelSSHRequest(run.request)
 	}
-	session.state, session.errorText, session.remote.loading = disconnected, "", false
+	session.state, session.errorText, session.remote.loading = disconnected, locales.Text{}, false
 }
 
 func (a *app) refreshRemoteFiles(session *fileSession) { a.refreshFilePane(session, session.remote) }
@@ -350,7 +357,7 @@ func (a *app) queueFileDirectory(session *fileSession, pane *filePaneState, navi
 		run = session.runtime
 	}
 	if run == nil {
-		pane.errorText = "文件会话未连接"
+		pane.errorText = locales.Deferred(locales.MessageFileSessionIsNotConnected)
 		return
 	}
 	run.sequence++
@@ -365,7 +372,7 @@ func (a *app) queueFileDirectory(session *fileSession, pane *filePaneState, navi
 		run.reveal = ""
 	}
 	pane.reveal = ""
-	pane.loading, pane.errorText = true, ""
+	pane.loading, pane.errorText = true, locales.Text{}
 	if run.client != nil && (!pane.remote || session.state == connected) && !run.listing {
 		a.readFileDirectory(session, pane, run)
 	}
@@ -397,7 +404,7 @@ func (a *app) readFileDirectory(session *fileSession, pane *filePaneState, run *
 		if err == nil && navigation.link != nil {
 			resolver, ok := run.client.(fileclient.DirectoryResolver)
 			if !ok {
-				err = errors.New("此文件连接不支持解析目录链接")
+				err = locales.NewError(locales.MessageThisFileConnectionCannotResolveDirectoryLinks)
 			} else {
 				location, err = resolver.ResolveDirectory(run.ctx, location)
 			}
@@ -424,8 +431,12 @@ func (a *app) readFileDirectory(session *fileSession, pane *filePaneState, run *
 				return
 			}
 			if err != nil {
-				pane.errorText = err.Error()
-				a.files.notice = &uikit.ToastProps{ID: "directory-error", Tone: uikit.ToneDanger, Title: "读取目录失败", Detail: err.Error()}
+				pane.errorText = locales.ErrorText(err)
+				a.files.notice = &uikit.ToastProps{ID: "directory-error", Tone: uikit.ToneDanger, Title: locales.Deferred(
+					locales.MessageUnableToReadDirectory,
+				), Detail: locales.ErrorText(
+					err,
+				)}
 				return
 			}
 			files := make([]fileEntry, 0, len(entries))
@@ -446,7 +457,7 @@ func (a *app) readFileDirectory(session *fileSession, pane *filePaneState, run *
 				pane.history = append(pane.history[:pane.historyIndex+1], location)
 				pane.historyIndex = len(pane.history) - 1
 			}
-			pane.path, pane.directories, pane.errorText = location, map[string][]fileEntry{location: files}, ""
+			pane.path, pane.directories, pane.errorText = location, map[string][]fileEntry{location: files}, locales.Text{}
 			if changed {
 				pane.query = ""
 				pane.table.Clear()
@@ -463,7 +474,7 @@ func (a *app) readFileDirectory(session *fileSession, pane *filePaneState, run *
 					a.files.localPaths[key] = location
 				}
 				if err := a.writeFilePreferences(); err != nil {
-					pane.errorText = "保存目录历史：" + err.Error()
+					pane.errorText = locales.Concat(locales.Deferred(locales.MessageSaveDirectoryHistory), locales.ErrorText(err))
 				}
 			}
 		}
@@ -508,7 +519,7 @@ func localFileLocation(location string) (string, error) {
 		location = filepath.Join(home, strings.TrimPrefix(strings.TrimPrefix(location, "~"), "/"))
 	}
 	if location == "" {
-		return "", fmt.Errorf("目录不能为空")
+		return "", locales.Errorf(locales.MessageDirectoryCannotBeEmpty)
 	}
 	return filepath.Abs(location)
 }

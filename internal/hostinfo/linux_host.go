@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"sshdesk/internal/locales"
 )
 
 // Linux reads /proc through POSIX shell builtins, so it needs no procps.
@@ -62,7 +64,7 @@ func (s *linuxSampler) Disk(ctx context.Context, key string) (Usage, error) {
 		return Usage{}, err
 	}
 	if actual := parseMonitorRoot(string(mounts)); actual.identity == "" || actual.identity != key {
-		return Usage{}, errors.New("SFTP 根挂载与当前 SSH 会话不一致")
+		return Usage{}, locales.NewError(locales.MessageTheSftpRootMountDoesNotMatchTheCurrentSshSession)
 	}
 	return usage, nil
 }
@@ -122,7 +124,7 @@ func monitorNumber(text string) (float64, bool) {
 const linuxCollectorPrelude = `LC_ALL=C
 export LC_ALL
 if ! { IFS= read -r monitor_os < /proc/sys/kernel/ostype; } 2>/dev/null || [ "$monitor_os" != Linux ]; then
-  printf 'error\000Linux /proc 不可用\000'
+  printf 'error\000linux_proc_unavailable\000'
   exit 0
 fi
 read_file() {
@@ -200,17 +202,24 @@ func parseMonitorSample(output string) (linuxSample, error) {
 func parseRecords(output, marker string) (map[string]string, error) {
 	parts := strings.Split(output, "\x00")
 	if len(parts) < 2 || parts[0] != marker || parts[len(parts)-1] != "" || len(parts)%2 != 0 {
-		return nil, errors.New("服务器返回了无法识别的采集数据")
+		return nil, locales.NewError(locales.MessageTheServerReturnedUnrecognizedMonitoringData)
 	}
 	sections := make(map[string]string, len(parts)/2)
 	for i := 1; i < len(parts)-1; i += 2 {
 		if _, exists := sections[parts[i]]; exists {
-			return nil, errors.New("服务器返回了重复的采集记录")
+			return nil, locales.NewError(locales.MessageTheServerReturnedDuplicateMonitoringRecords)
 		}
 		sections[parts[i]] = parts[i+1]
 	}
 	if message := sections["error"]; message != "" {
-		return nil, errors.New(message)
+		switch message {
+		case "unsupported_macos":
+			return nil, locales.NewError(locales.HostUnsupportedMacos)
+		case "linux_proc_unavailable":
+			return nil, locales.NewError(locales.HostLinuxProcUnavailable)
+		default:
+			return nil, errors.New(message)
+		}
 	}
 	return sections, nil
 }
@@ -272,11 +281,11 @@ func parseMonitorSections(sections map[string]string) linuxSample {
 		name string
 		ok   bool
 	}{
-		{"CPU", sample.hasCPU}, {"内存", metrics.memory != nil},
-		{"网络", sample.hasNetwork && metrics.uptime != nil}, {"负载", metrics.load != ""},
-		{"运行时间", metrics.uptime != nil},
-		{"进程数量", metrics.hasProcesses}, {"进程 Top", sample.processes != nil && len(sample.processes) > 0 && sample.hasCPU && metrics.cores > 0},
-		{"挂载信息", metrics.root.identity != ""},
+		{"CPU", sample.hasCPU}, {locales.MessageMemory(), metrics.memory != nil},
+		{locales.MessageNetwork(), sample.hasNetwork && metrics.uptime != nil}, {locales.MessageLoad2(), metrics.load != ""},
+		{locales.MessageUptime2(), metrics.uptime != nil},
+		{locales.MessageProcessCount(), metrics.hasProcesses}, {locales.MessageTopProcesses(), sample.processes != nil && len(sample.processes) > 0 && sample.hasCPU && metrics.cores > 0},
+		{locales.MessageMountInformation(), metrics.root.identity != ""},
 	} {
 		if !item.ok {
 			metrics.unavailable = append(metrics.unavailable, item.name)
@@ -557,7 +566,7 @@ func collectLinuxFacts(ctx context.Context, r Runner) (Facts, error) {
 		facts.OSName = "Linux"
 	}
 	if !facts.Valid() {
-		return Facts{}, errors.New("无法读取 Linux 主机名或内核版本")
+		return Facts{}, locales.NewError(locales.MessageUnableToReadLinuxHostnameOrKernelVersion)
 	}
 	return facts, nil
 }

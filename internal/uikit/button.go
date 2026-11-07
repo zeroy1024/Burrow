@@ -3,6 +3,7 @@ package uikit
 import (
 	"runtime"
 
+	"sshdesk/internal/locales"
 	"sshdesk/internal/theme"
 
 	"github.com/egoist/mygo/ui"
@@ -74,7 +75,7 @@ func Button(c *ui.Context, label string, props ButtonProps) ui.Element {
 	}
 	e.Children(func() {
 		if props.Loading {
-			Spinner(c, SpinnerProps{Size: SizeSm, Tone: buttonContentTone(props.Variant), Label: "正在处理", Motion: props.Motion}).PassThrough()
+			Spinner(c, SpinnerProps{Size: SizeSm, Tone: buttonContentTone(props.Variant), Label: locales.MessageProcessing2(), Motion: props.Motion}).PassThrough()
 		} else if props.Icon != "" {
 			ui.Icon(c, IconSVG(props.Icon)).Size(t.C.IconButton.IconSize, t.C.IconButton.IconSize).PassThrough()
 		} else if props.Leading != nil {

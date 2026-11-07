@@ -4,6 +4,7 @@ import (
 	"strconv"
 
 	"github.com/egoist/mygo/ui"
+	"sshdesk/internal/locales"
 	"sshdesk/internal/theme"
 )
 
@@ -96,40 +97,40 @@ func StatusPill(c *ui.Context, status Status, options ...StatusPillProps) ui.Ele
 	if len(options) != 0 {
 		props = options[0]
 	}
-	label, tone := "已连接", ToneSuccess
+	label, tone := locales.MessageConnected(), ToneSuccess
 	switch status {
 	case StatusConnecting:
-		label, tone = "连接中", ToneWarning
+		label, tone = locales.MessageConnecting2(), ToneWarning
 	case StatusDisconnected:
-		label, tone = "已断开", ToneNeutral
+		label, tone = locales.MessageDisconnected(), ToneNeutral
 	case StatusError:
-		label, tone = "失败", ToneDanger
+		label, tone = locales.MessageFailed(), ToneDanger
 	case StatusRunning:
-		label, tone = "进行中", ToneAccent
+		label, tone = locales.MessageInProgress(), ToneAccent
 	case StatusDone:
-		label, tone = "已完成", ToneSuccess
+		label, tone = locales.MessageCompleted(), ToneSuccess
 	case StatusPaused:
-		label, tone = "已暂停", ToneMuted
+		label, tone = locales.MessagePaused(), ToneMuted
 	case StatusIntercepted:
-		label, tone = "被策略拦截", ToneWarning
+		label, tone = locales.MessageBlockedByPolicy(), ToneWarning
 	case StatusPartialIntercepted:
-		label, tone = "部分拦截", ToneWarning
+		label, tone = locales.MessagePartiallyBlocked(), ToneWarning
 	case StatusPermissionDenied:
-		label, tone = "权限拒绝", ToneDanger
+		label, tone = locales.MessagePermissionDenied(), ToneDanger
 	case StatusAuthFailed:
-		label, tone = "认证失败", ToneDanger
+		label, tone = locales.MessageAuthenticationFailed(), ToneDanger
 	case StatusPartialFailed:
-		label, tone = "部分失败", ToneWarning
+		label, tone = locales.MessagePartiallyFailed(), ToneWarning
 	case StatusRevoked:
-		label, tone = "已撤销", ToneMuted
+		label, tone = locales.MessageRevoked(), ToneMuted
 	case StatusDisabled:
-		label, tone = "已停用", ToneWarning
+		label, tone = locales.MessageDisabled(), ToneWarning
 	case StatusEnabled:
-		label, tone = "已启用", ToneSuccess
+		label, tone = locales.MessageEnabled(), ToneSuccess
 	case StatusStopping:
-		label, tone = "停止中", ToneWarning
+		label, tone = locales.MessageStopping(), ToneWarning
 	case StatusInterrupted:
-		label, tone = "中断 / 未知", ToneMuted
+		label, tone = locales.MessageInterruptedUnknown(), ToneMuted
 	}
 	return Badge(c, label, BadgeProps{Tone: tone, Dot: true, Surface: props.Surface}).Role(ui.RoleStatus).Label(label)
 }
@@ -152,12 +153,14 @@ func ActivityBadge(c *ui.Context, kind ActivityBadgeKind, surface *theme.Theme) 
 	badge := ui.Row(c).Shrink(0).Padding(p.PaddingY, p.PaddingRight, p.PaddingY, p.PaddingLeft).
 		Radius(p.Radius)
 	if kind == ActivityBell {
-		return Tip(c, badge.Label("会话响铃"), "会话响铃").Background(Color(p.BellBg)).Children(func() {
+		return Tip(c, badge.Label(
+			locales.MessageSessionBell(),
+		), locales.MessageSessionBell()).Background(Color(p.BellBg)).Children(func() {
 			ui.Icon(c, IconSVG(IconBell)).Size(p.BellIconSize, p.BellIconSize).TextColor(Color(p.BellText)).PassThrough()
 		})
 	}
 	return badge.Gap(p.Gap).Background(Color(p.OutputBg)).PassThrough().Children(func() {
 		ui.Box(c).Size(p.DotSize, p.DotSize).Radius(t.Radius.Pill).Background(Color(p.OutputDot)).PassThrough()
-		ui.Text(c, "新输出").FontSize(p.FontSize).TextColor(Color(p.OutputText)).SingleLine().PassThrough()
+		ui.Text(c, locales.MessageNewOutput()).FontSize(p.FontSize).TextColor(Color(p.OutputText)).SingleLine().PassThrough()
 	})
 }

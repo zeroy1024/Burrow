@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/egoist/mygo/i18n"
 	"maps"
 	"slices"
 	"strconv"
@@ -14,6 +15,7 @@ import (
 	"time"
 
 	"github.com/egoist/mygo/ui"
+	"sshdesk/internal/locales"
 	"sshdesk/internal/mcpserver"
 	"sshdesk/internal/store"
 	"sshdesk/internal/uikit"
@@ -72,7 +74,7 @@ func (a *app) startMCPBackend() {
 			err := s.Start(a.ctx)
 			a.window.Update(func() {
 				if err != nil {
-					a.persistenceNotice("启动 MCP 服务失败", err)
+					a.persistenceNotice(locales.MessageUnableToStartTheMcpService, err)
 				}
 				a.refreshMCPBackend()
 			})
@@ -90,12 +92,12 @@ func (a *app) mcpFilter() store.MCPOperationFilter {
 	}
 	f.ConnectionIDs = a.mcpConnectionFilterIDs(a.mcp.auditConnFilter)
 	if a.mcp.auditTypeFilter != "all" {
-		if a.mcp.auditTypeFilter == "策略管理" {
+		if a.mcp.auditTypeFilter == "policy." {
 			f.ActionPrefix = "policy."
-		} else if a.mcp.auditTypeFilter == "协议请求" {
+		} else if a.mcp.auditTypeFilter == "mcp." {
 			f.ActionPrefix = "mcp."
 		} else {
-			f.Action = mcpActionValue(a.mcp.auditTypeFilter)
+			f.Action = a.mcp.auditTypeFilter
 		}
 	}
 	switch a.mcp.auditResultFilter {
@@ -228,7 +230,7 @@ func (a *app) refreshMCPBackend() {
 	}
 	connections, err := b.captureConnections()
 	if err != nil {
-		a.persistenceNotice("读取 MCP 连接失败", err)
+		a.persistenceNotice(locales.MessageUnableToReadMcpConnections, err)
 		return
 	}
 	b.connections = connections
@@ -243,7 +245,7 @@ func (a *app) refreshMCPBackend() {
 	a.persist(func() error { var err error; data, err = a.readMCPData(filter, detailID); return err }, func(err error) {
 		b.refreshing = false
 		if err != nil {
-			a.persistenceNotice("读取 MCP 数据失败", err)
+			a.persistenceNotice(locales.MessageUnableToReadMcpData, err)
 		} else {
 			a.applyMCPData(data)
 		}
@@ -276,27 +278,30 @@ func (a *app) applyMCPData(data mcpData) {
 			grants[i].loadPermissions(key.Grants)
 			var capabilities []string
 			if grants[i].AllowRead {
-				capabilities = append(capabilities, "读取")
+				capabilities = append(capabilities, locales.MessageRead())
 			}
 			if grants[i].AllowWrite {
-				capabilities = append(capabilities, "写入")
+				capabilities = append(capabilities, locales.MessageWrite())
 			}
 			if grants[i].AllowExec {
-				capabilities = append(capabilities, "执行")
+				capabilities = append(capabilities, locales.MessageExecute())
 			}
 			if len(capabilities) > 0 {
 				summary = append(summary, grants[i].Name+" ("+strings.Join(capabilities, "/")+")")
-			} else if grants[i].Warning != "" {
-				summary = append(summary, grants[i].Name+"（需重新授权）")
+			} else if !grants[i].Warning.Empty() {
+				summary = append(summary, grants[i].Name+locales.MessageRequiresAuthorizationAgain())
 			}
 		}
-		lastUsed := "从未使用"
+		lastUsed := locales.MessageNeverUsed()
 		if !key.LastUsedAt.IsZero() {
-			lastUsed = key.LastUsedAt.Local().Format("01-02 15:04")
+			lastUsed = localizedDate(key.LastUsedAt.Local(), i18n.MediumStyle, i18n.ShortStyle)
 		}
 		a.mcp.keys = append(a.mcp.keys, mcpSecretKey{ID: key.ID, Name: key.Name, Prefix: key.Prefix, State: key.State,
-			GrantsSummary: strings.Join(summary, "、"), PolicyHint: "受当前启用的拦截策略约束", Grants: grants,
-			UploadDirs: key.UploadDirs, DownloadDirs: key.DownloadDirs, LastUsed: lastUsed, CreatedAt: key.CreatedAt.Local().Format("2006-01-02 15:04")})
+			GrantsSummary: strings.Join(
+				summary,
+				locales.CommonListSeparator(),
+			), PolicyHint: locales.MessageSubjectToEnabledInterceptionPolicies(), Grants: grants,
+			UploadDirs: key.UploadDirs, DownloadDirs: key.DownloadDirs, LastUsed: lastUsed, CreatedAt: localizedDate(key.CreatedAt.Local(), i18n.MediumStyle, i18n.ShortStyle)})
 	}
 	a.mcp.policies = nil
 	for _, p := range data.policies {
@@ -324,9 +329,9 @@ func (a *app) applyMCPData(data mcpData) {
 			}
 		}
 		view.ConnSummary = strings.Join(names, ", ")
-		view.ConnSub = fmt.Sprintf("指定 %d 个连接", len(names))
+		view.ConnSub = locales.McpSelectedConnectionsCount(len(names))
 		if p.AllConnections {
-			view.ConnSummary, view.ConnSub = "全部连接", "含后续新增连接"
+			view.ConnSummary, view.ConnSub = locales.MessageAllConnections(), locales.MessageIncludesConnectionsAddedLater()
 		}
 		if p.Category == "ssh" {
 			for _, r := range p.CommandRules {
@@ -343,9 +348,9 @@ func (a *app) applyMCPData(data mcpData) {
 		if len(view.FileRules) > 0 {
 			view.RulePrimary = view.FileRules[0].Path
 		}
-		view.RuleSub = fmt.Sprintf("共 %d 条规则", len(view.CmdRules)+len(view.FileRules))
+		view.RuleSub = locales.McpRuleCount(len(view.CmdRules) + len(view.FileRules))
 		if slices.ContainsFunc(view.CmdRules, func(r mcpCommandRule) bool { return r.Mode == "contains" }) {
-			view.RuleSub += " · 含模糊匹配，可能误报"
+			view.RuleSub += locales.MessageIncludesFuzzyMatchingFalsePositivesArePossible()
 		}
 		a.mcp.policies = append(a.mcp.policies, view)
 	}
@@ -359,7 +364,7 @@ func (a *app) applyMCPData(data mcpData) {
 	for _, op := range data.operations {
 		view, err := mcpAuditView(op, data.files[op.ID], data.tasks[op.TaskID])
 		if err != nil {
-			a.persistenceNotice("解析 MCP 审计失败", err)
+			a.persistenceNotice(locales.MessageUnableToParseMcpAuditData, err)
 			return
 		}
 		view.FileTotal, view.FileCounts = data.fileTotals[op.ID], data.fileStates[op.ID]
@@ -377,7 +382,7 @@ func (a *app) applyMCPData(data mcpData) {
 func (a *app) mcpConnectionOptions(category int, all bool) []uikit.Option[string] {
 	var options []uikit.Option[string]
 	if all {
-		options = append(options, uikit.Option[string]{Value: "all", Label: "全部"})
+		options = append(options, uikit.Option[string]{Value: "all", Label: locales.MessageAll()})
 	}
 	if a.mcpBackend == nil {
 		return options
@@ -397,7 +402,7 @@ func (a *app) mcpConnectionOptions(category int, all bool) []uikit.Option[string
 func (a *app) mcpKeyOptions(all bool) []uikit.Option[string] {
 	var options []uikit.Option[string]
 	if all {
-		options = append(options, uikit.Option[string]{Value: "all", Label: "全部"})
+		options = append(options, uikit.Option[string]{Value: "all", Label: locales.MessageAll()})
 	}
 	for _, k := range a.mcp.keys {
 		if k.State != "revoked" || all {
@@ -410,11 +415,17 @@ func (a *app) mcpKeyOptions(all bool) []uikit.Option[string] {
 func (a *app) mcpWork(work func() error, done func(error)) {
 	b := a.mcpBackend
 	if b == nil || b.service == nil {
-		a.persistenceNotice("MCP 不可用", errors.New("MCP 后端未成功初始化"))
+		a.persistenceNotice(
+			locales.MessageMcpUnavailable,
+			locales.NewError(locales.MessageTheMcpBackendWasNotInitializedSuccessfully),
+		)
 		return
 	}
 	if b.busy {
-		a.persistenceNotice("MCP 操作未执行", errors.New("另一个 MCP 管理操作进行中，请稍后重试"))
+		a.persistenceNotice(
+			locales.MessageMcpOperationNotPerformed,
+			locales.NewError(locales.MessageAnotherMcpManagementOperationIsInProgressTryAgainShortly),
+		)
 		a.refreshMCPBackend()
 		return
 	}
@@ -424,7 +435,7 @@ func (a *app) mcpWork(work func() error, done func(error)) {
 		a.window.Update(func() {
 			b.busy = false
 			if err != nil {
-				a.persistenceNotice("MCP 操作失败", err)
+				a.persistenceNotice(locales.MessageMcpOperationFailed, err)
 			}
 			if done != nil {
 				done(err)
@@ -460,12 +471,12 @@ func (a *app) configureMCPBackend() {
 	host, port, enabled, retention := a.mcp.host, a.mcp.port, a.mcp.running, a.mcp.retentionDays
 	portNumber, err := strconv.Atoi(port)
 	if err != nil {
-		a.persistenceNotice("无效的监听端口", err)
+		a.persistenceNotice(locales.MessageInvalidListeningPort, err)
 		return
 	}
 	days, err := strconv.Atoi(retention)
 	if err != nil {
-		a.persistenceNotice("无效的审计保留周期", err)
+		a.persistenceNotice(locales.MessageInvalidAuditRetentionPeriod, err)
 		return
 	}
 	a.mcpWork(func() error {
@@ -476,7 +487,7 @@ func (a *app) configureMCPBackend() {
 func (a *app) pruneMCPBackend() {
 	days, err := strconv.Atoi(a.mcp.retentionDays)
 	if err != nil {
-		a.persistenceNotice("无效的保留周期", err)
+		a.persistenceNotice(locales.MessageInvalidRetentionPeriod, err)
 		return
 	}
 	a.mcpWork(func() error { return a.store.MCPPrune(a.ctx, time.Now().AddDate(0, 0, -days)) }, nil)
@@ -509,7 +520,7 @@ func (a *app) saveMCPBackendKey() {
 		return err
 	}, func(err error) {
 		if err != nil {
-			draft.NameError = err.Error()
+			draft.NameError = locales.ErrorText(err)
 			return
 		}
 		a.mcp.selectedKeyID = key.ID
@@ -523,13 +534,13 @@ func (a *app) saveMCPBackendKey() {
 
 func (a *app) saveMCPBackendPolicy() {
 	form := &a.mcp.policyDraft
-	form.NameError, form.SaveError = "", ""
+	form.NameError, form.SaveError = locales.Text{}, locales.Text{}
 	if strings.TrimSpace(form.Name) == "" {
-		form.NameError = "请输入策略名称"
+		form.NameError = locales.Deferred(locales.MessageEnterAPolicyName)
 	} else if len(form.Name) > 200 {
-		form.NameError = "策略名称过长，请缩短后重试（最多 200 字节）"
+		form.NameError = locales.Deferred(locales.MessageThePolicyNameIsTooLongUseNoMoreThanBytes)
 	}
-	if form.NameError != "" {
+	if !form.NameError.Empty() {
 		form.Scroll.ScrollTo(0, 0, ui.Animation{})
 		return
 	}
@@ -548,7 +559,7 @@ func (a *app) saveMCPBackendPolicy() {
 		}
 	}
 	if err := mcpserver.ValidatePolicy(p); err != nil {
-		form.SaveError = err.Error()
+		form.SaveError = locales.ErrorText(err)
 		form.Scroll.ScrollTo(0, 0, ui.Animation{})
 		return
 	}
@@ -556,7 +567,7 @@ func (a *app) saveMCPBackendPolicy() {
 		if err == nil {
 			form.modal.Close()
 		} else {
-			form.SaveError = err.Error()
+			form.SaveError = locales.ErrorText(err)
 			form.Scroll.ScrollTo(0, 0, ui.Animation{})
 		}
 	})
@@ -589,7 +600,7 @@ func (a *app) deleteMCPBackendPolicy(id string) {
 func (a *app) controlMCPBackendTask(id, action string) {
 	number, err := strconv.Atoi(id)
 	if err != nil {
-		a.persistenceNotice("无效的任务标识", err)
+		a.persistenceNotice(locales.MessageInvalidTaskId, err)
 		return
 	}
 	a.mcpWork(func() error { return a.mcpBackend.ControlTask(a.ctx, number, action) }, nil)
@@ -610,18 +621,68 @@ func (a *app) stopMCPForQuit(done func(error)) {
 
 func mcpActionName(value string) string {
 	if strings.HasPrefix(value, "mcp.") {
-		return "协议请求"
+		return locales.MessageProtocolRequest()
 	}
-	return map[string]string{"connections_list": "连接发现", "ssh_exec": "命令执行", "files_list": "目录浏览", "files_stat": "文件信息", "files_read": "文件读取", "files_write": "文件写入", "files_upload": "文件上传", "files_download": "文件下载", "authentication": "认证失败", "tasks_list": "任务列表", "tasks_get": "任务查询", "tasks_cancel": "任务取消"}[value]
+	return map[string]string{"connections_list": locales.MessageConnectionDiscovery(), "ssh_exec": locales.MessageCommandExecution(), "files_list": locales.MessageDirectoryListing(), "files_stat": locales.MessageFileInformation(), "files_read": locales.MessageFileRead(), "files_write": locales.MessageFileWrite(), "files_upload": locales.MessageFileUpload(), "files_download": locales.MessageFileDownload(), "authentication": locales.MessageAuthenticationFailed(), "tasks_list": locales.MessageTaskList(), "tasks_get": locales.MessageTaskLookup(), "tasks_cancel": locales.MessageTaskCancellation()}[value]
 }
 
-func mcpActionValue(name string) string {
-	for _, value := range []string{"ssh_exec", "files_list", "files_stat", "files_read", "files_write", "files_upload", "files_download", "authentication"} {
-		if mcpActionName(value) == name {
-			return value
+func mcpFileActionName(value string) string {
+	if value == "exec" {
+		return locales.MessageCommandExecution()
+	}
+	for _, action := range uikit.DefaultFilePolicyActions() {
+		if action.ID == value {
+			return action.Label
 		}
 	}
-	return name
+	return value
+}
+
+func mcpStageName(value string) string {
+	switch value {
+	case "accepted":
+		return locales.McpStateAccepted()
+	case "validated":
+		return locales.McpStateValidated()
+	case "queued":
+		return locales.MessageQueued()
+	case "running":
+		return locales.MessageRunning()
+	case "waiting":
+		return locales.McpStateWaiting()
+	case "waiting_user":
+		return locales.McpStateWaitingUser()
+	case "paused":
+		return locales.MessagePaused()
+	case "completed":
+		return locales.MessageCompleted()
+	case "failed":
+		return locales.MessageFailed()
+	case "intercepted":
+		return locales.MessageBlockedByPolicy()
+	case "partial_intercepted":
+		return locales.MessagePartiallyBlocked()
+	case "permission_denied":
+		return locales.MessagePermissionDenied()
+	case "authentication_failed":
+		return locales.MessageAuthenticationFailed()
+	case "cancel_requested":
+		return locales.MessageCancellationRequested()
+	case "cancelled":
+		return locales.McpStateCancelled()
+	case "timed_out":
+		return locales.McpStateTimedOut()
+	case "interrupted":
+		return locales.McpStateInterrupted()
+	case "skipped":
+		return locales.McpStateSkipped()
+	case "cleanup_pending":
+		return locales.McpStateCleanupPending()
+	case "cleaning":
+		return locales.McpStateCleaning()
+	default:
+		return value
+	}
 }
 
 func mcpUIStatus(value string) uikit.Status {
@@ -662,14 +723,14 @@ func mcpAuditView(op store.MCPOperation, files []store.MCPFileEvent, task store.
 	if err := json.Unmarshal(op.Target, &target); err != nil {
 		return mcpAuditItem{}, err
 	}
-	view := mcpAuditItem{ID: op.ID, KeyID: op.KeyID, KeyName: op.KeyName, ConnectionID: op.ConnectionID,
+	view := mcpAuditItem{Action: op.Action, ID: op.ID, KeyID: op.KeyID, KeyName: op.KeyName, ConnectionID: op.ConnectionID,
 		Time: op.StartedAt.Local().Format("15:04:05"), Day: op.StartedAt.Local().Format("01-02"),
 		ConnName: target.Name, ConnHost: target.Host, ConnPort: strconv.Itoa(target.Port), ConnUser: target.User,
 		ConnProtocol: strings.ToUpper(target.Protocol), ActionType: mcpActionName(op.Action), Status: mcpUIStatus(op.Status),
-		StartTime: op.StartedAt.Local().Format("2006-01-02 15:04:05"), EndTime: "进行中", IsCommand: op.Action == "ssh_exec",
+		StartTime: localizedDate(op.StartedAt.Local(), i18n.MediumStyle, i18n.MediumStyle), EndTime: locales.MessageInProgress(), IsCommand: op.Action == "ssh_exec",
 		CommandText: request.Command, RemotePath: request.Path, LocalPath: request.Local, OutputStatus: op.Error, Summary: request.Path}
 	if view.ActionType == "" {
-		view.ActionType = "管理操作"
+		view.ActionType = locales.MessageManagementOperation()
 	}
 	if view.IsCommand {
 		view.Summary = strings.Join(strings.Fields(request.Command), " ")
@@ -677,7 +738,7 @@ func mcpAuditView(op store.MCPOperation, files []store.MCPFileEvent, task store.
 		view.Summary = strings.TrimPrefix(op.Action, "mcp.")
 	}
 	if !op.FinishedAt.IsZero() {
-		view.EndTime = op.FinishedAt.Local().Format("2006-01-02 15:04:05")
+		view.EndTime = localizedDate(op.FinishedAt.Local(), i18n.MediumStyle, i18n.MediumStyle)
 		view.Duration = op.FinishedAt.Sub(op.StartedAt).Round(time.Millisecond).String()
 	} else {
 		view.Duration = time.Since(op.StartedAt).Round(time.Second).String()
@@ -691,22 +752,30 @@ func mcpAuditView(op store.MCPOperation, files []store.MCPFileEvent, task store.
 	if err := json.Unmarshal(op.Result, &result); err != nil {
 		return view, err
 	}
-	view.ExitCodeText = "—（未知或未执行）"
+	view.ExitCodeText = locales.MessageUnknownOrNotExecuted()
 	if result.ExitCode != nil {
 		view.ExitCodeText = strconv.Itoa(*result.ExitCode)
 	}
 	if view.IsCommand && op.Error == "" {
-		view.OutputStatus = fmt.Sprintf("stdout %s · stderr %s · 截断 %t", transferBytes(int64(result.Stdout)), transferBytes(int64(result.Stderr)), result.Truncated)
+		view.OutputStatus = locales.McpOutputSummary(
+			transferBytes(int64(result.Stdout)),
+			transferBytes(int64(result.Stderr)),
+			strconv.FormatBool(result.Truncated),
+		)
 	}
 	for _, event := range op.Timeline {
-		view.Timeline = append(view.Timeline, uikit.TimelineItem{Stage: event.Stage, Detail: event.Detail, Time: event.At.Local().Format("15:04:05"), Tone: uikit.ToneSecondary})
+		view.Timeline = append(view.Timeline, uikit.TimelineItem{Stage: mcpStageName(event.Stage), Detail: event.Detail, Time: event.At.Local().Format("15:04:05"), Tone: uikit.ToneSecondary})
 	}
 	for i, h := range op.Hits {
-		category := "文件策略"
+		category := locales.MessageFilePolicy()
 		if h.Category == "ssh" {
-			category = "命令策略"
+			category = locales.MessageCommandPolicy()
 		}
-		view.PolicyHits = append(view.PolicyHits, mcpPolicyHitSnapshot{PolicyID: h.PolicyID, PolicyName: h.Name, Category: category, Version: h.Version, RuleSummary: h.Rule, ForbiddenText: h.Action, HitCountText: fmt.Sprintf("第 %d / %d 条命中", i+1, len(op.Hits))})
+		view.PolicyHits = append(view.PolicyHits, mcpPolicyHitSnapshot{PolicyID: h.PolicyID, PolicyName: h.Name, Category: category, Version: h.Version, RuleSummary: h.Rule, Action: h.Action, ForbiddenText: mcpFileActionName(h.Action), HitCountText: fmt.Sprintf(
+			locales.MessageMatchOf(),
+			i+1,
+			len(op.Hits),
+		)})
 	}
 	latest := make(map[string]int)
 	var summaries []store.MCPFileEvent
@@ -721,7 +790,7 @@ func mcpAuditView(op store.MCPOperation, files []store.MCPFileEvent, task store.
 	}
 	for _, f := range summaries {
 		state := map[string]string{"completed": "ok", "intercepted": "intercepted", "failed": "failed", "skipped": "skipped", "running": "pending", "pending": "pending", "interrupted": "pending"}[f.Status]
-		view.Files = append(view.Files, mcpAuditFileItem{Path: f.Path, State: state, Size: transferBytes(f.Bytes), PolicyTag: f.Action})
+		view.Files = append(view.Files, mcpAuditFileItem{Path: f.Path, State: state, Size: transferBytes(f.Bytes), PolicyTag: mcpFileActionName(f.Action)})
 	}
 	if task.ID > 0 {
 		fraction := float32(0)
@@ -729,17 +798,17 @@ func mcpAuditView(op store.MCPOperation, files []store.MCPFileEvent, task store.
 			fraction = float32(task.Done) / float32(task.Total)
 		}
 		view.Task = &mcpAuditTask{ID: strconv.Itoa(task.ID), Title: view.ActionType + " → " + target.Name,
-			Subtitle: task.State, Transferred: transferBytes(task.Done), Total: transferBytes(task.Total), Fraction: fraction,
+			Subtitle: mcpStageName(task.State), Transferred: transferBytes(task.Done), Total: transferBytes(task.Total), Fraction: fraction,
 			Paused: task.State == "paused" || task.State == "interrupted" || task.State == "failed" || task.State == "intercepted" || task.State == "partial_intercepted", CancelRequest: task.State == "cancel_requested" || task.State == "cancelled" || task.State == "completed"}
 		if op.Action == "files_write" {
 			view.Task.CleanupOnly = true
-			view.Task.Title = "自有临时文件清理 → " + target.Name
-			view.Task.Subtitle = map[string]string{"cleanup_pending": "等待手动重试清理", "cleaning": "正在清理", "completed": "清理完成"}[task.State]
+			view.Task.Title = locales.MessageOwnedTemporaryFileCleanup() + target.Name
+			view.Task.Subtitle = map[string]string{"cleanup_pending": locales.MessageWaitingForAManualCleanupRetry(), "cleaning": locales.MessageCleaningUp(), "completed": locales.MessageCleanupComplete()}[task.State]
 			view.Task.Paused = task.State == "cleanup_pending"
 			view.Task.CancelRequest = task.State != "cleanup_pending"
 		}
 		if task.State == "waiting_user" && len(op.Timeline) > 0 {
-			view.Task.WaitingPrompt = "等待用户：" + op.Timeline[len(op.Timeline)-1].Detail
+			view.Task.WaitingPrompt = locales.MessageWaitingForUser() + op.Timeline[len(op.Timeline)-1].Detail
 		}
 		view.TransferStat = transferBytes(task.Done) + " / " + transferBytes(task.Total)
 	}
@@ -834,7 +903,7 @@ func mcpAuditPayloadView(view *mcpAuditItem, op store.MCPOperation, payload *sto
 				for i := range view.PolicyHits {
 					hit := &view.PolicyHits[i]
 					if hit.PolicyID != evidence.PolicyID || hit.Version != evidence.Version ||
-						hit.RuleSummary != evidence.Rule || hit.ForbiddenText != evidence.Action {
+						hit.RuleSummary != evidence.Rule || hit.Action != evidence.Action {
 						continue
 					}
 					hit.MatchSaved = true

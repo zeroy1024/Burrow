@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"time"
 
+	"sshdesk/internal/locales"
 	"sshdesk/internal/mcpserver"
 	"sshdesk/internal/store"
 )
@@ -69,7 +70,7 @@ func (a *app) recordMCPWaiting(id string, taskID int, waiting bool, detail strin
 		return a.store.MCPFinish(a.ctx, op)
 	}, func(err error) {
 		if err != nil {
-			a.persistenceNotice("记录 MCP 待处理状态失败", err)
+			a.persistenceNotice(locales.MessageUnableToRecordMcpWaitingState, err)
 			a.mcpBackend.service.FailStorage(err)
 		}
 		a.refreshMCPBackend()

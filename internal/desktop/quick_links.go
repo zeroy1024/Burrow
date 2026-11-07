@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"slices"
 
+	"sshdesk/internal/locales"
 	"sshdesk/internal/theme"
 	"sshdesk/internal/uikit"
 
@@ -101,11 +102,15 @@ func (a *app) fileSSHLinkDialog(c *ui.Context) {
 	open := true
 	t := theme.Current()
 	uikit.Modal(c.Key("ftp-ssh-link"), &open, uikit.ModalProps{
-		Title: "选择 SSH 快捷目标", Width: t.C.Dialog.HostWidth, Compact: true,
+		Title: locales.MessageChooseSshShortcutTarget(), Width: t.C.Dialog.HostWidth, Compact: true,
 		Motion: uikit.MotionOverride(a.reduceMotion(c)),
 	}, func(parts uikit.ModalParts) {
 		ui.Column(c).FillWidth().Gap(t.Space.N12).Children(func() {
-			uikit.Text(c, "FTP 使用独立登录。选择已有 SSH 主机后，本次会话可双向跳转。", uikit.TextProps{Style: uikit.TextSmall})
+			uikit.Text(
+				c,
+				locales.MessageFtpUsesASeparateLoginSelectASavedSshHostToSwitchBetween(),
+				uikit.TextProps{Style: uikit.TextSmall},
+			)
 			scroll := ui.Local(parts.Panel, "ssh-link-scroll", func() ui.ScrollState { return ui.ScrollState{} })
 			list := ui.Scroll(c).MaxHeight(t.Size.StatsPanel).FillWidth().TrackScroll(scroll).Children(func() {
 				ui.Column(c).FillWidth().Gap(t.Space.N6).Children(func() {
@@ -137,8 +142,14 @@ func (a *app) fileSSHLinkDialog(c *ui.Context) {
 					}
 				})
 			})
-			uikit.Scrollbars(c, parts.Panel, list, scroll, uikit.ScrollbarProps{Label: "SSH 快捷目标滚动条"})
-			uikit.Button(c, "取消", uikit.ButtonProps{}).OnClick(parts.RequestDismiss)
+			uikit.Scrollbars(
+				c,
+				parts.Panel,
+				list,
+				scroll,
+				uikit.ScrollbarProps{Label: locales.MessageSshShortcutTargetScrollbar()},
+			)
+			uikit.Button(c, locales.CommonCancel(), uikit.ButtonProps{}).OnClick(parts.RequestDismiss)
 		})
 	})
 	if !open {

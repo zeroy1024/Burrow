@@ -5,6 +5,7 @@ import (
 	"slices"
 	"time"
 
+	"sshdesk/internal/locales"
 	"sshdesk/internal/theme"
 
 	"github.com/egoist/mygo/ui"
@@ -95,23 +96,23 @@ type remoteSession struct {
 func demoHosts() []host {
 	hosts := []host{
 		{name: "prod-web-01", user: "root", address: "192.0.2.10", os: 0,
-			latency: 18, system: "Ubuntu 22.04.4", uptime: "41 天 6 小时", cpu: 23, memory: 41, disk: 57},
+			latency: 18, system: "Ubuntu 22.04.4", uptime: locales.MessageDaysHours(), cpu: 23, memory: 41, disk: 57},
 		{name: "prod-web-02", user: "root", address: "192.0.2.11", os: 0,
-			latency: 21, system: "Ubuntu 22.04.4", uptime: "28 天 3 小时", cpu: 16, memory: 35, disk: 43},
+			latency: 21, system: "Ubuntu 22.04.4", uptime: locales.MessageDaysHours2(), cpu: 16, memory: 35, disk: 43},
 		{name: "prod-db-master", user: "admin", address: "192.0.2.12", os: 1,
-			latency: 9, system: "Debian 12", uptime: "64 天 2 小时", cpu: 12, memory: 62, disk: 71},
+			latency: 9, system: "Debian 12", uptime: locales.MessageDaysHours3(), cpu: 12, memory: 62, disk: 71},
 		{name: "cdn-origin", user: "deploy", address: "192.0.2.13", os: 2,
-			latency: 32, system: "CentOS Stream 9", uptime: "17 天 4 小时", cpu: 8, memory: 24, disk: 38},
+			latency: 32, system: "CentOS Stream 9", uptime: locales.MessageDaysHours4(), cpu: 8, memory: 24, disk: 38},
 		{name: "staging-api", user: "ubuntu", address: "192.0.2.14", os: 0,
-			latency: 46, system: "Ubuntu 24.04", uptime: "12 天 4 小时", cpu: 31, memory: 27, disk: 32},
+			latency: 46, system: "Ubuntu 24.04", uptime: locales.MessageDaysHours5(), cpu: 31, memory: 27, disk: 32},
 		{name: "bastion", user: "ops", address: "192.0.2.15", os: 3,
-			latency: 12, system: "Alpine Linux 3.21", uptime: "23 天 8 小时", cpu: 4, memory: 18, disk: 22},
+			latency: 12, system: "Alpine Linux 3.21", uptime: locales.MessageDaysHours6(), cpu: 4, memory: 18, disk: 22},
 		{name: "qa-runner", user: "ci", address: "192.0.2.16", os: 4,
-			latency: 28, system: "Fedora 42", uptime: "3 天 1 小时", cpu: 38, memory: 48, disk: 44},
+			latency: 28, system: "Fedora 42", uptime: locales.MessageDaysHour(), cpu: 38, memory: 48, disk: 44},
 		{name: "nas.home", user: "zero", address: "192.0.2.17", os: 5,
-			latency: 2, system: "Linux 6.6", uptime: "78 天 9 小时", cpu: 6, memory: 32, disk: 68},
+			latency: 2, system: "Linux 6.6", uptime: locales.MessageDaysHours7(), cpu: 6, memory: 32, disk: 68},
 		{name: "vps-tokyo", user: "root", address: "192.0.2.18", os: 6,
-			latency: 54, system: "Arch Linux", uptime: "9 天 5 小时", cpu: 11, memory: 29, disk: 35},
+			latency: 54, system: "Arch Linux", uptime: locales.MessageDaysHours8(), cpu: 11, memory: 29, disk: 35},
 	}
 	for i := range hosts {
 		hosts[i].port = 22
@@ -174,7 +175,7 @@ func disconnectSession(session *remoteSession) {
 		// The terminal reports its end with [Disconnected], and its OnExit adds the hint.
 		return
 	}
-	showSSHMessage(session, "会话已断开。")
+	showSSHMessage(session, locales.MessageSessionDisconnected2())
 	showReconnectHint(session, false)
 }
 

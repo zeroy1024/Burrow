@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"sshdesk/internal/locales"
 	"sshdesk/internal/theme"
 
 	"github.com/egoist/mygo/ui"
@@ -506,7 +507,7 @@ func (a *app) settleCatalogDrag(c *ui.Context, commit bool) {
 			}
 		}, func(err error) {
 			if err != nil {
-				a.persistenceNotice("保存排序失败，已恢复原位置", err)
+				a.persistenceNotice(locales.MessageUnableToSaveOrderPreviousPositionsRestored, err)
 			} else {
 				d.phase = catalogSettling
 			}

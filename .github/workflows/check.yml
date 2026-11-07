@@ -69,6 +69,13 @@ jobs:
       - name: 检查第三方许可汇总
         run: python3 scripts/licenses.py --check
 
+      - name: 检查语言资源
+        run: |
+          python3 scripts/i18n.py
+          go tool mygo i18n check
+          go tool mygo generate
+          git diff --exit-code -- internal/locales/catalog_gen.go
+
       - name: 检查主模块
         run: |
           go mod verify

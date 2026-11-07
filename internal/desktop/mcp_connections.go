@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"sshdesk/internal/locales"
 	"sshdesk/internal/mcpserver"
 	"sshdesk/internal/store"
 )
@@ -127,15 +128,17 @@ func (g *mcpKeyGrant) loadPermissions(grants []store.MCPGrant) {
 				continue
 			}
 			if grant.EndpointDigest != source.EndpointDigest {
-				g.Warning = "连接信息已变更，原授权已失效；请重新选择权限并保存确认"
+				g.Warning = locales.Deferred(
+					locales.MessageConnectionDetailsChangedAndThePreviousGrantIsInvalidSelectPermissionsAgainAnd,
+				)
 				continue
 			}
 			source.Read, source.Write, source.Exec = grant.Read, grant.Write, grant.Exec
 			legacyFiles = legacyFiles || i > 0 && (grant.Read || grant.Write)
 		}
 	}
-	if legacyFiles && g.Warning == "" {
-		g.Warning = "已合并显示；已有文件授权仍使用原 SFTP 配置，新增权限使用 SSH 配置。"
+	if legacyFiles && g.Warning.Empty() {
+		g.Warning = locales.Deferred(locales.MessageShownAsOneConnectionExistingFileGrantsRetainTheOriginalSftpSettingsNew)
 	}
 	g.updatePermissions()
 }

@@ -10,6 +10,7 @@ import (
 
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
+	"sshdesk/internal/locales"
 	"sshdesk/internal/uikit"
 )
 
@@ -24,7 +25,7 @@ type fileEntry struct {
 
 type filePaneState struct {
 	loading      bool
-	errorText    string
+	errorText    locales.Text
 	path         string
 	remote       bool
 	directories  map[string][]fileEntry
@@ -62,7 +63,7 @@ type fileActionDialog struct {
 	kind      string
 	name      string
 	original  string
-	errorText string
+	errorText locales.Text
 }
 
 type fileDrag struct {
@@ -211,7 +212,14 @@ func (a *app) revealTransferredFile(c *ui.Context, task *transferTask) {
 	if task.sourceRemote {
 		location, err := localFileLocation(transferJoin(false, task.targetPath, task.entry.name))
 		if err != nil {
-			uikit.Toast(c, uikit.ToastProps{ID: "transfer-reveal-error", Tone: uikit.ToneDanger, Title: "无法定位文件", Detail: err.Error()})
+			uikit.Toast(
+				c,
+				uikit.ToastProps{ID: "transfer-reveal-error", Tone: uikit.ToneDanger, Title: locales.Deferred(
+					locales.MessageUnableToLocateFile,
+				), Detail: locales.ErrorText(
+					err,
+				)},
+			)
 			return
 		}
 		a.sshWorkers.Go(func() {
@@ -221,7 +229,11 @@ func (a *app) revealTransferredFile(c *ui.Context, task *transferTask) {
 			}
 			a.window.Update(func() {
 				if err != nil {
-					a.files.notice = &uikit.ToastProps{ID: "transfer-reveal-error", Tone: uikit.ToneDanger, Title: "无法定位文件", Detail: err.Error()}
+					a.files.notice = &uikit.ToastProps{ID: "transfer-reveal-error", Tone: uikit.ToneDanger, Title: locales.Deferred(
+						locales.MessageUnableToLocateFile,
+					), Detail: locales.ErrorText(
+						err,
+					)}
 					return
 				}
 				mygo.Shell.ShowItemInFolder(location)

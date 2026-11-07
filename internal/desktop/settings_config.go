@@ -2,8 +2,6 @@ package desktop
 
 import (
 	"encoding/json"
-	"errors"
-	"fmt"
 	"image/color"
 	"maps"
 	"os"
@@ -13,6 +11,7 @@ import (
 
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
+	"sshdesk/internal/locales"
 	"sshdesk/internal/termtheme"
 	"sshdesk/internal/theme"
 	"sshdesk/internal/uikit"
@@ -49,14 +48,14 @@ type preferenceSaveState struct {
 }
 
 type settingsState struct {
-	open                           bool
-	returnSection                  section
-	previousFocus                  ui.Handle
-	search                         ui.Handle
-	query                          string
-	locale                         string
+	open          bool
+	returnSection section
+	previousFocus ui.Handle
+	search        ui.Handle
+	query         string
+
 	scroll                         [7]ui.ScrollState
-	notice                         string
+	notice                         locales.Text
 	allSchemes                     bool
 	recording                      string
 	pendingBinding, conflictAction string
@@ -104,9 +103,9 @@ func (a *app) loadAppPreferences() error {
 	if err != nil {
 		a.prefs = previous
 		a.prefsLoadErr = err
-		return fmt.Errorf("读取设置：%w", err)
+		return locales.Errorf(locales.MessageReadSettings, err)
 	}
-	a.settingsCategory = slices.IndexFunc(settingsCategories[:], func(v settingsCategory) bool { return v.id == a.prefs.LastSettingsTab })
+	a.settingsCategory = slices.IndexFunc(settingsCategories()[:], func(v settingsCategory) bool { return v.id == a.prefs.LastSettingsTab })
 	if a.settingsCategory < 0 {
 		a.settingsCategory = 2
 	}
@@ -124,53 +123,53 @@ func (a *app) loadAppPreferences() error {
 
 func (a *app) validateAppPreferences() error {
 	p := a.prefs
-	if !slices.Contains([]string{"", "zh-Hans", "en"}, p.Locale) {
-		return errors.New("无效的界面语言")
+	if p.Locale != "" && !slices.Contains(mygo.App.Languages(), p.Locale) {
+		return locales.NewError(locales.MessageInvalidInterfaceLanguage)
 	}
 	if p.Keymap == nil || p.ModalAdvancedOpen == nil {
-		return errors.New("设置映射不能为 null")
+		return locales.NewError(locales.MessageSettingsMapsCannotBeNull)
 	}
 	if p.Version != 1 {
-		return fmt.Errorf("不支持的设置版本 %d", p.Version)
+		return locales.Errorf(locales.MessageUnsupportedSettingsVersion, p.Version)
 	}
 	if !slices.Contains([]string{"light", "dark", "system"}, p.AppTheme) {
-		return errors.New("无效的应用主题")
+		return locales.NewError(locales.MessageInvalidAppTheme)
 	}
 	if !slices.Contains([]string{"system", "on", "off"}, p.ReduceMotion) {
-		return errors.New("无效的减少动态效果设置")
+		return locales.NewError(locales.MessageInvalidReducedMotionSetting)
 	}
 	if !slices.Contains([]string{"keep", "closeWindow", "quit"}, p.LastTabClose) {
-		return errors.New("无效的选项卡关闭设置")
+		return locales.NewError(locales.MessageInvalidTabCloseSetting)
 	}
 	if !slices.Contains([]string{"ask", "overwrite", "skip", "rename"}, p.ConflictPolicy) {
-		return errors.New("无效的文件冲突设置")
+		return locales.NewError(locales.MessageInvalidFileConflictSetting)
 	}
 	if !slices.Contains([]string{"scheme", "card"}, p.TermBackground) {
-		return errors.New("无效的终端背景来源")
+		return locales.NewError(locales.MessageInvalidTerminalBackgroundSource)
 	}
 	if p.TermMode != "follow" {
 		name, ok := strings.CutPrefix(p.TermMode, "fixed:")
 		if !ok {
-			return errors.New("无效的终端配色模式")
+			return locales.NewError(locales.MessageInvalidTerminalColorSchemeMode)
 		}
 		if _, ok := termtheme.Lookup(name); !ok {
-			return errors.New("终端配色不存在")
+			return locales.NewError(locales.MessageTheTerminalColorSchemeDoesNotExist)
 		}
 	}
 	for _, name := range []string{p.TermFollowLight, p.TermFollowDark} {
 		if _, ok := termtheme.Lookup(name); !ok {
-			return errors.New("浅色或深色终端配色不存在")
+			return locales.NewError(locales.MessageTheLightOrDarkTerminalColorSchemeDoesNotExist)
 		}
 	}
 	if p.TransferParallel < 1 || p.TransferParallel > 8 {
-		return errors.New("同时传输数必须在 1–8 之间")
+		return locales.NewError(locales.MessageConcurrentTransfersMustBeBetweenAnd)
 	}
 	if p.ScrollbackLines < 1000 || p.ScrollbackLines > 200000 {
-		return errors.New("回滚行数必须在 1000–200000 之间")
+		return locales.NewError(locales.MessageScrollbackMustBeBetweenAndLines)
 	}
 	if p.Accent != "system" {
 		if _, err := termtheme.ParseColor(p.Accent); err != nil {
-			return fmt.Errorf("无效的强调色：%w", err)
+			return locales.Errorf(locales.MessageInvalidAccentColor, err)
 		}
 	}
 	cfg := a.terminal.config()
@@ -184,7 +183,7 @@ func (a *app) validateAppPreferences() error {
 	for _, binding := range p.Keymap {
 		if binding != "" {
 			if _, _, ok := bindingToKey(binding); !ok {
-				return fmt.Errorf("无效的快捷键 %q", binding)
+				return locales.Errorf(locales.MessageInvalidShortcut, binding)
 			}
 		}
 	}
@@ -215,13 +214,13 @@ func (a *app) tickPreferences(c *ui.Context) {
 	a.prefsSave.dirty = false
 	data, err := a.preferencesData()
 	if err != nil {
-		a.persistenceNotice("保存设置失败", err)
+		a.persistenceNotice(locales.MessageUnableToSaveSettings, err)
 		return
 	}
 	a.persist(func() error { return a.store.SaveSetting(a.ctx, "preferences", data) }, func(err error) {
 		if err != nil {
-			a.settingsUI.notice = err.Error()
-			a.persistenceNotice("保存设置失败", err)
+			a.settingsUI.notice = locales.ErrorText(err)
+			a.persistenceNotice(locales.MessageUnableToSaveSettings, err)
 		}
 	})
 }
@@ -231,7 +230,7 @@ func (a *app) preferencesData() ([]byte, error) {
 		return nil, nil
 	}
 	if a.prefsLoadErr != nil {
-		return nil, fmt.Errorf("原设置读取失败，已阻止覆盖：%w", a.prefsLoadErr)
+		return nil, locales.Errorf(locales.MessageTheOriginalSettingsCouldNotBeReadOverwritingBlocked, a.prefsLoadErr)
 	}
 	a.prefs.TermMode = a.terminal.mode.String()
 	a.prefs.TermFollowLight, a.prefs.TermFollowDark = a.terminal.followLight, a.terminal.followDark
@@ -319,7 +318,7 @@ func (a *app) selectSettingsCategory(index int) {
 	}
 	a.settingsUI.recording, a.settingsUI.pendingBinding, a.settingsUI.conflictAction = "", "", ""
 	a.settingsCategory = index
-	a.prefs.LastSettingsTab = settingsCategories[index].id
+	a.prefs.LastSettingsTab = settingsCategories()[index].id
 	a.preferencesChanged()
 }
 

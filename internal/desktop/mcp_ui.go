@@ -10,6 +10,7 @@ import (
 
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
+	"sshdesk/internal/locales"
 	"sshdesk/internal/store"
 	"sshdesk/internal/theme"
 	"sshdesk/internal/uikit"
@@ -18,7 +19,8 @@ import (
 type mcpKeyGrant struct {
 	EndpointDigest        string
 	ConnectionID          string
-	Name, Warning         string
+	Name                  string
+	Warning               locales.Text
 	Protocol, Endpoint    string // 原始协议名（ssh/sftp/ftp/ftps）与 user@host:port
 	SupportsFiles         bool
 	SupportsSSH           bool
@@ -99,6 +101,7 @@ type mcpPolicyHitSnapshot struct {
 	Version       int
 	Category      string
 	RuleSummary   string
+	Action        string
 	ForbiddenText string
 	HitCountText  string
 	MatchSaved    bool
@@ -109,6 +112,7 @@ type mcpPolicyHitSnapshot struct {
 }
 
 type mcpAuditItem struct {
+	Action            string
 	FileTotal         int
 	FileCounts        map[string]int
 	ConnectionID      string
@@ -152,12 +156,12 @@ type mcpKeyModalDraft struct {
 	modal          uikit.ModalController
 	Open           bool
 	EditingID      string
-	EditingMeta    string // 编辑时的副标题：密钥前缀与创建时间
+	EditingMeta    locales.Text // 编辑时的副标题：密钥前缀与创建时间
 	OneTimeView    bool
 	GeneratedKey   string
 	SavedConfirmed bool
 	Name           string
-	NameError      string
+	NameError      locales.Text
 	Grants         []mcpKeyGrant
 	UploadDirs     []string
 	DownloadDirs   []string
@@ -189,8 +193,8 @@ type mcpPolicyDraft struct {
 	EditingID    string
 	Version      int
 	Name         string
-	NameError    string
-	SaveError    string
+	NameError    locales.Text
+	SaveError    locales.Text
 	Description  string
 	Enabled      bool
 	CategorySeg  int // 0 = 命令策略, 1 = 文件策略
@@ -274,10 +278,10 @@ func (a *app) mcpPage(c *ui.Context) {
 	ui.Column(c).Key("mcp-page").Fill().Gap(t.Space.N8).Children(func() {
 		a.mcpServiceBar(c)
 		if !a.mcp.running {
-			res := uikit.Banner(c, fmt.Sprintf("MCP 服务已关闭：%d 个后台传输任务已暂停保存；重新开启服务不会自动继续旧任务。", a.mcpPausedTasks()), uikit.BannerProps{
+			res := uikit.Banner(c, locales.McpStoppedTransferNotice(a.mcpPausedTasks()), uikit.BannerProps{
 				Tone:    uikit.ToneWarning,
 				Icon:    uikit.IconSVG(uikit.IconInfo),
-				Actions: []string{"查看关联任务"},
+				Actions: []string{locales.MessageViewRelatedTasks()},
 			})
 			if res.ActionIndex == 0 {
 				a.mcp.activeTab = 2
@@ -314,7 +318,7 @@ func (a *app) mcpPage(c *ui.Context) {
 				maxWidth := max(minWidth, windowWidth-t.C.Rail.Width-3*t.C.Window.Gutter-t.C.Mcp.MainMinWidth)
 				a.mcp.auditDrawerWidth = min(max(a.mcp.auditDrawerWidth, minWidth), maxWidth)
 				if target == 1 && workspace.Settled("audit-drawer-open") {
-					divider := uikit.DrawerDivider(c, "mcp-audit-resize", "调整审计详情宽度", a.mcp.auditDrawerWidth)
+					divider := uikit.DrawerDivider(c, "mcp-audit-resize", locales.MessageResizeAuditDetails(), a.mcp.auditDrawerWidth)
 					if uikit.ResizeGutter(c, divider, &a.mcp.auditDrawerWidth, minWidth, maxWidth, true) {
 						c.Invalidate()
 					}
@@ -334,24 +338,32 @@ func (a *app) mcpServiceBar(c *ui.Context) {
 	uikit.Card(c).Key("mcp-service-bar").FillWidth().Shrink(0).Padding(t.Space.N10, t.Space.N16).Children(func() {
 		ui.Row(c).FillWidth().AlignItems(ui.Center).Gap(t.Space.N14).Children(func() {
 			sw := uikit.Switch(c, &a.mcp.running, uikit.ToggleProps{
-				Label: "启用 MCP 服务", Motion: uikit.MotionOverride(a.reduceMotion(c)),
+				Label: locales.MessageEnableMcpService(), Motion: uikit.MotionOverride(a.reduceMotion(c)),
 			})
 			if sw.Changed() {
 				a.configureMCPBackend()
 			}
-			uikit.Text(c, "MCP 服务", uikit.TextProps{Style: uikit.TextBodyStrong})
-			statusText := "运行中"
+			uikit.Text(c, locales.MessageMcpService(), uikit.TextProps{Style: uikit.TextBodyStrong})
+			statusText := locales.MessageRunning()
 			statusTone := uikit.ToneSuccess
 			if !a.mcp.running {
-				statusText = "已关闭"
+				statusText = locales.MessageOff()
 				statusTone = uikit.ToneNeutral
 			}
 			uikit.Badge(c, statusText, uikit.BadgeProps{Tone: statusTone, Dot: true, Size: uikit.SizeMd})
 
 			ui.Row(c).Gap(t.Space.N6).AlignItems(ui.Center).Children(func() {
-				uikit.Text(c, "监听地址", uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneSecondary})
+				uikit.Text(
+					c,
+					locales.MessageListeningAddress(),
+					uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneSecondary},
+				)
 				addr := a.mcpListenAddress()
-				if uikit.CopyField(c, addr, uikit.CopyFieldProps{Key: "mcp-listen-addr", Label: "复制监听地址"}).Copied {
+				if uikit.CopyField(
+					c,
+					addr,
+					uikit.CopyFieldProps{Key: "mcp-listen-addr", Label: locales.MessageCopyListeningAddress()},
+				).Copied {
 					mygo.Clipboard.WriteText("http://" + addr + "/mcp")
 				}
 			})
@@ -378,22 +390,22 @@ func (a *app) mcpServiceBar(c *ui.Context) {
 					uikit.Text(c, val, uikit.TextProps{Style: uikit.TextBodyStrong, Tone: tone}).FontFeatures("tnum")
 				})
 			}
-			statPair("运行时长", a.mcp.uptime, false)
-			statPair("启用密钥", strconv.Itoa(activeKeys), false)
-			statPair("启用策略", strconv.Itoa(enabledPolicies), false)
-			statPair("今日调用", strconv.Itoa(a.mcp.todayCalls), false)
-			statPair("今日拦截", strconv.Itoa(a.mcp.todayIntercepts), a.mcp.todayIntercepts > 0)
+			statPair(locales.MessageUptime(), a.mcp.uptime, false)
+			statPair(locales.MessageEnableKey(), strconv.Itoa(activeKeys), false)
+			statPair(locales.MessageEnablePolicy(), strconv.Itoa(enabledPolicies), false)
+			statPair(locales.MessageCallsToday(), strconv.Itoa(a.mcp.todayCalls), false)
+			statPair(locales.MessageBlockedToday(), strconv.Itoa(a.mcp.todayIntercepts), a.mcp.todayIntercepts > 0)
 
 			ui.Spacer(c)
 			ui.Row(c).Gap(t.Space.N6).Shrink(0).AlignItems(ui.Center).Children(func() {
 				if uikit.IconButton(c, uikit.IconCopy, uikit.IconButtonProps{
-					Key: "mcp-copy-config", Label: "复制客户端配置",
+					Key: "mcp-copy-config", Label: locales.MessageCopyClientConfiguration(),
 				}).Clicked() {
 					mygo.Clipboard.WriteText(a.mcpClientConfigJSON())
 					a.mcp.configModalOpen = true
 				}
 				if uikit.IconButton(c, uikit.IconEdit, uikit.IconButtonProps{
-					Key: "mcp-edit-listen", Label: "编辑监听配置",
+					Key: "mcp-edit-listen", Label: locales.MessageEditListenerConfiguration(),
 				}).Clicked() {
 					a.mcp.hostDraft, a.mcp.portDraft = a.mcp.host, a.mcp.port
 					a.mcp.listenModalOpen = true
@@ -424,28 +436,44 @@ func (a *app) mcpMainCardContent(c *ui.Context) {
 			BorderWidth(0, 0, t.Size.Divider, 0).BorderColor(uikit.Color(t.Color.Border.Divider)).
 			AlignItems(ui.Center).Gap(t.Space.N10).Wrap().Children(func() {
 			items := []uikit.SegItem{
-				{Label: "授权密钥", Icon: uikit.IconKey, Count: &activeKeys},
-				{Label: "拦截策略", Icon: uikit.IconShield, Count: &enabledPolicies},
-				{Label: "审计记录", Icon: uikit.IconDocument, Count: &auditCount},
+				{Label: locales.MessageAccessKeys(), Icon: uikit.IconKey, Count: &activeKeys},
+				{Label: locales.MessageInterceptionPolicies(), Icon: uikit.IconShield, Count: &enabledPolicies},
+				{Label: locales.MessageAuditLog(), Icon: uikit.IconDocument, Count: &auditCount},
 			}
 			uikit.Segmented(c, &a.mcp.activeTab, items, uikit.SegmentedProps{
-				Label: "MCP 功能标签页", CountMax: 99,
+				Label: locales.MessageMcpTabs(), CountMax: 99,
 			})
 			ui.Spacer(c)
 			switch a.mcp.activeTab {
 			case 0:
-				if uikit.Button(c, "新增密钥", uikit.ButtonProps{Variant: uikit.ButtonPrimary, Icon: uikit.IconPlus}).Clicked() {
+				if uikit.Button(
+					c,
+					locales.MessageNewKey(),
+					uikit.ButtonProps{Variant: uikit.ButtonPrimary, Icon: uikit.IconPlus},
+				).Clicked() {
 					a.openNewMCPKeyModal()
 				}
 			case 1:
-				if uikit.Button(c, "新增策略", uikit.ButtonProps{Variant: uikit.ButtonPrimary, Icon: uikit.IconPlus}).Clicked() {
+				if uikit.Button(
+					c,
+					locales.MessageNewPolicy(),
+					uikit.ButtonProps{Variant: uikit.ButtonPrimary, Icon: uikit.IconPlus},
+				).Clicked() {
 					a.openNewMCPPolicyModal()
 				}
 			case 2:
-				if uikit.Button(c, "保留最近 "+a.mcp.retentionDays+" 天 · 清理", uikit.ButtonProps{Variant: uikit.ButtonPlain, Size: uikit.SizeSm}).Clicked() {
+				if uikit.Button(
+					c,
+					locales.McpRetentionAction(a.mcp.retentionDays),
+					uikit.ButtonProps{Variant: uikit.ButtonPlain, Size: uikit.SizeSm},
+				).Clicked() {
 					a.mcp.retentionOpen = true
 				}
-				if uikit.IconButton(c, uikit.IconRefresh, uikit.IconButtonProps{Key: "audit-refresh", Label: "刷新审计记录", Size: uikit.SizeSm}).Clicked() {
+				if uikit.IconButton(
+					c,
+					uikit.IconRefresh,
+					uikit.IconButtonProps{Key: "audit-refresh", Label: locales.MessageRefreshAuditLog(), Size: uikit.SizeSm},
+				).Clicked() {
 					a.refreshMCPBackend()
 				}
 			}
@@ -465,36 +493,36 @@ func (a *app) mcpMainCardContent(c *ui.Context) {
 func mcpKeyColumns(t *theme.Theme) []uikit.Column {
 	p := t.C.Mcp
 	return []uikit.Column{
-		{ID: "name", Title: "密钥名称 / 标识", Width: p.KeyName},
-		{ID: "state", Title: "状态", Width: p.KeyState},
-		{ID: "grants", Title: "连接授权"},
-		{ID: "dirs", Title: "目录授权", Width: p.KeyDirs},
-		{ID: "used", Title: "最近使用 / 创建", Width: p.KeyUsed},
+		{ID: "name", Title: locales.MessageKeyNameId(), Width: p.KeyName},
+		{ID: "state", Title: locales.MessageStatus(), Width: p.KeyState},
+		{ID: "grants", Title: locales.MessageConnectionGrants()},
+		{ID: "dirs", Title: locales.MessageDirectoryGrants(), Width: p.KeyDirs},
+		{ID: "used", Title: locales.MessageLastUsedCreated(), Width: p.KeyUsed},
 	}
 }
 
 func mcpPolicyColumns(t *theme.Theme) []uikit.Column {
 	p := t.C.Mcp
 	return []uikit.Column{
-		{ID: "name", Title: "策略名称 / 用途", Width: p.PolicyName},
-		{ID: "category", Title: "分类", Width: p.PolicyCategory},
-		{ID: "connections", Title: "适用连接", Width: p.PolicyConnections},
-		{ID: "keys", Title: "适用密钥", Width: p.PolicyKeys},
-		{ID: "rules", Title: "规则摘要"},
-		{ID: "state", Title: "状态 / 命中", Width: p.PolicyState},
+		{ID: "name", Title: locales.MessagePolicyNameDescription(), Width: p.PolicyName},
+		{ID: "category", Title: locales.MessageCategory(), Width: p.PolicyCategory},
+		{ID: "connections", Title: locales.MessageApplicableConnections(), Width: p.PolicyConnections},
+		{ID: "keys", Title: locales.MessageApplicableKeys(), Width: p.PolicyKeys},
+		{ID: "rules", Title: locales.MessageRuleSummary()},
+		{ID: "state", Title: locales.MessageStatusMatches(), Width: p.PolicyState},
 	}
 }
 
 func mcpAuditColumns(t *theme.Theme) []uikit.Column {
 	p := t.C.Mcp
 	return []uikit.Column{
-		{ID: "time", Title: "时间", Width: p.AuditTime},
-		{ID: "key", Title: "密钥名称", Width: p.AuditKey},
-		{ID: "connection", Title: "目标连接", Width: p.AuditConnection},
-		{ID: "action", Title: "操作类型", Width: p.AuditAction},
-		{ID: "summary", Title: "命令或路径摘要"},
-		{ID: "status", Title: "状态", Width: p.AuditStatus},
-		{ID: "duration", Title: "耗时", Width: p.AuditDuration, Align: uikit.AlignEnd},
+		{ID: "time", Title: locales.MessageTime(), Width: p.AuditTime},
+		{ID: "key", Title: locales.MessageKeyName(), Width: p.AuditKey},
+		{ID: "connection", Title: locales.MessageTargetConnection(), Width: p.AuditConnection},
+		{ID: "action", Title: locales.MessageActionType(), Width: p.AuditAction},
+		{ID: "summary", Title: locales.MessageCommandOrPathSummary()},
+		{ID: "status", Title: locales.MessageStatus(), Width: p.AuditStatus},
+		{ID: "duration", Title: locales.MessageDuration(), Width: p.AuditDuration, Align: uikit.AlignEnd},
 	}
 }
 
@@ -520,14 +548,14 @@ func (a *app) mcpKeysTab(c *ui.Context) {
 	columns := mcpKeyColumns(t)
 	ui.Column(c).Grow(1).MinHeight(0).FillWidth().Children(func() {
 		props := uikit.TableViewportProps{
-			Label: "授权密钥列表", MinWidth: t.C.Mcp.TableMinWidth, PaddingY: t.Space.N8,
+			Label: locales.MessageAccessKeyList(), MinWidth: t.C.Mcp.TableMinWidth, PaddingY: t.Space.N8,
 			Header: func() { uikit.TableHeaderRow(c, columns) },
 		}
 		if count == 0 {
 			props.Empty = func() {
 				uikit.EmptyState(c, uikit.EmptyProps{
-					IconName: uikit.IconKey, Title: "还没有授权密钥",
-					Detail: "新增密钥并授权连接后，MCP 客户端才能通过它访问服务器。", Action: "新增密钥",
+					IconName: uikit.IconKey, Title: locales.MessageNoAccessKeysYet(),
+					Detail: locales.MessageCreateAKeyAndGrantConnectionAccessSoAnMcpClientCanUse(), Action: locales.MessageNewKey(),
 				}).Action.OnClick(a.openNewMCPKeyModal)
 			}
 		}
@@ -548,13 +576,13 @@ func (a *app) mcpKeysTab(c *ui.Context) {
 					})
 					var menuEntries []uikit.MenuEntry
 					if !revoked {
-						toggleLabel := "停用密钥"
+						toggleLabel := locales.MessageDisableKey2()
 						if keyItem.State == "disabled" {
-							toggleLabel = "启用密钥"
+							toggleLabel = locales.MessageEnableKey()
 						}
 						menuEntries = []uikit.MenuEntry{
 							{
-								ID: "edit", Label: "编辑密钥", Icon: uikit.IconEdit,
+								ID: "edit", Label: locales.MessageEditKey(), Icon: uikit.IconEdit,
 								OnChoose: func() { a.openEditMCPKeyModal(keyItem.ID) },
 							},
 							{
@@ -571,7 +599,7 @@ func (a *app) mcpKeysTab(c *ui.Context) {
 							},
 							{ID: "sep", Separator: true},
 							{
-								ID: "revoke", Label: "撤销密钥", Icon: uikit.IconTrash, Danger: true,
+								ID: "revoke", Label: locales.MessageRevokeKey2(), Icon: uikit.IconTrash, Danger: true,
 								OnChoose: func() {
 									a.mcp.keyConfirm = mcpKeyConfirmDialog{
 										Open: true, KeyID: keyItem.ID, Name: keyItem.Name, Action: "revoke",
@@ -601,13 +629,13 @@ func (a *app) mcpKeysTab(c *ui.Context) {
 							uikit.Text(c, keyItem.PolicyHint, uikit.TextProps{Style: uikit.TextCaption, Tone: uikit.ToneTertiary}).SingleLine().Ellipsis("…")
 						})
 						uikit.TableCell(c, columns[3]).Children(func() {
-							upText := "上传：未授权"
+							upText := locales.MessageUploadNotAuthorized()
 							if len(keyItem.UploadDirs) > 0 {
-								upText = "上传：" + keyItem.UploadDirs[0]
+								upText = locales.MessageUpload2() + keyItem.UploadDirs[0]
 							}
-							downText := "下载：未授权"
+							downText := locales.MessageDownloadNotAuthorized()
 							if len(keyItem.DownloadDirs) > 0 {
-								downText = "下载：" + keyItem.DownloadDirs[0]
+								downText = locales.MessageDownload2() + keyItem.DownloadDirs[0]
 							}
 							if revoked {
 								upText, downText = "—", "—"
@@ -623,7 +651,7 @@ func (a *app) mcpKeysTab(c *ui.Context) {
 								})
 								if len(menuEntries) > 0 {
 									more := uikit.SiderMore(c, row, uikit.SiderMoreProps{
-										Icon: moreIcon, Label: keyItem.Name + " 操作菜单",
+										Icon: moreIcon, Label: locales.ActionsForName(keyItem.Name),
 									})
 									uikit.RowMenuOn(c, row, more, menuEntries)
 								}
@@ -635,7 +663,7 @@ func (a *app) mcpKeysTab(c *ui.Context) {
 		})
 		uikit.Pagination(c, &a.mcp.keyPage, uikit.PaginationProps{
 			Total: len(ordered), PageSize: 20,
-			Summary: fmt.Sprintf("共 %d 条授权密钥", len(ordered)),
+			Summary: locales.McpKeysCount(len(ordered)),
 		})
 	})
 }
@@ -683,25 +711,42 @@ func (a *app) mcpPoliciesTab(c *ui.Context) {
 	columns := mcpPolicyColumns(t)
 	ui.Column(c).Grow(1).MinHeight(0).FillWidth().Children(func() {
 		props := uikit.TableViewportProps{
-			Label: "拦截策略", MinWidth: t.C.Mcp.TableMinWidth, PaddingY: t.Space.N8,
+			Label: locales.MessageInterceptionPolicies(), MinWidth: t.C.Mcp.TableMinWidth, PaddingY: t.Space.N8,
 			Header: func() {
 				uikit.TableToolbar(c).Children(func() {
 					ui.Row(c).FillWidth().Gap(t.Space.N8).Children(func() {
 						catItems := []uikit.SegItem{
-							{Label: "全部", Count: &totalAll},
-							{Label: "命令策略", Count: &totalSSH},
-							{Label: "文件策略", Count: &totalFiles},
+							{Label: locales.MessageAll(), Count: &totalAll},
+							{Label: locales.MessageCommandPolicy(), Count: &totalSSH},
+							{Label: locales.MessageFilePolicy(), Count: &totalFiles},
 						}
-						uikit.Segmented(c, &a.mcp.policyCategorySeg, catItems, uikit.SegmentedProps{Size: uikit.SizeSm, Label: "策略分类筛选"})
-						uikit.FilterChip(c, "适用连接", &a.mcp.policyConnFilter, a.mcpConnectionOptions(-1, true), uikit.FilterChipProps{Key: "pol-conn-filter"})
-						uikit.FilterChip(c, "适用密钥", &a.mcp.policyKeyFilter, a.mcpKeyOptions(true), uikit.FilterChipProps{Key: "pol-key-filter"})
-						uikit.FilterChip(c, "状态", &a.mcp.policyStateFilter, []uikit.Option[string]{
-							{Value: "all", Label: "全部"},
-							{Value: "enabled", Label: "已启用"},
-							{Value: "disabled", Label: "已停用"},
+						uikit.Segmented(
+							c,
+							&a.mcp.policyCategorySeg,
+							catItems,
+							uikit.SegmentedProps{Size: uikit.SizeSm, Label: locales.MessageFilterPolicyCategories()},
+						)
+						uikit.FilterChip(
+							c,
+							locales.MessageApplicableConnections(),
+							&a.mcp.policyConnFilter,
+							a.mcpConnectionOptions(-1, true),
+							uikit.FilterChipProps{Key: "pol-conn-filter"},
+						)
+						uikit.FilterChip(
+							c,
+							locales.MessageApplicableKeys(),
+							&a.mcp.policyKeyFilter,
+							a.mcpKeyOptions(true),
+							uikit.FilterChipProps{Key: "pol-key-filter"},
+						)
+						uikit.FilterChip(c, locales.MessageStatus(), &a.mcp.policyStateFilter, []uikit.Option[string]{
+							{Value: "all", Label: locales.MessageAll()},
+							{Value: "enabled", Label: locales.MessageEnabled()},
+							{Value: "disabled", Label: locales.MessageDisabled()},
 						}, uikit.FilterChipProps{Key: "pol-state-filter"})
 					})
-					uikit.Banner(c, "执行条件：密钥已授权，且未命中已启用的拦截策略；任一规则命中即拦截。", uikit.BannerProps{
+					uikit.Banner(c, locales.MessageAnActionIsAllowedOnlyIfTheKeyIsAuthorizedAndNoEnabled(), uikit.BannerProps{
 						Icon: uikit.IconSVG(uikit.IconShield),
 					})
 				})
@@ -712,15 +757,15 @@ func (a *app) mcpPoliciesTab(c *ui.Context) {
 		case totalAll == 0:
 			props.Empty = func() {
 				uikit.EmptyState(c, uikit.EmptyProps{
-					IconName: uikit.IconShield, Title: "还没有拦截策略",
-					Detail: "新增策略后，命中规则的 MCP 命令或文件操作会被拦截。", Action: "新增策略",
+					IconName: uikit.IconShield, Title: locales.MessageNoInterceptionPoliciesYet(),
+					Detail: locales.MessageCreateAPolicyToBlockMcpCommandsOrFileOperationsThatMatchIts(), Action: locales.MessageNewPolicy(),
 				}).Action.OnClick(a.openNewMCPPolicyModal)
 			}
 		case count == 0:
 			props.Empty = func() {
 				uikit.EmptyState(c, uikit.EmptyProps{
-					IconName: uikit.IconShield, Title: "筛选无结果",
-					Detail: "当前筛选条件下没有匹配的拦截策略。", Action: "重置筛选条件",
+					IconName: uikit.IconShield, Title: locales.MessageNoMatchingResults(),
+					Detail: locales.MessageNoInterceptionPoliciesMatchTheCurrentFilters(), Action: locales.MessageResetFilters(),
 				}).Action.OnClick(func() {
 					a.mcp.policyCategorySeg = 0
 					a.mcp.policyConnFilter, a.mcp.policyKeyFilter, a.mcp.policyStateFilter = "all", "all", "all"
@@ -738,13 +783,13 @@ func (a *app) mcpPoliciesTab(c *ui.Context) {
 					row.OnClick(func() {
 						a.mcp.selectedPolicyID = pol.ID
 					})
-					toggleLabel := "停用策略"
+					toggleLabel := locales.MessageDisablePolicy()
 					if !pol.Enabled {
-						toggleLabel = "启用策略"
+						toggleLabel = locales.MessageEnablePolicy()
 					}
 					entries := []uikit.MenuEntry{
 						{
-							ID: "edit", Label: "编辑策略", Icon: uikit.IconEdit,
+							ID: "edit", Label: locales.MessageEditPolicy(), Icon: uikit.IconEdit,
 							OnChoose: func() {
 								a.mcp.selectedPolicyID = pol.ID
 								a.mcp.policyModalOpen = true
@@ -756,7 +801,7 @@ func (a *app) mcpPoliciesTab(c *ui.Context) {
 							OnChoose: func() { a.toggleMCPPolicy(pol.ID) },
 						},
 						{
-							ID: "audit", Label: "命中审计", Icon: uikit.IconDocument,
+							ID: "audit", Label: locales.MessageViewMatchingAuditRecords(), Icon: uikit.IconDocument,
 							OnChoose: func() {
 								a.mcp.activeTab = 2
 								a.mcp.auditResultFilter = "intercepted"
@@ -766,7 +811,7 @@ func (a *app) mcpPoliciesTab(c *ui.Context) {
 						},
 						{ID: "sep", Separator: true},
 						{
-							ID: "delete", Label: "删除策略", Icon: uikit.IconTrash, Danger: true,
+							ID: "delete", Label: locales.MessageDeletePolicy2(), Icon: uikit.IconTrash, Danger: true,
 							OnChoose: func() {
 								a.mcp.policyDelete = mcpPolicyDeleteDialog{
 									Open: true, PolicyID: pol.ID, Name: pol.Name,
@@ -783,9 +828,9 @@ func (a *app) mcpPoliciesTab(c *ui.Context) {
 						})
 						uikit.TableCell(c, columns[1]).AlignItems(ui.Start).Children(func() {
 							if pol.Category == "ssh" {
-								uikit.Badge(c, "命令策略", uikit.BadgeProps{Tone: uikit.ToneWarning})
+								uikit.Badge(c, locales.MessageCommandPolicy(), uikit.BadgeProps{Tone: uikit.ToneWarning})
 							} else {
-								uikit.Badge(c, "文件策略", uikit.BadgeProps{Tone: uikit.ToneAccent})
+								uikit.Badge(c, locales.MessageFilePolicy(), uikit.BadgeProps{Tone: uikit.ToneAccent})
 							}
 						})
 						uikit.TableCell(c, columns[2]).Children(func() {
@@ -793,10 +838,10 @@ func (a *app) mcpPoliciesTab(c *ui.Context) {
 							uikit.Text(c, pol.ConnSub, uikit.TextProps{Style: uikit.TextCaption, Tone: uikit.ToneTertiary}).SingleLine().Ellipsis("…")
 						})
 						uikit.TableCell(c, columns[3]).Children(func() {
-							keyTitle, keySub := "全部密钥", "含后续新增密钥"
+							keyTitle, keySub := locales.MessageAllKeys(), locales.MessageIncludesKeysAddedLater()
 							if !pol.AllKeys {
 								keyTitle = strings.Join(pol.KeyNames, ", ")
-								keySub = fmt.Sprintf("指定 %d 个密钥", len(pol.KeyNames))
+								keySub = locales.McpSelectedKeysCount(len(pol.KeyNames))
 							}
 							uikit.Text(c, keyTitle, uikit.TextProps{Style: uikit.TextFootnote}).SingleLine().Ellipsis("…")
 							uikit.Text(c, keySub, uikit.TextProps{Style: uikit.TextCaption, Tone: uikit.ToneTertiary}).SingleLine().Ellipsis("…")
@@ -814,13 +859,10 @@ func (a *app) mcpPoliciesTab(c *ui.Context) {
 										uikit.StatusPill(c, uikit.StatusDisabled).AlignSelf(ui.Start)
 									}
 									tone := uikit.ToneTertiary
-									if strings.Contains(pol.HitsSummary, "今日") {
-										tone = uikit.ToneWarning
-									}
 									uikit.Text(c, pol.HitsSummary, uikit.TextProps{Style: uikit.TextCaption, Tone: tone}).SingleLine().Ellipsis("…")
 								})
 								more := uikit.SiderMore(c, row, uikit.SiderMoreProps{
-									Icon: moreIcon, Label: pol.Name + " 操作菜单",
+									Icon: moreIcon, Label: locales.ActionsForName(pol.Name),
 								})
 								if uikit.RowMenuOn(c, row, more, entries) {
 									a.mcp.selectedPolicyID = pol.ID
@@ -833,7 +875,7 @@ func (a *app) mcpPoliciesTab(c *ui.Context) {
 		})
 		uikit.Pagination(c, &a.mcp.policyPage, uikit.PaginationProps{
 			Total: len(filtered), PageSize: 20,
-			Summary: fmt.Sprintf("共 %d 条拦截策略", len(filtered)),
+			Summary: locales.McpPoliciesCount(len(filtered)),
 		})
 	})
 }
@@ -845,31 +887,43 @@ func (a *app) mcpAuditTab(c *ui.Context) {
 
 	ui.Column(c).Grow(1).MinHeight(0).FillWidth().Children(func() {
 		props := uikit.TableViewportProps{
-			Label: "审计记录", MinWidth: t.C.Mcp.TableMinWidth, PaddingY: t.Space.N6,
+			Label: locales.MessageAuditLog(), MinWidth: t.C.Mcp.TableMinWidth, PaddingY: t.Space.N6,
 			Header: func() {
 				uikit.TableToolbar(c).Children(func() {
 					ui.Row(c).FillWidth().Gap(t.Space.N8).Children(func() {
-						uikit.FilterChip(c, "授权密钥", &a.mcp.auditKeyFilter, a.mcpKeyOptions(true), uikit.FilterChipProps{Key: "aud-key-filter"})
-						uikit.FilterChip(c, "目标连接", &a.mcp.auditConnFilter, a.mcpConnectionOptions(-1, true), uikit.FilterChipProps{Key: "aud-conn-filter"})
-						uikit.FilterChip(c, "操作类型", &a.mcp.auditTypeFilter, []uikit.Option[string]{
-							{Value: "all", Label: "全部"},
-							{Value: "文件上传", Label: "文件上传"},
-							{Value: "命令执行", Label: "命令执行"},
-							{Value: "文件读取", Label: "文件读取"},
-							{Value: "策略管理", Label: "策略管理"},
-							{Value: "协议请求", Label: "协议请求"},
-							{Value: "认证失败", Label: "认证失败"},
+						uikit.FilterChip(
+							c,
+							locales.MessageAccessKeys(),
+							&a.mcp.auditKeyFilter,
+							a.mcpKeyOptions(true),
+							uikit.FilterChipProps{Key: "aud-key-filter"},
+						)
+						uikit.FilterChip(
+							c,
+							locales.MessageTargetConnection(),
+							&a.mcp.auditConnFilter,
+							a.mcpConnectionOptions(-1, true),
+							uikit.FilterChipProps{Key: "aud-conn-filter"},
+						)
+						uikit.FilterChip(c, locales.MessageActionType(), &a.mcp.auditTypeFilter, []uikit.Option[string]{
+							{Value: "all", Label: locales.MessageAll()},
+							{Value: "files_upload", Label: locales.MessageFileUpload()},
+							{Value: "ssh_exec", Label: locales.MessageCommandExecution()},
+							{Value: "files_read", Label: locales.MessageFileRead()},
+							{Value: "policy.", Label: locales.MessagePolicyManagement()},
+							{Value: "mcp.", Label: locales.MessageProtocolRequest()},
+							{Value: "authentication", Label: locales.MessageAuthenticationFailed()},
 						}, uikit.FilterChipProps{Key: "aud-type-filter"})
-						uikit.FilterChip(c, "时间", &a.mcp.auditTimeFilter, []uikit.Option[string]{
-							{Value: "today", Label: "今天"},
-							{Value: "7d", Label: "最近 7 天"},
-							{Value: "30d", Label: "最近 30 天"},
+						uikit.FilterChip(c, locales.MessageTime(), &a.mcp.auditTimeFilter, []uikit.Option[string]{
+							{Value: "today", Label: locales.MessageToday2()},
+							{Value: "7d", Label: locales.MessageLastDays()},
+							{Value: "30d", Label: locales.MessageLastDays2()},
 						}, uikit.FilterChipProps{Key: "aud-time-filter"})
-						uikit.FilterChip(c, "结果", &a.mcp.auditResultFilter, []uikit.Option[string]{
-							{Value: "all", Label: "全部"},
-							{Value: "intercepted", Label: "被策略拦截"},
-							{Value: "denied", Label: "权限拒绝 / 认证失败"},
-							{Value: "done", Label: "已完成"},
+						uikit.FilterChip(c, locales.MessageResult(), &a.mcp.auditResultFilter, []uikit.Option[string]{
+							{Value: "all", Label: locales.MessageAll()},
+							{Value: "intercepted", Label: locales.MessageBlockedByPolicy()},
+							{Value: "denied", Label: locales.MessagePermissionDeniedAuthenticationFailed()},
+							{Value: "done", Label: locales.MessageCompleted()},
 						}, uikit.FilterChipProps{Key: "aud-res-filter"})
 					})
 				})
@@ -879,8 +933,8 @@ func (a *app) mcpAuditTab(c *ui.Context) {
 		if len(filtered) == 0 {
 			props.Empty = func() {
 				uikit.EmptyState(c, uikit.EmptyProps{
-					IconName: uikit.IconDocument, Title: "筛选无结果",
-					Detail: "当前筛选条件下没有匹配的审计记录。", Action: "重置筛选条件",
+					IconName: uikit.IconDocument, Title: locales.MessageNoMatchingResults(),
+					Detail: locales.MessageNoAuditRecordsMatchTheCurrentFilters(), Action: locales.MessageResetFilters(),
 				}).Action.OnClick(func() {
 					a.mcp.auditKeyFilter, a.mcp.auditConnFilter, a.mcp.auditTypeFilter, a.mcp.auditResultFilter = "all", "all", "all", "all"
 				})
@@ -915,9 +969,9 @@ func (a *app) mcpAuditTab(c *ui.Context) {
 								icon := uikit.IconDocument
 								if item.IsCommand {
 									icon = uikit.IconTerminal
-								} else if item.ActionType == "文件上传" {
+								} else if item.Action == "files_upload" {
 									icon = uikit.IconUpload
-								} else if item.ActionType == "策略管理" {
+								} else if strings.HasPrefix(item.Action, "policy.") {
 									icon = uikit.IconShield
 								}
 								uikit.Icon(c, icon, uikit.IconProps{Size: uikit.SizeSm, Tone: uikit.ToneSecondary})
@@ -939,7 +993,7 @@ func (a *app) mcpAuditTab(c *ui.Context) {
 		})
 		uikit.Pagination(c, &a.mcp.auditPage, uikit.PaginationProps{
 			Total: a.mcp.auditFiltered, PageSize: 20,
-			Summary: fmt.Sprintf("共 %d 条审计记录", a.mcp.auditFiltered),
+			Summary: locales.McpAuditsCount(a.mcp.auditFiltered),
 		})
 	})
 }

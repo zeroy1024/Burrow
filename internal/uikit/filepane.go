@@ -2,6 +2,7 @@ package uikit
 
 import (
 	"github.com/egoist/mygo/ui"
+	"sshdesk/internal/locales"
 	"sshdesk/internal/theme"
 )
 
@@ -55,7 +56,7 @@ func FilePaneFooter(c *ui.Context, props ...FooterProps) ui.Element {
 func FileDivider(c *ui.Context, left float32) ui.Element {
 	t := theme.Current()
 	return ui.Box(c).Key("file-divider").Absolute().Left(left).Top(0).Bottom(0).
-		Width(t.C.FTPSplit.Gutter).Cursor(ui.CursorResizeEW).Focusable().Role(ui.RoleSplitter).Label("调整本地面板宽度")
+		Width(t.C.FTPSplit.Gutter).Cursor(ui.CursorResizeEW).Focusable().Role(ui.RoleSplitter).Label(locales.MessageResizeLocalPane())
 }
 
 func StyleFileDivider(c *ui.Context, divider ui.Element, dragging bool) {
@@ -104,7 +105,7 @@ func HistoryButtons(c *ui.Context, canBack, canForward bool, backIcon, forwardIc
 		props = options[0]
 	}
 	return HistoryParts{
-		Back:    IconButton(c, backIcon, IconButtonProps{Key: "后退", Label: "后退", Shortcut: props.BackShortcut, Disabled: !canBack}),
-		Forward: IconButton(c, forwardIcon, IconButtonProps{Key: "前进", Label: "前进", Shortcut: props.ForwardShortcut, Disabled: !canForward}),
+		Back:    IconButton(c, backIcon, IconButtonProps{Key: locales.MessageBack(), Label: locales.MessageBack(), Shortcut: props.BackShortcut, Disabled: !canBack}),
+		Forward: IconButton(c, forwardIcon, IconButtonProps{Key: locales.MessageForward(), Label: locales.MessageForward(), Shortcut: props.ForwardShortcut, Disabled: !canForward}),
 	}
 }

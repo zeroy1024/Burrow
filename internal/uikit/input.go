@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	"sshdesk/internal/locales"
 	"sshdesk/internal/theme"
 
 	"github.com/egoist/mygo/ui"
@@ -126,9 +127,9 @@ func PasswordInput(c *ui.Context, value *string, p InputProps) PasswordParts {
 	shown := ui.Local(parts.Root, "uikit.password.reveal", func() bool { return false })
 	parts.Root.Children(func() {
 		parts.Input = Input(c.Key("input"), value, p).Grow(1).PaddingEnd(t.C.Input.Height)
-		label := "显示密码"
+		label := locales.MessageShowPassword()
 		if *shown {
-			label = "隐藏密码"
+			label = locales.MessageHidePassword()
 		}
 		icon := IconEye
 		if *shown {
@@ -153,7 +154,7 @@ func PortInput(c *ui.Context, value *string, p InputProps) ui.Element {
 	if *value != "" {
 		port, err := strconv.Atoi(*value)
 		if err != nil || port < 1 || port > 65535 {
-			p.Error = "端口需在 1–65535 之间"
+			p.Error = locales.MessagePortMustBeBetweenAnd()
 		}
 	}
 	return Input(c, value, p)

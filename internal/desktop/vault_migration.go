@@ -5,12 +5,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 
 	"github.com/egoist/mygo"
 	"golang.org/x/crypto/ssh"
+	"sshdesk/internal/locales"
 	"sshdesk/internal/localfs"
 	"sshdesk/internal/vault"
 )
@@ -18,13 +18,13 @@ import (
 type migrationPassphraseError struct{ ID, Name string }
 
 func (e *migrationPassphraseError) Error() string {
-	return "迁移私钥「" + e.Name + "」需要原私钥口令"
+	return locales.MessageMigratingPrivateKey() + e.Name + locales.MessageRequiresItsOriginalPassphrase()
 }
 
 type migrationCredentialError struct{ ID, Name string }
 
 func (e *migrationCredentialError) Error() string {
-	return "迁移会话「" + e.Name + "」需要重新输入已丢失的保存密码"
+	return locales.MessageMigratingSession() + e.Name + locales.MessageRequiresTheMissingSavedPasswordToBeEnteredAgain()
 }
 
 func (a *app) migrateVault(ctx context.Context, temporary map[string]string) error {
@@ -70,7 +70,7 @@ func (a *app) migrateVault(ctx context.Context, temporary map[string]string) err
 		var value []byte
 		if explicit, present := temporary[id]; present {
 			if explicit == "" || endpoint.PasswordRevision == "" {
-				return errors.New("重新输入的密码或旧凭据版本无效")
+				return locales.NewError(locales.MessageTheReEnteredPasswordOrPreviousCredentialVersionIsInvalid)
 			}
 			value, err = json.Marshal(sessionCredential{Revision: endpoint.PasswordRevision, Secret: explicit})
 		} else {
@@ -80,12 +80,12 @@ func (a *app) migrateVault(ctx context.Context, temporary map[string]string) err
 			return &migrationCredentialError{ID: id, Name: endpoint.Name}
 		}
 		if err != nil {
-			return fmt.Errorf("迁移会话「%s」的密码：%w", endpoint.Name, err)
+			return locales.Errorf(locales.MessageMigratePasswordForSession, endpoint.Name, err)
 		}
 		var credential sessionCredential
 		if err := json.Unmarshal(value, &credential); err != nil || credential.Revision == "" || credential.Secret == "" {
 			clear(value)
-			return errors.New("旧会话凭据格式无效")
+			return locales.NewError(locales.MessageInvalidLegacySessionCredentialFormat)
 		}
 		// The saved latest revision remains authoritative. Immutable stale snapshots
 		// continue to fail their normal revision comparison after migration.
@@ -99,14 +99,14 @@ func (a *app) migrateVault(ctx context.Context, temporary map[string]string) err
 		}
 		expected := filepath.Join(a.dataDirectory, "keys", key.ID)
 		if !localfs.ValidName(key.ID) || filepath.Clean(key.SecretID) != expected {
-			return errors.New("旧托管私钥路径无效")
+			return locales.NewError(locales.MessageInvalidLegacyManagedPrivateKeyPath)
 		}
 		info, err := os.Lstat(expected)
 		if err != nil {
-			return fmt.Errorf("迁移私钥「%s」：%w", key.Name, err)
+			return locales.Errorf(locales.MessageMigratePrivateKey, key.Name, err)
 		}
 		if !info.Mode().IsRegular() {
-			return errors.New("旧托管私钥必须是普通文件")
+			return locales.NewError(locales.MessageALegacyManagedPrivateKeyMustBeARegularFile)
 		}
 		if err := localfs.CheckPrivate(expected, info); err != nil {
 			return err
@@ -145,14 +145,14 @@ func (a *app) migrateVault(ctx context.Context, temporary map[string]string) err
 			items = append(items, vault.PlainItem{ID: "key/" + key.ID + "/passphrase", Kind: "key_passphrase", Revision: key.ID, Data: savedPhrase})
 		}
 		if parseErr != nil {
-			return fmt.Errorf("验证私钥「%s」：%w", key.Name, parseErr)
+			return locales.Errorf(locales.MessageVerifyPrivateKey, key.Name, parseErr)
 		}
 		public, _, _, _, err := ssh.ParseAuthorizedKey(key.PublicKey)
 		if err != nil {
 			return err
 		}
 		if !bytes.Equal(public.Marshal(), signer.PublicKey().Marshal()) || ssh.FingerprintSHA256(public) != key.Fingerprint {
-			return errors.New("迁移私钥公钥与已保存指纹不匹配")
+			return locales.NewError(locales.MessageTheMigratedPublicKeyDoesNotMatchTheSavedFingerprint)
 		}
 		keys[key.ID] = id
 	}

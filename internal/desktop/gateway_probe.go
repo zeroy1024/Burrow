@@ -3,13 +3,14 @@ package desktop
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"net"
 	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
+
+	"sshdesk/internal/locales"
 
 	"golang.org/x/net/proxy"
 )
@@ -60,7 +61,7 @@ func (a *app) prepareGatewayTest(id string, progress *gatewayTestProgress) (func
 				connection, connectErr := a.openSSHStep(ctx, step, plan.trust, dial, sshSecretsOverride{}, &result)
 				err = connectErr
 				if err == nil {
-					result.Detail = "SSH 握手与认证成功"
+					result.Detail = locales.Deferred(locales.MessageSshHandshakeAndAuthenticationSucceeded)
 					err = errors.Join(connection.Close(), connection.Wait())
 				}
 			} else {
@@ -89,15 +90,15 @@ func (a *app) prepareGatewayTest(id string, progress *gatewayTestProgress) (func
 			progress.proven.Store(int32(len(route)))
 		}
 		result.Elapsed, result.Err = time.Since(result.startedAt), err
-		result.Summary = fmt.Sprintf("连接成功 · %dms", result.Elapsed.Milliseconds())
+		result.Summary = locales.Format(locales.MessageConnectedMs, result.Elapsed.Milliseconds())
 		if err != nil {
-			result.Summary = "网关连接失败"
+			result.Summary = locales.Deferred(locales.MessageGatewayConnectionFailed)
 			if errors.Is(err, context.Canceled) || errors.Is(err, errSSHConnectCanceled) {
-				result.Summary = "测试已取消"
+				result.Summary = locales.Deferred(locales.MessageTestCancelled)
 			} else if errors.Is(err, context.DeadlineExceeded) {
-				result.Summary = "连接超时"
+				result.Summary = locales.Deferred(locales.MessageConnectionTimedOut)
 			}
-			result.Detail = err.Error()
+			result.Detail = locales.ErrorText(err)
 		}
 		return result
 	}, nil
@@ -165,32 +166,37 @@ func (c *gatewayTestSOCKSConn) Read(data []byte) (int, error) {
 
 // Probe only RFC 1928 method negotiation and RFC 1929 authentication. Relay
 // requests belong to target connection tests and require a destination.
-func probeSOCKS5(connection io.ReadWriter, auth *proxy.Auth) (string, error) {
+func probeSOCKS5(connection io.ReadWriter, auth *proxy.Auth) (locales.Text, error) {
 	greeting := []byte{5, 1, 0}
 	if auth != nil {
 		greeting = []byte{5, 2, 0, 2}
 	}
 	if _, err := connection.Write(greeting); err != nil {
-		return "", fmt.Errorf("SOCKS5 握手：%w", err)
+		return locales.Text{}, locales.Errorf(locales.MessageSocks5Handshake, err)
 	}
 	var reply [2]byte
 	if _, err := io.ReadFull(connection, reply[:]); err != nil {
-		return "", fmt.Errorf("SOCKS5 握手：%w", err)
+		return locales.Text{}, locales.Errorf(locales.MessageSocks5Handshake, err)
 	}
 	if reply[0] != 5 {
-		return "", errors.New("服务器未返回有效的 SOCKS5 协议响应")
+		return locales.Text{}, locales.NewError(locales.MessageTheServerDidNotReturnAValidSocks5Response)
 	}
 	switch reply[1] {
 	case 0:
-		return "SOCKS5 握手成功，无需认证", nil
+		return locales.Deferred(locales.MessageSocks5HandshakeSucceededNoAuthenticationRequired), nil
 	case 2:
 		if auth == nil {
-			return "", errors.New("SOCKS5 服务器要求用户名密码认证，请配置认证信息")
+			return locales.Text{}, locales.NewError(
+				locales.MessageTheSocks5ServerRequiresAUsernameAndPasswordConfigureAuthentication,
+			)
 		}
 	case 255:
-		return "", errors.New("SOCKS5 服务器不接受当前认证方式")
+		return locales.Text{}, locales.NewError(locales.MessageTheSocks5ServerDoesNotAcceptThisAuthenticationMethod)
 	default:
-		return "", fmt.Errorf("SOCKS5 服务器选择了不支持的认证方式：%d", reply[1])
+		return locales.Text{}, locales.Errorf(
+			locales.MessageTheSocks5ServerSelectedAnUnsupportedAuthenticationMethod,
+			reply[1],
+		)
 	}
 	request := []byte{1, byte(len(auth.User))}
 	request = append(request, auth.User...)
@@ -198,16 +204,16 @@ func probeSOCKS5(connection io.ReadWriter, auth *proxy.Auth) (string, error) {
 	request = append(request, auth.Password...)
 	defer clear(request)
 	if _, err := connection.Write(request); err != nil {
-		return "", fmt.Errorf("SOCKS5 认证：%w", err)
+		return locales.Text{}, locales.Errorf(locales.MessageSocks5Authentication, err)
 	}
 	if _, err := io.ReadFull(connection, reply[:]); err != nil {
-		return "", fmt.Errorf("SOCKS5 认证：%w", err)
+		return locales.Text{}, locales.Errorf(locales.MessageSocks5Authentication, err)
 	}
 	if reply[0] != 1 {
-		return "", errors.New("SOCKS5 服务器返回了无效的认证响应")
+		return locales.Text{}, locales.NewError(locales.MessageTheSocks5ServerReturnedAnInvalidAuthenticationResponse)
 	}
 	if reply[1] != 0 {
-		return "", errors.New("SOCKS5 用户名密码认证失败")
+		return locales.Text{}, locales.NewError(locales.MessageSocks5UsernameAndPasswordAuthenticationFailed)
 	}
-	return "SOCKS5 握手与认证成功", nil
+	return locales.Deferred(locales.MessageSocks5HandshakeAndAuthenticationSucceeded), nil
 }

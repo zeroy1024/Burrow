@@ -2,7 +2,9 @@ package hostinfo
 
 import (
 	"context"
-	"errors"
+
+	"sshdesk/internal/locales"
+
 	"strings"
 	"time"
 )
@@ -13,7 +15,7 @@ const darwinFactsScript = `printf '__BURROW_DARWIN_FACTS_V1__\000'
 LC_ALL=C
 export LC_ALL
 if [ "$(uname -s 2>/dev/null)" != Darwin ]; then
-  printf 'error\000不是 macOS 主机\000'
+  printf 'error\000unsupported_macos\000'
   exit 0
 fi
 for record in name:-productName version:-productVersion; do
@@ -45,7 +47,7 @@ func (darwinCollector) Facts(ctx context.Context, r Runner, _ Detection) (Facts,
 		facts.OSName = strings.TrimSpace(facts.OSName + " " + facts.OSVersion)
 	}
 	if !facts.Valid() {
-		return Facts{}, errors.New("无法读取 macOS 主机名或内核版本")
+		return Facts{}, locales.NewError(locales.MessageUnableToReadMacosHostnameOrKernelVersion)
 	}
 	return facts, nil
 }

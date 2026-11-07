@@ -13,6 +13,7 @@ import (
 
 	"sshdesk/internal/fileclient"
 	"sshdesk/internal/hostinfo"
+	"sshdesk/internal/locales"
 	"sshdesk/internal/sshclient"
 )
 
@@ -24,7 +25,7 @@ type hostFactsState struct {
 type hostFactsProbe struct {
 	connection *sshclient.Connection
 	pending    bool
-	errorText  string
+	errorText  locales.Text
 }
 
 // Identity includes the captured jump route, but excludes credentials and
@@ -68,7 +69,7 @@ func (a *app) readHostFacts() error {
 		return err
 	}
 	if values == nil {
-		return errors.New("主机基础信息格式无效")
+		return locales.NewError(locales.MessageInvalidHostInformationFormat)
 	}
 	for key, facts := range values {
 		// Records saved before platform detection were all collected from Linux.
@@ -77,7 +78,7 @@ func (a *app) readHostFacts() error {
 			values[key] = facts
 		}
 		if key == "" || !facts.Valid() {
-			return errors.New("主机基础信息记录无效")
+			return locales.NewError(locales.MessageInvalidHostInformationRecord)
 		}
 	}
 	a.hostFacts.values = values
@@ -167,18 +168,18 @@ func (a *app) rememberHostFacts(key string, facts hostinfo.Facts) {
 	}
 	a.hostFacts.values[key] = facts
 	if a.hostFacts.loadErr != nil {
-		a.persistenceNotice("保存主机基础信息失败", a.hostFacts.loadErr)
+		a.persistenceNotice(locales.MessageUnableToSaveHostInformation, a.hostFacts.loadErr)
 		return
 	}
 	data, err := json.Marshal(a.hostFacts.values)
 	if err != nil {
-		a.persistenceNotice("保存主机基础信息失败", err)
+		a.persistenceNotice(locales.MessageUnableToSaveHostInformation, err)
 		return
 	}
 	a.persist(func() error {
 		return a.store.SaveSetting(a.ctx, "hostFacts", data)
 	}, func(err error) {
-		a.persistenceNotice("保存主机基础信息失败", err)
+		a.persistenceNotice(locales.MessageUnableToSaveHostInformation, err)
 	})
 }
 
@@ -192,7 +193,7 @@ func (a *app) startSSHHostFacts(group *sshConnectionGroup) {
 	group.facts = hostFactsProbe{connection: connection, pending: true}
 	release, err := connection.Retain()
 	if err != nil {
-		group.facts.pending, group.facts.errorText = false, err.Error()
+		group.facts.pending, group.facts.errorText = false, locales.ErrorText(err)
 		return
 	}
 	lifetime := group.ctx
@@ -206,8 +207,8 @@ func (a *app) startSSHHostFacts(group *sshConnectionGroup) {
 			}
 			group.facts.pending = false
 			if err != nil {
-				group.facts.errorText = err.Error()
-				a.persistenceNotice("获取主机基础信息失败", err)
+				group.facts.errorText = locales.ErrorText(err)
+				a.persistenceNotice(locales.MessageUnableToRetrieveHostInformation2, err)
 				return
 			}
 			a.rememberHostFacts(key, facts)
@@ -286,7 +287,7 @@ func (f sftpHostFiles) ReadFile(ctx context.Context, name string, limit int64) (
 		return nil, err
 	}
 	if int64(len(data)) > limit {
-		return nil, errors.New("SFTP 读取 " + name + " 超过采集上限")
+		return nil, errors.New(locales.MessageSftpReadOf() + name + locales.MessageExceededTheCollectionLimit())
 	}
 	return data, nil
 }

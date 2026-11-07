@@ -4,6 +4,7 @@ import (
 	"runtime"
 
 	"github.com/egoist/mygo/ui"
+	"sshdesk/internal/locales"
 	"sshdesk/internal/theme"
 )
 
@@ -12,7 +13,7 @@ func Rail(c *ui.Context) ui.Element {
 	r := t.C.Rail
 	return ui.Column(c).Width(r.Width).Shrink(0).
 		Padding(r.PaddingTop, t.Space.N6, r.PaddingBottom, t.Space.N6).
-		Gap(r.Gap).AlignItems(ui.Center).Label("主导航").Role(ui.RoleTabList).FocusGroup(ui.Vertical)
+		Gap(r.Gap).AlignItems(ui.Center).Label(locales.MessageMainNavigation()).Role(ui.RoleTabList).FocusGroup(ui.Vertical)
 }
 
 type RailButtonProps struct {

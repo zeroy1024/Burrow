@@ -9,7 +9,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -20,14 +19,15 @@ import (
 
 	"golang.org/x/crypto/argon2"
 	"golang.org/x/crypto/chacha20poly1305"
+	"sshdesk/internal/locales"
 	"sshdesk/internal/localfs"
 	"sshdesk/internal/store"
 )
 
 var (
-	ErrLocked   = errors.New("凭据库尚未解锁")
-	ErrNotFound = errors.New("凭据不存在")
-	ErrUnlock   = errors.New("无法解锁，请检查密码或凭据数据")
+	ErrLocked   = locales.NewError(locales.MessageTheCredentialVaultIsLocked)
+	ErrNotFound = locales.NewError(locales.MessageTheCredentialDoesNotExist)
+	ErrUnlock   = locales.NewError(locales.MessageUnableToUnlockCheckYourPasswordOrCredentialData)
 )
 
 type PlainItem struct {
@@ -148,7 +148,7 @@ func (m *Manager) Close() {
 func ValidatePassword(password string) error {
 	length := utf8.RuneCountInString(password)
 	if !utf8.ValidString(password) || length < 6 || length > 64 {
-		return errors.New("解锁密码长度须为 6–64 个字符")
+		return locales.NewError(locales.MessageTheUnlockPasswordMustBeCharactersLong)
 	}
 	return nil
 }
@@ -358,7 +358,7 @@ func (m *Manager) commit(ctx context.Context, next store.VaultSnapshot, key []by
 	observed, readErr := m.db.ReadVault(finish)
 	if readErr != nil {
 		m.invalidate()
-		return errors.Join(err, fmt.Errorf("无法确认凭据库提交结果：%w", readErr))
+		return errors.Join(err, locales.Errorf(locales.MessageUnableToConfirmTheCredentialVaultCommitResult, readErr))
 	}
 	if observed.State == "ready" && reflect.DeepEqual(observed.Header, next.Header) {
 		if len(observed.Items) != len(next.Items) {
@@ -381,7 +381,7 @@ func (m *Manager) commit(ctx context.Context, next store.VaultSnapshot, key []by
 	}
 	if !reflect.DeepEqual(observed.Header, m.snapshot.Header) || observed.State != m.snapshot.State {
 		m.invalidate()
-		return errors.Join(err, errors.New("凭据库提交状态不一致"))
+		return errors.Join(err, locales.NewError(locales.MessageInconsistentCredentialVaultCommitState))
 	}
 	if err == nil {
 		return errors.New("vault replacement was not committed")
@@ -468,7 +468,7 @@ func decrypt(h store.VaultHeader, key []byte, item store.VaultItem) ([]byte, err
 	}
 	data, err := aead.Open(nil, item.Nonce, item.Ciphertext, itemAAD(h, item))
 	if err != nil {
-		return nil, fmt.Errorf("凭据完整性校验失败：%w", err)
+		return nil, locales.Errorf(locales.MessageCredentialIntegrityCheckFailed, err)
 	}
 	return data, nil
 }
@@ -524,19 +524,19 @@ func (m *Manager) writeLocalKey(h store.VaultHeader, kek []byte) error {
 	defer clear(data)
 	if h.KeyStorage == "keychain" {
 		if m.keyStore == nil {
-			return errors.New("此凭据库需要 macOS 钥匙串解锁，请使用配套备份恢复")
+			return locales.NewError(locales.MessageThisCredentialVaultRequiresMacosKeychainToUnlockRestoreItUsingItsMatching)
 		}
 		account := keychainAccount(h)
 		if err := m.keyStore.Set(account, data); err != nil {
-			return fmt.Errorf("保存钥匙串解锁密钥：%w", err)
+			return locales.Errorf(locales.MessageSaveKeychainUnlockKey, err)
 		}
 		verified, err := m.keyStore.Get(account)
 		defer clear(verified)
 		if err != nil {
-			return fmt.Errorf("核对钥匙串解锁密钥：%w", err)
+			return locales.Errorf(locales.MessageVerifyKeychainUnlockKey, err)
 		}
 		if !bytes.Equal(data, verified) {
-			return errors.New("钥匙串解锁密钥保存后不匹配")
+			return locales.NewError(locales.MessageTheSavedKeychainUnlockKeyDoesNotMatch)
 		}
 		return nil
 	}
@@ -563,14 +563,16 @@ func (m *Manager) readLocalKey(h store.VaultHeader) ([]byte, error) {
 	var err error
 	if h.KeyStorage == "keychain" {
 		if m.keyStore == nil {
-			return nil, errors.New("此凭据库需要 macOS 钥匙串解锁，请使用配套备份恢复")
+			return nil, locales.NewError(
+				locales.MessageThisCredentialVaultRequiresMacosKeychainToUnlockRestoreItUsingItsMatching,
+			)
 		}
 		data, err = m.keyStore.Get(keychainAccount(h))
 	} else {
 		path := m.localPath(h.LocalKeyID)
 		info, statErr := os.Lstat(path)
 		if statErr != nil {
-			return nil, fmt.Errorf("读取本机解锁密钥：%w", statErr)
+			return nil, locales.Errorf(locales.MessageReadLocalUnlockKey, statErr)
 		}
 		if !info.Mode().IsRegular() || info.Size() > 4096 {
 			return nil, errors.New("invalid local unlock key file")
@@ -581,7 +583,7 @@ func (m *Manager) readLocalKey(h store.VaultHeader) ([]byte, error) {
 		data, err = os.ReadFile(path)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("读取自动解锁密钥：%w", err)
+		return nil, locales.Errorf(locales.MessageReadAutomaticUnlockKey, err)
 	}
 	defer clear(data)
 	var saved localKey
@@ -590,7 +592,7 @@ func (m *Manager) readLocalKey(h store.VaultHeader) ([]byte, error) {
 	}
 	if saved.Version != 1 || saved.ID != h.LocalKeyID || saved.VaultID != h.ID || len(saved.Key) != 32 {
 		clear(saved.Key)
-		return nil, errors.New("本机解锁密钥与凭据库不匹配")
+		return nil, locales.NewError(locales.MessageTheLocalUnlockKeyDoesNotMatchTheCredentialVault)
 	}
 	return saved.Key, nil
 }

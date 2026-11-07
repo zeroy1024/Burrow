@@ -5,6 +5,8 @@ import (
 	"slices"
 	"strings"
 	"unicode/utf16"
+
+	"sshdesk/internal/locales"
 )
 
 // launcher describes a command that runs another command given in its
@@ -157,7 +159,7 @@ func (a *analyzer) launch(name string, args []Arg, f frame) {
 		a.shell(name, args, f)
 	case name == "eval":
 		joined, ok := joinArgs(args[1:])
-		a.nested(Arg{Value: joined, Dynamic: !ok}, "eval 的参数含动态内容", f.through("eval"))
+		a.nested(Arg{Value: joined, Dynamic: !ok}, locales.MessageEvalArgumentsContainDynamicContent(), f.through("eval"))
 	case name == "find":
 		a.find(args, f)
 	case name == "cmd":
@@ -183,13 +185,13 @@ func (a *analyzer) wrap(l *launcher, label string, args []Arg, from int, f frame
 	}
 	f = f.through(label)
 	for _, s := range scripts {
-		a.nested(s, label+" 的命令字符串含动态内容", f)
+		a.nested(s, label+locales.MessageCommandStringContainsDynamicContent(), f)
 	}
 	for _, start := range starts {
 		a.invoke(args[start:], f)
 		if l.join {
 			joined, ok := joinArgs(args[start:])
-			a.nested(Arg{Value: joined, Dynamic: !ok}, label+" 的命令含动态内容", f)
+			a.nested(Arg{Value: joined, Dynamic: !ok}, label+locales.MessageCommandContainsDynamicContent(), f)
 		}
 	}
 	if l.stdin && len(starts) == 0 && len(scripts) == 0 {
@@ -361,7 +363,7 @@ func (a *analyzer) shell(name string, args []Arg, f frame) {
 	}
 	switch {
 	case command && len(operands) > 0:
-		a.nested(operands[0], name+" -c 的命令字符串含动态内容", f.through(name+" -c"))
+		a.nested(operands[0], name+locales.MessageCCommandStringContainsDynamicContent(), f.through(name+" -c"))
 	case len(operands) == 0 || readsStdin:
 		a.stdinScripts(f.through(name))
 	}
@@ -407,7 +409,7 @@ func (a *analyzer) cmd(args []Arg, f frame) {
 			rest = append([]Arg{{Value: args[i].Value[2:]}}, rest...)
 		}
 		joined, ok := joinArgs(rest)
-		a.nested(Arg{Value: joined, Dynamic: !ok}, "cmd /c 的命令含动态内容", f.through("cmd /c"))
+		a.nested(Arg{Value: joined, Dynamic: !ok}, locales.MessageCmdCCommandContainsDynamicContent(), f.through("cmd /c"))
 		return
 	}
 }
@@ -418,7 +420,7 @@ func (a *analyzer) powershell(name string, args []Arg, f frame) {
 	f = f.through(name)
 	for i := 1; i < len(args); i++ {
 		if args[i].Dynamic {
-			a.uncertain(f.script, name+" 的参数含动态内容", f.via)
+			a.uncertain(f.script, name+locales.MessageArgumentsContainDynamicContent(), f.via)
 			return
 		}
 		v := strings.ToLower(args[i].Value)
@@ -434,7 +436,7 @@ func (a *analyzer) powershell(name string, args []Arg, f frame) {
 			if i+1 < len(args) && !args[i+1].Dynamic {
 				decoded, ok = decodeUTF16(args[i+1].Value)
 			}
-			a.nested(Arg{Value: decoded, Dynamic: !ok}, name+" 的编码命令无法解码", f)
+			a.nested(Arg{Value: decoded, Dynamic: !ok}, name+locales.MessageEncodedCommandCannotBeDecoded(), f)
 			return
 		case v == "-f" || len(v) >= 3 && strings.HasPrefix("-file", v):
 			return
@@ -452,7 +454,7 @@ func (a *analyzer) psCommand(args []Arg, f frame) {
 		return
 	}
 	joined, ok := joinArgs(args)
-	a.nested(Arg{Value: joined, Dynamic: !ok}, "PowerShell 命令含动态内容", f)
+	a.nested(Arg{Value: joined, Dynamic: !ok}, locales.MessagePowershellCommandContainsDynamicContent(), f)
 }
 
 func decodeUTF16(text string) (string, bool) {

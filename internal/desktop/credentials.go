@@ -9,7 +9,6 @@ import (
 	"crypto/rsa"
 	"encoding/pem"
 	"errors"
-	"fmt"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -20,6 +19,7 @@ import (
 	"github.com/egoist/mygo"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
+	"sshdesk/internal/locales"
 	"sshdesk/internal/sshclient"
 	"sshdesk/internal/store"
 	"sshdesk/internal/uikit"
@@ -29,7 +29,7 @@ import (
 type credentialState struct {
 	draft                      *credentialDraft
 	busy                       bool
-	notice                     string
+	notice                     locales.Text
 	serial                     uint64
 	cancel                     context.CancelFunc
 	agentLoading, agentChecked bool
@@ -44,17 +44,18 @@ type credentialDraft struct {
 	kind, name, keyType, comment, passphrase, keyID string
 	data                                            []byte
 	remember                                        bool
-	errorText                                       string
+	errorText                                       locales.Text
 }
 
 type credentialResult struct {
-	key               *managedKey
-	draft             *credentialDraft
-	deletedID         string
-	clearedIDs        []string
-	changes           *store.VaultChanges
-	publicKey, notice string
-	err               error
+	key        *managedKey
+	draft      *credentialDraft
+	deletedID  string
+	clearedIDs []string
+	changes    *store.VaultChanges
+	publicKey  string
+	notice     locales.Text
+	err        error
 }
 
 func (a *app) openCredentialSettings() { a.openSettingsCategory(5) }
@@ -79,7 +80,7 @@ func (a *app) credentialWork(work func(context.Context) credentialResult) {
 	a.credentials.cancel = cancel
 	serial := a.credentials.serial
 	a.credentials.busy = true
-	a.credentials.notice = ""
+	a.credentials.notice = locales.Text{}
 	a.sshWorkers.Go(func() {
 		result := work(ctx)
 		var stage func()
@@ -117,9 +118,9 @@ func (a *app) credentialWork(work func(context.Context) credentialResult) {
 				a.credentials.cancel = nil
 				a.credentials.busy = false
 				if result.err != nil {
-					a.credentials.notice = result.err.Error()
+					a.credentials.notice = locales.ErrorText(result.err)
 					if a.credentials.draft != nil {
-						a.credentials.draft.errorText = result.err.Error()
+						a.credentials.draft.errorText = locales.ErrorText(result.err)
 					}
 				} else if result.draft != nil {
 					a.credentials.draft = result.draft
@@ -134,9 +135,9 @@ func (a *app) credentialWork(work func(context.Context) credentialResult) {
 					}
 					if result.publicKey != "" {
 						mygo.Clipboard.WriteText(result.publicKey)
-						a.credentials.notice = "公钥已复制"
+						a.credentials.notice = locales.Deferred(locales.MessagePublicKeyCopied)
 					}
-					if result.notice != "" {
+					if !result.notice.Empty() {
 						a.credentials.notice = result.notice
 					}
 				}
@@ -161,7 +162,9 @@ func (a *app) clearStoredPasswords(ctx context.Context, ids []string) credential
 		deleted = append(deleted, sessionCredentialKey(id))
 	}
 	changes, err := a.vault.Prepare(nil, deleted)
-	return credentialResult{clearedIDs: ids, changes: changes, notice: "已清除所有保存的会话密码", err: err}
+	return credentialResult{clearedIDs: ids, changes: changes, notice: locales.Deferred(
+		locales.MessageAllSavedSessionPasswordsCleared,
+	), err: err}
 }
 
 // Run on the UI thread. Catalog persistence commits before cached credentials
@@ -237,16 +240,16 @@ func (a *app) choosePrivateKey() {
 	}
 	parent := a.window
 	a.credentialWork(func(ctx context.Context) credentialResult {
-		paths, err := mygo.Dialog.Open(mygo.OpenDialogOptions{Parent: parent, Title: "导入 SSH 私钥", ShowHiddenFiles: true})
+		paths, err := mygo.Dialog.Open(mygo.OpenDialogOptions{Parent: parent, Title: locales.MessageImportSshPrivateKey(), ShowHiddenFiles: true})
 		if err != nil {
-			return credentialResult{err: fmt.Errorf("选择私钥：%w", err)}
+			return credentialResult{err: locales.Errorf(locales.MessageChoosePrivateKey, err)}
 		}
 		if len(paths) == 0 || ctx.Err() != nil {
 			return credentialResult{}
 		}
 		data, err := os.ReadFile(paths[0])
 		if err != nil {
-			return credentialResult{err: fmt.Errorf("读取私钥：%w", err)}
+			return credentialResult{err: locales.Errorf(locales.MessageReadPrivateKey, err)}
 		}
 		defer clear(data)
 		raw, err := ssh.ParseRawPrivateKey(data)
@@ -255,7 +258,7 @@ func (a *app) choosePrivateKey() {
 			return credentialResult{draft: &credentialDraft{kind: "import", name: filepath.Base(paths[0]), data: slices.Clone(data), remember: true}}
 		}
 		if err != nil {
-			return credentialResult{err: fmt.Errorf("解析私钥：%w", err)}
+			return credentialResult{err: locales.Errorf(locales.MessageParsePrivateKey, err)}
 		}
 		return a.storeManagedKey(ctx, data, raw, filepath.Base(paths[0]), "", "", false)
 	})
@@ -267,12 +270,12 @@ func (a *app) beginKeyGeneration() {
 	}
 	current, err := user.Current()
 	if err != nil {
-		a.credentials.notice = "读取当前用户名：" + err.Error()
+		a.credentials.notice = locales.Concat(locales.Deferred(locales.MessageReadCurrentUsername), locales.ErrorText(err))
 		return
 	}
 	hostname, err := os.Hostname()
 	if err != nil {
-		a.credentials.notice = "读取本机名称：" + err.Error()
+		a.credentials.notice = locales.Concat(locales.Deferred(locales.MessageReadLocalHostname), locales.ErrorText(err))
 		return
 	}
 	a.credentials.draft = &credentialDraft{kind: "generate", keyType: "Ed25519", comment: current.Username + "@" + hostname, remember: true}
@@ -285,7 +288,7 @@ func (a *app) submitCredentialDraft() {
 	}
 	name := strings.TrimSpace(d.name)
 	if name == "" {
-		d.errorText = "请填写密钥名称"
+		d.errorText = locales.Deferred(locales.MessageEnterAKeyName)
 		return
 	}
 	snapshot := *d
@@ -300,7 +303,7 @@ func (a *app) submitCredentialDraft() {
 		case "import":
 			raw, err = ssh.ParseRawPrivateKeyWithPassphrase(data, []byte(snapshot.passphrase))
 			if err != nil {
-				return credentialResult{err: fmt.Errorf("私钥口令错误或格式不支持：%w", err)}
+				return credentialResult{err: locales.Errorf(locales.MessageIncorrectKeyPassphraseOrUnsupportedFormat, err)}
 			}
 		case "generate":
 			if snapshot.keyType == "RSA 4096" {
@@ -309,7 +312,7 @@ func (a *app) submitCredentialDraft() {
 				_, raw, err = ed25519.GenerateKey(rand.Reader)
 			}
 			if err != nil {
-				return credentialResult{err: fmt.Errorf("生成私钥：%w", err)}
+				return credentialResult{err: locales.Errorf(locales.MessageGeneratePrivateKey, err)}
 			}
 			if ctx.Err() != nil {
 				return credentialResult{err: ctx.Err()}
@@ -321,12 +324,12 @@ func (a *app) submitCredentialDraft() {
 				block, err = ssh.MarshalPrivateKey(raw, snapshot.comment)
 			}
 			if err != nil {
-				return credentialResult{err: fmt.Errorf("编码私钥：%w", err)}
+				return credentialResult{err: locales.Errorf(locales.MessageEncodePrivateKey, err)}
 			}
 			data = pem.EncodeToMemory(block)
 			defer clear(data)
 		default:
-			return credentialResult{err: errors.New("未知密钥操作")}
+			return credentialResult{err: locales.NewError(locales.MessageUnknownKeyOperation)}
 		}
 		return a.storeManagedKey(ctx, data, raw, snapshot.name, snapshot.comment, snapshot.passphrase, snapshot.remember)
 	})
@@ -338,7 +341,7 @@ func (a *app) storeManagedKey(ctx context.Context, data []byte, raw any, name, c
 	}
 	signer, err := ssh.NewSignerFromKey(raw)
 	if err != nil {
-		return credentialResult{err: fmt.Errorf("读取公钥：%w", err)}
+		return credentialResult{err: locales.Errorf(locales.MessageReadPublicKey, err)}
 	}
 	id := newSessionID()
 	public := ssh.MarshalAuthorizedKey(signer.PublicKey())
@@ -357,7 +360,9 @@ func (a *app) storeManagedKey(ctx context.Context, data []byte, raw any, name, c
 	}
 	keyType, bits := managedKeyType(raw, signer.PublicKey())
 	key := managedKey{ID: id, SecretID: privateCredentialKey(id), PublicKey: public, Name: name, Type: keyType, Bits: bits, Fingerprint: ssh.FingerprintSHA256(signer.PublicKey()), Comment: comment, CreatedAt: time.Now().UTC()}
-	return credentialResult{key: &key, changes: changes, notice: "密钥已保存，可从会话认证列表中选择。"}
+	return credentialResult{key: &key, changes: changes, notice: locales.Deferred(
+		locales.MessageKeySavedYouCanSelectItInTheSessionAuthenticationOptions,
+	)}
 }
 
 func managedKeyType(raw any, pub ssh.PublicKey) (string, int) {

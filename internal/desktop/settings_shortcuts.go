@@ -6,36 +6,39 @@ import (
 	"strings"
 
 	"github.com/egoist/mygo/ui"
+	"sshdesk/internal/locales"
 	"sshdesk/internal/theme"
 	"sshdesk/internal/uikit"
 )
 
 type shortcutAction struct{ id, label, group, binding string }
 
-var defaultShortcutActions = []shortcutAction{
-	{"session.new", "新建会话", "会话", "Cmd+N"},
-	{"tab.close", "关闭分屏或选项卡", "会话", "Cmd+W"},
-	{"tab.reopen", "重新打开关闭的选项卡", "会话", "Cmd+Shift+T"},
-	{"session.reconnect", "重新连接当前会话", "会话", "Cmd+Shift+R"},
-	{"tab.select.1", "切换到第 1 个分屏或选项卡", "会话", "Cmd+1"},
-	{"tab.select.2", "切换到第 2 个分屏或选项卡", "会话", "Cmd+2"},
-	{"tab.select.3", "切换到第 3 个分屏或选项卡", "会话", "Cmd+3"},
-	{"tab.select.4", "切换到第 4 个分屏或选项卡", "会话", "Cmd+4"},
-	{"tab.prev", "上一个分屏或选项卡", "会话", "Cmd+["},
-	{"tab.next", "下一个分屏或选项卡", "会话", "Cmd+]"},
-	{"sidebar.toggle", "显示/隐藏侧栏", "视图", "Cmd+\\"},
-	{"mode.terminal", "终端模式", "视图", "Cmd+Alt+1"},
-	{"mode.files", "文件传输模式", "视图", "Cmd+Alt+2"},
-	{"pane.split", "拆分窗格", "视图", "Cmd+D"},
-	{"host.search", "搜索当前页面", "搜索", "Cmd+F"},
-	{"app.settings", "设置", "应用", "Cmd+,"},
+func defaultShortcutActions() []shortcutAction {
+	return []shortcutAction{
+		{"session.new", locales.MessageNewSession(), locales.MessageSessions(), "Cmd+N"},
+		{"tab.close", locales.MessageClosePaneOrTab(), locales.MessageSessions(), "Cmd+W"},
+		{"tab.reopen", locales.MessageReopenClosedTab(), locales.MessageSessions(), "Cmd+Shift+T"},
+		{"session.reconnect", locales.MessageReconnectCurrentSession(), locales.MessageSessions(), "Cmd+Shift+R"},
+		{"tab.select.1", locales.MessageSelectPaneOrTab(), locales.MessageSessions(), "Cmd+1"},
+		{"tab.select.2", locales.MessageSelectPaneOrTab2(), locales.MessageSessions(), "Cmd+2"},
+		{"tab.select.3", locales.MessageSelectPaneOrTab3(), locales.MessageSessions(), "Cmd+3"},
+		{"tab.select.4", locales.MessageSelectPaneOrTab4(), locales.MessageSessions(), "Cmd+4"},
+		{"tab.prev", locales.MessagePreviousPaneOrTab(), locales.MessageSessions(), "Cmd+["},
+		{"tab.next", locales.MessageNextPaneOrTab(), locales.MessageSessions(), "Cmd+]"},
+		{"sidebar.toggle", locales.MessageToggleSidebar(), locales.MessageView2(), "Cmd+\\"},
+		{"mode.terminal", locales.MessageTerminalMode(), locales.MessageView2(), "Cmd+Alt+1"},
+		{"mode.files", locales.MessageFileTransferMode(), locales.MessageView2(), "Cmd+Alt+2"},
+		{"pane.split", locales.MessageSplitPane(), locales.MessageView2(), "Cmd+D"},
+		{"host.search", locales.MessageSearchCurrentPage(), locales.MessageSearch(), "Cmd+F"},
+		{"app.settings", locales.SettingsTitle(), locales.MessageApp(), "Cmd+,"},
+	}
 }
 
 func (a *app) shortcutBinding(id string) string {
 	if binding, ok := a.prefs.Keymap[id]; ok {
 		return binding
 	}
-	for _, action := range defaultShortcutActions {
+	for _, action := range defaultShortcutActions() {
 		if action.id == id {
 			return action.binding
 		}
@@ -46,8 +49,8 @@ func (a *app) shortcutBinding(id string) string {
 func (a *app) shortcutSettings(c *ui.Context) {
 	var groups []string
 	actions := map[string][]shortcutAction{}
-	for _, action := range defaultShortcutActions {
-		if !a.settingMatches(action.label, action.group+"快捷键") {
+	for _, action := range defaultShortcutActions() {
+		if !a.settingMatches(action.label, action.group+locales.MessageKeyboardShortcuts()) {
 			continue
 		}
 		if _, ok := actions[action.group]; !ok {
@@ -59,7 +62,7 @@ func (a *app) shortcutSettings(c *ui.Context) {
 		return
 	}
 	ui.Row(c).Key("shortcut-toolbar").FillWidth().Justify(ui.End).Children(func() {
-		uikit.Button(c, localize(c, "全部恢复默认"), uikit.ButtonProps{Disabled: len(a.prefs.Keymap) == 0}).OnClick(func() {
+		uikit.Button(c, locales.MessageResetAll(), uikit.ButtonProps{Disabled: len(a.prefs.Keymap) == 0}).OnClick(func() {
 			a.prefs.Keymap = map[string]string{}
 			a.settingsUI.recording, a.settingsUI.pendingBinding, a.settingsUI.conflictAction = "", "", ""
 			a.preferencesChanged()
@@ -67,10 +70,10 @@ func (a *app) shortcutSettings(c *ui.Context) {
 	})
 	for _, group := range groups {
 		help := ""
-		if group == "会话" {
-			help = "SSH 多分屏时优先切换分屏；单窗格及文件传输页切换选项卡。Ctrl+Tab / Ctrl+Shift+Tab 始终切换选项卡。"
+		if group == locales.MessageSessions() {
+			help = locales.MessageWithMultipleSshPanesSwitchPanesWithOnePaneOrInFileTransfer()
 		}
-		uikit.SettingsGroup(c, uikit.SettingsGroupProps{Key: group, Title: localize(c, group), Help: localize(c, help)}, func() {
+		uikit.SettingsGroup(c, uikit.SettingsGroupProps{Key: group, Title: group, Help: help}, func() {
 			for index, action := range actions[group] {
 				a.shortcutRow(c, action, index > 0)
 			}
@@ -90,8 +93,8 @@ func (a *app) shortcutRow(c *ui.Context, action shortcutAction, divider bool) {
 	recording := a.settingsUI.recording == action.id
 	conflict := ""
 	if recording && a.settingsUI.conflictAction != "" {
-		index := slices.IndexFunc(defaultShortcutActions, func(v shortcutAction) bool { return v.id == a.settingsUI.conflictAction })
-		conflict = fmt.Sprintf(localize(c, "与「%s」冲突"), localize(c, defaultShortcutActions[index].label))
+		index := slices.IndexFunc(defaultShortcutActions(), func(v shortcutAction) bool { return v.id == a.settingsUI.conflictAction })
+		conflict = fmt.Sprintf(locales.MessageConflictsWith(), defaultShortcutActions()[index].label)
 	}
 	binding := a.shortcutBinding(action.id)
 	row.Children(func() {
@@ -104,7 +107,7 @@ func (a *app) shortcutRow(c *ui.Context, action shortcutAction, divider bool) {
 				}
 				ui.Row(c).FillWidth().Gap(t.C.ShortcutField.ControlGap).Children(func() {
 					uikit.FieldMessage(c, conflict, uikit.FieldMessageProps{Tone: uikit.ToneDanger}).Grow(1)
-					uikit.Button(c, localize(c, "替换"), uikit.ButtonProps{Size: uikit.SizeSm}).OnClick(func() {
+					uikit.Button(c, locales.MessageReplace(), uikit.ButtonProps{Size: uikit.SizeSm}).OnClick(func() {
 						a.prefs.Keymap[a.settingsUI.conflictAction] = ""
 						a.storeShortcut(action.id, a.settingsUI.pendingBinding)
 					})
@@ -118,8 +121,12 @@ func (a *app) shortcutRow(c *ui.Context, action shortcutAction, divider bool) {
 						ui.Box(c).Size(size, size)
 						return
 					}
-					uikit.IconButton(c, uikit.IconRetry, uikit.IconButtonProps{Key: "reset", Label: localize(c, "恢复默认"), Size: uikit.SizeSm}).
-						Label(localize(c, "恢复默认：") + localize(c, action.label)).OnClick(func() { a.storeShortcut(action.id, action.binding) })
+					uikit.IconButton(
+						c,
+						uikit.IconRetry,
+						uikit.IconButtonProps{Key: "reset", Label: locales.MessageReset(), Size: uikit.SizeSm},
+					).
+						Label(locales.MessageReset2() + action.label).OnClick(func() { a.storeShortcut(action.id, action.binding) })
 				})
 			},
 		})
@@ -127,14 +134,14 @@ func (a *app) shortcutRow(c *ui.Context, action shortcutAction, divider bool) {
 }
 
 func (a *app) shortcutField(c *ui.Context, action shortcutAction, binding string, recording bool, conflict string) {
-	props := uikit.ShortcutFieldProps{Label: localize(c, action.label) + " " + localize(c, "快捷键"), Recording: recording, Error: conflict}
+	props := uikit.ShortcutFieldProps{Label: action.label + " " + locales.MessageKeyboardShortcuts(), Recording: recording, Error: conflict}
 	switch {
 	case conflict != "":
 		props.Keys = uikit.ShortcutKeys(a.settingsUI.pendingBinding)
 	case recording:
-		props.Text = localize(c, "按下新的快捷键…")
+		props.Text = locales.MessagePressANewShortcut()
 	case binding == "":
-		props.Text = localize(c, "未设置")
+		props.Text = locales.MessageUnassigned()
 	default:
 		props.Keys = uikit.ShortcutKeys(binding)
 	}
@@ -170,7 +177,7 @@ func (a *app) shortcutField(c *ui.Context, action shortcutAction, binding string
 
 func (a *app) storeShortcut(id, binding string) {
 	if binding != "" {
-		for _, candidate := range defaultShortcutActions {
+		for _, candidate := range defaultShortcutActions() {
 			if candidate.id != id && a.shortcutBinding(candidate.id) == binding {
 				a.settingsUI.recording = id
 				a.settingsUI.pendingBinding = binding
@@ -179,7 +186,7 @@ func (a *app) storeShortcut(id, binding string) {
 			}
 		}
 	}
-	for _, action := range defaultShortcutActions {
+	for _, action := range defaultShortcutActions() {
 		if action.id == id && binding == action.binding {
 			delete(a.prefs.Keymap, id)
 			a.settingsUI.recording, a.settingsUI.pendingBinding, a.settingsUI.conflictAction = "", "", ""

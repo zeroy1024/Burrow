@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/egoist/mygo/ui"
+	"sshdesk/internal/locales"
 	"sshdesk/internal/theme"
 )
 
@@ -116,11 +117,11 @@ func TestResult(c *ui.Context, state *TestState, props TestResultProps) TestResu
 	if summary == "" {
 		switch state.State {
 		case TestOK:
-			summary = fmt.Sprintf("连接成功 · %d ms", state.Elapsed.Milliseconds())
+			summary = fmt.Sprintf(locales.MessageConnectedMs2(), state.Elapsed.Milliseconds())
 		case TestFailed:
-			summary = "连接失败"
+			summary = locales.MessageConnectionFailed()
 		default:
-			summary = "正在连接…"
+			summary = locales.MessageConnecting()
 		}
 	}
 	announced := ui.Local(row, "uikit.testresult.announced", func() string { return "" })
@@ -152,8 +153,8 @@ func TestResult(c *ui.Context, state *TestState, props TestResultProps) TestResu
 		ui.Row(c).Key(stage).MinWidth(0).Gap(p.Gap).AlignItems(ui.Center).
 			Transition(ui.ElementTransition{Duration: p.Crossfade, Enter: &ui.Motion{}, Exit: &ui.Motion{}}).Children(func() {
 			if state.State == TestPending {
-				Spinner(c, SpinnerProps{Size: SizeXs, Tone: ToneSecondary, Label: "正在连接", Motion: props.Motion}).Size(p.SpinnerSize, p.SpinnerSize).Shrink(0)
-				ui.Text(c, "正在连接…").FontSize(p.FontSize).TextColor(Color(p.Testing)).MinWidth(0).SingleLine()
+				Spinner(c, SpinnerProps{Size: SizeXs, Tone: ToneSecondary, Label: locales.MessageConnecting3(), Motion: props.Motion}).Size(p.SpinnerSize, p.SpinnerSize).Shrink(0)
+				ui.Text(c, locales.MessageConnecting()).FontSize(p.FontSize).TextColor(Color(p.Testing)).MinWidth(0).SingleLine()
 				return
 			}
 			icon, ink, glyph := props.SuccessIcon, p.Success, p.SuccessIcon

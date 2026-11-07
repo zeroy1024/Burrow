@@ -8,6 +8,8 @@ import (
 	"slices"
 	"strings"
 
+	"sshdesk/internal/locales"
+
 	"mvdan.cc/sh/v3/expand"
 	"mvdan.cc/sh/v3/syntax"
 )
@@ -88,14 +90,14 @@ func (a *analyzer) script(src string, via []string, depth int) {
 		return
 	}
 	if depth > maxDepth || a.scripts >= maxScripts {
-		a.uncertain(src, "嵌套层数或解析量超过上限", via)
+		a.uncertain(src, locales.MessageNestingDepthOrParsingVolumeExceedsTheLimit(), via)
 		return
 	}
 	a.parsed[src] = true
 	a.scripts++
 	file, err := syntax.NewParser(syntax.Variant(syntax.LangBash)).Parse(strings.NewReader(src), "")
 	if err != nil {
-		a.uncertain(src, "命令无法完整解析："+err.Error(), via)
+		a.uncertain(src, locales.MessageUnableToFullyParseTheCommand()+err.Error(), via)
 		return
 	}
 	// Collect before expanding: expansion may rewrite brace words into nodes
@@ -150,11 +152,11 @@ func (a *analyzer) invoke(args []Arg, f frame) {
 	}
 	program := args[0]
 	if program.Dynamic && program.tail == "" {
-		a.uncertain(f.script, "命令名无法静态确定", f.via)
+		a.uncertain(f.script, locales.MessageTheCommandNameCannotBeDeterminedStatically(), f.via)
 		return
 	}
 	if len(a.out.Calls) >= maxCalls {
-		a.uncertain(f.script, "命令数量超过上限", f.via)
+		a.uncertain(f.script, locales.MessageTheNumberOfCommandsExceedsTheLimit(), f.via)
 		return
 	}
 	names := programNames(program)
@@ -174,12 +176,12 @@ func (a *analyzer) nested(arg Arg, reason string, f frame) {
 }
 
 func (a *analyzer) stdinScripts(f frame) {
-	f = f.through("标准输入")
+	f = f.through(locales.MessageStandardInput())
 	for _, in := range f.stdin {
 		if in.parse {
 			a.script(in.text, f.via, f.depth+1)
 		} else {
-			a.uncertain(f.script, "标准输入含动态内容", f.via)
+			a.uncertain(f.script, locales.MessageStandardInputContainsDynamicContent(), f.via)
 		}
 	}
 }

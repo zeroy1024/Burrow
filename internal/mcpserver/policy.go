@@ -18,33 +18,34 @@ import (
 	"golang.org/x/text/unicode/norm"
 
 	"sshdesk/internal/fileclient"
+	"sshdesk/internal/locales"
 	"sshdesk/internal/shellcmd"
 	"sshdesk/internal/store"
 )
 
 func ValidatePolicy(p store.MCPPolicy) error {
 	if strings.TrimSpace(p.Name) == "" || len(p.Name) > 200 {
-		return fail("invalid_argument", "请填写有效的策略名称（最多 200 字节）")
+		return fail("invalid_argument", locales.MessageEnterAValidPolicyNameUpToBytes())
 	}
 	if !p.AllConnections && len(p.ConnectionIDs) == 0 {
-		return fail("invalid_argument", "请选择适用连接或使用全部连接")
+		return fail("invalid_argument", locales.MessageSelectApplicableConnectionsOrUseAllConnections())
 	}
 	if len(p.ConnectionIDs) > 1000 {
-		return fail("invalid_argument", "适用连接最多 1000 个")
+		return fail("invalid_argument", locales.MessageAPolicyCanApplyToAtMostConnections())
 	}
 	if !p.AllKeys && len(p.KeyIDs) == 0 {
-		return fail("invalid_argument", "请选择适用密钥")
+		return fail("invalid_argument", locales.MessageSelectApplicableKeys())
 	}
 	if p.Category == "ssh" {
 		if len(p.CommandRules) == 0 || len(p.CommandRules) > 100 {
-			return fail("invalid_argument", "命令规则数量必须为 1 至 100")
+			return fail("invalid_argument", locales.MessageTheNumberOfCommandRulesMustBeBetweenAnd())
 		}
 		for _, r := range p.CommandRules {
 			if r.Pattern == "" || len(r.Pattern) > 8192 {
-				return fail("invalid_argument", "命令规则为空或超长")
+				return fail("invalid_argument", locales.MessageTheCommandRuleIsEmptyOrTooLong())
 			}
 			if r.IgnoreCase && r.Mode != "command" {
-				return fail("invalid_argument", "仅命令匹配支持忽略参数大小写")
+				return fail("invalid_argument", locales.MessageOnlyCommandMatchingSupportsCaseInsensitiveArguments())
 			}
 			switch r.Mode {
 			case "exact", "contains":
@@ -54,23 +55,23 @@ func ValidatePolicy(p store.MCPPolicy) error {
 				}
 			case "regex":
 				if _, err := regexp.Compile(r.Pattern); err != nil {
-					return fmt.Errorf("正则表达式无效：%w", err)
+					return locales.Errorf(locales.MessageInvalidRegularExpression2, err)
 				}
 			default:
-				return fail("invalid_argument", "无效的命令匹配类型")
+				return fail("invalid_argument", locales.MessageInvalidCommandMatchMode())
 			}
 		}
 		return nil
 	}
 	if p.Category != "files" || len(p.FileRules) == 0 || len(p.FileRules) > 100 {
-		return fail("invalid_argument", "无效的文件策略或规则数量")
+		return fail("invalid_argument", locales.MessageInvalidFilePolicyOrNumberOfRules())
 	}
 	for _, r := range p.FileRules {
 		if r.Side != "local" && r.Side != "remote" || r.Kind != "file" && r.Kind != "dir" || r.Path == "" || len(r.Path) > 4096 || strings.ContainsRune(r.Path, 0) {
-			return fail("invalid_argument", "无效的文件路径规则")
+			return fail("invalid_argument", locales.MessageInvalidFilePathRule())
 		}
 		if r.Side == "remote" && !path.IsAbs(r.Path) {
-			return fail("invalid_argument", "远端规则必须使用绝对路径")
+			return fail("invalid_argument", locales.MessageRemoteRulesMustUseAbsolutePaths())
 		}
 		if r.Side == "local" {
 			if _, err := LocalPath(r.Path); err != nil {
@@ -79,7 +80,7 @@ func ValidatePolicy(p store.MCPPolicy) error {
 		}
 		for action := range r.DeniedActions {
 			if !slices.Contains([]string{"browse", "read", "create", "write", "rename", "move", "delete"}, action) {
-				return fail("invalid_argument", "无效的文件操作类型")
+				return fail("invalid_argument", locales.MessageInvalidFileActionType())
 			}
 		}
 	}
@@ -113,15 +114,15 @@ func (s *Service) CheckCommand(ctx context.Context, keyID, connectionID, command
 		for _, r := range p.CommandRules {
 			rule := r.Mode + ": " + r.Pattern
 			if r.IgnoreCase {
-				rule += "（参数忽略大小写）"
+				rule += locales.MessageCaseInsensitiveArguments()
 			}
 			hit := store.MCPHit{PolicyID: p.ID, Name: p.Name, Version: p.Version,
 				Category: p.Category, Rule: rule, Action: "exec"}
-			reason := fmt.Sprintf("策略「%s」的规则 %s", p.Name, rule)
+			reason := fmt.Sprintf(locales.MessagePolicyRule(), p.Name, rule)
 			if r.Mode == "command" {
 				matcher, err := shellcmd.ParseRule(r.Pattern, r.IgnoreCase)
 				if err != nil {
-					return fail("invalid_policy", "已保存的策略无效，拒绝执行")
+					return fail("invalid_policy", locales.MessageTheSavedPolicyIsInvalidExecutionDenied())
 				}
 				// One parse serves every command rule of every policy.
 				if analysis == nil {
@@ -134,14 +135,14 @@ func (s *Service) CheckCommand(ctx context.Context, keyID, connectionID, command
 				}
 				match := Match{Text: ev.Text, Via: strings.Join(ev.Via, " ▸ "), Fallback: ev.Fallback}
 				if ev.Fallback != "" {
-					reason += fmt.Sprintf(" 按关键词从严命中（%s）：%q", ev.Fallback, clip(ev.Text))
+					reason += fmt.Sprintf(locales.MessageConservativelyMatchedByKeyword(), ev.Fallback, clip(ev.Text))
 				} else {
-					reason += fmt.Sprintf(" 命中命令 %q", clip(ev.Text))
+					reason += fmt.Sprintf(locales.MessageMatchedCommand(), clip(ev.Text))
 					if match.Via != "" {
-						reason += "（经由 " + match.Via + "）"
+						reason += locales.PolicyVia(match.Via)
 					}
 					if ev.Count > 1 {
-						reason += fmt.Sprintf("，共 %d 处", ev.Count)
+						reason += locales.PolicyMatchCount(ev.Count)
 					}
 				}
 				hits, matches, reasons = append(hits, hit), append(matches, match), append(reasons, reason)
@@ -160,7 +161,7 @@ func (s *Service) CheckCommand(ctx context.Context, keyID, connectionID, command
 			case "regex":
 				re, err := regexp.Compile(r.Pattern)
 				if err != nil {
-					return fail("invalid_policy", "已保存的策略无效，拒绝执行")
+					return fail("invalid_policy", locales.MessageTheSavedPolicyIsInvalidExecutionDenied())
 				}
 				if span := re.FindStringIndex(command); span != nil {
 					start, end = span[0], span[1]
@@ -172,19 +173,19 @@ func (s *Service) CheckCommand(ctx context.Context, keyID, connectionID, command
 			match := Match{Text: command[start:end], Context: commandWord(command, start, end)}
 			switch {
 			case r.Mode == "exact":
-				reason += " 与整条命令完全一致"
+				reason += locales.MessageExactlyMatchesTheFullCommand()
 			case match.Text == "":
-				reason += fmt.Sprintf(" 在第 %d 字节处匹配到空文本", start)
+				reason += fmt.Sprintf(locales.MessageMatchedEmptyTextAtByte(), start)
 			case match.Context != match.Text:
-				reason += fmt.Sprintf(" 命中 %q（位于 %q）", clip(match.Text), clip(match.Context))
+				reason += fmt.Sprintf(locales.MessageMatchedIn(), clip(match.Text), clip(match.Context))
 			default:
-				reason += fmt.Sprintf(" 命中 %q", clip(match.Text))
+				reason += fmt.Sprintf(locales.MessageMatched(), clip(match.Text))
 			}
 			hits, matches, reasons = append(hits, hit), append(matches, match), append(reasons, reason)
 		}
 	}
 	if len(hits) > 0 {
-		return &Failure{Code: "intercepted", Message: "命令被拦截策略拒绝：" + strings.Join(reasons, "；"), Hits: hits, Matches: matches}
+		return &Failure{Code: "intercepted", Message: locales.MessageCommandDeniedByInterceptionPolicy() + strings.Join(reasons, "；"), Hits: hits, Matches: matches}
 	}
 	return nil
 }
@@ -243,11 +244,11 @@ func (s *Service) CheckFile(ctx context.Context, keyID, connectionID, side, name
 			}
 			target, err := canonical(name)
 			if err != nil {
-				return fail("path_unverifiable", "无法核实被保护路径的实际位置")
+				return fail("path_unverifiable", locales.MessageUnableToVerifyTheActualLocationOfTheProtectedPath())
 			}
 			protected, err := canonical(r.Path)
 			if err != nil {
-				return fail("path_unverifiable", "无法核实拦截规则的实际路径")
+				return fail("path_unverifiable", locales.MessageUnableToVerifyTheActualPathOfTheInterceptionRule())
 			}
 			actual := target
 			// Match conservatively on native platforms where case and Unicode
@@ -269,12 +270,18 @@ func (s *Service) CheckFile(ctx context.Context, keyID, connectionID, side, name
 				// Report the canonical path: it may differ from the requested
 				// name when a symlink or alias led into the protected location.
 				hits, matches = append(hits, hit), append(matches, Match{Text: actual})
-				reasons = append(reasons, fmt.Sprintf("策略「%s」的规则 %s 禁止 %s，实际路径 %q 受保护", p.Name, hit.Rule, action, actual))
+				reasons = append(reasons, fmt.Sprintf(
+					locales.MessagePolicyRuleBlocksActualPathIsProtected(),
+					p.Name,
+					hit.Rule,
+					action,
+					actual,
+				))
 			}
 		}
 	}
 	if len(hits) > 0 {
-		return &Failure{Code: "intercepted", Message: "文件操作被拦截策略拒绝：" + strings.Join(reasons, "；"), Hits: hits, Matches: matches}
+		return &Failure{Code: "intercepted", Message: locales.MessageFileOperationDeniedByInterceptionPolicy() + strings.Join(reasons, "；"), Hits: hits, Matches: matches}
 	}
 	return nil
 }
@@ -364,7 +371,7 @@ func AuthorizeLocal(key store.MCPKey, name string, download bool) (string, error
 			// Refuse alias traversal: the existing transfer engine anchors its
 			// selected source/destination with os.Root before authentication.
 			if filepath.Clean(name) != actual {
-				return "", fail("path_unverifiable", "本地传输路径不能经过符号链接")
+				return "", fail("path_unverifiable", locales.MessageLocalTransferPathsCannotTraverseSymbolicLinks())
 			}
 			if _, err := os.Stat(dir); err != nil {
 				return "", err
@@ -372,5 +379,5 @@ func AuthorizeLocal(key store.MCPKey, name string, download bool) (string, error
 			return name, nil
 		}
 	}
-	return "", fail("permission_denied", "本地路径不在该密钥授权目录内")
+	return "", fail("permission_denied", locales.MessageTheLocalPathIsOutsideThisKeySAuthorizedDirectories())
 }

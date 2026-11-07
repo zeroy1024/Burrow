@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/egoist/mygo/ui"
+	"sshdesk/internal/locales"
 	"sshdesk/internal/theme"
 )
 
@@ -313,7 +314,7 @@ func ConnectionBadge(c *ui.Context, state ConnState, surface *theme.Theme) ui.El
 }
 
 func ProtocolBadge(c *ui.Context, protocol string) ui.Element {
-	return Badge(c, protocol+" 已连接 · 演示", BadgeProps{Tone: ToneSuccess, Dot: true})
+	return Badge(c, protocol+locales.MessageConnectedDemo(), BadgeProps{Tone: ToneSuccess, Dot: true})
 }
 
 type LatencyProps struct {

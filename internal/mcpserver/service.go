@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"sshdesk/internal/fileclient"
+	"sshdesk/internal/locales"
 	"sshdesk/internal/sshclient"
 	"sshdesk/internal/store"
 )
@@ -209,7 +210,7 @@ func (s *Service) storageFault(err error) error {
 	}
 	s.mu.Unlock()
 	s.Changed()
-	return fail("audit_unavailable", "MCP 存储不可用，已阻止新的操作")
+	return fail("audit_unavailable", locales.MessageMcpStorageIsUnavailableNewOperationsAreBlocked())
 }
 
 func (s *Service) FailStorage(err error) error { return s.storageFault(err) }
@@ -235,7 +236,7 @@ func (s *Service) Authenticate(ctx context.Context, secret string) (store.MCPKey
 				return store.MCPKey{}, ctx.Err()
 			}
 			if errors.Is(err, sql.ErrNoRows) {
-				return store.MCPKey{}, fail("authentication_failed", "无效的授权密钥")
+				return store.MCPKey{}, fail("authentication_failed", locales.MessageInvalidAccessKey())
 			}
 			// A readable key still authenticates recovery controls. Call rejects
 			// new business operations after this write fault.
@@ -249,11 +250,11 @@ func (s *Service) verifySecret(ctx context.Context, secret string) (store.MCPKey
 	var key store.MCPKey
 	id, _, ok := strings.Cut(strings.TrimPrefix(secret, "brw_mcp_"), ".")
 	if !ok || len(id) != 26 || len(secret) > 128 || !strings.HasPrefix(secret, "brw_mcp_") {
-		return key, fail("authentication_failed", "无效的授权密钥")
+		return key, fail("authentication_failed", locales.MessageInvalidAccessKey())
 	}
 	key, err := s.Store.MCPKey(ctx, id)
 	if errors.Is(err, sql.ErrNoRows) {
-		return key, fail("authentication_failed", "无效的授权密钥")
+		return key, fail("authentication_failed", locales.MessageInvalidAccessKey())
 	}
 	if err != nil {
 		if ctx.Err() != nil {
@@ -263,10 +264,10 @@ func (s *Service) verifySecret(ctx context.Context, secret string) (store.MCPKey
 	}
 	digest := sha256.Sum256([]byte(secret))
 	if subtle.ConstantTimeCompare(key.Digest, digest[:]) != 1 {
-		return store.MCPKey{}, fail("authentication_failed", "无效的授权密钥")
+		return store.MCPKey{}, fail("authentication_failed", locales.MessageInvalidAccessKey())
 	}
 	if key.State != "active" {
-		return key, fail("authentication_failed", "无效的授权密钥")
+		return key, fail("authentication_failed", locales.MessageInvalidAccessKey())
 	}
 	return key, nil
 }
@@ -299,7 +300,7 @@ func (s *Service) validateKey(ctx context.Context, key *store.MCPKey) error {
 	key.UploadDirs, key.DownloadDirs = slices.Clone(key.UploadDirs), slices.Clone(key.DownloadDirs)
 	key.Name = strings.TrimSpace(key.Name)
 	if key.Name == "" || len(key.Name) > 200 {
-		return fail("invalid_argument", "请填写有效的密钥名称（最多 200 字节）")
+		return fail("invalid_argument", locales.MessageEnterAValidKeyNameUpToBytes())
 	}
 	connections, err := s.Backend.Connections(ctx)
 	if err != nil {
@@ -310,17 +311,17 @@ func (s *Service) validateKey(ctx context.Context, key *store.MCPKey) error {
 		g := &key.Grants[i]
 		index := slices.IndexFunc(connections, func(c Connection) bool { return c.ID == g.ConnectionID })
 		if index < 0 || seen[g.ConnectionID] {
-			return fail("invalid_argument", "授权连接不存在或重复")
+			return fail("invalid_argument", locales.MessageAnAuthorizedConnectionIsMissingOrDuplicated())
 		}
 		seen[g.ConnectionID] = true
 		c := connections[index]
 		if g.Read && !c.Supports("read") || g.Write && !c.Supports("write") || g.Exec && !c.Supports("exec") {
-			return fail("invalid_argument", "连接协议与授权能力不匹配")
+			return fail("invalid_argument", locales.MessageTheConnectionProtocolDoesNotMatchTheGrantedCapabilities())
 		}
 		if g.EndpointDigest == "" {
 			g.EndpointDigest = c.Identity
 		} else if g.EndpointDigest != c.Identity {
-			return fail("invalid_argument", "连接信息已变更，请重新确认授权")
+			return fail("invalid_argument", locales.MessageConnectionDetailsChangedConfirmAuthorizationAgain())
 		}
 	}
 	for _, dirs := range [][]string{key.UploadDirs, key.DownloadDirs} {
@@ -341,10 +342,10 @@ func (s *Service) UpdateKey(ctx context.Context, key store.MCPKey) error {
 		return err
 	}
 	if old.State == "revoked" {
-		return fail("invalid_argument", "已撤销的密钥不可恢复")
+		return fail("invalid_argument", locales.MessageARevokedKeyCannotBeRestored())
 	}
 	if key.State != "active" && key.State != "disabled" && key.State != "revoked" {
-		return fail("invalid_argument", "无效的密钥状态")
+		return fail("invalid_argument", locales.MessageInvalidKeyState())
 	}
 	key.Digest, key.CreatedAt, key.Prefix, key.LastUsedAt = old.Digest, old.CreatedAt, old.Prefix, old.LastUsedAt
 	if key.State == "revoked" {
@@ -354,7 +355,7 @@ func (s *Service) UpdateKey(ctx context.Context, key store.MCPKey) error {
 	}
 	if err := s.Store.MCPUpdateKey(ctx, key); err != nil {
 		if errors.Is(err, store.ErrMCPKeyRevoked) {
-			return fail("invalid_argument", "已撤销的密钥不可恢复")
+			return fail("invalid_argument", locales.MessageARevokedKeyCannotBeRestored())
 		}
 		return s.storageFault(err)
 	}
@@ -363,14 +364,14 @@ func (s *Service) UpdateKey(ctx context.Context, key store.MCPKey) error {
 
 func (s *Service) SetKeyState(ctx context.Context, id, state string) error {
 	if state != "active" && state != "disabled" && state != "revoked" {
-		return fail("invalid_argument", "无效的密钥状态")
+		return fail("invalid_argument", locales.MessageInvalidKeyState())
 	}
 	key, err := s.Store.MCPSetKeyState(ctx, id, state)
 	if errors.Is(err, sql.ErrNoRows) {
-		return fail("not_found", "密钥已不存在，请刷新后重试")
+		return fail("not_found", locales.MessageTheKeyNoLongerExistsRefreshAndTryAgain())
 	}
 	if errors.Is(err, store.ErrMCPKeyRevoked) {
-		return fail("invalid_argument", "已撤销的密钥不可恢复")
+		return fail("invalid_argument", locales.MessageARevokedKeyCannotBeRestored())
 	}
 	if err != nil {
 		return s.storageFault(err)
@@ -433,7 +434,7 @@ func (s *Service) SavePolicy(ctx context.Context, p store.MCPPolicy) error {
 	for _, id := range p.ConnectionIDs {
 		i := slices.IndexFunc(connections, func(c Connection) bool { return c.ID == id })
 		if i < 0 || p.Category == "ssh" && !connections[i].Supports("exec") || p.Category == "files" && !connections[i].Supports("read") {
-			return fail("invalid_argument", "策略适用连接不存在或协议不匹配")
+			return fail("invalid_argument", locales.MessageAPolicyConnectionDoesNotExistOrHasAnIncompatibleProtocol())
 		}
 		if !slices.Contains(scoped, id) {
 			scoped = append(scoped, id)
@@ -451,7 +452,7 @@ func (s *Service) SavePolicy(ctx context.Context, p store.MCPPolicy) error {
 	}
 	p.ConnectionIDs = scoped
 	if len(p.ConnectionIDs) > 1000 {
-		return fail("invalid_argument", "策略适用连接超过限制")
+		return fail("invalid_argument", locales.MessageTheNumberOfPolicyConnectionsExceedsTheLimit())
 	}
 	if p.ID == "" {
 		p.ID, p.Version = rand.Text(), 1
@@ -467,7 +468,7 @@ func (s *Service) SavePolicy(ctx context.Context, p store.MCPPolicy) error {
 func (s *Service) SetPolicyEnabled(ctx context.Context, id string, enabled bool) error {
 	if err := s.Store.MCPSetPolicyEnabled(ctx, id, enabled); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return fail("not_found", "策略已不存在，请刷新后重试")
+			return fail("not_found", locales.MessageThePolicyNoLongerExistsRefreshAndTryAgain())
 		}
 		return s.storageFault(err)
 	}
@@ -498,7 +499,7 @@ func (s *Service) Authorize(ctx context.Context, keyID, connectionID, capability
 		return key, Connection{}, err
 	}
 	if key.State != "active" || !s.Accepting() {
-		return key, Connection{}, fail("permission_denied", "授权密钥已失效或服务已停止接收操作")
+		return key, Connection{}, fail("permission_denied", locales.MessageTheAccessKeyIsNoLongerValidOrTheServiceHasStoppedAccepting())
 	}
 	connections, err := s.Backend.Connections(ctx)
 	if err != nil {
@@ -521,12 +522,12 @@ func (s *Service) Authorize(ctx context.Context, keyID, connectionID, capability
 			}
 		}
 	}
-	return key, Connection{}, fail("permission_denied", "连接未获授权、权限不足或端点身份已改变")
+	return key, Connection{}, fail("permission_denied", locales.MessageTheConnectionIsUnauthorizedPermissionsAreInsufficientOrTheEndpointIdentityHasChanged())
 }
 
 func LocalPath(name string) (string, error) {
 	if strings.ContainsRune(name, 0) || name == "" {
-		return "", fail("invalid_argument", "本地路径不能为空")
+		return "", fail("invalid_argument", locales.MessageLocalPathCannotBeEmpty())
 	}
 	if name == "~" || strings.HasPrefix(name, "~/") {
 		home, err := os.UserHomeDir()
@@ -540,7 +541,7 @@ func LocalPath(name string) (string, error) {
 		}
 	}
 	if !filepath.IsAbs(name) {
-		return "", fail("invalid_argument", "本地路径必须是绝对路径")
+		return "", fail("invalid_argument", locales.MessageLocalPathMustBeAbsolute())
 	}
 	return filepath.Clean(name), nil
 }

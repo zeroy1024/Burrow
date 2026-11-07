@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/egoist/mygo/ui"
+	"sshdesk/internal/locales"
 	"sshdesk/internal/theme"
 )
 
@@ -30,7 +31,7 @@ func Spinner(c *ui.Context, props SpinnerProps) ui.Element {
 	}
 	label := props.Label
 	if label == "" {
-		label = "正在处理"
+		label = locales.MessageProcessing2()
 	}
 	reduced := MotionReduced(c, props.Motion)
 	period := t.C.Spinner.Period
@@ -63,7 +64,7 @@ func TabSpinner(c *ui.Context, props SpinnerProps) ui.Element {
 	t := theme.Current().C.Tab
 	reduced := MotionReduced(c, props.Motion)
 	e := ui.Box(c).Size(t.SpinnerSize, t.SpinnerSize).Shrink(0).Role(ui.RoleProgress).
-		Range(0, 1, -1).Label("连接中")
+		Range(0, 1, -1).Label(locales.MessageConnecting2())
 	return e.Draw(func(p *ui.Painter, r ui.Rect) {
 		cx, cy := r.X+r.W/2, r.Y+r.H/2
 		radius := (r.W - t.SpinnerStroke) / 2

@@ -3,7 +3,6 @@ package desktop
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"image"
 	"image/draw"
 	"image/png"
@@ -11,6 +10,7 @@ import (
 	"math"
 	"sync"
 
+	"sshdesk/internal/locales"
 	"sshdesk/internal/theme"
 	"sshdesk/internal/uikit"
 
@@ -89,12 +89,12 @@ func (a *app) captureTerminalPress(session *remoteSession, fromTab bool) {
 	a.clearTerminalPreviews()
 	s := &a.terminalCapture
 	if !a.terminalCaptureVisible(session) {
-		s.reason = "源窗格未显示，使用独立终端状态快照"
+		s.reason = locales.MessageTheSourcePaneIsHiddenUsingAnIndependentTerminalStateSnapshot()
 		return
 	}
 	frame := session.terminal.capture
 	if frame.body.W <= 0 || frame.body.H <= 0 || frame.rootSize.X <= 0 || frame.rootSize.Y <= 0 {
-		s.reason = "源终端尚无已绘制正文，使用独立终端状态快照"
+		s.reason = locales.MessageTheSourceTerminalHasNoRenderedContentYetUsingAnIndependentTerminalState()
 		return
 	}
 	s.session, s.terminal, s.pressed, s.capturing = session, session.terminal, true, true
@@ -102,7 +102,7 @@ func (a *app) captureTerminalPress(session *remoteSession, fromTab bool) {
 	data, err := a.window.CapturePage()
 	s.capturing = false
 	if err != nil {
-		s.reason = "捕获源终端失败：" + err.Error()
+		s.reason = locales.MessageUnableToCaptureSourceTerminal() + err.Error()
 		return
 	}
 	// CapturePage may refresh a held scene. The DrawOver metadata then belongs
@@ -126,7 +126,7 @@ func (a *app) captureTerminalPress(session *remoteSession, fromTab bool) {
 			}
 			s.cancel = nil
 			if err != nil {
-				s.reason = "裁切源终端失败：" + err.Error()
+				s.reason = locales.MessageUnableToCropSourceTerminal() + err.Error()
 				return
 			}
 			s.bitmap = ui.NewBitmap(cropped)
@@ -153,7 +153,7 @@ func cropTerminalCapture(data []byte, frame terminalCaptureFrame) (*image.RGBA, 
 	crop := image.Rect(bounds.Min.X+int(math.Ceil(float64(r.X)*xScale)), bounds.Min.Y+int(math.Ceil(float64(r.Y)*yScale)),
 		bounds.Min.X+int(math.Floor(float64(r.X+r.W)*xScale)), bounds.Min.Y+int(math.Floor(float64(r.Y+r.H)*yScale)))
 	if crop.Empty() || !crop.In(bounds) {
-		return nil, fmt.Errorf("终端正文超出所捕获窗口范围")
+		return nil, locales.Errorf(locales.MessageTerminalContentExtendsBeyondTheCapturedWindow)
 	}
 	result := image.NewRGBA(image.Rect(0, 0, crop.Dx(), crop.Dy()))
 	draw.Draw(result, result.Bounds(), source, crop.Min, draw.Src)
@@ -240,7 +240,11 @@ func (a *app) nativeTerminalDragContents(c *ui.Context, session *remoteSession, 
 			ui.Box(c).Absolute().Left(t.C.Pane.ContentSide).Top(t.C.Pane.ContentSide).
 				Width(sourceWidth - 2*t.C.Pane.ContentSide).Height(max(1, sourceHeight-2*t.C.Pane.ContentSide)).Clip().PassThrough().Children(func() {
 				if preview.err != nil {
-					uikit.Text(c, "无法显示终端快照："+preview.err.Error(), uikit.TextProps{Style: uikit.TextSmall}).PassThrough()
+					uikit.Text(
+						c,
+						locales.MessageUnableToDisplayTerminalSnapshot()+preview.err.Error(),
+						uikit.TextProps{Style: uikit.TextSmall},
+					).PassThrough()
 					return
 				}
 				nativeterm.View(c, preview.view).Fill().PassThrough().Unselectable().InputMethod(false).

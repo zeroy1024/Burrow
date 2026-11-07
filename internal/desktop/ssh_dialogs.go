@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"slices"
 
+	"sshdesk/internal/locales"
 	"sshdesk/internal/theme"
 	"sshdesk/internal/uikit"
 
@@ -14,8 +15,9 @@ import (
 type sshPrompt struct {
 	modal                uikit.ModalController
 	ctx                  context.Context
-	title, address       string
-	confirmLabel, detail string
+	address              string
+	title                locales.Text
+	confirmLabel, detail locales.Text
 	fingerprint, keyType string
 	secret               string
 	open                 bool
@@ -31,8 +33,8 @@ type sshAnswer struct {
 
 // SSH workers wait here; only the window's main thread owns the prompt queue.
 func (a *app) askSSH(ctx context.Context, prompt *sshPrompt) sshAnswer {
-	a.mcpPromptChanged(ctx, true, prompt.title)
-	defer a.mcpPromptChanged(ctx, false, prompt.title)
+	a.mcpPromptChanged(ctx, true, prompt.title.String())
+	defer a.mcpPromptChanged(ctx, false, prompt.title.String())
 	prompt.ctx, prompt.open, prompt.answer = ctx, true, make(chan sshAnswer, 1)
 	a.window.Update(func() {
 		if ctx.Err() == nil {
@@ -72,33 +74,37 @@ func (a *app) sshDialogs(c *ui.Context) {
 	}
 	result := uikit.Modal(c.Key("ssh-prompt").Key(p), &p.open, uikit.ModalProps{
 		Controller: &p.modal,
-		Title:      p.title, Compact: true, Width: t.C.Dialog.HostWidth,
+		Title:      p.title.String(), Compact: true, Width: t.C.Dialog.HostWidth,
 		Motion: uikit.MotionOverride(a.reduceMotion(c)),
 	}, func(parts uikit.ModalParts) {
 		uikit.Text(c, p.address, uikit.TextProps{Style: uikit.TextSmall})
 		if p.fingerprint != "" {
-			uikit.Text(c, "首次连接此服务器。请与服务器管理员核对主机密钥指纹后再信任。", uikit.TextProps{Style: uikit.TextSmall})
+			uikit.Text(
+				c,
+				locales.MessageThisIsYourFirstConnectionToThisServerVerifyTheHostKeyFingerprint(),
+				uikit.TextProps{Style: uikit.TextSmall},
+			)
 			uikit.Text(c, fmt.Sprintf("%s\n%s", p.keyType, p.fingerprint), uikit.TextProps{Style: uikit.TextMono}).Selectable()
 		} else {
 			if p.echo {
-				uikit.Input(c, &p.secret, uikit.InputProps{Label: p.title, Mono: true}).FillWidth().AutoFocus()
+				uikit.Input(c, &p.secret, uikit.InputProps{Label: p.title.String(), Mono: true}).FillWidth().AutoFocus()
 			} else {
-				uikit.PasswordInput(c, &p.secret, uikit.InputProps{Label: p.title, Mono: true}).Input.FillWidth().AutoFocus()
+				uikit.PasswordInput(c, &p.secret, uikit.InputProps{Label: p.title.String(), Mono: true}).Input.FillWidth().AutoFocus()
 			}
-			detail := p.detail
+			detail := p.detail.String()
 			if detail == "" {
-				detail = "仅用于本次连接，不保存到配置。"
+				detail = locales.MessageUsedOnlyForThisConnectionAndNotSavedInTheConfiguration()
 			}
 			uikit.Text(c, detail, uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneSecondary})
 		}
 		ui.Row(c).Justify(ui.End).Gap(t.Space.N8).Children(func() {
-			uikit.Button(c, "取消", uikit.ButtonProps{}).OnClick(parts.RequestDismiss)
-			label := "连接"
+			uikit.Button(c, locales.CommonCancel(), uikit.ButtonProps{}).OnClick(parts.RequestDismiss)
+			label := locales.MessageConnect()
 			if p.fingerprint != "" {
-				label = "信任并连接"
+				label = locales.MessageTrustAndConnect()
 			}
-			if p.confirmLabel != "" {
-				label = p.confirmLabel
+			if !p.confirmLabel.Empty() {
+				label = p.confirmLabel.String()
 			}
 			uikit.Button(c, label, uikit.ButtonProps{Variant: uikit.ButtonPrimary}).OnClick(func() { answer(true) })
 		})

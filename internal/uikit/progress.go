@@ -4,6 +4,7 @@ import (
 	"image/color"
 
 	"github.com/egoist/mygo/ui"
+	"sshdesk/internal/locales"
 	"sshdesk/internal/theme"
 )
 
@@ -54,7 +55,7 @@ func Progress(c *ui.Context, props ProgressProps) ui.Element {
 	bar := ui.Box(c).Height(height).Radius(p.Radius).Background(Color(track)).Clip().FillWidth().
 		Role(ui.RoleProgress).Label(props.Label)
 	if props.Value < 0 {
-		bar.Value("进行中").Range(0, 1, -1)
+		bar.Value(locales.MessageInProgress()).Range(0, 1, -1)
 		if MotionReduced(c, props.Motion) {
 			bar.Children(func() { ui.Box(c).Fill().Stripes(Color(fill), height*2, height*2, 45) })
 		} else {

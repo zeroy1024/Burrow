@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync/atomic"
 
+	"sshdesk/internal/locales"
 	"sshdesk/internal/sshclient"
 	"sshdesk/internal/termtheme"
 	"sshdesk/internal/theme"
@@ -118,7 +119,7 @@ func (a *app) attachSSH(session *remoteSession, run *sshRuntime) {
 					session.state = disconnected
 					if err != nil {
 						session.state, afterMessage = connectionFailed, true
-						showSSHMessage(session, "SSH 会话结束："+err.Error())
+						showSSHMessage(session, locales.MessageSshSessionEnded()+err.Error())
 					}
 				}
 				if session.awaitingConnect() {
@@ -139,7 +140,7 @@ func (a *app) attachSSH(session *remoteSession, run *sshRuntime) {
 		run.cancel()
 		run.conn.Close()
 		session.state = connectionFailed
-		showSSHMessage(session, "无法启动终端："+err.Error())
+		showSSHMessage(session, locales.MessageUnableToStartTerminal()+err.Error())
 		return
 	}
 	session.terminal = &sshTerminal{
@@ -221,7 +222,7 @@ func (a *app) syncSSHTerminal(session *remoteSession) {
 // geometry, clipping, opacity and chrome already used by the prototype.
 func (a *app) sshTerminalView(c *ui.Context, session *remoteSession) ui.Element {
 	a.syncSSHTerminal(session)
-	output := nativeterm.View(c, session.terminal.view).Bind(&session.focus).Label(session.endpoint.name + " SSH 终端")
+	output := nativeterm.View(c, session.terminal.view).Bind(&session.focus).Label(session.endpoint.name + locales.MessageSshTerminal())
 	if session.focusPending {
 		if a.sshSessionFocused(session) {
 			output.Focus()
@@ -269,7 +270,7 @@ func showReconnectHint(session *remoteSession, newLine bool) {
 	if session.terminal == nil || terminalRunning(session) {
 		return
 	}
-	hint := "\x1b[0;2m" + localizeTag(mygo.App.Locale(), "按 Enter 重新连接") + "\x1b[0m"
+	hint := "\x1b[0;2m" + locales.MessagePressEnterToReconnect() + "\x1b[0m"
 	if newLine {
 		hint = "\r\n" + hint
 	}

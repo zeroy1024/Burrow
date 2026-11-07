@@ -5,12 +5,12 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"path/filepath"
 	"slices"
 	"time"
 
 	"sshdesk/internal/hostinfo"
+	"sshdesk/internal/locales"
 	"sshdesk/internal/store"
 	"sshdesk/internal/vault"
 )
@@ -158,21 +158,27 @@ func (a *app) sessionPassword(h host) (string, error) {
 	if err == nil {
 		defer clear(data)
 		if h.session.PasswordRevision == "" {
-			return "", fmt.Errorf("保存的密码已更新，请为此会话重新输入：%w", vault.ErrNotFound)
+			return "", locales.Errorf(locales.MessageTheSavedPasswordHasChangedEnterItAgainForThisSession, vault.ErrNotFound)
 		}
 		var credential sessionCredential
 		if err := json.Unmarshal(data, &credential); err != nil || credential.Revision == "" || credential.Secret == "" {
-			return "", errors.New("保存的会话凭据格式无效")
+			return "", locales.NewError(locales.MessageInvalidSavedSessionCredentialFormat)
 		}
 		if credential.Revision != h.session.PasswordRevision {
-			return "", fmt.Errorf("保存的密码与此会话快照不匹配，请重新输入：%w", vault.ErrNotFound)
+			return "", locales.Errorf(
+				locales.MessageTheSavedPasswordDoesNotMatchThisSessionSnapshotEnterItAgain,
+				vault.ErrNotFound,
+			)
 		}
 		return credential.Secret, nil
 	}
 	if !errors.Is(err, vault.ErrNotFound) {
-		return "", fmt.Errorf("读取会话密码：%w", err)
+		return "", locales.Errorf(locales.MessageReadSessionPassword, err)
 	}
-	return "", fmt.Errorf("此会话保存的密码已不可用，请重新输入：%w", vault.ErrNotFound)
+	return "", locales.Errorf(
+		locales.MessageTheSavedPasswordForThisSessionIsNoLongerAvailableEnterItAgain,
+		vault.ErrNotFound,
+	)
 }
 
 func (a *app) modalAdvancedOpen(protocol string) bool {
@@ -190,7 +196,7 @@ func (a *app) setModalAdvancedOpen(protocol string, open bool) {
 func (a *app) keyByID(id string) (managedKey, error) {
 	index := slices.IndexFunc(a.keys, func(k managedKey) bool { return k.ID == id })
 	if index == -1 {
-		return managedKey{}, errors.New("请选择私钥")
+		return managedKey{}, locales.NewError(locales.MessageSelectAPrivateKey)
 	}
 	return a.keys[index], nil
 }

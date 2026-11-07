@@ -6,6 +6,7 @@ import (
 
 	"github.com/egoist/mygo/plugins/glass"
 	"github.com/egoist/mygo/ui"
+	"sshdesk/internal/locales"
 	"sshdesk/internal/theme"
 )
 
@@ -189,7 +190,7 @@ func PaneHeader(c *ui.Context, props HeaderProps) HeaderResult {
 		if props.Close {
 			label := props.CloseLabel
 			if label == "" {
-				label = "关闭面板"
+				label = locales.MessageClosePane3()
 			}
 			result.CloseButton = IconButton(c, IconClose, IconButtonProps{Label: label, Size: SizeSm, Surface: t})
 			result.Close = result.CloseButton.Clicked()
@@ -315,7 +316,7 @@ func PaneFooter(c *ui.Context, props FooterProps) ui.Element {
 }
 
 func FormatSelection(total, selected int, bytes int64) string {
-	text := fmt.Sprintf("%d 项", total)
+	text := locales.CommonItemCount(total)
 	if selected == 0 {
 		return text
 	}
@@ -327,9 +328,9 @@ func FormatSelection(total, selected int, bytes int64) string {
 		amount, unit = amount/1024, next
 	}
 	if unit == "B" {
-		return fmt.Sprintf("%s · 已选 %d 项（%d B）", text, selected, bytes)
+		return locales.FilesSelectionSummary(total, selected, fmt.Sprintf("%d B", bytes))
 	}
-	return fmt.Sprintf("%s · 已选 %d 项（%.1f %s）", text, selected, amount, unit)
+	return locales.FilesSelectionSummary(total, selected, fmt.Sprintf("%.1f %s", amount, unit))
 }
 
 func PaneHairline(c *ui.Context, surface *theme.Theme) ui.Element {

@@ -2,6 +2,7 @@ package uikit
 
 import (
 	"github.com/egoist/mygo/ui"
+	"sshdesk/internal/locales"
 	"sshdesk/internal/theme"
 )
 
@@ -96,7 +97,7 @@ func SidePanel(c *ui.Context, props SidePanelProps, body func()) SidePanelResult
 				props.ScrollOverlay(result.Viewport, scroll)
 			} else {
 				Scrollbars(c, result.Viewport, content, scroll, ScrollbarProps{
-					Label: props.Title + "滚动条", State: props.Scrollbar, Input: props.ScrollInput,
+					Label: props.Title + locales.MessageScrollbar(), State: props.Scrollbar, Input: props.ScrollInput,
 				})
 			}
 		})

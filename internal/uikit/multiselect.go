@@ -5,6 +5,7 @@ import (
 	"slices"
 
 	"github.com/egoist/mygo/ui"
+	"sshdesk/internal/locales"
 	"sshdesk/internal/theme"
 )
 
@@ -48,7 +49,7 @@ func MultiSelect[T comparable](
 					ui.Text(c, label).FontSize(p.ChipFontSize).MinWidth(0).Shrink(1).
 						SingleLine().Ellipsis("…").PassThrough()
 					if IconButton(c, IconClose, IconButtonProps{
-						Key: "remove", Label: "移除 " + label, Size: SizeXs, Disabled: props.Disabled,
+						Key: "remove", Label: locales.MessageRemove() + label, Size: SizeXs, Disabled: props.Disabled,
 					}).Size(t.Size.IconSm, t.Size.IconSm).Shrink(0).Clicked() {
 						remove = index
 					}

@@ -16,6 +16,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"sshdesk/internal/locales"
 )
 
 const ftpOperationTimeout = 20 * time.Second
@@ -74,7 +76,7 @@ func (e *ftpRedactedError) Unwrap() error { return e.cause }
 
 func DialFTP(ctx context.Context, cfg FTPConfig) (Client, error) {
 	if cfg.DialContext != nil && cfg.Mode == "active" {
-		return nil, errors.New("FTP 主动模式暂不支持连接网关，请选择被动模式")
+		return nil, locales.NewError(locales.MessageActiveFtpDoesNotSupportGatewaysSelectPassiveMode)
 	}
 	if err := ctx.Err(); err != nil {
 		return nil, err

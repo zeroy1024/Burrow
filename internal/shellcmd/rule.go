@@ -1,11 +1,11 @@
 package shellcmd
 
 import (
-	"errors"
-	"fmt"
 	"regexp"
 	"slices"
 	"strings"
+
+	"sshdesk/internal/locales"
 
 	"mvdan.cc/sh/v3/expand"
 	"mvdan.cc/sh/v3/pattern"
@@ -44,31 +44,33 @@ const boundary = "[\\s;&|()<>`$'\"/\\\\={}]"
 func ParseRule(pattern string, ignoreCase bool) (Rule, error) {
 	file, err := syntax.NewParser(syntax.Variant(syntax.LangBash)).Parse(strings.NewReader(pattern), "")
 	if err != nil {
-		return Rule{}, fmt.Errorf("命令规则无法解析：%w", err)
+		return Rule{}, locales.Errorf(locales.MessageUnableToParseCommandRule, err)
 	}
 	if len(file.Stmts) != 1 {
-		return Rule{}, errors.New("命令规则只能包含一条命令，组合命令请拆成多条规则")
+		return Rule{}, locales.NewError(locales.MessageACommandRuleCanContainOnlyOneCommandSplitCombinedCommandsIntoSeparate)
 	}
 	stmt := file.Stmts[0]
 	call, ok := stmt.Cmd.(*syntax.CallExpr)
 	if !ok || stmt.Negated || stmt.Background || stmt.Coprocess || stmt.Disown || len(stmt.Redirs) > 0 ||
 		len(call.Assigns) > 0 || len(call.Args) == 0 {
-		return Rule{}, errors.New("命令规则只能是一条简单命令，不能包含 &&、|、重定向、变量赋值或控制结构")
+		return Rule{}, locales.NewError(locales.MessageACommandRuleMustBeASingleSimpleCommandWithoutPipesRedirectionsVariable)
 	}
 	var tokens []string
 	for _, w := range call.Args {
 		if dynamic(w) {
-			return Rule{}, errors.New("命令规则不能包含变量、命令替换或算术展开")
+			return Rule{}, locales.NewError(
+				locales.MessageCommandRulesCannotContainVariablesCommandSubstitutionsOrArithmeticExpansions,
+			)
 		}
 		fields, err := expand.Fields(nil, w)
 		if err != nil {
-			return Rule{}, fmt.Errorf("命令规则无法解析：%w", err)
+			return Rule{}, locales.Errorf(locales.MessageUnableToParseCommandRule, err)
 		}
 		tokens = append(tokens, fields...)
 	}
 	r := Rule{program: normalize(tokens[0]), ignoreCase: ignoreCase}
 	if r.program == "" {
-		return Rule{}, errors.New("命令规则缺少命令名")
+		return Rule{}, locales.NewError(locales.MessageTheCommandRuleIsMissingACommandName)
 	}
 	r.keywords = append(r.keywords, keyword(r.program, true))
 	optionsDone := false

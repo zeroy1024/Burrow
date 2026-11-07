@@ -11,6 +11,7 @@ import (
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/i18n"
 	"github.com/egoist/mygo/ui"
+	"sshdesk/internal/locales"
 	"sshdesk/internal/termtheme"
 	"sshdesk/internal/theme"
 	"sshdesk/internal/uikit"
@@ -21,17 +22,20 @@ type settingsCategory struct {
 	icon                *ui.SVG
 }
 
-var settingsCategories = [...]settingsCategory{
-	{"general", "通用", "语言、启动与选项卡", settingsIcon},
-	{"appearance", "外观", "主题、强调色与动态效果", paletteIcon},
-	{"terminal", "终端", "配色、背景、字体与光标 · 修改立即生效", terminalIcon},
-	{"files", "文件传输", "目录、传输与同名文件", filesIcon},
-	{"shortcuts", "快捷键", "点击快捷键录制 · Esc 取消 · Delete 清除", textCursorIcon},
-	{"keys", "密钥与凭据", "私钥、ssh-agent 与已保存的密码", lockIcon},
-	{"about", "关于", "Burrow 与开源许可", infoIcon},
+func settingsCategories() []settingsCategory {
+	return []settingsCategory{
+		{"general", locales.MessageGeneral(), locales.MessageLanguageStartupAndTabs(), settingsIcon},
+		{"appearance", locales.MessageAppearance(), locales.MessageThemeAccentAndMotion(), paletteIcon},
+		{"terminal", locales.MessageTerminal(), locales.MessageColorsBackgroundFontAndCursorChangesApplyImmediately(), terminalIcon},
+		{"files", locales.FilesTitle(), locales.MessageDirectoriesTransfersAndNameConflicts(), filesIcon},
+		{"shortcuts", locales.MessageKeyboardShortcuts(), locales.MessageClickAShortcutToRecordEscCancelsDeleteClears(), textCursorIcon},
+		{"keys", locales.MessageKeysCredentials(), locales.MessagePrivateKeysSshAgentAndSavedPasswords(), lockIcon},
+		{"about", locales.AboutTitle(), locales.MessageBurrowAndOpenSourceLicenses(), infoIcon},
+	}
 }
 
 type settingField struct {
+	id                       any
 	label, description, help string
 	control                  func()
 }
@@ -42,7 +46,6 @@ func (a *app) settingsPage(c *ui.Context) {
 	}
 	t := theme.Current()
 	p := t.C.Settings
-	a.settingsUI.locale = c.Locale()
 	ui.Row(c).Key("settings-page").Fill().Gap(t.Space.N8).Children(func() {
 		uikit.Card(c).Width(p.NavWidth).Shrink(0).FillHeight().Children(func() { a.settingsSidebar(c, 1) })
 		a.settings(c)
@@ -52,13 +55,13 @@ func (a *app) settingsPage(c *ui.Context) {
 func (a *app) settingsSidebar(c *ui.Context, shown float32) {
 	t := theme.Current()
 	ui.Column(c).Fill().Children(func() {
-		uikit.SiderHeader(c, uikit.SiderHeaderProps{Title: localize(c, "设置"), HideAdd: true})
+		uikit.SiderHeader(c, uikit.SiderHeaderProps{Title: locales.SettingsTitle(), HideAdd: true})
 		a.sidebarSearch(c.Key("settings-search"), &a.settingsUI.query, &a.settingsUI.search,
-			localize(c, "搜索设置"), localize(c, "搜索设置"))
+			locales.MessageSearchSettings(), locales.MessageSearchSettings())
 		ui.Column(c).FillWidth().Padding(t.C.Catalog.ListPaddingY, t.C.Catalog.ListPaddingX).Gap(t.C.Catalog.RowGap).Children(func() {
-			for index, category := range settingsCategories {
+			for index, category := range settingsCategories() {
 				uikit.SettingsNavItem(c, uikit.SettingsNavItemProps{
-					Key: category.id, Label: localize(c, category.label), Icon: category.icon, Selected: a.settingsCategory == index,
+					Key: category.id, Label: category.label, Icon: category.icon, Selected: a.settingsCategory == index,
 				}).OnClick(func() { a.selectSettingsCategory(index) })
 			}
 		})
@@ -76,8 +79,11 @@ func (a *app) settings(c *ui.Context) {
 		searching := strings.TrimSpace(a.settingsUI.query) != ""
 		visible := !searching && a.settingsCategory == 4 || searching && a.settingsCategoryHasMatch(4)
 		if visible {
-			visible = slices.ContainsFunc(defaultShortcutActions, func(action shortcutAction) bool {
-				return action.id == a.settingsUI.recording && a.settingMatches(action.label, action.group+"快捷键")
+			visible = slices.ContainsFunc(defaultShortcutActions(), func(action shortcutAction) bool {
+				return action.id == a.settingsUI.recording && a.settingMatches(
+					action.label,
+					action.group+locales.MessageKeyboardShortcuts(),
+				)
 			})
 		}
 		if !visible {
@@ -89,14 +95,14 @@ func (a *app) settings(c *ui.Context) {
 	uikit.Card(c).Key("settings-content").Grow(1).MinWidth(0).FillHeight().Children(func() {
 		ui.Row(c).FillWidth().Shrink(0).Padding(p.HeaderPaddingTop, p.HeaderPaddingRight, p.HeaderPaddingBottom, p.HeaderPaddingLeft).
 			BorderWidth(0, 0, t.Size.Divider, 0).BorderColor(uikit.Color(t.Color.Border.Divider)).AlignItems(ui.Center).Children(func() {
-			category := settingsCategories[a.settingsCategory]
+			category := settingsCategories()[a.settingsCategory]
 			ui.Column(c).Grow(1).Gap(t.Space.N4).Children(func() {
 				title, subtitle := category.label, category.subtitle
 				if strings.TrimSpace(a.settingsUI.query) != "" {
-					title, subtitle = "搜索结果", "匹配设置名称与说明 · 修改立即生效"
+					title, subtitle = locales.MessageSearchResults(), locales.MessageMatchingSettingNamesAndDescriptionsChangesApplyImmediately()
 				}
-				uikit.Text(c, localize(c, title), uikit.TextProps{Style: uikit.TextTitle})
-				uikit.Text(c, localize(c, subtitle), uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneTertiary})
+				uikit.Text(c, title, uikit.TextProps{Style: uikit.TextTitle})
+				uikit.Text(c, subtitle, uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneTertiary})
 			})
 		})
 		viewport := ui.Box(c).Grow(1).MinHeight(0).FillWidth()
@@ -107,22 +113,22 @@ func (a *app) settings(c *ui.Context) {
 					content := ui.Column(c).Key(a.settingsCategory).FillWidth().MaxWidth(p.ContentMax+2*p.ContentPaddingX).
 						Padding(p.ContentPaddingY, p.ContentPaddingX).Gap(p.GroupGap)
 					content.Children(func() {
-						if a.settingsUI.notice != "" {
-							uikit.Banner(c, localize(c, a.settingsUI.notice), uikit.BannerProps{Tone: uikit.ToneDanger, Icon: sessionAlertIcon})
+						if !a.settingsUI.notice.Empty() {
+							uikit.Banner(c, a.settingsUI.notice.String(), uikit.BannerProps{Tone: uikit.ToneDanger, Icon: sessionAlertIcon})
 						}
 						if a.terminalError != nil {
-							uikit.Banner(c, localize(c, a.terminalError.Error()), uikit.BannerProps{Tone: uikit.ToneDanger, Icon: sessionAlertIcon})
+							uikit.Banner(c, a.terminalError.Error(), uikit.BannerProps{Tone: uikit.ToneDanger, Icon: sessionAlertIcon})
 						}
 						if strings.TrimSpace(a.settingsUI.query) != "" {
 							count := 0
-							for index := range settingsCategories {
+							for index := range settingsCategories() {
 								if a.settingsCategoryHasMatch(index) {
 									a.settingsCategoryContent(c, index)
 									count++
 								}
 							}
 							if count == 0 {
-								uikit.EmptyMessage(c, localize(c, "没有匹配的设置"), uikit.EmptySettingsSearch)
+								uikit.EmptyMessage(c, locales.MessageNoMatchingSettings(), uikit.EmptySettingsSearch)
 							}
 						} else {
 							a.settingsCategoryContent(c, a.settingsCategory)
@@ -133,7 +139,13 @@ func (a *app) settings(c *ui.Context) {
 			uikit.ScrollFade(c, uikit.EdgeBottom, uikit.ScrollFadeProps{
 				Height: p.FadeHeight, Gradient: true, Background: uikit.Color(t.Color.Surface.Card),
 			})
-			uikit.Scrollbars(c, viewport, contentScroll, scroll, uikit.ScrollbarProps{Label: "设置内容滚动条"})
+			uikit.Scrollbars(
+				c,
+				viewport,
+				contentScroll,
+				scroll,
+				uikit.ScrollbarProps{Label: locales.MessageSettingsContentScrollbar()},
+			)
 		})
 	})
 }
@@ -162,7 +174,7 @@ func (a *app) settingMatches(label, description string) bool {
 	if query == "" {
 		return true
 	}
-	haystack := []rune(strings.ToLower(label + description + localizeTag(a.settingsUI.locale, label) + localizeTag(a.settingsUI.locale, description)))
+	haystack := []rune(strings.ToLower(label + " " + description))
 	needle := []rune(query)
 	at := 0
 	for _, r := range haystack {
@@ -187,11 +199,10 @@ func (a *app) settingsCategoryHasMatch(index int) bool {
 		"关于 版本 开源许可 MyGo Catppuccin JetBrains Mono",
 	}
 	english := []string{"language system startup restore sessions close last tab active connection confirmation", "app theme light dark system accent preview reduce motion window translucency global background blur macOS", "color scheme follow app fixed light dark terminal background font size line height cursor style blink scrollback", "default local directory concurrent transfers name conflict", "keyboard shortcuts new close reopen select tabs previous next sidebar terminal file mode split search current page settings", "private key import generate ssh-agent saved passwords add to agent credentials", "about version open source license MyGo Catppuccin JetBrains Mono"}
-	return (index == 5 && a.securitySettingsMatch()) || a.settingMatches(settingsCategories[index].label, texts[index]+english[index])
+	return (index == 5 && a.securitySettingsMatch()) || a.settingMatches(settingsCategories()[index].label, texts[index]+english[index])
 }
 
 func (a *app) settingsText(c *ui.Context, text string, props uikit.TextProps, size float32) {
-	text = localize(c, text)
 	query := []rune(strings.ToLower(strings.TrimSpace(a.settingsUI.query)))
 	if len(query) == 0 {
 		uikit.Text(c, text, props).FontSize(size)
@@ -212,7 +223,7 @@ func (a *app) settingsText(c *ui.Context, text string, props uikit.TextProps, si
 	ui.RichText(c, spans...).Font(font.Family).FontSize(font.Size).FontWeight(font.Weight)
 }
 
-func (a *app) settingsGroup(c *ui.Context, title, help string, fields []settingField) {
+func (a *app) settingsGroup(c *ui.Context, id, title, help string, fields []settingField) {
 	visible := make([]settingField, 0, len(fields))
 	for _, field := range fields {
 		if a.settingMatches(field.label, field.description) || a.settingMatches(field.label, field.help) {
@@ -224,13 +235,13 @@ func (a *app) settingsGroup(c *ui.Context, title, help string, fields []settingF
 	}
 	t := theme.Current()
 	p := t.C.Settings
-	uikit.SettingsGroup(c, uikit.SettingsGroupProps{Key: title, Title: localize(c, title), Help: localize(c, help)}, func() {
+	uikit.SettingsGroup(c, uikit.SettingsGroupProps{Key: id, Title: title, Help: help}, func() {
 		for index, field := range visible {
 			uikit.SettingsRow(c, uikit.SettingsRowProps{
-				Key: field.label, Gap: p.RowGap, Title: localize(c, field.label), Detail: localize(c, field.description),
+				Key: field.id, Gap: p.RowGap, Title: field.label, Detail: field.description,
 				Divider: index > 0,
 				Text: func() {
-					uikit.SettingsLabel(c, localize(c, field.help), func() {
+					uikit.SettingsLabel(c, field.help, func() {
 						a.settingsText(c, field.label, uikit.TextProps{}, p.RowLabelSize)
 					})
 					if field.description != "" {
@@ -247,61 +258,64 @@ func (a *app) settingsGroup(c *ui.Context, title, help string, fields []settingF
 
 func settingsRow(c *ui.Context, label string, content func()) {
 	uikit.SettingsRow(c, uikit.SettingsRowProps{
-		Gap: theme.Current().Space.N16, Inline: true, Title: localize(c, label), Control: content,
+		Gap: theme.Current().Space.N16, Inline: true, Title: label, Control: content,
 	})
 }
 
 func settingsSegment(c *ui.Context, id, label string, options []string, current int, change func(int)) {
 	items := make([]uikit.SegItem, len(options))
 	for index, label := range options {
-		items[index] = uikit.SegItem{Label: localize(c, label)}
+		items[index] = uikit.SegItem{Label: label}
 	}
-	if uikit.Segmented(c.Key(id), &current, items, uikit.SegmentedProps{Label: localize(c, label)}).Changed() {
+	if uikit.Segmented(c.Key(id), &current, items, uikit.SegmentedProps{Label: label}).Changed() {
 		change(current)
 	}
 }
 
 func (a *app) preferenceSwitch(c *ui.Context, label string, value *bool) {
 	p := theme.Current().C.Switch
-	if uikit.Switch(c, value, uikit.ToggleProps{Label: localize(c, label), Motion: uikit.MotionOverride(a.reduceMotion(c))}).Size(p.W, p.H).Label(localize(c, label)).Changed() {
+	if uikit.Switch(c, value, uikit.ToggleProps{Label: label, Motion: uikit.MotionOverride(a.reduceMotion(c))}).Size(p.W, p.H).Label(label).Changed() {
 		a.preferencesChanged()
 	}
 }
 
 func (a *app) generalSettings(c *ui.Context) {
-	a.settingsGroup(c, "语言", "", []settingField{{"语言", "", "更改后立即生效", func() {
-		options := []string{localize(c, "跟随系统"), i18n.Autonym("zh-Hans"), i18n.Autonym("en")}
-		tags := []string{"", "zh-Hans", "en"}
-		index := slices.Index(tags, a.prefs.Locale)
-		if index < 0 {
-			index = 0
+	a.settingsGroup(c, "SettingsLanguage", locales.SettingsLanguage(), "", []settingField{{"SettingsLanguage", locales.SettingsLanguage(), "", locales.MessageChangesApplyImmediately(), func() {
+		options := []uikit.Option[string]{{Value: "", Label: locales.SettingsLanguageSystem()}}
+		for _, tag := range mygo.App.Languages() {
+			options = append(options, uikit.Option[string]{Value: tag, Label: i18n.Autonym(tag)})
 		}
-		selected := options[index]
-		if uikit.Select(c, &selected, uikit.StringOptions(options), uikit.SelectProps{Label: localize(c, "语言")}).Width(theme.Current().C.Settings.ContentMax / 3).Label(localize(c, "语言")).Changed() {
-			a.prefs.Locale = tags[slices.Index(options, selected)]
+		if uikit.Select(c, &a.prefs.Locale, options, uikit.SelectProps{Label: locales.SettingsLanguage()}).
+			Width(theme.Current().C.Settings.ContentMax / 3).Label(locales.SettingsLanguage()).Changed() {
 			mygo.App.SetLocale(a.prefs.Locale)
 			a.preferencesChanged()
 		}
 	}}})
-	a.settingsGroup(c, "启动与选项卡", "", []settingField{
-		{"启动时恢复会话", "", "重新打开上次退出时的选项卡（不会自动输入密码）", func() { a.preferenceSwitch(c, "启动时恢复会话", &a.prefs.RestoreSessions) }},
-		{"关闭最后一个选项卡时", "", "", func() {
-			values := []string{"keep", "closeWindow", "quit"}
-			settingsSegment(c, "last-tab-close", "关闭最后一个选项卡时", []string{"保留窗口", "关闭窗口", "退出应用"}, slices.Index(values, a.prefs.LastTabClose), func(index int) { a.prefs.LastTabClose = values[index]; a.preferencesChanged() })
+	a.settingsGroup(c, "MessageStartupTabs", locales.MessageStartupTabs(), "", []settingField{
+		{"MessageRestoreSessionsOnStartup", locales.MessageRestoreSessionsOnStartup(), "", locales.MessageReopenTabsFromThePreviousSessionWithoutSubmittingPasswords(), func() {
+			a.preferenceSwitch(
+				c,
+				locales.MessageRestoreSessionsOnStartup(),
+				&a.prefs.RestoreSessions,
+			)
 		}},
-		{"关闭活动连接前确认", "", "", func() {
-			a.preferenceSwitch(c, "关闭活动连接前确认", &a.prefs.ConfirmCloseActive)
+		{"MessageWhenTheLastTabCloses", locales.MessageWhenTheLastTabCloses(), "", "", func() {
+			values := []string{"keep", "closeWindow", "quit"}
+			settingsSegment(c, "last-tab-close", locales.MessageWhenTheLastTabCloses(), []string{locales.MessageKeepWindow(), locales.MessageCloseWindow(), locales.MessageQuitApp()}, slices.Index(values, a.prefs.LastTabClose), func(index int) { a.prefs.LastTabClose = values[index]; a.preferencesChanged() })
+		}},
+		{"MessageConfirmBeforeClosingAnActiveConnection", locales.MessageConfirmBeforeClosingAnActiveConnection(), "", "", func() {
+			a.preferenceSwitch(c, locales.MessageConfirmBeforeClosingAnActiveConnection(), &a.prefs.ConfirmCloseActive)
 		}},
 	})
 }
 
 func (a *app) appearanceSettings(c *ui.Context) {
 	t := theme.Current()
-	a.settingsGroup(c, "应用主题", "", []settingField{{"应用主题", "", "", func() {
+	a.settingsGroup(c, "MessageAppTheme", locales.MessageAppTheme(), "", []settingField{{"MessageAppTheme", locales.MessageAppTheme(), "", "", func() {
 		ui.Row(c).Gap(t.Space.N12).Width(t.C.Settings.ContentMax * 2 / 3).Children(func() {
 			choice := a.appearance
-			for index, label := range []string{"浅色", "深色", "跟随系统"} {
-				uikit.ThemeCard(c, uikit.ThemeCardProps{Key: index, Label: localize(c, label), Appearance: index,
+			for index, label := range []string{locales.MessageLight2(), locales.MessageDark2(), locales.SettingsLanguageSystem()} {
+				uikit.ThemeCard(c, uikit.ThemeCardProps{Key: index, Label: label, Appearance: index,
 					Selected: a.appearance == index, Choice: &choice}).OnClick(func() { a.setAppearance(index) })
 			}
 			if choice != a.appearance {
@@ -309,7 +323,7 @@ func (a *app) appearanceSettings(c *ui.Context) {
 			}
 		})
 	}}})
-	a.settingsGroup(c, "强调色", "", []settingField{{"强调色", a.accentName(), "", func() {
+	a.settingsGroup(c, "MessageAccentColor", locales.MessageAccentColor(), "", []settingField{{"MessageAccentColor", locales.MessageAccentColor(), a.accentName(), "", func() {
 		p := t.C.AccentSwatch
 		ui.Row(c).Gap(p.Gap).AlignItems(ui.Center).Children(func() {
 			colors := []color.NRGBA{t.Color.AccentChoices.Blue, t.Color.AccentChoices.Purple, t.Color.AccentChoices.Pink, t.Color.AccentChoices.Red, t.Color.AccentChoices.Orange, t.Color.AccentChoices.Yellow, t.Color.AccentChoices.Green, t.Color.AccentChoices.Graphite}
@@ -323,35 +337,43 @@ func (a *app) appearanceSettings(c *ui.Context) {
 					swatches = colors[index-1 : index]
 				}
 				uikit.AccentSwatch(c, uikit.AccentSwatchProps{
-					Key: value, Label: localize(c, a.accentLabel(index)), Selected: strings.EqualFold(a.prefs.Accent, value),
+					Key: value, Label: a.accentLabel(index), Selected: strings.EqualFold(a.prefs.Accent, value),
 					Colors: swatches, SystemGradient: index == 0,
 				}).
 					OnClick(func() { a.prefs.Accent = value; a.syncAppearance(); a.preferencesChanged() })
 			}
 		})
-	}}, {"预览", "", "", func() {
+	}}, {"MessagePreview", locales.MessagePreview(), "", "", func() {
 		ui.Row(c).Gap(t.Space.N12).AlignItems(ui.Center).Children(func() {
-			uikit.Button(c, localize(c, "主按钮"), uikit.ButtonProps{Variant: uikit.ButtonPrimary})
-			settingsSegment(c, "accent-preview", "预览", []string{"项目一", "项目二"}, 0, func(int) {})
+			uikit.Button(c, locales.MessagePrimary(), uikit.ButtonProps{Variant: uikit.ButtonPrimary})
+			settingsSegment(c, "accent-preview", locales.MessagePreview(), []string{locales.MessageOne(), locales.MessageTwo()}, 0, func(int) {})
 			on := true
 			uikit.Progress(c.Key("accent-progress-preview"), uikit.ProgressProps{
 				Value: 0.5, Height: t.C.Progress.Height, Track: t.C.Progress.Track, Fill: t.C.Progress.Fill,
 			}).Width(t.Space.N24 * 2)
-			uikit.Switch(c, &on, uikit.ToggleProps{Label: localize(c, "开关预览"), Disabled: true, Motion: uikit.MotionOverride(a.reduceMotion(c))})
+			uikit.Switch(
+				c,
+				&on,
+				uikit.ToggleProps{Label: locales.MessageSwitchPreview(), Disabled: true, Motion: uikit.MotionOverride(a.reduceMotion(c))},
+			)
 		})
 	}}})
-	a.settingsGroup(c, "辅助功能", "关闭应用内动态效果时，系统减少动态效果仍对 MyGo 内建控件生效。", []settingField{
-		{"减少动态效果", "", "减少位移与缩放，保留透明度和颜色过渡", func() {
+	a.settingsGroup(c, "MessageAccessibility", locales.MessageAccessibility(), locales.MessageSystemReducedMotionStillAppliesToMygoControlsWhenAppReducedMotionIs(), []settingField{
+		{"MessageReduceMotion", locales.MessageReduceMotion(), "", locales.MessageReduceMovementAndScalingWhileRetainingFadesAndColorTransitions(), func() {
 			values := []string{"system", "on", "off"}
-			settingsSegment(c, "reduce-motion", "减少动态效果", []string{"跟随系统", "始终开启", "关闭"}, slices.Index(values, a.prefs.ReduceMotion), func(index int) { a.prefs.ReduceMotion = values[index]; a.preferencesChanged() })
+			settingsSegment(c, "reduce-motion", locales.MessageReduceMotion(), []string{locales.SettingsLanguageSystem(), locales.MessageAlwaysOn(), locales.CommonClose()}, slices.Index(values, a.prefs.ReduceMotion), func(index int) { a.prefs.ReduceMotion = values[index]; a.preferencesChanged() })
 		}},
-		{"窗口半透明", "", "macOS 全局毛玻璃及栏内模糊；系统「降低透明度」开启时自动关闭", func() {
+		{"MessageWindowTranslucency", locales.MessageWindowTranslucency(), "", locales.MessageFrostedWindowBackgroundOnMacosAndBlurWithinBarsDisabledWhenTheSystem(), func() {
 			value := a.prefs.Translucency
 			locked := a.reduceTransparency
 			if locked {
 				value = false
 			}
-			if uikit.Switch(c, &value, uikit.ToggleProps{Label: localize(c, "窗口半透明"), Disabled: locked, Motion: uikit.MotionOverride(a.reduceMotion(c))}).Changed() {
+			if uikit.Switch(
+				c,
+				&value,
+				uikit.ToggleProps{Label: locales.MessageWindowTranslucency(), Disabled: locked, Motion: uikit.MotionOverride(a.reduceMotion(c))},
+			).Changed() {
 				a.prefs.Translucency = value
 				a.preferencesChanged()
 			}
@@ -360,7 +382,7 @@ func (a *app) appearanceSettings(c *ui.Context) {
 }
 
 func (a *app) accentLabel(index int) string {
-	return []string{"跟随系统", "蓝色", "紫色", "粉色", "红色", "橙色", "黄色", "绿色", "石墨"}[index]
+	return []string{locales.SettingsLanguageSystem(), locales.MessageBlue(), locales.MessagePurple(), locales.MessagePink(), locales.MessageRed(), locales.MessageOrange(), locales.MessageYellow(), locales.MessageGreen(), locales.MessageGraphite()}[index]
 }
 func (a *app) accentName() string {
 	values := []string{"system", "#0a84ff", "#8e5cf7", "#ec4899", "#ff3b30", "#ff9500", "#f5b400", "#30c45a", "#8e8e93"}
@@ -386,8 +408,19 @@ func (a *app) terminalPreview(c *ui.Context) {
 	colors := uikit.ResolveTerminalColors(scheme, prefs.Background)
 	uikit.SettingsGroupBody(c).Clip().Children(func() {
 		ui.Row(c).FillWidth().Padding(t.Space.N10, t.Space.N14).Background(uikit.Color(t.Color.Surface.Card)).Children(func() {
-			uikit.SettingsGroupTitle(c, localize(c, "预览"), "", func() {
-				uikit.Text(c, localize(c, fmt.Sprintf("%s · %s %.1f / %.0f · %s", scheme.Name, prefs.FontFamily[0], prefs.FontSize, prefs.LineHeight, localize(c, []string{"块状光标", "竖线光标", "下划线光标"}[prefs.CursorShape]))), uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneTertiary})
+			uikit.SettingsGroupTitle(c, locales.MessagePreview(), "", func() {
+				uikit.Text(
+					c,
+					fmt.Sprintf(
+						"%s · %s %.1f / %.0f · %s",
+						scheme.Name,
+						prefs.FontFamily[0],
+						prefs.FontSize,
+						prefs.LineHeight,
+						[]string{locales.MessageBlockCursor(), locales.MessageBarCursor(), locales.MessageUnderlineCursor()}[prefs.CursorShape],
+					),
+					uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneTertiary},
+				)
 			})
 		})
 		ui.Column(c).FillWidth().Padding(t.Space.N14).Background(uikit.Color(colors.Background)).
@@ -431,22 +464,29 @@ func terminalPreviewLines() []terminalLine {
 
 func (a *app) terminalColorSettings(c *ui.Context) {
 	t := theme.Current()
-	if a.settingMatches("配色方案", "方案 跟随应用明暗 固定一种 配色 浅色外观时 深色外观时") {
+	if a.settingMatches(
+		locales.MessageColorSchemes(),
+		"方案 跟随应用明暗 固定一种 配色 浅色外观时 深色外观时",
+	) {
 		uikit.SettingsGroup(c, uikit.SettingsGroupProps{
-			Title: localize(c, "配色方案"),
-			Help:  localize(c, "点击卡片：按配色自身明暗放进浅色或深色槽位。导入支持 Ghostty 主题格式。"),
+			Title: locales.MessageColorSchemes(),
+			Help:  locales.MessageClickACardToAssignItsLightOrDarkSlotImportAcceptsGhostty(),
 			Actions: func() {
-				uikit.Button(c, localize(c, "导入配色…"), uikit.ButtonProps{Disabled: a.terminal.importing}).OnClick(a.chooseTerminalTheme)
+				uikit.Button(
+					c,
+					locales.MessageImportScheme(),
+					uikit.ButtonProps{Disabled: a.terminal.importing},
+				).OnClick(a.chooseTerminalTheme)
 			},
 		}, func() {
 			uikit.SettingsRow(c, uikit.SettingsRowProps{
-				Gap: t.C.Settings.RowGap, Title: localize(c, "方案"), Help: localize(c, "跟随：按应用当前明暗，在下方两种配色间自动切换"),
+				Gap: t.C.Settings.RowGap, Title: locales.MessageMode(), Help: locales.MessageFollowSwitchBetweenTheLightAndDarkSchemesWithAppAppearance(),
 				Control: func() {
 					index := 0
 					if a.terminal.mode.Kind == termtheme.FixedScheme {
 						index = 1
 					}
-					settingsSegment(c, "scheme-mode", "配色方案模式", []string{"跟随应用明暗", "固定一种"}, index, func(index int) {
+					settingsSegment(c, "scheme-mode", locales.MessageColorSchemeMode(), []string{locales.MessageFollowAppAppearance(), locales.MessageFixedScheme()}, index, func(index int) {
 						a.changeTerminalSettings(func() {
 							if index == 0 {
 								a.terminal.mode = termtheme.FollowAppTheme()
@@ -459,19 +499,19 @@ func (a *app) terminalColorSettings(c *ui.Context) {
 			})
 			a.schemeGrid(c)
 			if a.terminal.mode.Kind == termtheme.FollowApp {
-				a.schemeSelectRow(c, "浅色外观时", &a.terminal.followLight)
-				a.schemeSelectRow(c, "深色外观时", &a.terminal.followDark)
+				a.schemeSelectRow(c, locales.MessageLightAppearance(), &a.terminal.followLight)
+				a.schemeSelectRow(c, locales.MessageDarkAppearance(), &a.terminal.followDark)
 			} else {
 				selected := a.terminal.mode.Name
-				a.schemeSelectRow(c, "配色", &selected)
+				a.schemeSelectRow(c, locales.MessageScheme(), &selected)
 				if selected != a.terminal.mode.Name {
 					a.changeTerminalSettings(func() { a.terminal.mode = termtheme.Fixed(selected) })
 				}
 			}
 		})
 	}
-	a.settingsGroup(c, "背景", "", []settingField{{"终端背景", "", "配色自带：任何外观都用配色的背景色。与卡片一致：用卡片底色", func() {
-		settingsSegment(c, "terminal-bg", "终端背景", []string{"配色自带（默认）", "与卡片一致"}, int(a.terminal.prefs.Background), func(index int) {
+	a.settingsGroup(c, "MessageBackground", locales.MessageBackground(), "", []settingField{{"MessageTerminalBackground", locales.MessageTerminalBackground(), "", locales.MessageSchemeUseItsBackgroundInAnyAppearanceMatchCardUseTheCardBackground(), func() {
+		settingsSegment(c, "terminal-bg", locales.MessageTerminalBackground(), []string{locales.MessageSchemeDefault(), locales.MessageMatchCard()}, int(a.terminal.prefs.Background), func(index int) {
 			a.changeTerminalSettings(func() { a.terminal.prefs.Background = termtheme.BackgroundSource(index) })
 		})
 	}}})
@@ -479,7 +519,7 @@ func (a *app) terminalColorSettings(c *ui.Context) {
 
 func (a *app) schemeSelectRow(c *ui.Context, label string, value *string) {
 	uikit.SettingsRow(c, uikit.SettingsRowProps{
-		Key: label, Gap: theme.Current().C.Settings.RowGap, Divider: true, Title: localize(c, label),
+		Key: label, Gap: theme.Current().C.Settings.RowGap, Divider: true, Title: label,
 		Control: func() {
 			selected := *value
 			if a.settingsSchemeSelect(c, label, &selected) {
@@ -514,11 +554,11 @@ func (a *app) schemeGrid(c *ui.Context) {
 			})
 		}
 		if count > 8 {
-			label := fmt.Sprintf(localize(c, "全部 %d 种 ▾"), count)
+			label := locales.SettingsSchemesCount(count)
 			if a.settingsUI.allSchemes {
-				label = "收起 ▴"
+				label = locales.MessageShowFewer()
 			}
-			uikit.Button(c, localize(c, label), uikit.ButtonProps{}).OnClick(func() { a.settingsUI.allSchemes = !a.settingsUI.allSchemes })
+			uikit.Button(c, label, uikit.ButtonProps{}).OnClick(func() { a.settingsUI.allSchemes = !a.settingsUI.allSchemes })
 		}
 	})
 }
@@ -532,15 +572,15 @@ func (a *app) schemeCard(c *ui.Context, name string) {
 	if a.terminal.mode.Kind == termtheme.FollowApp {
 		if name == a.terminal.followLight {
 			selected = true
-			badge = "☀ 浅色"
+			badge = locales.MessageLight()
 		}
 		if name == a.terminal.followDark {
 			selected = true
-			badge = "☾ 深色"
+			badge = locales.MessageDark()
 		}
 	}
 	item := uikit.SchemeCard(c, uikit.SchemeCardProps{
-		Name: name, Badge: localize(c, badge), Selected: selected, Background: scheme.Background, Colors: scheme.ANSI[:8],
+		Name: name, Badge: badge, Selected: selected, Background: scheme.Background, Colors: scheme.ANSI[:8],
 	}, func() {
 		prefs := a.terminal.prefs
 		prefs.FontSize = p.PreviewFontSize
@@ -577,16 +617,21 @@ func (a *app) terminalTextSettings(c *ui.Context) {
 			a.settingsUI.fonts = append([]string{"JetBrains Mono"}, append(a.settingsUI.fonts[:index], a.settingsUI.fonts[index+1:]...)...)
 		}
 	}
-	a.settingsGroup(c, "字体", "", []settingField{
-		{"字体", "", "", func() {
+	a.settingsGroup(c, "MessageFont", locales.MessageFont(), "", []settingField{
+		{"MessageFont", locales.MessageFont(), "", "", func() {
 			selected := a.terminal.prefs.FontFamily[0]
-			if uikit.Select(c, &selected, uikit.StringOptions(a.settingsUI.fonts), uikit.SelectProps{Label: localize(c, "字体")}).Width(t.C.Settings.SelectWidth).Label(localize(c, "字体")).Changed() {
+			if uikit.Select(
+				c,
+				&selected,
+				uikit.StringOptions(a.settingsUI.fonts),
+				uikit.SelectProps{Label: locales.MessageFont()},
+			).Width(t.C.Settings.SelectWidth).Label(locales.MessageFont()).Changed() {
 				a.changeTerminalSettings(func() { a.terminal.prefs.FontFamily = []string{selected, "monospace"} })
 			}
 		}},
-		{"字号", "", "", func() {
+		{"MessageFontSize", locales.MessageFontSize(), "", "", func() {
 			value := float64(a.terminal.prefs.FontSize)
-			if settingsNumberInput(c, "字号", &value, 9, 24, 0.5, t.C.Settings.NumberWidth, false) {
+			if settingsNumberInput(c, locales.MessageFontSize(), &value, 9, 24, 0.5, t.C.Settings.NumberWidth, false) {
 				a.changeTerminalSettings(func() {
 					a.terminal.prefs.FontSize = float32(value)
 					if !a.prefs.LineHeightEdited {
@@ -598,32 +643,36 @@ func (a *app) terminalTextSettings(c *ui.Context) {
 					a.terminal.prefs.LineHeight = max(a.terminal.prefs.LineHeight, float32(math.Ceil(value*1.2)))
 				})
 			}
-			uikit.Text(c, localize(c, "px"), uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneTertiary})
+			uikit.Text(c, "px", uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneTertiary})
 		}},
-		{"行高", "", "", func() {
+		{"MessageLineHeight", locales.MessageLineHeight(), "", "", func() {
 			value := float64(a.terminal.prefs.LineHeight)
-			if settingsNumberInput(c, "行高", &value, math.Ceil(float64(a.terminal.prefs.FontSize)*1.2), 40, 1, t.C.Settings.NumberWidth, false) {
+			if settingsNumberInput(c, locales.MessageLineHeight(), &value, math.Ceil(float64(a.terminal.prefs.FontSize)*1.2), 40, 1, t.C.Settings.NumberWidth, false) {
 				a.changeTerminalSettings(func() { a.terminal.prefs.LineHeight = float32(value); a.prefs.LineHeightEdited = true })
 			}
-			uikit.Text(c, localize(c, "px"), uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneTertiary})
+			uikit.Text(c, "px", uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneTertiary})
 		}},
 	})
-	a.settingsGroup(c, "光标", "", []settingField{
-		{"样式", "", "", func() {
-			settingsSegment(c, "cursor-shape", "光标样式", []string{"▉ 块", "▏竖线", "▁ 下划线"}, int(a.terminal.prefs.CursorShape), func(index int) {
+	a.settingsGroup(c, "MessageCursor", locales.MessageCursor(), "", []settingField{
+		{"MessageStyle", locales.MessageStyle(), "", "", func() {
+			settingsSegment(c, "cursor-shape", locales.MessageCursorStyle(), []string{locales.MessageBlock(), locales.MessageBar(), locales.MessageUnderline()}, int(a.terminal.prefs.CursorShape), func(index int) {
 				a.changeTerminalSettings(func() { a.terminal.prefs.CursorShape = termtheme.CursorShape(index) })
 			})
 		}},
-		{"闪烁", "", "", func() {
+		{"MessageBlink", locales.MessageBlink(), "", "", func() {
 			value := a.terminal.prefs.CursorBlink
-			if uikit.Switch(c, &value, uikit.ToggleProps{Label: localize(c, "光标闪烁"), Motion: uikit.MotionOverride(a.reduceMotion(c))}).Changed() {
+			if uikit.Switch(
+				c,
+				&value,
+				uikit.ToggleProps{Label: locales.MessageCursorBlink(), Motion: uikit.MotionOverride(a.reduceMotion(c))},
+			).Changed() {
 				a.changeTerminalSettings(func() { a.terminal.prefs.CursorBlink = value })
 			}
 		}},
 	})
-	a.settingsGroup(c, "回滚", "", []settingField{{"回滚行数", "", "每个会话保留的输出行数，超过后丢弃最早的输出。", func() {
+	a.settingsGroup(c, "MessageScrollback", locales.MessageScrollback(), "", []settingField{{"MessageScrollbackLines", locales.MessageScrollbackLines(), "", locales.MessageLinesOfOutputKeptPerSessionTheOldestAreDiscardedBeyondThis(), func() {
 		value := float64(a.prefs.ScrollbackLines)
-		if settingsNumberInput(c, "回滚行数", &value, 1000, 200000, 1000, t.C.Settings.ScrollbackWidth, true) {
+		if settingsNumberInput(c, locales.MessageScrollbackLines(), &value, 1000, 200000, 1000, t.C.Settings.ScrollbackWidth, true) {
 			a.prefs.ScrollbackLines = int(value)
 			a.preferencesChanged()
 		}
@@ -641,23 +690,31 @@ func (a *app) terminalNumberSetting(c *ui.Context, label string, destination *fl
 
 func (a *app) fileSettings(c *ui.Context) {
 	t := theme.Current()
-	a.settingsGroup(c, "目录", "", []settingField{{"默认本地目录", "", "展开本地面板时打开的目录", func() {
-		if uikit.Input(c, &a.prefs.DefaultLocalDir, uikit.InputProps{Mono: true, Label: localize(c, "默认本地目录")}).Width(t.C.Settings.SelectWidth).Changed() {
+	a.settingsGroup(c, "MessageDirectories", locales.MessageDirectories(), "", []settingField{{"MessageDefaultLocalDirectory", locales.MessageDefaultLocalDirectory(), "", locales.MessageDirectoryOpenedWhenShowingTheLocalPane(), func() {
+		if uikit.Input(
+			c,
+			&a.prefs.DefaultLocalDir,
+			uikit.InputProps{Mono: true, Label: locales.MessageDefaultLocalDirectory()},
+		).Width(t.C.Settings.SelectWidth).Changed() {
 			a.preferencesChanged()
 		}
-		uikit.IconButton(c, filesIcon, uikit.IconButtonProps{Key: "default-local-folder", Label: "选择本地目录"}).OnClick(a.chooseDefaultLocalDirectory)
+		uikit.IconButton(
+			c,
+			filesIcon,
+			uikit.IconButtonProps{Key: "default-local-folder", Label: locales.MessageChooseLocalDirectory()},
+		).OnClick(a.chooseDefaultLocalDirectory)
 	}}})
-	a.settingsGroup(c, "传输", "", []settingField{
-		{"同时传输数", "", "", func() {
+	a.settingsGroup(c, "MessageTransfers", locales.MessageTransfers(), "", []settingField{
+		{"MessageConcurrentTransfers", locales.MessageConcurrentTransfers(), "", "", func() {
 			value := float64(a.prefs.TransferParallel)
-			if settingsNumberInput(c, "同时传输数", &value, 1, 8, 1, t.C.Settings.NumberWidth, false) {
+			if settingsNumberInput(c, locales.MessageConcurrentTransfers(), &value, 1, 8, 1, t.C.Settings.NumberWidth, false) {
 				a.prefs.TransferParallel = int(value)
 				a.preferencesChanged()
 			}
 		}},
-		{"同名冲突", "", "", func() {
+		{"MessageNameConflicts", locales.MessageNameConflicts(), "", "", func() {
 			values := []string{"ask", "overwrite", "skip", "rename"}
-			settingsSegment(c, "conflict-policy", "同名冲突", []string{"询问", "覆盖", "跳过", "重命名"}, slices.Index(values, a.prefs.ConflictPolicy), func(index int) { a.prefs.ConflictPolicy = values[index]; a.preferencesChanged() })
+			settingsSegment(c, "conflict-policy", locales.MessageNameConflicts(), []string{locales.MessageAsk(), locales.MessageOverwrite(), locales.MessageSkip(), locales.MessageRename()}, slices.Index(values, a.prefs.ConflictPolicy), func(index int) { a.prefs.ConflictPolicy = values[index]; a.preferencesChanged() })
 		}},
 	})
 }
@@ -668,15 +725,15 @@ func (a *app) chooseDefaultLocalDirectory() {
 		return
 	}
 	go func() {
-		paths, err := mygo.Dialog.Open(mygo.OpenDialogOptions{Parent: window, Title: "默认本地目录", Directory: true})
+		paths, err := mygo.Dialog.Open(mygo.OpenDialogOptions{Parent: window, Title: locales.MessageDefaultLocalDirectory(), Directory: true})
 		window.Update(func() {
 			if err != nil {
 				if a.settingsUI.open {
-					a.settingsUI.notice = err.Error()
+					a.settingsUI.notice = locales.ErrorText(err)
 				} else {
 					a.files.notice = &uikit.ToastProps{
-						ID: "选择本地目录失败：" + err.Error(), Tone: uikit.ToneDanger,
-						Title: "选择本地目录失败", Detail: err.Error(),
+						ID: locales.MessageUnableToChooseLocalDirectory() + err.Error(), Tone: uikit.ToneDanger,
+						Title: locales.Deferred(locales.MessageUnableToChooseLocalDirectory2), Detail: locales.ErrorText(err),
 					}
 				}
 				return

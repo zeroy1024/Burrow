@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"sshdesk/internal/hostinfo"
+	"sshdesk/internal/locales"
 	"sshdesk/internal/theme"
 	"sshdesk/internal/uikit"
 
@@ -28,13 +29,17 @@ type statusLive struct {
 func (a *app) serverStatus(c *ui.Context) {
 	t := theme.Current()
 	result := uikit.SidePanel(c, uikit.SidePanelProps{
-		Title: "服务器状态", CloseLabel: "关闭服务器状态", Scroll: &a.statusScroll,
+		Title: locales.MessageServerStatus(), CloseLabel: locales.MessageCloseServerStatus(), Scroll: &a.statusScroll,
 		ContentPaddingX: t.Space.N16,
 		Scrollbar:       &a.statusScrollbar,
 	}, func() {
 		tab := a.currentTab()
 		if tab == nil {
-			uikit.Text(c, "选择一个终端查看状态", uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneSecondary}).Margin(t.Space.N14, -t.Space.N2, t.Space.N14, -t.Space.N2)
+			uikit.Text(
+				c,
+				locales.MessageSelectATerminalToViewItsStatus(),
+				uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneSecondary},
+			).Margin(t.Space.N14, -t.Space.N2, t.Space.N14, -t.Space.N2)
 			return
 		}
 		session := tab.focused
@@ -48,16 +53,16 @@ func (a *app) serverStatus(c *ui.Context) {
 				uikit.EmptyState(c, empty)
 				a.statusFacts(c, &a.statusFactsOpen, facts, factsMessage, nil)
 			case m.session == session && m.unsupported:
-				a.statusHost(c, session, facts, statusLive{label: "未监控", ink: t.Color.Text.Quaternary})
-				uikit.EmptyState(c, uikit.EmptyProps{IconName: uikit.IconActivity, Title: m.platform.DisplayName() + " 暂不支持监控",
-					Detail: "目前只有 Linux 提供监控指标，基础信息仍可查看"})
+				a.statusHost(c, session, facts, statusLive{label: locales.MessageNotMonitored(), ink: t.Color.Text.Quaternary})
+				uikit.EmptyState(c, uikit.EmptyProps{IconName: uikit.IconActivity, Title: m.platform.DisplayName() + locales.MessageDoesNotSupportMonitoringYet(),
+					Detail: locales.MessageMonitoringMetricsAreCurrentlyAvailableOnlyForLinuxBasicInformationIsStillAvailable()})
 				a.statusFacts(c, &a.statusFactsOpen, facts, factsMessage, nil)
 			default:
 				metrics := hostinfo.Metrics{}
 				var history monitorHistory
 				var disk *float64
 				var diskUsed, diskTotal uint64
-				live := statusLive{label: "采集中", ink: t.Color.Warning.Default, halo: t.Color.Warning.Halo}
+				live := statusLive{label: locales.MessageCollecting(), ink: t.Color.Warning.Default, halo: t.Color.Warning.Halo}
 				notice := ""
 				// A placeholder shimmers while its value is on the way: before
 				// the first sample, or while a rate waits for its second. It stays
@@ -67,7 +72,7 @@ func (a *app) serverStatus(c *ui.Context) {
 				if m.session == session {
 					if m.metrics != nil {
 						metrics, history = *m.metrics, m.history
-						live = statusLive{label: "实时", ink: t.Color.Success.Default, halo: t.Color.Success.Halo}
+						live = statusLive{label: locales.MessageLive(), ink: t.Color.Success.Default, halo: t.Color.Success.Halo}
 						if motion {
 							live.beat = m.updatedAt
 						}
@@ -77,9 +82,9 @@ func (a *app) serverStatus(c *ui.Context) {
 							disk = &percent
 						}
 						shimmer = func(item string) bool { return motion && !slices.Contains(metrics.Unavailable, item) }
-						diskShimmer = shimmer("挂载信息") && m.diskError == ""
-					} else if m.errorText != "" {
-						live = statusLive{label: "采集失败", ink: t.Color.Danger.Default, halo: t.Color.Danger.Tint14}
+						diskShimmer = shimmer(locales.MessageMountInformation()) && m.diskError == ""
+					} else if !m.errorText.Empty() {
+						live = statusLive{label: locales.MessageCollectionFailed(), ink: t.Color.Danger.Default, halo: t.Color.Danger.Tint14}
 						shimmer, diskShimmer = func(string) bool { return false }, false
 					}
 					notice = monitorNotice(m)
@@ -89,9 +94,9 @@ func (a *app) serverStatus(c *ui.Context) {
 					uikit.Text(c, notice, uikit.TextProps{Style: uikit.TextCaption, Tone: uikit.ToneSecondary})
 				}
 				statusCPU(c, metrics, history.cpu, m.session == session && m.metrics != nil, shimmer("CPU"))
-				statusResources(c, metrics, disk, diskUsed, diskTotal, shimmer("内存"), diskShimmer)
-				statusNetwork(c, metrics, history, shimmer("网络"))
-				statusProcesses(c, metrics, shimmer("进程 Top"))
+				statusResources(c, metrics, disk, diskUsed, diskTotal, shimmer(locales.MessageMemory()), diskShimmer)
+				statusNetwork(c, metrics, history, shimmer(locales.MessageNetwork()))
+				statusProcesses(c, metrics, shimmer(locales.MessageTopProcesses()))
 				a.statusFacts(c, &a.statusFactsOpen, facts, factsMessage, metrics.Uptime)
 			}
 			ui.Box(c).Height(t.Space.N8)
@@ -108,18 +113,18 @@ func statusOffline(session *remoteSession) (statusLive, uikit.EmptyProps) {
 	t := theme.Current()
 	hint := ""
 	if session.awaitingConnect() {
-		hint = "在终端中按 Enter 重新连接"
+		hint = locales.MessagePressEnterInTheTerminalToReconnect()
 	}
 	switch session.state {
 	case connecting:
-		return statusLive{label: "连接中", ink: t.Color.Warning.Default, halo: t.Color.Warning.Halo},
-			uikit.EmptyProps{IconName: uikit.IconServer, Title: "正在连接", Detail: "连接后开始采集服务器状态"}
+		return statusLive{label: locales.MessageConnecting2(), ink: t.Color.Warning.Default, halo: t.Color.Warning.Halo},
+			uikit.EmptyProps{IconName: uikit.IconServer, Title: locales.MessageConnecting3(), Detail: locales.MessageServerStatusCollectionStartsAfterConnecting()}
 	case connectionFailed:
-		return statusLive{label: "连接失败", ink: t.Color.Danger.Default, halo: t.Color.Danger.Tint14},
-			uikit.EmptyProps{IconName: uikit.IconTerminal, Title: "连接失败", Detail: hint}
+		return statusLive{label: locales.MessageConnectionFailed(), ink: t.Color.Danger.Default, halo: t.Color.Danger.Tint14},
+			uikit.EmptyProps{IconName: uikit.IconTerminal, Title: locales.MessageConnectionFailed(), Detail: hint}
 	}
-	return statusLive{label: "已断开", ink: t.Color.Text.Quaternary},
-		uikit.EmptyProps{IconName: uikit.IconTerminal, Title: "会话已断开", Detail: hint}
+	return statusLive{label: locales.MessageDisconnected(), ink: t.Color.Text.Quaternary},
+		uikit.EmptyProps{IconName: uikit.IconTerminal, Title: locales.MessageSessionDisconnected(), Detail: hint}
 }
 
 func (a *app) statusHostFacts(session *remoteSession) (*hostinfo.Facts, string) {
@@ -131,14 +136,14 @@ func (a *app) statusHostFacts(session *remoteSession) (*hostinfo.Facts, string) 
 			facts = &value
 		}
 		pending = group.facts.pending && group.connection != nil && group.facts.connection == group.connection
-		errorText = group.facts.errorText
+		errorText = group.facts.errorText.String()
 	}
 	message := ""
 	if pending {
-		message = "正在更新主机基础信息…"
+		message = locales.MessageUpdatingHostInformation()
 	}
 	if errorText != "" {
-		message = "基础信息获取失败：" + errorText
+		message = locales.MessageUnableToRetrieveHostInformation3() + errorText
 	}
 	return facts, message
 }
@@ -153,7 +158,7 @@ func (a *app) statusHost(c *ui.Context, session *remoteSession, facts *hostinfo.
 		Radius(t.C.Stats.HostRadius).Background(uikit.Color(t.C.Stats.HostBg))
 	// The panel follows the focused terminal; the tooltip says so instead of
 	// a permanent caption.
-	uikit.Tip(c, card, "跟随当前聚焦的终端")
+	uikit.Tip(c, card, locales.MessageFollowsTheFocusedTerminal())
 	card.Children(func() {
 		uikit.OsLogo(c, style.name, uikit.SizeDefault)
 		ui.Column(c).Grow(1).MinWidth(0).Gap(t.Space.N1).PassThrough().Children(func() {
@@ -269,10 +274,10 @@ func statusCPU(c *ui.Context, metrics hostinfo.Metrics, samples []float64, sampl
 	t := theme.Current()
 	cores := "—"
 	if metrics.Cores > 0 {
-		cores = strconv.Itoa(metrics.Cores)
+		cores = locales.MonitorCoreCount(metrics.Cores)
 	}
 	ui.Column(c).Gap(t.Space.N8).Children(func() {
-		statusHeading(c, "CPU", cores+" 核")
+		statusHeading(c, "CPU", cores)
 		ui.Row(c).FillWidth().Gap(t.Space.N8).AlignItems(ui.End).Children(func() {
 			if metrics.CPU == nil {
 				statusFigure(c, "—", "", t.C.Stats.ValueLarge, 0, t.Font.Weight.Medium, uikit.ToneTertiary)
@@ -282,8 +287,8 @@ func statusCPU(c *ui.Context, metrics hostinfo.Metrics, samples []float64, sampl
 			}
 			ui.Spacer(c)
 			load, high := statusLoad(metrics)
-			ui.Column(c).Shrink(0).Gap(t.Space.N2).AlignItems(ui.End).Description("1、5、15 分钟平均负载").Children(func() {
-				statusCaption(c, "负载 1 · 5 · 15")
+			ui.Column(c).Shrink(0).Gap(t.Space.N2).AlignItems(ui.End).Description(locales.MessageAverageLoadOverAndMinutes()).Children(func() {
+				statusCaption(c, locales.MessageLoad())
 				tone := uikit.ToneNeutral
 				if high {
 					tone = uikit.ToneWarning
@@ -294,18 +299,18 @@ func statusCPU(c *ui.Context, metrics hostinfo.Metrics, samples []float64, sampl
 		if len(samples) == 0 {
 			statusPlaceholder(c, t.C.Stats.ChartHeight, shimmer)
 			if sampled && metrics.CPU == nil {
-				statusCaption(c, "需要两次采样建立基线")
+				statusCaption(c, locales.MessageTwoSamplesAreRequiredToEstablishABaseline())
 			}
 			return
 		}
 		scale, peak := statusCPUScale(samples)
 		uikit.Sparkline(c, samples, uikit.SparklineProps{
-			Height: t.C.Stats.ChartHeight, Max: scale, Slots: monitorSamples, Grid: true, Label: "CPU 使用率趋势",
+			Height: t.C.Stats.ChartHeight, Max: scale, Slots: monitorSamples, Grid: true, Label: locales.MessageCpuUsageTrend(),
 		})
 		ui.Row(c).FillWidth().Gap(t.Space.N8).Children(func() {
-			statusCaption(c, fmt.Sprintf("约 2 分钟 · 0–%.0f%%", scale))
+			statusCaption(c, fmt.Sprintf(locales.MessageAboutMinutes(), scale))
 			ui.Spacer(c)
-			statusCaption(c, fmt.Sprintf("峰值 %.0f%%", peak))
+			statusCaption(c, fmt.Sprintf(locales.MessagePeak(), peak))
 		})
 	})
 }
@@ -343,14 +348,14 @@ func statusResources(c *ui.Context, metrics hostinfo.Metrics, disk *float64, dis
 		memory, free := "—", ""
 		if metrics.Memory != nil {
 			memory = fmt.Sprintf("%.1f / %.1f GB", float64(metrics.MemoryUsed)/1e9, float64(metrics.MemoryTotal)/1e9)
-			free = fmt.Sprintf("可用 %.1f GB", float64(metrics.MemoryTotal-metrics.MemoryUsed)/1e9)
+			free = fmt.Sprintf(locales.MessageGbAvailable(), float64(metrics.MemoryTotal-metrics.MemoryUsed)/1e9)
 		}
-		statusResource(c, "内存", "", metrics.Memory, memory, free, memoryShimmer)
+		statusResource(c, locales.MessageMemory(), "", metrics.Memory, memory, free, memoryShimmer)
 		usage := "—"
 		if disk != nil {
 			usage = fmt.Sprintf("%.1f / %.1f GB", float64(diskUsed)/1e9, float64(diskTotal)/1e9)
 		}
-		statusResource(c, "磁盘", "/", disk, usage, statusFilesystem(metrics), diskShimmer)
+		statusResource(c, locales.MessageDisk(), "/", disk, usage, statusFilesystem(metrics), diskShimmer)
 	})
 }
 
@@ -411,10 +416,10 @@ func statusNetwork(c *ui.Context, metrics hostinfo.Metrics, history monitorHisto
 		top = max(top, value)
 	}
 	ui.Column(c).Gap(t.Space.N8).Children(func() {
-		statusHeading(c, "网络", "默认路由接口")
+		statusHeading(c, locales.MessageNetwork(), locales.MessageDefaultRouteInterface())
 		ui.Row(c).FillWidth().Gap(t.Space.N10).Children(func() {
-			statusRate(c, "↓ 下行", metrics.Down, history.down, top, shimmer)
-			statusRate(c, "↑ 上行", metrics.Up, history.up, top, shimmer)
+			statusRate(c, locales.MessageDownload3(), metrics.Down, history.down, top, shimmer)
+			statusRate(c, locales.MessageUpload3(), metrics.Up, history.up, top, shimmer)
 		})
 	})
 }
@@ -431,7 +436,7 @@ func statusRate(c *ui.Context, label string, value *float64, samples []float64, 
 		number, unit := monitorRate(*value)
 		statusFigure(c, number, " "+unit, t.Font.Size.Title, t.Font.Size.Caption2, t.Font.Weight.Semibold, uikit.ToneNeutral)
 		uikit.Sparkline(c, samples, uikit.SparklineProps{
-			Height: t.C.Stats.NetChartHeight, Max: top, Slots: monitorSamples, Label: label + "趋势",
+			Height: t.C.Stats.NetChartHeight, Max: top, Slots: monitorSamples, Label: label + locales.MessageTrend(),
 		})
 	})
 }
@@ -440,10 +445,10 @@ func statusProcesses(c *ui.Context, metrics hostinfo.Metrics, shimmer bool) {
 	t := theme.Current()
 	meta := "CPU"
 	if metrics.Processes != nil {
-		meta = fmt.Sprintf("%d 个进程 · CPU", *metrics.Processes)
+		meta = locales.MonitorProcessesCount(*metrics.Processes)
 	}
 	ui.Column(c).Gap(t.Space.N6).Children(func() {
-		statusHeading(c, "进程 Top", meta)
+		statusHeading(c, locales.MessageTopProcesses(), meta)
 		ui.Column(c).Gap(t.Space.N2).Children(func() {
 			if len(metrics.Top) == 0 && shimmer {
 				// Uneven name lengths, as fractions of the row, read as a list
@@ -507,10 +512,10 @@ func (a *app) statusFacts(
 	t := theme.Current()
 	meta := ""
 	if uptime != nil {
-		meta = "运行 " + monitorUptime(uptime, true)
+		meta = locales.MessageUp() + monitorUptime(uptime, true)
 	}
 	uikit.Disclosure(c, open, uikit.DisclosureProps{
-		Title: "系统", TitleStyle: uikit.TextLabel, TitleTone: uikit.ToneSecondary, Meta: meta,
+		Title: locales.MessageOperatingSystem(), TitleStyle: uikit.TextLabel, TitleTone: uikit.ToneSecondary, Meta: meta,
 		Motion: uikit.MotionOverride(a.reduceMotion(c)),
 	}, func() {
 		hostname, kernel, arch := "—", "—", "—"
@@ -518,16 +523,16 @@ func (a *app) statusFacts(
 			hostname, kernel, arch = monitorText(facts.Hostname), monitorText(facts.Kernel), monitorText(facts.Arch)
 		}
 		ui.Column(c).FillWidth().Gap(t.Space.N10).Children(func() {
-			statusFact(c, "主机名", hostname, true)
-			statusFact(c, "内核", kernel, true)
+			statusFact(c, locales.MessageHostname(), hostname, true)
+			statusFact(c, locales.MessageKernel(), kernel, true)
 			ui.Row(c).FillWidth().Gap(t.Space.N16).Children(func() {
-				statusFact(c, "架构", arch, true).Shrink(0)
+				statusFact(c, locales.MessageArchitecture(), arch, true).Shrink(0)
 				if uptime != nil {
-					statusFact(c, "运行时间", monitorUptime(uptime, false), false)
+					statusFact(c, locales.MessageUptime2(), monitorUptime(uptime, false), false)
 				}
 			})
 			if facts != nil && facts.Platform == hostinfo.Windows {
-				statusFact(c, "默认 Shell", monitorText(facts.Shell), true)
+				statusFact(c, locales.MessageDefaultShell(), monitorText(facts.Shell), true)
 			}
 			if message != "" {
 				uikit.Text(c, message, uikit.TextProps{Style: uikit.TextCaption, Tone: uikit.ToneSecondary})

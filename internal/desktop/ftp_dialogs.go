@@ -2,9 +2,11 @@ package desktop
 
 import (
 	"fmt"
+	"github.com/egoist/mygo/i18n"
 	"path"
 	"strings"
 
+	"sshdesk/internal/locales"
 	"sshdesk/internal/theme"
 
 	"github.com/egoist/mygo"
@@ -29,21 +31,32 @@ func (a *app) filePreviewModal(c *ui.Context, dialog *fileActionDialog) {
 	t := theme.Current()
 	entry := dialog.preview
 	open := true
-	kind, source, icon := "文件", "本地", uikit.IconDocument
+	kind, source, icon := locales.MessageFile(), locales.MessageLocal(), uikit.IconDocument
 	if entry.dir {
-		kind, icon = "文件夹", uikit.IconFolder
+		kind, icon = locales.MessageFolder(), uikit.IconFolder
 	}
 	if dialog.pane.remote {
-		source = "远程"
+		source = locales.MessageRemote()
 	}
 	uikit.Modal(c.Key("file-preview-dialog"), &open, uikit.ModalProps{
-		Title: "文件预览", Subtitle: source + kind, Icon: uikit.IconSVG(icon), Width: t.C.Dialog.HostWidth,
-		CloseLabel: "关闭文件预览", Motion: uikit.MotionOverride(a.reduceMotion(c)),
+		Title: locales.MessageFilePreview(), Subtitle: locales.FilesPreviewSubtitle(
+			source,
+			kind,
+		), Icon: uikit.IconSVG(icon), Width: t.C.Dialog.HostWidth,
+		CloseLabel: locales.MessageCloseFilePreview(), Motion: uikit.MotionOverride(a.reduceMotion(c)),
 		Footer: func(parts uikit.ModalParts) {
 			uikit.ModalFooter(c).Children(func() {
-				uikit.Button(c, "复制路径", uikit.ButtonProps{Icon: uikit.IconCopy}).OnClick(func() { mygo.Clipboard.WriteText(entry.path) })
+				uikit.Button(
+					c,
+					locales.MessageCopyPath(),
+					uikit.ButtonProps{Icon: uikit.IconCopy},
+				).OnClick(func() { mygo.Clipboard.WriteText(entry.path) })
 				ui.Spacer(c)
-				uikit.Button(c, "关闭", uikit.ButtonProps{Variant: uikit.ButtonPrimary}).OnClick(parts.RequestDismiss)
+				uikit.Button(
+					c,
+					locales.CommonClose(),
+					uikit.ButtonProps{Variant: uikit.ButtonPrimary},
+				).OnClick(parts.RequestDismiss)
 			})
 		},
 	}, func(parts uikit.ModalParts) {
@@ -51,17 +64,21 @@ func (a *app) filePreviewModal(c *ui.Context, dialog *fileActionDialog) {
 		scroller := ui.Scroll(c).FillWidth().MinHeight(0).Shrink(1).TrackScroll(scroll).Children(func() {
 			uikit.ModalBody(c).Children(func() {
 				uikit.KeyValue(c, []uikit.KV{
-					{Key: "名称", Value: entry.name}, {Key: "类型", Value: kind}, {Key: "大小", Value: transferBytes(entry.size)},
-					{Key: "修改时间", Value: entry.modified.Format("2006-01-02 15:04:05")},
-					{Key: "权限", Value: entry.permissions, Mono: true}, {Key: "所有者", Value: entry.owner},
+					{Key: locales.CommonName(), Value: entry.name}, {Key: locales.MessageType(), Value: kind}, {Key: locales.MessageSize(), Value: transferBytes(entry.size)},
+					{Key: locales.MessageModified(), Value: localizedDate(entry.modified, i18n.MediumStyle, i18n.MediumStyle)},
+					{Key: locales.MessagePermissions(), Value: entry.permissions, Mono: true}, {Key: locales.MessageOwner(), Value: entry.owner},
 				})
-				field := uikit.FormRow(c, "路径", uikit.FormRowProps{Inline: true})
+				field := uikit.FormRow(c, locales.MessagePath(), uikit.FormRowProps{Inline: true})
 				field.Body.Children(func() {
-					uikit.Input(c, &dialog.preview.path, uikit.InputProps{Label: "文件路径", Mono: true}).ReadOnly(true).FillWidth().AutoFocus()
+					uikit.Input(
+						c,
+						&dialog.preview.path,
+						uikit.InputProps{Label: locales.MessageFilePath(), Mono: true},
+					).ReadOnly(true).FillWidth().AutoFocus()
 				})
 			})
 		})
-		uikit.Scrollbars(c, parts.Panel, scroller, scroll, uikit.ScrollbarProps{Label: "文件预览滚动条"})
+		uikit.Scrollbars(c, parts.Panel, scroller, scroll, uikit.ScrollbarProps{Label: locales.MessageFilePreviewScrollbar()})
 	})
 	if !open {
 		a.files.dialog = nil
@@ -71,12 +88,12 @@ func (a *app) filePreviewModal(c *ui.Context, dialog *fileActionDialog) {
 func (a *app) fileActionModal(c *ui.Context) {
 	t := theme.Current()
 	dialog := a.files.dialog
-	title, action, variant := "新建文件夹", "创建", uikit.ButtonPrimary
+	title, action, variant := locales.MessageNewFolder(), locales.MessageCreate(), uikit.ButtonPrimary
 	switch dialog.kind {
 	case "rename":
-		title, action = "重命名", "保存"
+		title, action = locales.MessageRename(), locales.CommonSave()
 	case "delete":
-		title, action, variant = "删除文件", "删除", uikit.ButtonDanger
+		title, action, variant = locales.MessageDeleteFile(), locales.CommonDelete(), uikit.ButtonDanger
 	}
 	open := true
 	var nameError string
@@ -87,19 +104,27 @@ func (a *app) fileActionModal(c *ui.Context) {
 		Compact:    true, Width: t.C.Dialog.HostWidth, Title: title, Disabled: dialog.busy, Motion: uikit.MotionOverride(a.reduceMotion(c)),
 	}, func(parts uikit.ModalParts) {
 		current = parts
-		uikit.Text(c, "操作将应用到当前目录中的实际文件。", uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneSecondary})
+		uikit.Text(
+			c,
+			locales.MessageThisOperationAffectsActualFilesInTheCurrentDirectory(),
+			uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneSecondary},
+		)
 		if dialog.kind == "delete" {
 			count := ui.Local(parts.Panel, "uikit.file-action.selection-count", func() int { return len(dialog.pane.selection()) })
-			message := fmt.Sprintf("确认删除选中的 %d 项？", *count)
+			message := locales.FilesDeleteSelectedConfirm(*count)
 			if dialog.original != "" {
-				message = fmt.Sprintf("确认删除「%s」？", dialog.original)
+				message = fmt.Sprintf(locales.MessageDelete2(), dialog.original)
 			}
 			uikit.Text(c, message, uikit.TextProps{})
 		} else {
 			initial := ui.Local(parts.Panel, "uikit.file-action.initial-name", func() string { return dialog.name })
-			input := uikit.Input(c, &dialog.name, uikit.InputProps{Label: "名称", DeferStyle: true}).AutoFocus().FillWidth()
+			input := uikit.Input(
+				c,
+				&dialog.name,
+				uikit.InputProps{Label: locales.CommonName(), DeferStyle: true},
+			).AutoFocus().FillWidth()
 			if input.Changed() {
-				dialog.errorText = ""
+				dialog.errorText = locales.Text{}
 			}
 			nameError = fileActionNameError(dialog)
 			uikit.StyleFormControl(input, nameError)
@@ -109,11 +134,11 @@ func (a *app) fileActionModal(c *ui.Context) {
 				uikit.FieldMessage(c, nameError, uikit.FieldMessageProps{Tone: uikit.ToneDanger})
 			}
 		}
-		if dialog.errorText != "" {
-			uikit.Banner(c, dialog.errorText, uikit.BannerProps{Tone: uikit.ToneDanger, Icon: sessionAlertIcon})
+		if !dialog.errorText.Empty() {
+			uikit.Banner(c, dialog.errorText.String(), uikit.BannerProps{Tone: uikit.ToneDanger, Icon: sessionAlertIcon})
 		}
 		ui.Row(c).Key("actions").Justify(ui.End).Gap(t.Space.N8).Children(func() {
-			uikit.Button(c, "取消", uikit.ButtonProps{}).OnClick(parts.RequestDismiss)
+			uikit.Button(c, locales.CommonCancel(), uikit.ButtonProps{}).OnClick(parts.RequestDismiss)
 			clicked = uikit.Button(c, action, uikit.ButtonProps{Variant: variant, Disabled: nameError != "", Loading: dialog.busy}).Clicked()
 		})
 	})
@@ -136,14 +161,14 @@ func fileActionNameError(dialog *fileActionDialog) string {
 	name := dialog.name
 	invalid := strings.TrimSpace(name) == "" || name == "." || name == ".." || strings.ContainsAny(name, "/\x00")
 	if invalid {
-		return "请输入有效名称，不能包含 /，也不能使用 . 或 ..。"
+		return locales.MessageEnterAValidNameWithoutAndDoNotUseOr()
 	}
 	for _, entry := range dialog.pane.directories[dialog.pane.path] {
 		if dialog.kind == "rename" && entry.name == dialog.original {
 			continue
 		}
 		if entry.name == name {
-			return "此目录中已存在同名文件或文件夹。"
+			return locales.MessageAFileOrFolderWithThisNameAlreadyExistsInThisDirectory()
 		}
 	}
 	return ""
@@ -156,20 +181,24 @@ func (a *app) fileConflictModal(c *ui.Context) {
 	open := true
 	var choice int
 	result := uikit.Modal(c.Key(conflict), &open, uikit.ModalProps{
-		Compact: true, Width: t.C.Dialog.HostWidth, Title: "目标中已存在同名项目", Motion: uikit.MotionOverride(a.reduceMotion(c)),
+		Compact: true, Width: t.C.Dialog.HostWidth, Title: locales.MessageAnItemWithThisNameAlreadyExists(), Motion: uikit.MotionOverride(a.reduceMotion(c)),
 	}, func(parts uikit.ModalParts) {
 		uikit.Text(c, entry.name, uikit.TextProps{Style: uikit.TextHeadline})
-		uikit.Text(c, "目标："+path.Join(conflict.target, entry.name), uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneSecondary})
-		uikit.Checkbox(c, &conflict.applyAll, "对所有重名项应用此选择")
+		uikit.Text(
+			c,
+			locales.MessageDestination()+path.Join(conflict.target, entry.name),
+			uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneSecondary},
+		)
+		uikit.Checkbox(c, &conflict.applyAll, locales.MessageApplyThisChoiceToAllConflicts())
 		ui.Row(c).Justify(ui.End).Gap(t.Space.N8).Children(func() {
-			uikit.Button(c, "取消", uikit.ButtonProps{}).OnClick(parts.RequestDismiss)
-			if uikit.Button(c, "跳过", uikit.ButtonProps{}).Clicked() {
+			uikit.Button(c, locales.CommonCancel(), uikit.ButtonProps{}).OnClick(parts.RequestDismiss)
+			if uikit.Button(c, locales.MessageSkip(), uikit.ButtonProps{}).Clicked() {
 				choice = 2
 			}
-			if uikit.Button(c, "保留两者", uikit.ButtonProps{}).Clicked() {
+			if uikit.Button(c, locales.MessageKeepBoth(), uikit.ButtonProps{}).Clicked() {
 				choice = 3
 			}
-			if uikit.Button(c, "覆盖", uikit.ButtonProps{Variant: uikit.ButtonPrimary}).Clicked() {
+			if uikit.Button(c, locales.MessageOverwrite(), uikit.ButtonProps{Variant: uikit.ButtonPrimary}).Clicked() {
 				choice = 1
 			}
 		})

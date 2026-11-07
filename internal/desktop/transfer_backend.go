@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"sshdesk/internal/fileclient"
+	"sshdesk/internal/locales"
 	"sshdesk/internal/localfs"
 	"sshdesk/internal/mcpserver"
 
@@ -31,7 +32,7 @@ import (
 	"golang.org/x/text/unicode/norm"
 )
 
-var errTransferConflictCanceled = errors.New("传输已取消")
+var errTransferConflictCanceled = locales.NewError(locales.MessageTransferCancelled)
 
 type transferConflictChoice struct {
 	choice   int
@@ -165,7 +166,7 @@ func (a *app) startTransfer(task *transferTask, cleanup bool) {
 	run.total.Store(task.total)
 	task.run, task.speed = run, 0
 	if !cleanup {
-		task.state, task.errorText = transferRunning, ""
+		task.state, task.errorText = transferRunning, locales.Text{}
 		if task.started.IsZero() {
 			task.started = time.Now()
 		}
@@ -200,7 +201,7 @@ func (a *app) startTransfer(task *transferTask, cleanup bool) {
 					}
 					if !a.mcpBackend.service.Accepting() {
 						run.awaitingClient = false
-						run.ready <- transferClientResult{err: errors.New("MCP 服务已停止")}
+						run.ready <- transferClientResult{err: locales.NewError(locales.MessageMcpServiceStopped)}
 						return
 					}
 					a.requestTransferClient(task, run)
@@ -259,7 +260,7 @@ func (a *app) startTransfer(task *transferTask, cleanup bool) {
 			err = closeErr
 		}
 		if journalErr := run.journal(); journalErr != nil {
-			err = errors.Join(err, fmt.Errorf("保存传输检查点：%w", journalErr))
+			err = errors.Join(err, locales.Errorf(locales.MessageSaveTransferCheckpoint, journalErr))
 		}
 		if a.ctx.Err() != nil {
 			return
@@ -365,7 +366,10 @@ func (a *app) finishTransfer(task *transferTask, run *transferRun, cleanup bool,
 			a.transfers.tasks = slices.DeleteFunc(a.transfers.tasks, func(candidate *transferTask) bool { return candidate == task })
 		} else {
 			task.removeRequested, task.cleanupPending = false, true
-			task.state, task.errorText = transferFailed, "取消后的临时文件清理失败："+err.Error()
+			task.state, task.errorText = transferFailed, locales.Concat(
+				locales.Deferred(locales.MessageUnableToCleanUpTemporaryFilesAfterCancellation),
+				locales.ErrorText(err),
+			)
 			task.failureNotice = true
 		}
 	} else {
@@ -376,7 +380,9 @@ func (a *app) finishTransfer(task *transferTask, run *transferRun, cleanup bool,
 				a.transfers.tasks = slices.DeleteFunc(a.transfers.tasks, func(candidate *transferTask) bool { return candidate == task })
 			} else if a.transfers.quitting {
 				task.removeRequested, task.cleanupPending = false, true
-				task.state, task.errorText = transferFailed, "取消后的临时文件等待清理"
+				task.state, task.errorText = transferFailed, locales.Deferred(
+					locales.MessageTemporaryFilesAwaitingCleanupAfterCancellation,
+				)
 			} else {
 				task.cleanupPending = true
 				task.state = transferFailed
@@ -385,7 +391,7 @@ func (a *app) finishTransfer(task *transferTask, run *transferRun, cleanup bool,
 			// A pause may already have been followed by resume. The old worker
 			// still has to finish before the new attempt can own its manifest.
 		} else if err != nil {
-			task.state, task.errorText, task.failureNotice = transferFailed, err.Error(), true
+			task.state, task.errorText, task.failureNotice = transferFailed, locales.ErrorText(err), true
 		} else {
 			task.state, task.completed = transferDone, time.Now()
 			if destination := task.job.root.destination; destination != "" {
@@ -437,7 +443,7 @@ func (a *app) resumeTransfer(task *transferTask) {
 	if task.removeRequested {
 		return
 	}
-	task.state, task.errorText, task.failureNotice = transferQueued, "", false
+	task.state, task.errorText, task.failureNotice = transferQueued, locales.Text{}, false
 	a.persistTransfers()
 	a.mcpTransferChanged(task, nil)
 	a.scheduleTransfers()
@@ -478,7 +484,7 @@ func (a *app) performTransfer(ctx context.Context, task *transferTask, run *tran
 			return err
 		}
 		if !transferSafeName(job.name) {
-			return errors.New("文件名不能安全地用于目标路径")
+			return locales.NewError(locales.MessageTheFilenameCannotBeSafelyUsedInTheDestinationPath)
 		}
 		root, err := buildTransferManifest(ctx, source, job.sourceRemote, sourcePath)
 		if err != nil {
@@ -530,20 +536,20 @@ func buildTransferManifest(ctx context.Context, client fileclient.Client, remote
 
 func buildTransferManifestAt(ctx context.Context, client fileclient.Client, remote bool, source string, depth int) (*transferNode, error) {
 	if depth > 256 {
-		return nil, errors.New("目录层级过深，已停止传输")
+		return nil, locales.NewError(locales.MessageDirectoryNestingIsTooDeepTransferStopped)
 	}
 	entry, err := client.Stat(ctx, source)
 	if err != nil {
 		return nil, err
 	}
 	if entry.Symlink {
-		return nil, fmt.Errorf("符号链接不会被递归跟随：%s", source)
+		return nil, locales.Errorf(locales.MessageSymbolicLinksAreNotFollowedRecursively, source)
 	}
 	if entry.ModeKnown && !entry.Directory && !entry.Mode.IsRegular() {
-		return nil, fmt.Errorf("不支持传输特殊文件：%s", source)
+		return nil, locales.Errorf(locales.MessageTransferringSpecialFilesIsNotSupported, source)
 	}
 	if entry.Size < 0 {
-		return nil, fmt.Errorf("文件大小无效：%s", source)
+		return nil, locales.Errorf(locales.MessageInvalidFileSize, source)
 	}
 	node := &transferNode{source: source, entry: entry}
 	if !entry.Directory {
@@ -557,7 +563,7 @@ func buildTransferManifestAt(ctx context.Context, client fileclient.Client, remo
 	seen := map[string]bool{}
 	for _, child := range entries {
 		if !transferSafeName(child.Name) || seen[child.Name] {
-			return nil, errors.New("目录响应包含无效或重复文件名")
+			return nil, locales.NewError(locales.MessageTheDirectoryResponseContainsInvalidOrDuplicateFilenames)
 		}
 		seen[child.Name] = true
 		nested, err := buildTransferManifestAt(ctx, client, remote, transferJoin(remote, source, child.Name), depth+1)
@@ -568,7 +574,7 @@ func buildTransferManifestAt(ctx context.Context, client fileclient.Client, remo
 		// protocol Stat response must not replace it with another server path.
 		nested.entry.Name = child.Name
 		if nested.total > math.MaxInt64-node.total {
-			return nil, errors.New("传输总大小超过支持范围")
+			return nil, locales.NewError(locales.MessageTheTotalTransferSizeExceedsTheSupportedRange)
 		}
 		node.total += nested.total
 		node.children = append(node.children, nested)
@@ -598,10 +604,10 @@ func (a *app) copyTransferNode(ctx context.Context, task *transferTask, run *tra
 		return err
 	}
 	if fresh.ModeKnown && !fresh.Directory && !fresh.Mode.IsRegular() && !fresh.Symlink {
-		return fmt.Errorf("不支持传输特殊文件：%s", node.source)
+		return locales.Errorf(locales.MessageTransferringSpecialFilesIsNotSupported, node.source)
 	}
 	if fresh.Symlink || fresh.Directory != node.entry.Directory || (!fresh.Directory && !sameTransferEntry(fresh, node.entry)) {
-		return fmt.Errorf("源文件在传输期间已改变：%s", node.source)
+		return locales.Errorf(locales.MessageTheSourceFileChangedDuringTransfer, node.source)
 	}
 	if node.destination == "" {
 		destination, approved, skip, err := a.chooseTransferDestination(ctx, task, job, target,
@@ -632,7 +638,7 @@ func (a *app) copyTransferNode(ctx context.Context, task *transferTask, run *tra
 		if errors.Is(err, fs.ErrNotExist) {
 			err = target.Mkdir(ctx, node.destination)
 		} else if err == nil && (!existing.Directory || existing.Symlink) {
-			err = fmt.Errorf("目标不是普通目录：%s", node.destination)
+			err = locales.Errorf(locales.MessageTheDestinationIsNotARegularDirectory, node.destination)
 		}
 		if err != nil {
 			return err
@@ -650,7 +656,10 @@ func (a *app) copyTransferNode(ctx context.Context, task *transferTask, run *tra
 	privateDirectory := false
 	if !job.sourceRemote && node.approved != nil {
 		if !node.approved.ModeKnown {
-			return fmt.Errorf("无法确认已有目标的权限，未执行覆盖：%s", node.destination)
+			return locales.Errorf(
+				locales.MessageUnableToVerifyTheExistingDestinationSPermissionsOverwritingBlocked,
+				node.destination,
+			)
 		}
 		if node.approved.Mode.Perm()&0044 != 0044 {
 			var supported bool
@@ -658,7 +667,10 @@ func (a *app) copyTransferNode(ctx context.Context, task *transferTask, run *tra
 			if !supported {
 				_, privateDirectory = target.(fileclient.PrivateDirectoryMaker)
 				if !privateDirectory {
-					return fmt.Errorf("此连接无法在上传前安全创建私有临时文件，未执行受限权限文件的覆盖：%s", node.destination)
+					return locales.Errorf(
+						locales.MessageThisConnectionCannotSafelyCreateAPrivateTemporaryFileBeforeUploadingOverwritingThe,
+						node.destination,
+					)
 				}
 			}
 		}
@@ -669,7 +681,7 @@ func (a *app) copyTransferNode(ctx context.Context, task *transferTask, run *tra
 			return err
 		}
 		if !entry.Directory || entry.Symlink || !entry.ModeKnown || entry.Mode.Perm() != 0700 {
-			return errors.New("私有暂存目录权限已改变，拒绝继续上传")
+			return locales.NewError(locales.MessagePrivateStagingDirectoryPermissionsChangedUploadWillNotContinue)
 		}
 		if node.temporary == "" {
 			node.temporary = transferJoin(!job.sourceRemote, node.stageDirectory, "content")
@@ -677,7 +689,9 @@ func (a *app) copyTransferNode(ctx context.Context, task *transferTask, run *tra
 		}
 	}
 	if privateDirectory && node.temporary != "" && node.stageDirectory == "" {
-		return errors.New("旧临时文件不在私有目录中，不能安全覆盖受限目标")
+		return locales.NewError(
+			locales.MessageThePreviousTemporaryFileIsOutsideThePrivateDirectoryTheRestrictedDestinationCannot,
+		)
 	}
 	if privateWriter != nil && node.temporary != "" {
 		// Old parts may still have the server's public creation permissions.
@@ -710,11 +724,11 @@ func (a *app) copyTransferNode(ctx context.Context, task *transferTask, run *tra
 		name := ".sshdesk-" + hex.EncodeToString(suffix[:]) + ".part"
 		temporary := transferJoin(!job.sourceRemote, transferDir(!job.sourceRemote, node.destination), name)
 		if temporary == node.destination {
-			return errors.New("临时文件名称与目标相同")
+			return locales.NewError(locales.MessageTheTemporaryFilenameIsTheSameAsTheDestination)
 		}
 		if _, err := target.Stat(ctx, temporary); !errors.Is(err, fs.ErrNotExist) {
 			if err == nil {
-				return errors.New("临时文件名称已被占用")
+				return locales.NewError(locales.MessageTheTemporaryFilenameIsAlreadyInUse)
 			}
 			return err
 		}
@@ -784,7 +798,7 @@ func (a *app) copyTransferNode(ctx context.Context, task *transferTask, run *tra
 			return errors.Join(copyErr, closeErr)
 		}
 		if copied != node.entry.Size-offset {
-			return fmt.Errorf("源文件大小在传输期间已改变：%s", node.source)
+			return locales.Errorf(locales.MessageTheSourceFileSizeChangedDuringTransfer, node.source)
 		}
 	}
 	digest := hex.EncodeToString(resume.hash.Sum(nil))
@@ -793,7 +807,7 @@ func (a *app) copyTransferNode(ctx context.Context, task *transferTask, run *tra
 		return err
 	}
 	if !sameTransferEntry(fresh, node.entry) || node.digest != "" && node.digest != digest {
-		return fmt.Errorf("源文件在传输期间已改变：%s", node.source)
+		return locales.Errorf(locales.MessageTheSourceFileChangedDuringTransfer, node.source)
 	}
 	written, err := target.Stat(ctx, node.temporary)
 	if err != nil {
@@ -801,7 +815,7 @@ func (a *app) copyTransferNode(ctx context.Context, task *transferTask, run *tra
 	}
 	if written.Symlink || written.Directory || written.Size != node.entry.Size ||
 		written.ModeKnown && !written.Mode.IsRegular() {
-		return fmt.Errorf("目标临时文件大小不匹配：%s", node.temporary)
+		return locales.Errorf(locales.MessageTheDestinationTemporaryFileSizeDoesNotMatch, node.temporary)
 	}
 	node.staged, node.partial, node.digest = &written, &written, digest
 	for {
@@ -868,9 +882,9 @@ func (a *app) copyTransferNode(ctx context.Context, task *transferTask, run *tra
 		}
 		if !uncertainTransferCommit(ctx, target, err) {
 			node.committing = false
-			return fmt.Errorf("提交传输文件失败：%w", err)
+			return locales.Errorf(locales.MessageUnableToCommitTransferredFile, err)
 		}
-		return fmt.Errorf("提交结果不确定，重试时将核对暂存文件和目标：%w", err)
+		return locales.Errorf(locales.MessageTheCommitResultIsUncertainRetryingWillVerifyTheStagedFileAndDestination, err)
 	}
 }
 
@@ -898,7 +912,7 @@ func prepareTransferResume(
 	resume.exists = true
 	if partial.Symlink || partial.Directory || partial.Size < 0 || partial.Size > node.entry.Size ||
 		partial.ModeKnown && !partial.Mode.IsRegular() {
-		return resume, fmt.Errorf("临时文件状态无效：%s", node.temporary)
+		return resume, locales.Errorf(locales.MessageInvalidTemporaryFileState, node.temporary)
 	}
 	if checkpoint := node.checkpoint; checkpoint != nil && checkpoint.Offset > partial.Size {
 		// A failed network write may have acknowledged more bytes than the server
@@ -908,15 +922,15 @@ func prepareTransferResume(
 		return resume, nil
 	}
 	if node.staged != nil && !sameTransferEntry(partial, *node.staged) {
-		return resume, fmt.Errorf("已验证的临时文件已改变：%s", node.temporary)
+		return resume, locales.Errorf(locales.MessageTheVerifiedTemporaryFileHasChanged, node.temporary)
 	}
 	if node.partial != nil && !sameTransferEntry(partial, *node.partial) {
-		return resume, fmt.Errorf("已记录的部分文件已改变：%s", node.temporary)
+		return resume, locales.Errorf(locales.MessageTheRecordedPartialFileHasChanged, node.temporary)
 	}
 	checkpoint := node.checkpoint
 	if checkpoint == nil {
 		if partial.Size != 0 {
-			return resume, errors.New("暂存文件缺少可验证的检查点")
+			return resume, locales.NewError(locales.MessageTheStagedFileHasNoVerifiableCheckpoint)
 		}
 		checkpoint = &transferCheckpoint{Digest: hex.EncodeToString(resume.hash.Sum(nil))}
 	}
@@ -927,7 +941,7 @@ func prepareTransferResume(
 			return resume, err
 		}
 	} else if checkpoint.Digest != hex.EncodeToString(resume.hash.Sum(nil)) {
-		return resume, errors.New("传输前缀检查点无效")
+		return resume, locales.NewError(locales.MessageInvalidTransferPrefixCheckpoint)
 	}
 	resume.offset = checkpoint.Offset
 	node.checkpoint, node.partial = checkpoint, &partial
@@ -943,7 +957,7 @@ func verifiedTransferPrefix(
 ) (hash.Hash, error) {
 	input, err := target.OpenRead(ctx, name, 0)
 	if err != nil {
-		return nil, fmt.Errorf("无法校验已传部分，未继续复用：%s：%w", name, err)
+		return nil, locales.Errorf(locales.MessageUnableToVerifyTheTransferredPortionItWasNotReused, name, err)
 	}
 	h := sha256.New()
 	prefix, readErr := io.CopyN(h, input, checkpoint.Offset)
@@ -958,14 +972,14 @@ func verifiedTransferPrefix(
 		return nil, errors.Join(readErr, closeErr)
 	}
 	if prefix+tail != partial.Size || hex.EncodeToString(h.Sum(nil)) != checkpoint.Digest {
-		return nil, fmt.Errorf("已传部分的内容已改变，未继续复用：%s", name)
+		return nil, locales.Errorf(locales.MessageTheTransferredContentHasChangedItWasNotReused, name)
 	}
 	fresh, err := target.Stat(ctx, name)
 	if err != nil {
 		return nil, err
 	}
 	if !sameTransferEntry(fresh, partial) {
-		return nil, fmt.Errorf("部分文件在核对期间已改变：%s", name)
+		return nil, locales.Errorf(locales.MessageThePartialFileChangedDuringVerification, name)
 	}
 	return h, nil
 }
@@ -984,32 +998,38 @@ func preserveTransferPermissions(
 	}
 	if preserver, ok := target.(fileclient.PermissionPreserver); ok {
 		if err := preserver.PreservePermissions(ctx, node.destination, node.temporary); err != nil {
-			return fmt.Errorf("保留目标权限失败，未提交：%s：%w", node.destination, err)
+			return locales.Errorf(locales.MessageUnableToPreserveDestinationPermissionsFileNotCommitted, node.destination, err)
 		}
 		staged, err := target.Stat(ctx, node.temporary)
 		if err != nil {
 			return err
 		}
 		if staged.Symlink || staged.Directory || staged.Size != node.entry.Size {
-			return fmt.Errorf("暂存文件已改变，未提交：%s", node.temporary)
+			return locales.Errorf(locales.MessageTheStagedFileHasChangedFileNotCommitted, node.temporary)
 		}
 		node.staged, node.partial = &staged, &staged
 		return nil
 	}
 	if !current.ModeKnown {
-		return fmt.Errorf("无法确认已有目标的权限，未执行覆盖：%s", node.destination)
+		return locales.Errorf(
+			locales.MessageUnableToVerifyTheExistingDestinationSPermissionsOverwritingBlocked,
+			node.destination,
+		)
 	}
 	if !current.Mode.IsRegular() {
-		return fmt.Errorf("目标不是普通文件，未执行覆盖：%s", node.destination)
+		return locales.Errorf(locales.MessageTheDestinationIsNotARegularFileOverwritingBlocked, node.destination)
 	}
 	mask := fs.ModePerm | fs.ModeSetuid | fs.ModeSetgid | fs.ModeSticky
 	mode := current.Mode & mask
 	setter, ok := target.(fileclient.PermissionSetter)
 	if !ok {
-		return fmt.Errorf("目标不支持保留文件权限，未提交：%s", node.destination)
+		return locales.Errorf(
+			locales.MessageTheDestinationDoesNotSupportPreservingFilePermissionsFileNotCommitted,
+			node.destination,
+		)
 	}
 	if err := setter.Chmod(ctx, node.temporary, mode); err != nil {
-		return fmt.Errorf("保留目标权限失败，未提交：%s：%w", node.destination, err)
+		return locales.Errorf(locales.MessageUnableToPreserveDestinationPermissionsFileNotCommitted, node.destination, err)
 	}
 	staged, err := target.Stat(ctx, node.temporary)
 	if err != nil {
@@ -1017,7 +1037,7 @@ func preserveTransferPermissions(
 	}
 	if staged.Symlink || staged.Directory || staged.Size != node.entry.Size ||
 		!staged.ModeKnown || staged.Mode&mask != mode {
-		return fmt.Errorf("无法确认暂存文件权限，未提交：%s", node.temporary)
+		return locales.Errorf(locales.MessageUnableToVerifyStagedFilePermissionsFileNotCommitted, node.temporary)
 	}
 	node.staged, node.partial = &staged, &staged
 	return nil
@@ -1042,7 +1062,7 @@ func hashTransferFile(ctx context.Context, client fileclient.Client, name string
 		return "", errors.Join(copyErr, closeErr)
 	}
 	if count != size {
-		return "", fmt.Errorf("核对文件大小已改变：%s", name)
+		return "", locales.Errorf(locales.MessageTheVerificationFileSizeHasChanged, name)
 	}
 	return hex.EncodeToString(hash.Sum(nil)), nil
 }
@@ -1101,11 +1121,11 @@ func verifyCompletedTransfers(ctx context.Context, target fileclient.Client, nod
 	if node.done {
 		entry, err := target.Stat(ctx, node.destination)
 		if err != nil {
-			return fmt.Errorf("已完成目标已改变，请重新排队：%s：%w", node.destination, err)
+			return locales.Errorf(locales.MessageTheCompletedDestinationHasChangedQueueItAgain, node.destination, err)
 		}
 		if entry.Symlink || entry.Directory != node.entry.Directory ||
 			!entry.Directory && (entry.Size != node.entry.Size || entry.ModeKnown && !entry.Mode.IsRegular()) {
-			return fmt.Errorf("已完成目标类型或大小已改变，请重新排队：%s", node.destination)
+			return locales.Errorf(locales.MessageTheCompletedDestinationTypeOrSizeHasChangedQueueItAgain, node.destination)
 		}
 	}
 	for _, child := range node.children {
@@ -1132,7 +1152,11 @@ func reconcileTransferCommits(ctx context.Context, target fileclient.Client, job
 
 func recoverTransferCommit(ctx context.Context, target fileclient.Client, job *transferJob, node *transferNode, run *transferRun) error {
 	uncertain := func(err error) error {
-		return fmt.Errorf("提交结果仍不确定，请核对后重试或取消并重新排队：%s：%w", node.destination, err)
+		return locales.Errorf(
+			locales.MessageTheCommitResultIsStillUncertainVerifyItThenRetryOrCancelAnd,
+			node.destination,
+			err,
+		)
 	}
 	partial, partialErr := target.Stat(ctx, node.temporary)
 	if partialErr != nil && !errors.Is(partialErr, fs.ErrNotExist) {
@@ -1140,10 +1164,10 @@ func recoverTransferCommit(ctx context.Context, target fileclient.Client, job *t
 	}
 	partialExists := partialErr == nil
 	if partialExists && (partial.Symlink || partial.Directory || partial.Size < 0 || partial.Size > node.entry.Size) {
-		return uncertain(errors.New("暂存文件类型或大小已改变"))
+		return uncertain(locales.NewError(locales.MessageTheStagedFileTypeOrSizeHasChanged))
 	}
 	if partialExists && node.staged != nil && !sameTransferEntry(partial, *node.staged) {
-		return uncertain(errors.New("已验证的暂存文件已改变"))
+		return uncertain(locales.NewError(locales.MessageTheVerifiedStagedFileHasChanged))
 	}
 	entry, targetErr := target.Stat(ctx, node.destination)
 	if errors.Is(targetErr, fs.ErrNotExist) {
@@ -1151,7 +1175,7 @@ func recoverTransferCommit(ctx context.Context, target fileclient.Client, job *t
 			node.committing = false
 			return nil // The owned bytes remain staged; no final target exists.
 		}
-		return uncertain(errors.New("暂存文件和目标都不存在"))
+		return uncertain(locales.NewError(locales.MessageNeitherTheStagedFileNorTheDestinationExists))
 	}
 	if targetErr != nil {
 		return uncertain(targetErr)
@@ -1162,32 +1186,32 @@ func recoverTransferCommit(ctx context.Context, target fileclient.Client, job *t
 			node.committing = false
 			return nil
 		}
-		return uncertain(errors.New("目标类型或大小不匹配"))
+		return uncertain(locales.NewError(locales.MessageTheDestinationTypeOrSizeDoesNotMatch))
 	}
 	if node.digest == "" {
-		return uncertain(errors.New("提交检查点缺少摘要"))
+		return uncertain(locales.NewError(locales.MessageTheCommitCheckpointIsMissingItsDigest))
 	}
 	digest, err := hashTransferFile(ctx, target, node.destination, node.entry.Size)
 	if err != nil {
-		return uncertain(fmt.Errorf("无法读回目标核对：%w", err))
+		return uncertain(locales.Errorf(locales.MessageUnableToReadBackTheDestinationForVerification, err))
 	}
 	fresh, err := target.Stat(ctx, node.destination)
 	if err != nil {
 		return uncertain(err)
 	}
 	if !sameTransferEntry(fresh, entry) {
-		return uncertain(errors.New("目标在核对期间已改变"))
+		return uncertain(locales.NewError(locales.MessageTheDestinationChangedDuringVerification))
 	}
 	if digest != node.digest {
 		if partialExists {
 			node.committing = false
 			return nil
 		}
-		return uncertain(errors.New("目标内容不匹配"))
+		return uncertain(locales.NewError(locales.MessageTheDestinationContentsDoNotMatch))
 	}
 	if partialExists {
 		if err := target.Remove(ctx, node.temporary, false); err != nil && !errors.Is(err, fs.ErrNotExist) {
-			return uncertain(fmt.Errorf("目标内容已确认，但暂存副本清理失败：%w", err))
+			return uncertain(locales.Errorf(locales.MessageDestinationContentsVerifiedButTheStagedCopyCouldNotBeCleanedUp, err))
 		}
 	}
 	markTransferCommitted(job, node, run)
@@ -1273,7 +1297,10 @@ func (a *app) chooseTransferDestination(ctx context.Context, task *transferTask,
 		case 1:
 			if existing.Symlink || existing.Directory != source.Directory ||
 				!existing.Directory && existing.ModeKnown && !existing.Mode.IsRegular() {
-				return "", nil, false, fmt.Errorf("目标类型不同或为符号链接，请选择保留两者：%s", candidate)
+				return "", nil, false, locales.Errorf(
+					locales.MessageTheDestinationHasADifferentTypeOrIsASymbolicLinkChooseKeep,
+					candidate,
+				)
 			}
 			return candidate, &existing, false, nil
 		case 2:
@@ -1420,7 +1447,7 @@ func cleanupTransferFiles(ctx context.Context, target fileclient.Client, job *tr
 		}
 		privateDirectory := transferPrivateDirectory(job.root, name)
 		if err == nil && (entry.Symlink || entry.Directory != privateDirectory) {
-			err = errors.New("临时文件已被替换，未执行删除")
+			err = locales.NewError(locales.MessageTheTemporaryFileWasReplacedDeletionBlocked)
 		}
 		if err == nil {
 			err = target.Remove(ctx, name, privateDirectory)
@@ -1483,7 +1510,7 @@ func cleanupTransferDirectories(ctx context.Context, target fileclient.Client, j
 			return err
 		}
 		if !entry.Directory || entry.Symlink {
-			return errors.New("私有暂存目录已被替换，未执行清理")
+			return locales.NewError(locales.MessageThePrivateStagingDirectoryWasReplacedCleanupBlocked)
 		}
 		if err := target.Remove(ctx, name, true); err != nil {
 			return err

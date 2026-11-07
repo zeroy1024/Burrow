@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 
+	"sshdesk/internal/locales"
 	"sshdesk/internal/theme"
 	"sshdesk/internal/uikit"
 
@@ -45,7 +46,7 @@ func (a *app) terminals(c *ui.Context, size ui.Point) {
 		}
 		area.Children(func() {
 			parts := uikit.EmptyState(c, uikit.EmptyProps{Kind: uikit.EmptyTerminal, Icon: terminalIcon,
-				Title: "选择一台主机，开始会话", Detail: "左侧主机可拖入终端窗格", Action: "添加 SSH 主机"})
+				Title: locales.MessageSelectAHostToStartASession(), Detail: locales.MessageDragAHostFromTheSidebarIntoATerminalPane(), Action: locales.MessageAddSshHost()})
 			parts.Action.OnClick(func() { a.startHostDraft() })
 		})
 		return
@@ -149,7 +150,7 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 	}
 	// Only the inner card clips. Its wrapper owns the focus border and overlay hairline.
 	pane := uikit.Pane(c, uikit.PaneProps{
-		Key: fmt.Sprintf("pane-wrap-%d", session.id), Label: h.name + " SSH 终端", Surface: surface,
+		Key: fmt.Sprintf("pane-wrap-%d", session.id), Label: h.name + locales.MessageSshTerminal(), Surface: surface,
 		Focused: tab.focused == session, Multiple: multiple, Lifted: a.lifted(session),
 	}).Absolute().Left(rect.X).Top(rect.Y).Size(rect.W, rect.H).Bind(&session.frame)
 	a.paneMotion(c, pane, tab, session)
@@ -242,7 +243,7 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 			if multiple {
 				// A shared drag ancestor lets the title and bell keep their own hover targets.
 				header = uikit.PaneHeader(c, uikit.HeaderProps{Key: "identity", Density: uikit.DensityCompact, Surface: surface}).Root.
-					Absolute().Top(0).Left(0).Padding(0, 0, 0, p.HeaderPaddingLeft).Label("拖动窗格 " + h.name).
+					Absolute().Top(0).Left(0).Padding(0, 0, 0, p.HeaderPaddingLeft).Label(locales.MessageDragPane() + h.name).
 					OnClick(func() { a.focusSession(tab, session) })
 				a.paneDragHandle(c, header, paneTransfer{tab: tab, session: session})
 				header.Children(func() {
@@ -285,16 +286,16 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 					splitShortcut = shortcutDisplay(a.shortcutBinding("pane.split"))
 					closeShortcut = shortcutDisplay(a.shortcutBinding("tab.close"))
 				}
-				split := uikit.PaneIconButton(c, "分栏 "+h.name, splitIcon, surface, uikit.PaneIconButtonProps{
+				split := uikit.PaneIconButton(c, locales.MessageSplit()+h.name, splitIcon, surface, uikit.PaneIconButtonProps{
 					Shortcut: splitShortcut,
 					Disabled: count >= maxTerminalPanes || session.closing || !canSplit(session.layoutRect, dropRight) && !canSplit(session.layoutRect, dropBottom),
 				}).Absolute().Top(0).Left(0).Size(p.ActionWidth, p.ActionHeight)
 				keyboardFocus = split.FocusVisible()
 				split.OnClick(func() { a.splitSession(session, stacked) })
 				if multiple {
-					icon, label := expandIcon, "放大窗格 "
+					icon, label := expandIcon, locales.MessageMaximizePane()
 					if tab.maximized {
-						icon, label = restoreIcon, "恢复窗格 "
+						icon, label = restoreIcon, locales.MessageRestorePane()
 					}
 					animation := uikit.Anim(c, t.C.IconButton.Transition, uikit.MotionOverride(a.reduceMotion(c)))
 					expand := uikit.PaneIconButton(c.Key("pane-zoom"), label+h.name, icon, surface, uikit.PaneIconButtonProps{
@@ -304,7 +305,7 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 					expand.OnClick(func() {
 						a.togglePaneZoom(tab, session)
 					})
-					close := uikit.PaneIconButton(c, "关闭窗格 "+h.name, closeIcon, surface, uikit.PaneIconButtonProps{
+					close := uikit.PaneIconButton(c, locales.MessageClosePane2()+h.name, closeIcon, surface, uikit.PaneIconButtonProps{
 						Shortcut: closeShortcut,
 					}).Absolute().Top(0).Left(2*(p.ActionWidth+p.ActionGap)).Size(p.ActionWidth, p.ActionHeight)
 					keyboardFocus = keyboardFocus || close.FocusVisible()
@@ -323,7 +324,11 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 			uikit.PaneFooter(c, uikit.FooterProps{Key: "status", Surface: surface}).Absolute().Bottom(0).Left(0).Right(0).
 				Opacity(appearance.FooterOpacity).PassThrough().Children(func() {
 				uikit.ConnectionBadge(c, connectionIndicatorState(session.state), surface)
-				uikit.Latency(c, sshLatencyMS(session, c.Now()), uikit.LatencyProps{Surface: surface, Prefix: "延迟"})
+				uikit.Latency(
+					c,
+					sshLatencyMS(session, c.Now()),
+					uikit.LatencyProps{Surface: surface, Prefix: locales.MessageLatency()},
+				)
 				ui.Spacer(c)
 				ui.Text(c, a.paneSizeLabel(session)).FontSize(status.FontSize).SingleLine()
 			})

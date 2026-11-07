@@ -3,18 +3,18 @@ package desktop
 import (
 	"context"
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 
 	"github.com/egoist/mygo"
+	"sshdesk/internal/locales"
 	"sshdesk/internal/localfs"
 )
 
 func (a *app) exportManagedKey(key managedKey) {
 	parent := a.window
 	a.credentialWork(func(ctx context.Context) (result credentialResult) {
-		path, err := mygo.Dialog.Save(mygo.SaveDialogOptions{Parent: parent, Title: "导出私钥", DefaultPath: key.Name, Message: "导出的文件包含私钥，请妥善保管。"})
+		path, err := mygo.Dialog.Save(mygo.SaveDialogOptions{Parent: parent, Title: locales.MessageExportPrivateKey(), DefaultPath: key.Name, Message: locales.MessageTheExportedFileContainsAPrivateKeyKeepItSafe()})
 		if err != nil {
 			return credentialResult{err: err}
 		}
@@ -30,7 +30,7 @@ func (a *app) exportManagedKey(key managedKey) {
 		// symlink or special file to a different destination.
 		if info, err := os.Lstat(path); err == nil {
 			if !info.Mode().IsRegular() {
-				return credentialResult{err: errors.New("导出目标必须是普通文件")}
+				return credentialResult{err: locales.NewError(locales.MessageTheExportDestinationMustBeARegularFile)}
 			}
 		} else if !errors.Is(err, os.ErrNotExist) {
 			return credentialResult{err: err}
@@ -43,7 +43,7 @@ func (a *app) exportManagedKey(key managedKey) {
 		defer func() {
 			if temporary != "" {
 				if err := mygo.Shell.TrashItem(temporary); err != nil {
-					result.err = errors.Join(result.err, fmt.Errorf("回收导出暂存文件：%w", err))
+					result.err = errors.Join(result.err, locales.Errorf(locales.MessageCleanUpExportStagingFile, err))
 				}
 			}
 		}()
@@ -52,12 +52,12 @@ func (a *app) exportManagedKey(key managedKey) {
 		}
 		_, writeErr := file.Write(data)
 		if err := errors.Join(writeErr, file.Sync(), file.Close()); err != nil {
-			return credentialResult{err: fmt.Errorf("导出私钥：%w", err)}
+			return credentialResult{err: locales.Errorf(locales.MessageExportPrivateKey3, err)}
 		}
 		if err := os.Rename(temporary, path); err != nil {
 			return credentialResult{err: err}
 		}
 		temporary = ""
-		return credentialResult{notice: "私钥已导出"}
+		return credentialResult{notice: locales.Deferred(locales.MessagePrivateKeyExported)}
 	})
 }

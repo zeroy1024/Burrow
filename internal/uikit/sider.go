@@ -1,6 +1,7 @@
 package uikit
 
 import (
+	"sshdesk/internal/locales"
 	"sshdesk/internal/theme"
 
 	"github.com/egoist/mygo/ui"
@@ -37,7 +38,7 @@ func Sider(c *ui.Context, title string, props SiderProps, body func()) SiderResu
 		}
 		addLabel := props.AddLabel
 		if addLabel == "" {
-			addLabel = "添加"
+			addLabel = locales.CommonAdd()
 		}
 		header := SiderHeader(c, SiderHeaderProps{Title: title, AddLabel: addLabel, AddIcon: icon})
 		result.AddButton, result.Add = header.Add, header.Add.Clicked()
@@ -46,7 +47,7 @@ func Sider(c *ui.Context, title string, props SiderProps, body func()) SiderResu
 		}
 		search := props.Search
 		if search.Label == "" {
-			search.Label = "搜索" + title
+			search.Label = locales.MessageSearch() + title
 		}
 		if search.Placeholder == "" {
 			search.Placeholder = search.Label
@@ -348,7 +349,7 @@ func (result *SiderRowResult) Present(c *ui.Context, view SiderRowPresentation) 
 		SiderRowLabel(c, props.Title, props.Subtitle)
 		label := props.MoreLabel
 		if label == "" {
-			label = "更多操作 " + props.Title
+			label = locales.MessageMoreActionsFor() + props.Title
 		}
 		result.More = SiderMore(c, row, SiderMoreProps{Label: label, Description: props.Description,
 			Icon: IconSVG(IconMore), Disabled: view.InteractionDisabled})

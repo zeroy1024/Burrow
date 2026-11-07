@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/egoist/mygo/ui"
 	"slices"
+	"sshdesk/internal/locales"
 	"sshdesk/internal/store"
 	"strings"
 	"time"
@@ -339,7 +340,7 @@ func (a *app) tickWorkspace(c *ui.Context) {
 	saved := a.workspaceSnapshot()
 	data, err := json.Marshal(saved)
 	if err != nil {
-		a.persistenceNotice("保存工作区失败", err)
+		a.persistenceNotice(locales.MessageUnableToSaveWorkspace, err)
 		return
 	}
 	if !bytes.Equal(data, a.workspaceSave.last) {
@@ -356,19 +357,19 @@ func (a *app) tickWorkspace(c *ui.Context) {
 	}
 	a.workspaceSave.dirtyAt = time.Time{}
 	if err := validateStoredWorkspace(saved, a.hosts, a.keys); err != nil {
-		a.persistenceNotice("保存工作区失败", err)
+		a.persistenceNotice(locales.MessageUnableToSaveWorkspace, err)
 		return
 	}
 	value, err := encodeWorkspace(saved)
 	if err != nil {
-		a.persistenceNotice("保存工作区失败", err)
+		a.persistenceNotice(locales.MessageUnableToSaveWorkspace, err)
 		return
 	}
 	a.persist(func() error { return a.store.SaveWorkspace(a.ctx, value) }, func(err error) {
 		if err == nil {
 			a.savedWorkspace = saved
 		} else {
-			a.persistenceNotice("保存工作区失败", err)
+			a.persistenceNotice(locales.MessageUnableToSaveWorkspace, err)
 		}
 	})
 }
@@ -428,7 +429,7 @@ func (a *app) enforceScrollback() {
 			// Apply the limit in place; rendering must not own terminal lifetime.
 			if live := session.terminal; live != nil && live.scrollbackLines != limit {
 				if err := live.view.SetScrollbackLines(limit); err != nil {
-					a.terminalError = fmt.Errorf("更新终端回滚行数：%w", err)
+					a.terminalError = locales.Errorf(locales.MessageUpdateTerminalScrollback, err)
 					return
 				}
 				live.scrollbackLines = limit

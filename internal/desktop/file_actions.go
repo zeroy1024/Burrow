@@ -2,14 +2,13 @@ package desktop
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"path"
 	"slices"
 	"strings"
 
 	"github.com/egoist/mygo/ui"
 	"sshdesk/internal/fileclient"
+	"sshdesk/internal/locales"
 	"sshdesk/internal/uikit"
 )
 
@@ -18,7 +17,7 @@ func (a *app) applyFileAction(c *ui.Context, dialog *fileActionDialog) bool {
 		return false
 	}
 	if message := fileActionNameError(dialog); message != "" {
-		dialog.errorText = message
+		dialog.errorText = locales.Raw(message)
 		return false
 	}
 	pane := dialog.pane
@@ -27,7 +26,7 @@ func (a *app) applyFileAction(c *ui.Context, dialog *fileActionDialog) bool {
 		run = dialog.session.runtime
 	}
 	if run == nil || run.client == nil || run.ctx.Err() != nil {
-		dialog.errorText = "文件会话未连接"
+		dialog.errorText = locales.Deferred(locales.MessageFileSessionIsNotConnected)
 		return false
 	}
 	name, directory, kind := dialog.name, pane.path, dialog.kind
@@ -41,11 +40,11 @@ func (a *app) applyFileAction(c *ui.Context, dialog *fileActionDialog) bool {
 			}
 		}
 		if len(selected) == 0 {
-			dialog.errorText = "操作的项目已不存在，请刷新目录。"
+			dialog.errorText = locales.Deferred(locales.MessageTheSelectedItemNoLongerExistsRefreshTheDirectory)
 			return false
 		}
 	}
-	dialog.busy, dialog.errorText = true, ""
+	dialog.busy, dialog.errorText = true, locales.Text{}
 	client, ctx := run.client, run.ctx
 	a.sshWorkers.Go(func() {
 		var err error
@@ -61,25 +60,29 @@ func (a *app) applyFileAction(c *ui.Context, dialog *fileActionDialog) bool {
 			}
 		case "delete":
 			if len(selected) == 0 {
-				err = errors.New("未选择要删除的项目")
+				err = locales.NewError(locales.MessageNoItemsSelectedForDeletion)
 			}
 			for index, entry := range selected {
 				if err != nil {
 					break
 				}
 				if err = removeFileTree(ctx, client, entry.path, 0); err != nil {
-					err = fmt.Errorf("已删除 %d/%d 项；%s：%w", index, len(selected), entry.name, err)
+					err = locales.Errorf(locales.MessageDeletedItems, index, len(selected), entry.name, err)
 				}
 			}
 		default:
-			err = fmt.Errorf("不支持的文件操作 %q", kind)
+			err = locales.Errorf(locales.MessageUnsupportedFileOperation, kind)
 		}
 		a.window.Update(func() {
 			dialog.busy = false
 			if err != nil {
-				dialog.errorText = err.Error()
+				dialog.errorText = locales.ErrorText(err)
 				if a.files.dialog != dialog {
-					a.files.notice = &uikit.ToastProps{ID: "file-action-error", Tone: uikit.ToneDanger, Title: "文件操作失败", Detail: err.Error()}
+					a.files.notice = &uikit.ToastProps{ID: "file-action-error", Tone: uikit.ToneDanger, Title: locales.Deferred(
+						locales.MessageFileOperationFailed,
+					), Detail: locales.ErrorText(
+						err,
+					)}
 				}
 			} else {
 				if a.files.dialog == dialog {
@@ -103,7 +106,7 @@ func removeFileTree(ctx context.Context, client fileclient.Client, location stri
 		return remover.RemoveTree(ctx, location)
 	}
 	if depth > 256 {
-		return errors.New("目录层级过深，已停止删除")
+		return locales.NewError(locales.MessageDirectoryNestingIsTooDeepDeletionStopped)
 	}
 	entry, err := client.Stat(ctx, location)
 	if err != nil {
@@ -116,7 +119,7 @@ func removeFileTree(ctx context.Context, client fileclient.Client, location stri
 		}
 		for _, child := range entries {
 			if child.Name == "" || child.Name == "." || child.Name == ".." || strings.ContainsAny(child.Name, "/\x00") {
-				return errors.New("服务器返回了非法目录项")
+				return locales.NewError(locales.MessageTheServerReturnedAnInvalidDirectoryEntry)
 			}
 			if err := removeFileTree(ctx, client, path.Join(location, child.Name), depth+1); err != nil {
 				return err

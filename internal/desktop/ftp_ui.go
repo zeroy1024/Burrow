@@ -1,13 +1,14 @@
 package desktop
 
 import (
-	"fmt"
+	"github.com/egoist/mygo/i18n"
 	"os"
 	"path"
 	"path/filepath"
 	"slices"
 	"strings"
 
+	"sshdesk/internal/locales"
 	"sshdesk/internal/theme"
 	"sshdesk/internal/uikit"
 
@@ -31,7 +32,7 @@ func (a *app) fileWorkspace(c *ui.Context) {
 		session := a.currentFileSession()
 		if session == nil {
 			uikit.EmptyState(c, uikit.EmptyProps{Kind: uikit.EmptyFiles, Icon: filesIcon,
-				Title: "选择站点，浏览远程文件", Detail: "从左侧站点目录打开 SFTP / FTP 会话"})
+				Title: locales.MessageSelectASiteToBrowseRemoteFiles(), Detail: locales.MessageOpenAnSftpFtpSessionFromTheSiteSidebar()})
 		} else if session.state != connected {
 			a.fileConnectionPage(c, session)
 		} else {
@@ -44,17 +45,17 @@ func (a *app) fileWorkspace(c *ui.Context) {
 }
 
 func (a *app) fileConnectionPage(c *ui.Context, session *fileSession) {
-	message := "会话已断开"
+	message := locales.MessageSessionDisconnected()
 	switch session.state {
 	case connecting:
-		message = "正在连接 " + session.endpoint.name + "…"
+		message = locales.MessageConnectingTo() + session.endpoint.name + "…"
 	case connectionFailed:
-		message = "连接失败"
+		message = locales.MessageConnectionFailed()
 	}
 	props := uikit.EmptyProps{Kind: uikit.EmptyConnection, Icon: filesIcon, Title: message,
-		Error: session.errorText, Detail: session.endpoint.user + "@" + session.endpoint.address}
+		Error: session.errorText.String(), Detail: session.endpoint.user + "@" + session.endpoint.address}
 	if session.state != connecting {
-		props.Action = "重新连接"
+		props.Action = locales.MessageReconnect()
 	}
 	parts := uikit.EmptyState(c, props)
 	if props.Action != "" {
@@ -169,7 +170,13 @@ func (a *app) filePane(c *ui.Context, session *fileSession, pane *filePaneState,
 	t := theme.Current()
 	compact := targetWidth < t.C.FilePane.CompactWidth
 	columns := fileTableColumns(t, compact)
-	card := uikit.FilePane(c, pane, map[bool]string{true: "远程文件", false: "本地文件"}[pane.remote], &pane.focus, a.files.activeRemote == pane.remote)
+	card := uikit.FilePane(
+		c,
+		pane,
+		map[bool]string{true: locales.MessageRemoteFiles(), false: locales.MessageLocalFiles()}[pane.remote],
+		&pane.focus,
+		a.files.activeRemote == pane.remote,
+	)
 	if card.FocusWithin() {
 		a.files.activeRemote = pane.remote
 	}
@@ -197,7 +204,7 @@ func (a *app) filePane(c *ui.Context, session *fileSession, pane *filePaneState,
 		}
 		table := uikit.DataTable(c.Key("file-scroll"), &pane.table, &pane.scroll, columns, uikit.TableProps{
 			Count: len(entries), HeaderHeight: headHeight, FooterHeight: footerHeight,
-			Width: targetWidth, Focused: a.files.activeRemote == pane.remote, Zebra: true, Label: map[bool]string{true: "远程文件", false: "本地文件"}[pane.remote],
+			Width: targetWidth, Focused: a.files.activeRemote == pane.remote, Zebra: true, Label: map[bool]string{true: locales.MessageRemoteFiles(), false: locales.MessageLocalFiles()}[pane.remote],
 			Key: func(index int) string { return entries[index].path }, RowLabel: func(index int) string { return entries[index].name }, Reveal: pane.reveal,
 			Underlay: func() { a.fileScrollEdge(c, headHeight, false); a.fileScrollEdge(c, footerHeight, true) },
 			Backdrop: backdrop,
@@ -206,11 +213,11 @@ func (a *app) filePane(c *ui.Context, session *fileSession, pane *filePaneState,
 				folderTarget = target
 			}
 		}, func() {
-			message := "此文件夹为空"
+			message := locales.MessageThisFolderIsEmpty()
 			if pane.loading {
-				message = "正在读取目录…"
-			} else if pane.errorText != "" {
-				message = pane.errorText
+				message = locales.MessageReadingDirectory()
+			} else if !pane.errorText.Empty() {
+				message = pane.errorText.String()
 			}
 			uikit.EmptyMessage(c, message, uikit.EmptyFolder).PassThrough()
 		})
@@ -260,9 +267,9 @@ func (a *app) fileToolbar(c *ui.Context, session *fileSession, pane *filePaneSta
 	t := theme.Current()
 	uikit.FilePaneHeader(c).Children(func() {
 		if pane.remote {
-			label := "显示本地面板"
+			label := locales.MessageShowLocalPane()
 			if a.files.localOpen {
-				label = "隐藏本地面板"
+				label = locales.MessageHideLocalPane()
 			}
 			toggle := uikit.PaneToggle(c, &a.files.localOpen, uikit.PaneToggleProps{
 				Label: label, Icon: sidebarIcon, IconOn: fileSidebarOnIcon, Shortcut: shortcutDisplay("Cmd+Shift+L"),
@@ -282,9 +289,9 @@ func (a *app) fileToolbar(c *ui.Context, session *fileSession, pane *filePaneSta
 		history.Forward.OnClick(func() { a.fileHistory(c, session, pane, 1) })
 		if compact {
 			a.fileSearchSlot(c, session, pane)
-			label := "搜索当前文件夹"
+			label := locales.MessageSearchCurrentFolder()
 			if pane.searchOpen {
-				label = "收起搜索"
+				label = locales.MessageCloseSearch()
 			}
 			uikit.IconButton(c, searchIcon, uikit.IconButtonProps{Key: "file-search-toggle", Label: label}).
 				Expanded(pane.searchOpen).OnClick(func() {
@@ -302,14 +309,26 @@ func (a *app) fileToolbar(c *ui.Context, session *fileSession, pane *filePaneSta
 			fileSearchInput(c, pane).Width(t.C.FilePane.SearchWidth)
 		}
 		if pane.remote {
-			uikit.IconButton(c, transferUpIcon, uikit.IconButtonProps{Label: "上传文件"}).
+			uikit.IconButton(c, transferUpIcon, uikit.IconButtonProps{Label: locales.MessageUploadFiles()}).
 				OnClick(func() { a.chooseUpload(c, session) })
 		}
-		uikit.IconButton(c, fileNewFolderIcon, uikit.IconButtonProps{Label: "新建文件夹", Disabled: !fileWritable(pane, pane.path)}).OnClick(func() {
-			a.files.dialog = &fileActionDialog{session: session, pane: pane, kind: "mkdir", name: "新建文件夹"}
+		uikit.IconButton(
+			c,
+			fileNewFolderIcon,
+			uikit.IconButtonProps{Label: locales.MessageNewFolder(), Disabled: !fileWritable(pane, pane.path)},
+		).OnClick(func() {
+			a.files.dialog = &fileActionDialog{session: session, pane: pane, kind: "mkdir", name: locales.MessageNewFolder()}
 		})
-		uikit.IconButton(c, fileRefreshIcon, uikit.IconButtonProps{Label: "刷新"}).OnClick(func() { a.refreshFilePane(session, pane) })
-		uikit.MenuOn(c, uikit.IconButton(c, moreIcon, uikit.IconButtonProps{Label: "更多文件操作"}), a.filePaneMenu(c, session, pane))
+		uikit.IconButton(
+			c,
+			fileRefreshIcon,
+			uikit.IconButtonProps{Label: locales.MessageRefresh()},
+		).OnClick(func() { a.refreshFilePane(session, pane) })
+		uikit.MenuOn(
+			c,
+			uikit.IconButton(c, moreIcon, uikit.IconButtonProps{Label: locales.MessageMoreFileActions()}),
+			a.filePaneMenu(c, session, pane),
+		)
 	})
 }
 
@@ -352,14 +371,14 @@ func (a *app) fileSearchSlot(c *ui.Context, session *fileSession, pane *filePane
 func fileSearchInput(c *ui.Context, pane *filePaneState) ui.Element {
 	t := theme.Current()
 	parts := uikit.SearchField(c.Key("file-query"), &pane.query, uikit.SearchProps{Variant: uikit.SearchFilter, Height: t.C.Breadcrumb.Height,
-		Handle: &pane.search, Label: "搜索当前文件夹", Placeholder: "搜索文件"})
+		Handle: &pane.search, Label: locales.MessageSearchCurrentFolder(), Placeholder: locales.MessageSearchFiles()})
 	return parts.Root.MinWidth(0)
 }
 
 func (a *app) filePaneLabel(c *ui.Context, pane *filePaneState) {
-	label := "本地"
+	label := locales.MessageLocal()
 	if pane.remote {
-		label = "远程"
+		label = locales.MessageRemote()
 	}
 	uikit.PaneLabel(c, label, a.files.localOpen, a.files.activeRemote == pane.remote)
 }
@@ -397,11 +416,11 @@ func (a *app) fileBreadcrumbs(c *ui.Context, session *fileSession, pane *filePan
 
 func fileTableColumns(t *theme.Theme, compact bool) []uikit.Column {
 	columns := []uikit.Column{
-		{ID: "name", Title: "名称", SortLabel: "按名称排序", MinWidth: t.C.FilePane.NameMinWidth, LeadingWidth: t.Size.Icon + t.C.FileList.ColumnGap, MiddleEllipsis: true, Sortable: true},
-		{ID: "size", Title: "大小", SortLabel: "按大小排序", Width: t.C.FilePane.SizeWidth, MinWidth: t.C.FilePane.SizeWidth, Align: uikit.AlignEnd, Sortable: true, TextStyle: uikit.ColumnMetadata},
-		{ID: "modified", Title: "修改时间", SortLabel: "按修改时间排序", Width: t.C.FilePane.DateWidth, MinWidth: t.C.FilePane.DateWidth, Sortable: true, TextStyle: uikit.ColumnMetadata},
-		{ID: "permissions", Title: "权限", SortLabel: "按权限排序", Width: t.C.FilePane.PermissionsWidth, MinWidth: t.C.FilePane.PermissionsWidth, TextStyle: uikit.ColumnMonoMetadata},
-		{ID: "owner", Title: "所有者", SortLabel: "按所有者排序", Width: t.C.FilePane.OwnerWidth, MinWidth: t.C.FilePane.OwnerWidth, TextStyle: uikit.ColumnMetadata},
+		{ID: "name", Title: locales.CommonName(), SortLabel: locales.MessageSortByName(), MinWidth: t.C.FilePane.NameMinWidth, LeadingWidth: t.Size.Icon + t.C.FileList.ColumnGap, MiddleEllipsis: true, Sortable: true},
+		{ID: "size", Title: locales.MessageSize(), SortLabel: locales.MessageSortBySize(), Width: t.C.FilePane.SizeWidth, MinWidth: t.C.FilePane.SizeWidth, Align: uikit.AlignEnd, Sortable: true, TextStyle: uikit.ColumnMetadata},
+		{ID: "modified", Title: locales.MessageModified(), SortLabel: locales.MessageSortByModifiedDate(), Width: t.C.FilePane.DateWidth, MinWidth: t.C.FilePane.DateWidth, Sortable: true, TextStyle: uikit.ColumnMetadata},
+		{ID: "permissions", Title: locales.MessagePermissions(), SortLabel: locales.MessageSortByPermissions(), Width: t.C.FilePane.PermissionsWidth, MinWidth: t.C.FilePane.PermissionsWidth, TextStyle: uikit.ColumnMonoMetadata},
+		{ID: "owner", Title: locales.MessageOwner(), SortLabel: locales.MessageSortByOwner(), Width: t.C.FilePane.OwnerWidth, MinWidth: t.C.FilePane.OwnerWidth, TextStyle: uikit.ColumnMetadata},
 	}
 	if compact {
 		return columns[:3]
@@ -460,14 +479,14 @@ func fileTableRowData(entry fileEntry) (uikit.FileKind, []string) {
 	} else {
 		size = transferBytes(entry.size)
 	}
-	return kind, []string{entry.name, size, entry.modified.Format("01月02日 15:04"), entry.permissions, entry.owner}
+	return kind, []string{entry.name, size, localizedDateOptions(entry.modified, i18n.DateOptions{Skeleton: "MMMdjm"}), entry.permissions, entry.owner}
 }
 
 func (a *app) filePaneMenu(c *ui.Context, session *fileSession, pane *filePaneState) []uikit.MenuEntry {
 	selection := pane.selection()
-	label, icon := "上传所选项目", uikit.IconUpload
+	label, icon := locales.MessageUploadSelectedItems(), uikit.IconUpload
 	if pane.remote {
-		label, icon = "下载所选项目", uikit.IconDownload
+		label, icon = locales.MessageDownloadSelectedItems(), uikit.IconDownload
 	}
 	writable := fileWritable(pane, pane.path)
 	entries := []uikit.MenuEntry{
@@ -480,23 +499,23 @@ func (a *app) filePaneMenu(c *ui.Context, session *fileSession, pane *filePaneSt
 			a.requestFileTransfer(c, fileDrag{session: session, remote: pane.remote, entries: selection}, target, target.path)
 		}},
 		{ID: "transfer-divider", Separator: true},
-		{ID: "mkdir", Label: "新建文件夹", Icon: uikit.IconFolder, Disabled: !writable, OnChoose: func() {
-			a.files.dialog = &fileActionDialog{session: session, pane: pane, kind: "mkdir", name: "新建文件夹"}
+		{ID: "mkdir", Label: locales.MessageNewFolder(), Icon: uikit.IconFolder, Disabled: !writable, OnChoose: func() {
+			a.files.dialog = &fileActionDialog{session: session, pane: pane, kind: "mkdir", name: locales.MessageNewFolder()}
 		}},
-		{ID: "rename", Label: "重命名", Icon: uikit.IconEdit, Disabled: len(selection) != 1 || !writable, OnChoose: func() {
+		{ID: "rename", Label: locales.MessageRename(), Icon: uikit.IconEdit, Disabled: len(selection) != 1 || !writable, OnChoose: func() {
 			a.files.dialog = &fileActionDialog{session: session, pane: pane, kind: "rename", name: selection[0].name, original: selection[0].name}
 		}},
-		{ID: "copy-path", Label: "复制路径", Icon: uikit.IconCopy, Disabled: len(selection) != 1, OnChoose: func() { mygo.Clipboard.WriteText(selection[0].path) }},
+		{ID: "copy-path", Label: locales.MessageCopyPath(), Icon: uikit.IconCopy, Disabled: len(selection) != 1, OnChoose: func() { mygo.Clipboard.WriteText(selection[0].path) }},
 	}
 	if !pane.remote {
 		entries = append(entries, uikit.MenuEntry{ID: "local-divider", Separator: true},
 			uikit.MenuEntry{
-				ID: "local-reveal", Label: "在文件管理器中显示", Icon: uikit.IconFolder,
+				ID: "local-reveal", Label: locales.MessageShowInFileManager(), Icon: uikit.IconFolder,
 				Disabled: len(selection) != 1, OnChoose: func() { mygo.Shell.ShowItemInFolder(selection[0].path) },
 			})
 	}
 	entries = append(entries, uikit.MenuEntry{ID: "danger-divider", Separator: true},
-		uikit.MenuEntry{ID: "delete", Label: "删除所选项目", Icon: uikit.IconTrash, Danger: true, Disabled: len(selection) == 0 || !writable, OnChoose: func() {
+		uikit.MenuEntry{ID: "delete", Label: locales.MessageDeleteSelectedItems(), Icon: uikit.IconTrash, Danger: true, Disabled: len(selection) == 0 || !writable, OnChoose: func() {
 			a.files.dialog = &fileActionDialog{session: session, pane: pane, kind: "delete"}
 		}})
 	return entries
@@ -536,7 +555,7 @@ func (a *app) fileStatus(c *ui.Context, session *fileSession, pane *filePaneStat
 	items := []string{}
 	source := ""
 	if !compact || !pane.remote {
-		source = "本机"
+		source = locales.MessageThisComputer()
 		if pane.remote {
 			h := session.endpoint
 			source = h.user + "@" + h.name
@@ -592,7 +611,7 @@ func (a *app) fileDropTarget(
 		return ""
 	}
 	if !writable {
-		uikit.Tip(c, element, "此目录不可写")
+		uikit.Tip(c, element, locales.MessageThisDirectoryIsNotWritable())
 		return ""
 	}
 	element.DrawOver(func(p *ui.Painter, r ui.Rect) {
@@ -605,17 +624,17 @@ func (a *app) fileDropTarget(
 		}
 	})
 	if directory == pane.path {
-		direction := "下载"
+		direction := "download"
 		if pane.remote {
-			direction = "上传"
+			direction = "upload"
 		}
-		label := "松开以" + direction + "到 " + directory
+		label := locales.FilesDropTarget(direction, directory)
 		if valid {
 			var total int64
 			for _, entry := range drag.entries {
 				total += entry.size
 			}
-			label += fmt.Sprintf(" · %d 项 · %s", len(drag.entries), transferBytes(total))
+			label += locales.FilesDropCount(len(drag.entries), transferBytes(total))
 		}
 		element.Children(func() {
 			uikit.DropHint(c, label, t.C.FilePane.StatusHeight+t.Space.N12)
@@ -627,11 +646,18 @@ func (a *app) fileDropTarget(
 
 func (a *app) chooseUpload(c *ui.Context, session *fileSession) {
 	paths, err := mygo.Dialog.Open(mygo.OpenDialogOptions{
-		Parent: a.window, Title: "选择上传文件", Multiple: true,
-		Message: "上传到当前远程目录。",
+		Parent: a.window, Title: locales.MessageChooseFilesToUpload(), Multiple: true,
+		Message: locales.MessageUploadToTheCurrentRemoteDirectory(),
 	})
 	if err != nil {
-		uikit.Toast(c, uikit.ToastProps{ID: "打开文件选择器失败：" + err.Error(), Tone: uikit.ToneDanger, Title: "打开文件选择器失败", Detail: err.Error()})
+		uikit.Toast(
+			c,
+			uikit.ToastProps{ID: locales.MessageUnableToOpenFilePicker() + err.Error(), Tone: uikit.ToneDanger, Title: locales.Deferred(
+				locales.MessageUnableToOpenFilePicker2,
+			), Detail: locales.ErrorText(
+				err,
+			)},
+		)
 		return
 	}
 	a.uploadFinderPaths(c, session, paths, session.remote.path)
@@ -642,12 +668,19 @@ func (a *app) uploadFinderPaths(c *ui.Context, session *fileSession, paths []str
 	for _, source := range paths {
 		info, err := os.Lstat(source)
 		if err != nil {
-			uikit.Toast(c, uikit.ToastProps{ID: "无法读取文件信息：" + err.Error(), Tone: uikit.ToneDanger, Title: "无法读取文件信息", Detail: err.Error()})
+			uikit.Toast(
+				c,
+				uikit.ToastProps{ID: locales.MessageUnableToReadFileInformation() + err.Error(), Tone: uikit.ToneDanger, Title: locales.Deferred(
+					locales.MessageUnableToReadFileInformation2,
+				), Detail: locales.ErrorText(
+					err,
+				)},
+			)
 			return
 		}
 		entries = append(entries, fileEntry{
 			name: filepath.Base(source), path: source, size: info.Size(), dir: info.IsDir(),
-			modified: info.ModTime(), permissions: info.Mode().Perm().String(), owner: "本机",
+			modified: info.ModTime(), permissions: info.Mode().Perm().String(), owner: locales.MessageThisComputer(),
 		})
 	}
 	a.requestFileTransfer(c, fileDrag{session: session, entries: entries}, session.remote, target)

@@ -3,7 +3,6 @@ package desktop
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net"
 	"os/user"
 	"slices"
@@ -11,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"sshdesk/internal/locales"
 	"sshdesk/internal/sshclient"
 	"sshdesk/internal/vault"
 
@@ -129,7 +129,11 @@ func (a *app) sshRuntimeConfig(ctx context.Context, step sshDialStep, override s
 		answers := make([]string, 0, len(questions))
 		for index, question := range questions {
 			answer := a.askSSH(ctx, &sshPrompt{
-				title: "SSH 交互认证", address: address, detail: instruction + "\n" + question,
+				title: locales.Deferred(
+					locales.MessageSshInteractiveAuthentication,
+				), address: address, detail: locales.Raw(
+					instruction + "\n" + question,
+				),
 				echo: index < len(echoes) && echoes[index],
 			})
 			if !answer.accepted {
@@ -156,10 +160,10 @@ func (a *app) sshRuntimeConfig(ctx context.Context, step sshDialStep, override s
 				return cfg, nil
 			}
 			if !errors.Is(err, vault.ErrNotFound) {
-				return cfg, fmt.Errorf("读取会话密码：%w", err)
+				return cfg, locales.Errorf(locales.MessageReadSessionPassword, err)
 			}
 		}
-		answer := a.askSSH(ctx, &sshPrompt{title: "输入 SSH 密码", address: address})
+		answer := a.askSSH(ctx, &sshPrompt{title: locales.Deferred(locales.MessageEnterSshPassword), address: address})
 		if !answer.accepted {
 			if ctx.Err() != nil {
 				return cfg, ctx.Err()
@@ -170,7 +174,7 @@ func (a *app) sshRuntimeConfig(ctx context.Context, step sshDialStep, override s
 	case "key":
 		data, err := a.vault.Get(ctx, step.key.SecretID)
 		if err != nil {
-			return cfg, fmt.Errorf("读取私钥：%w", err)
+			return cfg, locales.Errorf(locales.MessageReadPrivateKey, err)
 		}
 		defer clear(data)
 		cfg.Signer, err = ssh.ParsePrivateKey(data)
@@ -179,20 +183,23 @@ func (a *app) sshRuntimeConfig(ctx context.Context, step sshDialStep, override s
 			return cfg, nil
 		}
 		if !errors.As(err, &encrypted) {
-			return cfg, fmt.Errorf("解析私钥：%w", err)
+			return cfg, locales.Errorf(locales.MessageParsePrivateKey, err)
 		}
 		if override.passphrase != nil {
 			cfg.Passphrase = *override.passphrase
 		} else {
 			secret, err := a.vault.Get(ctx, "key/"+step.key.ID+"/passphrase")
 			if err != nil && !errors.Is(err, vault.ErrNotFound) {
-				return cfg, fmt.Errorf("读取私钥口令：%w", err)
+				return cfg, locales.Errorf(locales.MessageReadPrivateKeyPassphrase, err)
 			}
 			cfg.Passphrase = string(secret)
 			clear(secret)
 		}
 		if cfg.Passphrase == "" {
-			answer := a.askSSH(ctx, &sshPrompt{title: "输入私钥口令", address: address})
+			answer := a.askSSH(
+				ctx,
+				&sshPrompt{title: locales.Deferred(locales.MessageEnterPrivateKeyPassphrase), address: address},
+			)
 			if !answer.accepted {
 				if ctx.Err() != nil {
 					return cfg, ctx.Err()
@@ -204,18 +211,20 @@ func (a *app) sshRuntimeConfig(ctx context.Context, step sshDialStep, override s
 		cfg.Signer, err = ssh.ParsePrivateKeyWithPassphrase(data, []byte(cfg.Passphrase))
 		cfg.Passphrase = ""
 		if err != nil {
-			return cfg, fmt.Errorf("解析私钥：%w", err)
+			return cfg, locales.Errorf(locales.MessageParsePrivateKey, err)
 		}
 	case "agent":
 	default:
-		return cfg, fmt.Errorf("不支持的 SSH 认证方式 %q", cfg.Auth)
+		return cfg, locales.Errorf(locales.MessageUnsupportedSshAuthenticationMethod, cfg.Auth)
 	}
 	return cfg, nil
 }
 
 func (a *app) sshHostKeyCallback(ctx context.Context, trust sshclient.HostKeyStore, result *connectionTestResult) ssh.HostKeyCallback {
 	verify := sshclient.KnownHosts(ctx, trust, func(hostname, fingerprint, keyType string) bool {
-		accepted := a.askSSH(ctx, &sshPrompt{title: "信任服务器主机密钥？", address: hostname,
+		accepted := a.askSSH(ctx, &sshPrompt{title: locales.Deferred(
+			locales.MessageTrustTheServerSHostKey,
+		), address: hostname,
 			fingerprint: fingerprint, keyType: keyType}).accepted
 		if accepted && result != nil {
 			result.NewHost, result.Fingerprint = true, fingerprint

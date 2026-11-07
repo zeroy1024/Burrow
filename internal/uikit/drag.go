@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/egoist/mygo/ui"
+	"sshdesk/internal/locales"
 	"sshdesk/internal/theme"
 )
 
@@ -187,7 +188,7 @@ func DragGroupLabel(c *ui.Context, title string, count int, chevron *ui.SVG, pro
 	ui.Text(c, title).FontSize(p.FontSize).FontWeight(weight).TextColor(ink).PassThrough()
 	ui.Spacer(c).PassThrough()
 	if props.Dragging {
-		ui.Text(c, strconv.Itoa(count)+" 台").FontSize(p.CountSize).TextColor(Color(p.Count)).PassThrough()
+		ui.Text(c, strconv.Itoa(count)+locales.MessageHosts2()).FontSize(p.CountSize).TextColor(Color(p.Count)).PassThrough()
 	} else {
 		Count(c, count, CountProps{Style: CountQuiet})
 	}

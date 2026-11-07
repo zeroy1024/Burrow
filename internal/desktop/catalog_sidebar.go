@@ -5,6 +5,7 @@ import (
 	"slices"
 	"strings"
 
+	"sshdesk/internal/locales"
 	"sshdesk/internal/theme"
 	"sshdesk/internal/uikit"
 
@@ -76,12 +77,12 @@ func (a *app) catalogList(c *ui.Context) {
 					}
 				}
 				if len(a.page().catalogSlots) == 0 && strings.TrimSpace(a.page().query) != "" {
-					uikit.EmptyMessage(c, "没有匹配的主机", uikit.EmptyCatalogSearch)
+					uikit.EmptyMessage(c, locales.MessageNoMatchingHosts(), uikit.EmptyCatalogSearch)
 				}
 			})
 		})
 		uikit.Scrollbars(c, viewport, content, &a.page().catalogScroll, uikit.ScrollbarProps{
-			Label: "会话栏滚动条", State: &a.page().catalogScrollbar,
+			Label: locales.MessageSessionSidebarScrollbar(), State: &a.page().catalogScrollbar,
 		})
 	})
 	if a.section == sectionSSH {
@@ -150,7 +151,10 @@ func (a *app) catalogHeader(c *ui.Context, slot catalogSlot) ui.Element {
 	})
 	if result.Toggled {
 		a.page().lastGroup = group
-		a.commitCatalogMoveAsync(func() { a.setGroupCollapsed(group, !a.groupCollapsed(group)) }, func(err error) { a.persistenceNotice("保存分组状态失败", err) })
+		a.commitCatalogMoveAsync(
+			func() { a.setGroupCollapsed(group, !a.groupCollapsed(group)) },
+			func(err error) { a.persistenceNotice(locales.MessageUnableToSaveGroupState, err) },
+		)
 	}
 	var menu []uikit.MenuEntry
 	if a.page().catalogDrag == nil {
@@ -167,21 +171,21 @@ func (a *app) catalogHeader(c *ui.Context, slot catalogSlot) ui.Element {
 }
 
 func (a *app) catalogGroupMenu(c *ui.Context, group *hostGroup) []uikit.MenuEntry {
-	addLabel := "添加主机"
+	addLabel := locales.MessageAddHost()
 	if group.scope == sectionFiles {
-		addLabel = "添加站点"
+		addLabel = locales.MessageAddSite()
 	}
 	return []uikit.MenuEntry{
-		{ID: "add", Label: localize(c, addLabel), Icon: uikit.IconPlus, OnChoose: func() {
+		{ID: "add", Label: addLabel, Icon: uikit.IconPlus, OnChoose: func() {
 			a.page().lastGroup = group
 			a.startHostDraft()
 		}},
-		{ID: "new-group", Label: localize(c, "新建分组"), Icon: uikit.IconFolder, OnChoose: a.startGroupDraft},
-		{ID: "rename-group", Label: localize(c, "修改组名"), Icon: uikit.IconEdit, OnChoose: func() {
+		{ID: "new-group", Label: locales.MessageNewGroup(), Icon: uikit.IconFolder, OnChoose: a.startGroupDraft},
+		{ID: "rename-group", Label: locales.MessageRenameGroup(), Icon: uikit.IconEdit, OnChoose: func() {
 			a.startGroupRename(group)
 		}},
 		{ID: "before-delete", Separator: true},
-		{ID: "delete-group", Label: localize(c, "删除分组"), Icon: uikit.IconTrash, Danger: true,
+		{ID: "delete-group", Label: locales.MessageDeleteGroup(), Icon: uikit.IconTrash, Danger: true,
 			Disabled: a.groupDeleteDestination(group) == nil, OnChoose: func() {
 				a.page().groupDelete = group
 				a.page().groupRename = nil
@@ -192,12 +196,12 @@ func (a *app) catalogGroupMenu(c *ui.Context, group *hostGroup) []uikit.MenuEntr
 
 func (a *app) catalogHostMenu(c *ui.Context, id hostID) []uikit.MenuEntry {
 	h := a.hosts[id]
-	connectLabel, editLabel, deleteLabel := "连接主机", "编辑主机", "删除主机"
+	connectLabel, editLabel, deleteLabel := locales.MessageConnectHost(), locales.MessageEditHost(), locales.MessageDeleteHost()
 	if a.section == sectionFiles {
-		connectLabel, editLabel, deleteLabel = "连接站点", "编辑站点", "删除站点"
+		connectLabel, editLabel, deleteLabel = locales.MessageConnectSite(), locales.MessageEditSite(), locales.MessageDeleteSite()
 	}
 	menu := []uikit.MenuEntry{
-		{ID: "connect", Label: localize(c, connectLabel), Icon: uikit.IconTerminal, OnChoose: func() {
+		{ID: "connect", Label: connectLabel, Icon: uikit.IconTerminal, OnChoose: func() {
 			a.openCatalogHost(id)
 			if a.section == sectionFiles {
 				session := a.currentFileSession()
@@ -207,7 +211,7 @@ func (a *app) catalogHostMenu(c *ui.Context, id hostID) []uikit.MenuEntry {
 			}
 		}},
 		{ID: "after-connect", Separator: true},
-		{ID: "edit", Label: localize(c, editLabel), Icon: uikit.IconEdit, OnChoose: func() {
+		{ID: "edit", Label: editLabel, Icon: uikit.IconEdit, OnChoose: func() {
 			for _, group := range a.catalogGroups() {
 				if slices.Contains(group.hosts, id) {
 					a.page().lastGroup = group
@@ -216,7 +220,7 @@ func (a *app) catalogHostMenu(c *ui.Context, id hostID) []uikit.MenuEntry {
 			}
 			a.startEditHostDraft(id)
 		}},
-		{ID: "copy", Label: localize(c, "复制地址"), Icon: uikit.IconCopy, OnChoose: func() {
+		{ID: "copy", Label: locales.MessageCopyAddress(), Icon: uikit.IconCopy, OnChoose: func() {
 			address := fmt.Sprintf("%s@%s:%d", h.user, h.address, h.port)
 			if a.section == sectionFiles {
 				protocol := "sftp"
@@ -228,9 +232,9 @@ func (a *app) catalogHostMenu(c *ui.Context, id hostID) []uikit.MenuEntry {
 			mygo.Clipboard.WriteText(address)
 		}},
 		{ID: "before-delete", Separator: true},
-		{ID: "delete", Label: localize(c, deleteLabel), Icon: uikit.IconTrash, Danger: true, OnChoose: func() {
+		{ID: "delete", Label: deleteLabel, Icon: uikit.IconTrash, Danger: true, OnChoose: func() {
 			if a.fileSiteBusy(id) {
-				uikit.Notify(c, "请先取消或清除该会话的传输任务")
+				uikit.Notify(c, locales.MessageCancelOrRemoveThisSessionSTransfersFirst())
 				return
 			}
 			a.page().draft = hostDraft{id: id, name: h.name, deleting: true}
@@ -238,12 +242,12 @@ func (a *app) catalogHostMenu(c *ui.Context, id hostID) []uikit.MenuEntry {
 		}},
 	}
 	if h.protocol == "" || h.protocol == "sftp" {
-		label := "快捷添加到 SFTP…"
+		label := locales.MessageQuickAddToSftp()
 		if h.protocol == "sftp" {
-			label = "快捷添加到 SSH…"
+			label = locales.MessageQuickAddToSsh()
 		}
 		menu = slices.Insert(menu, 3, uikit.MenuEntry{
-			ID: "add-other-protocol", Label: localize(c, label), Icon: uikit.IconPlus,
+			ID: "add-other-protocol", Label: label, Icon: uikit.IconPlus,
 			OnChoose: func() { a.startOtherProtocolDraft(id) },
 		})
 	}

@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/egoist/mygo/ui"
+	"sshdesk/internal/locales"
 	"sshdesk/internal/theme"
 )
 
@@ -23,7 +24,7 @@ func CodeBlock(c *ui.Context, label, value string) CodeBlockResult {
 			Text(c, label, TextProps{Style: TextFootnote, Tone: ToneSecondary})
 			ui.Spacer(c)
 			result.Copy = IconButton(c, IconCopy, IconButtonProps{
-				Key: "copy", Label: "复制" + label, Size: SizeSm,
+				Key: "copy", Label: locales.CommonCopy() + label, Size: SizeSm,
 			}).Clicked()
 		})
 		content := ui.TextAreaBase(c, &value).FillWidth().MinWidth(0).Lines(2, 12).ReadOnly(true).TrackScroll(scroll).
@@ -38,7 +39,7 @@ func CodeBlock(c *ui.Context, label, value string) CodeBlockResult {
 			content.SetTextSelection(0, 0)
 			*shown = value
 		}
-		Scrollbars(c, result.Root, content, scroll, ScrollbarProps{Label: label + "滚动条", Contain: true})
+		Scrollbars(c, result.Root, content, scroll, ScrollbarProps{Label: label + locales.MessageScrollbar(), Contain: true})
 	})
 	return result
 }

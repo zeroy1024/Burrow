@@ -1,6 +1,7 @@
 package uikit
 
 import (
+	"sshdesk/internal/locales"
 	"sshdesk/internal/theme"
 
 	"github.com/egoist/mygo/ui"
@@ -42,9 +43,9 @@ func SortHeader(c *ui.Context, props SortHeaderProps) SortHeaderParts {
 			cell := ui.Box(c).Key(column.ID).Width(widths[index]).Height(t.C.FileList.HeaderHeight).Shrink(0).Role(ui.RoleColumnHeader).Label(column.Title)
 			order, priority, sorted := columnOrder(column, props.State)
 			if sorted {
-				direction := "升序"
+				direction := locales.MessageAscending()
 				if order.Descending {
-					direction = "降序"
+					direction = locales.MessageDescending()
 				}
 				cell.Value(direction).Description(column.Title + "，" + direction)
 			}
@@ -82,7 +83,9 @@ func SortHeader(c *ui.Context, props SortHeaderProps) SortHeaderParts {
 						gap = t.C.FileList.ColumnGap
 					}
 					edge := ui.Box(c).Key("resize").Absolute().Top(0).Bottom(0).Right(-(gap + t.C.Window.Gutter) / 2).Width(t.C.Window.Gutter).
-						Cursor(ui.CursorResizeEW).Focusable().FocusRing(false).Role(ui.RoleSplitter).Label("调整" + column.Title + "列宽").Center()
+						Cursor(ui.CursorResizeEW).Focusable().FocusRing(false).Role(ui.RoleSplitter).Label(locales.TableResizeColumn(
+						column.Title,
+					)).Center()
 					dx, _, dragging := edge.Dragged()
 					width := widths[index]
 					if dragging && dx != 0 {

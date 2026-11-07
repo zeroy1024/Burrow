@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 
+	"sshdesk/internal/locales"
 	"sshdesk/internal/theme"
 	"sshdesk/internal/uikit"
 
@@ -18,17 +19,30 @@ func (a *app) keySettings(c *ui.Context) {
 	t := theme.Current()
 	p := t.C.Settings
 	a.applicationSecuritySettings(c)
-	a.credentialGroup(c, "私钥", func() {
-		uikit.Button(c, localize(c, "导入…"), uikit.ButtonProps{Disabled: a.credentials.busy}).OnClick(a.choosePrivateKey)
-		uikit.Button(c, localize(c, "生成…"), uikit.ButtonProps{Disabled: a.credentials.busy}).OnClick(a.beginKeyGeneration)
+	a.credentialGroup(c, locales.MessagePrivateKeys(), func() {
+		uikit.Button(c, locales.MessageImport2(), uikit.ButtonProps{Disabled: a.credentials.busy}).OnClick(a.choosePrivateKey)
+		uikit.Button(
+			c,
+			locales.MessageGenerate2(),
+			uikit.ButtonProps{Disabled: a.credentials.busy},
+		).OnClick(a.beginKeyGeneration)
 	}, func() {
 		if len(a.keys) == 0 {
-			uikit.Text(c, localize(c, "尚未导入私钥。导入后可用于 SSH 或 SFTP 会话。"), uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneSecondary}).Padding(p.RowPaddingY, p.RowPaddingX)
+			uikit.Text(
+				c,
+				locales.MessageNoPrivateKeysYetImportAKeyToUseItWithSshOr(),
+				uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneSecondary},
+			).Padding(p.RowPaddingY, p.RowPaddingX)
 		}
 		for _, key := range a.keys {
 			key := key
 			query := strings.ToLower(strings.TrimSpace(a.settingsUI.query))
-			if query != "" && !strings.Contains(strings.ToLower(localize(c, "私钥")+" "+localize(c, "密钥与凭据")+" "+key.Name+" "+key.Type+" "+key.Fingerprint+" "), query) {
+			if query != "" && !strings.Contains(
+				strings.ToLower(
+					locales.MessagePrivateKeys()+" "+locales.MessageKeysCredentials()+" "+key.Name+" "+key.Type+" "+key.Fingerprint+" ",
+				),
+				query,
+			) {
 				continue
 			}
 			row := uikit.SettingsRow(c, uikit.SettingsRowProps{Key: key.ID, Gap: t.Space.N12})
@@ -55,35 +69,55 @@ func (a *app) keySettings(c *ui.Context) {
 				ui.Column(c).Grow(1).MinWidth(0).Gap(t.Space.N3).Children(func() {
 					uikit.Text(c, key.Name, uikit.TextProps{Style: uikit.TextBodyStrong})
 					ui.Row(c).Gap(t.Space.N8).Children(func() {
-						uikit.Text(c, localize(c, fmt.Sprintf(localize(c, "%s · %d 位"), key.Type, key.Bits)), uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneSecondary})
+						uikit.Text(
+							c,
+							fmt.Sprintf(locales.MessageBits(), key.Type, key.Bits),
+							uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneSecondary},
+						)
 						fingerprint := uikit.Button(c, key.Fingerprint, uikit.ButtonProps{Variant: uikit.ButtonPlain, Size: uikit.SizeXs}).
-							Label(localize(c, "复制私钥指纹")).Padding(0).Height(t.Font.LineHeight.Sub).
+							Label(locales.MessageCopyPrivateKeyFingerprint()).Padding(0).Height(t.Font.LineHeight.Sub).
 							Font(strings.Join(t.C.Input.MonoFont, ", ")).FontSize(p.RowDescSize).TextColor(uikit.Color(p.RowDesc)).
 							OnClick(func() { mygo.Clipboard.WriteText(key.Fingerprint) })
-						uikit.Tip(c, fingerprint, localize(c, "复制指纹"))
+						uikit.Tip(c, fingerprint, locales.MessageCopyFingerprint())
 					})
-					uikit.Text(c, localize(c, "已加密托管"), uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneSecondary})
-					uikit.Text(c, localize(c, fmt.Sprintf(localize(c, "被 %d 个会话使用"), a.keyUseCount(key.ID))), uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneSecondary})
+					uikit.Text(
+						c,
+						locales.MessageEncryptedInBurrow(),
+						uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneSecondary},
+					)
+					uikit.Text(
+						c,
+						locales.KeysUsageCount(a.keyUseCount(key.ID)),
+						uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneSecondary},
+					)
 				})
-				uikit.MenuOn(c, uikit.IconButton(c, moreIcon, uikit.IconButtonProps{Label: localize(c, "密钥操作"), Disabled: a.credentials.busy}), a.managedKeyMenu(c, key))
+				uikit.MenuOn(
+					c,
+					uikit.IconButton(
+						c,
+						moreIcon,
+						uikit.IconButtonProps{Label: locales.MessageKeyActions(), Disabled: a.credentials.busy},
+					),
+					a.managedKeyMenu(c, key),
+				)
 			})
 		}
 	})
 	a.credentialGroup(c, "ssh-agent", nil, func() {
 		uikit.SettingsRow(c, uikit.SettingsRowProps{Gap: t.Space.N12}).Children(func() {
 			ui.Column(c).Grow(1).MinWidth(0).Gap(t.Space.N4).Children(func() {
-				label, tone := "尚未检测 ssh-agent", uikit.ToneSecondary
+				label, tone := locales.MessageSshAgentNotChecked(), uikit.ToneSecondary
 				if a.credentials.agentLoading {
-					label = "正在检测 ssh-agent…"
+					label = locales.MessageCheckingSshAgent()
 				} else if a.credentials.agentChecked {
 					if a.credentials.agentError != nil {
-						label = "未检测到 ssh-agent"
+						label = locales.MessageSshAgentNotDetected()
 					} else {
-						label = fmt.Sprintf(localize(c, "已连接 · %d 把密钥"), a.credentials.agentCount)
+						label = locales.KeysAgentConnectedCount(a.credentials.agentCount)
 						tone = uikit.ToneSuccess
 					}
 				}
-				uikit.Text(c, localize(c, label), uikit.TextProps{Style: uikit.TextBody, Tone: tone})
+				uikit.Text(c, label, uikit.TextProps{Style: uikit.TextBody, Tone: tone})
 				if socket := os.Getenv("SSH_AUTH_SOCK"); socket != "" {
 					uikit.MiddleLabel(c, socket, uikit.MiddleLabelProps{
 						Font:  ui.Font{Family: strings.Join(t.Font.Family.Mono, ", "), Size: t.Font.Size.Footnote, Weight: t.Font.Weight.Regular},
@@ -91,17 +125,21 @@ func (a *app) keySettings(c *ui.Context) {
 					}).FillWidth()
 				}
 				if a.credentials.agentError != nil {
-					uikit.Text(c, localize(c, a.credentials.agentError.Error()), uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneSecondary})
+					uikit.Text(c, a.credentials.agentError.Error(), uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneSecondary})
 				}
 			})
-			uikit.Button(c, localize(c, "刷新"), uikit.ButtonProps{Disabled: a.credentials.agentLoading}).OnClick(a.refreshCredentialAgent)
+			uikit.Button(
+				c,
+				locales.MessageRefresh(),
+				uikit.ButtonProps{Disabled: a.credentials.agentLoading},
+			).OnClick(a.refreshCredentialAgent)
 		})
-		uikit.Button(c, localize(c, "ssh-agent 使用说明"), uikit.ButtonProps{}).OnClick(func() {
+		uikit.Button(c, locales.MessageAboutSshAgent(), uikit.ButtonProps{}).OnClick(func() {
 			go func() {
 				err := mygo.Shell.OpenExternal("https://www.openssh.com/manual.html")
 				if err != nil {
 					mygo.RunOnMain(func() {
-						a.credentials.notice = err.Error()
+						a.credentials.notice = locales.ErrorText(err)
 						if a.window != nil {
 							a.window.Invalidate()
 						}
@@ -116,16 +154,22 @@ func (a *app) keySettings(c *ui.Context) {
 			count++
 		}
 	}
-	a.credentialGroup(c, "已保存的密码", nil, func() {
-		a.credentialRow(c, fmt.Sprintf(localize(c, "%d 个会话保存了密码"), count), "密码和私钥口令加密保存在本机", func() {
-			uikit.Button(c, localize(c, "全部清除…"), uikit.ButtonProps{Variant: uikit.ButtonDangerPlain, Disabled: count == 0 || a.credentials.busy}).OnClick(func() { a.credentials.draft = &credentialDraft{kind: "clear-passwords"} })
+	a.credentialGroup(c, locales.MessageSavedPasswords(), nil, func() {
+		a.credentialRow(c, locales.KeysSavedPasswordCount(
+			count,
+		), locales.MessagePasswordsAndKeyPassphrasesAreEncryptedOnThisDevice(), func() {
+			uikit.Button(
+				c,
+				locales.MessageClearAll2(),
+				uikit.ButtonProps{Variant: uikit.ButtonDangerPlain, Disabled: count == 0 || a.credentials.busy},
+			).OnClick(func() { a.credentials.draft = &credentialDraft{kind: "clear-passwords"} })
 		})
 	})
 	if a.credentials.busy {
-		uikit.Text(c, localize(c, "正在处理密钥…"), uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneSecondary})
+		uikit.Text(c, locales.MessageProcessingKey(), uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneSecondary})
 	}
-	if a.credentials.notice != "" {
-		uikit.Text(c, localize(c, a.credentials.notice), uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneSecondary})
+	if !a.credentials.notice.Empty() {
+		uikit.Text(c, a.credentials.notice.String(), uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneSecondary})
 	}
 }
 
@@ -133,21 +177,21 @@ func (a *app) credentialGroup(c *ui.Context, title string, actions, content func
 	if strings.TrimSpace(a.settingsUI.query) != "" {
 		description := ""
 		switch title {
-		case "私钥":
+		case locales.MessagePrivateKeys():
 			description = "private keys import generate 导入 生成"
 			for _, key := range a.keys {
 				description += key.Name + key.Type + key.Fingerprint
 			}
 		case "ssh-agent":
 			description = "ssh-agent add refresh 添加到 agent 使用私钥连接成功后添加到 ssh-agent 已连接 刷新"
-		case "已保存的密码":
+		case locales.MessageSavedPasswords():
 			description = "saved passwords clear all 系统钥匙串 保存的密码 全部清除"
 		}
 		if !a.settingMatches(title, description) {
 			return
 		}
 	}
-	uikit.SettingsGroup(c, uikit.SettingsGroupProps{Title: localize(c, title), Actions: actions}, content)
+	uikit.SettingsGroup(c, uikit.SettingsGroupProps{Title: title, Actions: actions}, content)
 }
 
 func (a *app) credentialRow(c *ui.Context, label, help string, control func()) {
@@ -155,24 +199,24 @@ func (a *app) credentialRow(c *ui.Context, label, help string, control func()) {
 		return
 	}
 	uikit.SettingsRow(c, uikit.SettingsRowProps{
-		Gap: theme.Current().Space.N12, Title: localize(c, label), Help: localize(c, help), Control: control,
+		Gap: theme.Current().Space.N12, Title: label, Help: help, Control: control,
 	})
 }
 
 func (a *app) managedKeyMenu(c *ui.Context, key managedKey) []uikit.MenuEntry {
 	used := a.keyUseCount(key.ID)
-	label := "删除…"
+	label := locales.MessageDelete()
 	if used > 0 {
-		label = fmt.Sprintf(localize(c, "删除（被 %d 个会话使用）"), used)
+		label = locales.KeysDeleteUsedCount(used)
 	}
 	return []uikit.MenuEntry{
-		{ID: "rename", Label: localize(c, "重命名…"), Icon: uikit.IconEdit, OnChoose: func() {
+		{ID: "rename", Label: locales.MessageRename2(), Icon: uikit.IconEdit, OnChoose: func() {
 			a.credentials.draft = &credentialDraft{kind: "rename", keyID: key.ID, name: key.Name}
 		}},
-		{ID: "copy-public", Label: localize(c, "复制公钥"), Icon: uikit.IconCopy, OnChoose: func() { a.copyManagedPublicKey(key) }},
-		{ID: "export", Label: localize(c, "导出私钥…"), Icon: uikit.IconFolder, OnChoose: func() { a.exportManagedKey(key) }},
+		{ID: "copy-public", Label: locales.MessageCopyPublicKey(), Icon: uikit.IconCopy, OnChoose: func() { a.copyManagedPublicKey(key) }},
+		{ID: "export", Label: locales.MessageExportPrivateKey2(), Icon: uikit.IconFolder, OnChoose: func() { a.exportManagedKey(key) }},
 		{ID: "before-delete", Separator: true},
-		{ID: "delete", Label: localize(c, label), Icon: uikit.IconTrash, Disabled: used > 0, Danger: true, OnChoose: func() {
+		{ID: "delete", Label: label, Icon: uikit.IconTrash, Disabled: used > 0, Danger: true, OnChoose: func() {
 			a.credentials.draft = &credentialDraft{kind: "delete", keyID: key.ID, name: key.Name}
 		}},
 	}
@@ -190,21 +234,21 @@ func (a *app) credentialDialogs(c *ui.Context) {
 	}
 	t := theme.Current()
 	p := t.C.Modal
-	title, action := "导入私钥", "导入"
+	title, action := locales.MessageImportPrivateKey(), locales.MessageImport()
 	switch d.kind {
 	case "generate":
-		title, action = "生成 SSH 密钥", "生成"
+		title, action = locales.MessageGenerateSshKey(), locales.MessageGenerate()
 	case "rename":
-		title, action = "重命名密钥", "保存"
+		title, action = locales.MessageRenameKey(), locales.CommonSave()
 	case "delete":
-		title, action = "删除密钥", "删除"
+		title, action = locales.MessageDeleteKey(), locales.CommonDelete()
 	case "clear-passwords":
-		title, action = "清除已保存的密码", "全部清除"
+		title, action = locales.MessageClearSavedPasswords(), locales.MessageClearAll()
 	}
 	open := true
-	props := uikit.ModalProps{Width: p.GenerateWidth, Title: localize(c, title), Disabled: a.credentials.busy,
+	props := uikit.ModalProps{Width: p.GenerateWidth, Title: title, Disabled: a.credentials.busy,
 		Controller: &d.modal,
-		CloseLabel: localize(c, "关闭密钥窗口"), Motion: uikit.MotionOverride(a.reduceMotion(c))}
+		CloseLabel: locales.MessageCloseKeyWindow(), Motion: uikit.MotionOverride(a.reduceMotion(c))}
 	props.Header = func(parts uikit.ModalParts) {
 		parts.Panel.Padding(p.HeaderPaddingTop, p.BodyPaddingX, p.FooterPaddingBottom).Gap(t.Space.N14)
 		uikit.ModalHeader(c, props)
@@ -226,43 +270,56 @@ func (a *app) credentialDialogs(c *ui.Context) {
 		initial := ui.Local(parts.Panel, "uikit.credentials.initial", func() credentialFormValues { return current })
 		parts.SetDirty(current != *initial || d.passphrase != "")
 		if d.kind == "delete" {
-			uikit.Text(c, localize(c, fmt.Sprintf(localize(c, "确认删除「%s」的托管私钥？此操作无法撤销。"), d.name)), uikit.TextProps{})
+			uikit.Text(c, fmt.Sprintf(locales.MessageDeleteTheManagedPrivateKeyThisCannotBeUndone(), d.name), uikit.TextProps{})
 		} else if d.kind == "clear-passwords" {
-			uikit.Text(c, localize(c, "清除已保存的全部会话密码。下次连接时需要重新输入。"), uikit.TextProps{})
+			uikit.Text(c, locales.MessageClearAllSavedSessionPasswordsYouWillNeedToEnterThemAgainWhen(), uikit.TextProps{})
 		} else {
-			credentialField(c, "名称", func() ui.Element {
-				return uikit.Input(c, &d.name, uikit.InputProps{}).Label(localize(c, "密钥名称")).AutoFocus().FillWidth()
+			credentialField(c, locales.CommonName(), func() ui.Element {
+				return uikit.Input(c, &d.name, uikit.InputProps{}).Label(locales.MessageKeyName()).AutoFocus().FillWidth()
 			})
 			if d.kind == "generate" {
-				credentialField(c, "类型", func() ui.Element {
+				credentialField(c, locales.MessageType(), func() ui.Element {
 					// Its popup lives outside the disabled panel; reset that transient
 					// state when work starts so an already open menu cannot keep editing.
-					return uikit.Select(c.Key(a.credentials.busy), &d.keyType, uikit.StringOptions([]string{"Ed25519", "RSA 4096"}), uikit.SelectProps{Label: localize(c, "密钥类型"), Disabled: a.credentials.busy}).Label(localize(c, "密钥类型"))
+					return uikit.Select(
+						c.Key(a.credentials.busy),
+						&d.keyType,
+						uikit.StringOptions([]string{"Ed25519", "RSA 4096"}),
+						uikit.SelectProps{Label: locales.MessageKeyType(), Disabled: a.credentials.busy},
+					).Label(locales.MessageKeyType())
 				})
-				credentialField(c, "注释", func() ui.Element {
-					return uikit.Input(c, &d.comment, uikit.InputProps{}).Label(localize(c, "密钥注释")).FillWidth()
+				credentialField(c, locales.MessageComment(), func() ui.Element {
+					return uikit.Input(c, &d.comment, uikit.InputProps{}).Label(locales.MessageKeyComment()).FillWidth()
 				})
 			}
 			if d.kind == "generate" || d.kind == "import" {
-				credentialField(c, "口令", func() ui.Element {
-					return uikit.PasswordInput(c, &d.passphrase, uikit.InputProps{Label: localize(c, "私钥口令"), Mono: true}).Input.FillWidth()
+				credentialField(c, locales.MessagePassphrase(), func() ui.Element {
+					return uikit.PasswordInput(
+						c,
+						&d.passphrase,
+						uikit.InputProps{Label: locales.MessagePrivateKeyPassphrase(), Mono: true},
+					).Input.FillWidth()
 				})
-				uikit.Checkbox(c, &d.remember, localize(c, "加密保存私钥口令"))
+				uikit.Checkbox(c, &d.remember, locales.MessageSaveTheKeyPassphraseWithEncryption())
 			}
 		}
-		if d.errorText != "" {
-			uikit.Banner(c, localize(c, d.errorText), uikit.BannerProps{Tone: uikit.ToneDanger, Icon: sessionAlertIcon})
+		if !d.errorText.Empty() {
+			uikit.Banner(c, d.errorText.String(), uikit.BannerProps{Tone: uikit.ToneDanger, Icon: sessionAlertIcon})
 		}
 		if a.credentials.busy {
-			uikit.Text(c, localize(c, "正在处理…"), uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneSecondary})
+			uikit.Text(c, locales.MessageProcessing(), uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneSecondary})
 		}
 		ui.Row(c).FillWidth().Justify(ui.End).Gap(p.FooterGap).Children(func() {
-			uikit.Button(c, localize(c, "取消"), uikit.ButtonProps{Disabled: a.credentials.busy}).OnClick(parts.RequestDismiss)
+			uikit.Button(
+				c,
+				locales.CommonCancel(),
+				uikit.ButtonProps{Disabled: a.credentials.busy},
+			).OnClick(parts.RequestDismiss)
 			variant := uikit.ButtonPrimary
 			if d.kind == "delete" || d.kind == "clear-passwords" {
 				variant = uikit.ButtonDanger
 			}
-			actionButton := uikit.Button(c, localize(c, action), uikit.ButtonProps{Variant: variant, Disabled: a.credentials.busy})
+			actionButton := uikit.Button(c, action, uikit.ButtonProps{Variant: variant, Disabled: a.credentials.busy})
 			actionButton.OnClick(submit)
 		})
 	})
@@ -277,18 +334,18 @@ func (a *app) credentialDialogs(c *ui.Context) {
 }
 
 func credentialField(c *ui.Context, label string, control func() ui.Element) {
-	uikit.FormRow(c, localize(c, label), uikit.FormRowProps{Inline: true}, control)
+	uikit.FormRow(c, label, uikit.FormRowProps{Inline: true}, control)
 }
 
 func (a *app) renameManagedKey(d *credentialDraft) {
 	name := strings.TrimSpace(d.name)
 	if name == "" {
-		d.errorText = "请填写密钥名称"
+		d.errorText = locales.Deferred(locales.MessageEnterAKeyName)
 		return
 	}
 	index := slices.IndexFunc(a.keys, func(key managedKey) bool { return key.ID == d.keyID })
 	if index < 0 {
-		d.errorText = "密钥已不存在"
+		d.errorText = locales.Deferred(locales.MessageTheKeyNoLongerExists)
 		return
 	}
 	old := a.keys[index].Name
@@ -296,7 +353,7 @@ func (a *app) renameManagedKey(d *credentialDraft) {
 	a.saveCatalogAsync(func(err error) {
 		if err != nil {
 			a.keys[index].Name = old
-			d.errorText = err.Error()
+			d.errorText = locales.ErrorText(err)
 			return
 		}
 		a.dismissCredentialDraft()
@@ -305,12 +362,12 @@ func (a *app) renameManagedKey(d *credentialDraft) {
 
 func (a *app) deleteManagedKey(d *credentialDraft) {
 	if a.keyUseCount(d.keyID) > 0 {
-		d.errorText = "密钥仍被会话使用，不能删除"
+		d.errorText = locales.Deferred(locales.MessageThisKeyIsUsedByASessionAndCannotBeDeleted)
 		return
 	}
 	key, err := a.keyByID(d.keyID)
 	if err != nil {
-		d.errorText = err.Error()
+		d.errorText = locales.ErrorText(err)
 		return
 	}
 	a.credentialWork(func(ctx context.Context) credentialResult {
@@ -318,7 +375,9 @@ func (a *app) deleteManagedKey(d *credentialDraft) {
 			return credentialResult{err: err}
 		}
 		changes, err := a.vault.Prepare(nil, []string{key.SecretID, "key/" + key.ID + "/passphrase"})
-		return credentialResult{deletedID: key.ID, changes: changes, notice: "托管私钥已删除", err: err}
+		return credentialResult{deletedID: key.ID, changes: changes, notice: locales.Deferred(
+			locales.MessageManagedPrivateKeyDeleted,
+		), err: err}
 	})
 }
 

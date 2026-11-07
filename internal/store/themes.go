@@ -3,8 +3,8 @@ package store
 import (
 	"bytes"
 	"context"
-	"errors"
-	"fmt"
+
+	"sshdesk/internal/locales"
 )
 
 type Theme struct {
@@ -47,15 +47,15 @@ func (s *Store) SaveTheme(ctx context.Context, t Theme) error {
 		}
 		if old.Name != t.Name {
 			rows.Close()
-			return fmt.Errorf("已存在同名配色文件 %q", t.Filename)
+			return locales.Errorf(locales.MessageAColorSchemeFileNamedAlreadyExists, t.Filename)
 		}
 		if old.Filename != t.Filename {
 			rows.Close()
-			return fmt.Errorf("配色名称 %q 已由文件 %q 使用", t.Name, old.Filename)
+			return locales.Errorf(locales.MessageColorSchemeNameIsAlreadyUsedByFile, t.Name, old.Filename)
 		}
 		if !bytes.Equal(old.Source, t.Source) {
 			rows.Close()
-			return fmt.Errorf("已存在同名配色文件 %q，请重命名后导入", t.Filename)
+			return locales.Errorf(locales.MessageAColorSchemeFileNamedAlreadyExistsRenameItBeforeImporting, t.Filename)
 		}
 	}
 	if err := closeRows(rows); err != nil {
@@ -77,7 +77,7 @@ func (s *Store) DeleteTheme(ctx context.Context, name string) error {
 		return err
 	}
 	if count == 0 {
-		return errors.New("配色不存在")
+		return locales.NewError(locales.MessageTheColorSchemeDoesNotExist)
 	}
 	return nil
 }

@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/egoist/mygo/ui"
+	"sshdesk/internal/locales"
 	"sshdesk/internal/theme"
 )
 
@@ -53,7 +54,7 @@ func PathBar(c *ui.Context, props PathBarProps) PathBarParts {
 	ellipsisWidth := measure("…")
 	bar := Tip(c, ui.Box(c).Key("file-breadcrumbs").Grow(1).MinWidth(0).Clip().Height(t.C.Breadcrumb.Height).
 		Radius(t.C.Breadcrumb.Radius).Background(Color(t.C.Breadcrumb.BgOnGlass)).
-		Font(family).FontSize(font.Size).FontWeight(font.Weight).Label("当前目录 "+props.Path), props.Path)
+		Font(family).FontSize(font.Size).FontWeight(font.Weight).Label(locales.MessageCurrentDirectory()+props.Path), props.Path)
 	parts := PathBarParts{Root: bar, Index: -1}
 	width := bar.LayoutBounds().W
 	available := max(0, width-2*t.C.Breadcrumb.PaddingX)

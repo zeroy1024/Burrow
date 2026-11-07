@@ -2,10 +2,10 @@ package desktop
 
 import (
 	"encoding/json"
-	"fmt"
 	"maps"
 	"time"
 
+	"sshdesk/internal/locales"
 	"sshdesk/internal/theme"
 
 	"github.com/egoist/mygo/ui"
@@ -58,7 +58,7 @@ func (a *app) refreshFileInitialDirectories(session *fileSession, previous fileO
 	reset := func(pane *filePaneState, location string) {
 		pane.path, pane.history, pane.historyIndex = location, nil, -1
 		pane.directories = map[string][]fileEntry{}
-		pane.query, pane.errorText, pane.reveal, pane.hoverFolder = "", "", "", ""
+		pane.query, pane.errorText, pane.reveal, pane.hoverFolder = "", locales.Text{}, "", ""
 		pane.table.Clear()
 		pane.table.List.ScrollTo(0, 0)
 		pane.scroll = ui.ScrollState{Handle: pane.scroll.Handle}
@@ -100,7 +100,7 @@ func (a *app) readFilePreferences() error {
 		return err
 	}
 	if prefs.LocalRatio <= 0 || prefs.LocalRatio >= 1 || prefs.TransferFilter < 0 || prefs.TransferFilter > 2 || prefs.TransferDockHeight < 0 {
-		return fmt.Errorf("无效的文件面板设置")
+		return locales.Errorf(locales.MessageInvalidFilePaneSettings)
 	}
 	a.files.localOpen, a.files.ratio = prefs.LocalPaneOpen, prefs.LocalRatio
 	a.files.localPaths = maps.Clone(prefs.LocalPaths)
@@ -114,13 +114,20 @@ func (a *app) readFilePreferences() error {
 
 func (a *app) saveFilePreferences(c *ui.Context) {
 	if err := a.writeFilePreferences(); err != nil {
-		uikit.Toast(c, uikit.ToastProps{ID: "保存文件传输偏好失败：" + err.Error(), Tone: uikit.ToneDanger, Title: "保存文件传输偏好失败", Detail: err.Error()})
+		uikit.Toast(
+			c,
+			uikit.ToastProps{ID: locales.MessageUnableToSaveFileTransferPreferences() + err.Error(), Tone: uikit.ToneDanger, Title: locales.Deferred(
+				locales.MessageUnableToSaveFileTransferPreferences2,
+			), Detail: locales.ErrorText(
+				err,
+			)},
+		)
 	}
 }
 
 func (a *app) writeFilePreferences() error {
 	if a.filePrefs.loadErr != nil {
-		return fmt.Errorf("原配置读取失败，已阻止覆盖：%w", a.filePrefs.loadErr)
+		return locales.Errorf(locales.MessageTheOriginalConfigurationCouldNotBeReadOverwritingBlocked, a.filePrefs.loadErr)
 	}
 	a.filePrefs.save = preferenceSaveState{dirty: true}
 	if a.window != nil {
@@ -145,15 +152,21 @@ func (a *app) tickFilePreferences(c *ui.Context) {
 	save.dirty = false
 	data, err := a.filePreferencesData()
 	if err != nil {
-		a.persistenceNotice("保存文件传输偏好失败", err)
+		a.persistenceNotice(locales.MessageUnableToSaveFileTransferPreferences2, err)
 		return
 	}
-	a.persist(func() error { return a.store.SaveSetting(a.ctx, "files", data) }, func(err error) { a.persistenceNotice("保存文件传输偏好失败", err) })
+	a.persist(
+		func() error { return a.store.SaveSetting(a.ctx, "files", data) },
+		func(err error) { a.persistenceNotice(locales.MessageUnableToSaveFileTransferPreferences2, err) },
+	)
 }
 
 func (a *app) filePreferencesData() ([]byte, error) {
 	if a.filePrefs.loadErr != nil {
-		return nil, fmt.Errorf("原配置读取失败，已阻止覆盖：%w", a.filePrefs.loadErr)
+		return nil, locales.Errorf(
+			locales.MessageTheOriginalConfigurationCouldNotBeReadOverwritingBlocked,
+			a.filePrefs.loadErr,
+		)
 	}
 	prefs := filePreferences{LocalPaneOpen: a.files.localOpen, LocalRatio: a.files.ratio, LocalPaths: a.files.localPaths,
 		TransferDockCollapsed: a.transfers.collapsed, TransferFilter: a.transfers.filter, TransferDockHeight: a.transfers.dockHeight}

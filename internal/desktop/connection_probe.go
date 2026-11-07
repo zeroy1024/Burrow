@@ -12,25 +12,27 @@ import (
 
 	"sshdesk/internal/fileclient"
 	"sshdesk/internal/hostinfo"
+	"sshdesk/internal/locales"
 	"sshdesk/internal/sshclient"
 	"sshdesk/internal/theme"
 )
 
 type connectionTestResult struct {
-	Summary, Detail, Fingerprint string
-	Elapsed                      time.Duration
-	startedAt                    time.Time
-	Err                          error
-	NewHost                      bool
-	HostFacts                    *hostinfo.Facts
-	HostFactsKey                 string
-	HostFactsErr                 error
+	Summary, Detail locales.Text
+	Fingerprint     string
+	Elapsed         time.Duration
+	startedAt       time.Time
+	Err             error
+	NewHost         bool
+	HostFacts       *hostinfo.Facts
+	HostFactsKey    string
+	HostFactsErr    error
 }
 
 type hostKeyChangedError struct{ old, current string }
 
 func (e *hostKeyChangedError) Error() string {
-	return "主机密钥已变更\n原指纹 " + e.old + "\n新指纹 " + e.current
+	return locales.MessageHostKeyChangedPreviousFingerprint() + e.old + locales.MessageNewFingerprint() + e.current
 }
 
 // prepareConnectionTest captures catalog and key metadata on the window thread.
@@ -60,7 +62,10 @@ func (a *app) prepareConnectionTest(h host, password, passphrase string, passphr
 				if err == nil {
 					defer release()
 					if password == "" && h.session.Auth != "anonymous" {
-						answer := a.askSSH(ctx, &sshPrompt{title: "输入 FTP 密码", address: h.user + "@" + h.address})
+						answer := a.askSSH(
+							ctx,
+							&sshPrompt{title: locales.Deferred(locales.MessageEnterFtpPassword), address: h.user + "@" + h.address},
+						)
 						if answer.accepted {
 							password = answer.secret
 						} else {
@@ -124,27 +129,42 @@ func (a *app) prepareConnectionTest(h host, password, passphrase string, passphr
 		}
 		result.Err = err
 		if err == nil {
-			result.Summary = fmt.Sprintf("连接成功 · %dms", result.Elapsed.Milliseconds())
+			result.Summary = locales.Format(locales.MessageConnectedMs, result.Elapsed.Milliseconds())
 			if result.NewHost {
-				result.Summary += " · 已确认主机指纹"
-				result.Detail = result.Fingerprint
+				result.Summary = locales.Concat(result.Summary, locales.Deferred(locales.MessageHostFingerprintVerified))
+				result.Detail = locales.Raw(result.Fingerprint)
 			}
 			if facts := result.HostFacts; facts != nil {
-				for _, line := range [][2]string{{"主机名", facts.Hostname}, {"系统", facts.OSName}, {"内核", facts.Kernel},
-					{"架构", facts.Arch}, {"默认 Shell", facts.Shell}} {
-					if line[1] != "" {
-						result.Detail = strings.TrimSpace(result.Detail + "\n" + line[0] + "：" + line[1])
+				for _, line := range []struct {
+					label func() string
+					value string
+				}{
+					{label: locales.MessageHostname, value: facts.Hostname},
+					{label: locales.MessageOperatingSystem, value: facts.OSName},
+					{label: locales.MessageKernel, value: facts.Kernel},
+					{label: locales.MessageArchitecture, value: facts.Arch},
+					{label: locales.MessageDefaultShell, value: facts.Shell},
+				} {
+					if line.value != "" {
+						result.Detail = locales.Concat(
+							result.Detail,
+							locales.Raw("\n"),
+							locales.Deferred(line.label),
+							locales.Raw(": "+line.value),
+						).TrimSpace()
 					}
 				}
 			}
 			if result.HostFactsErr != nil {
-				result.Summary += " · 基础信息获取失败"
+				result.Summary = locales.Concat(result.Summary, locales.Deferred(locales.MessageUnableToRetrieveHostInformation))
 				detail := sanitizeConnectionError(result.HostFactsErr.Error(), password, passphrase)
-				result.Detail = strings.TrimSpace(result.Detail + "\n" + detail)
+				result.Detail = locales.Concat(result.Detail, locales.Raw("\n"+detail)).TrimSpace()
 			}
 		} else {
-			result.Summary = connectionErrorSummary(err)
-			result.Detail = fmt.Sprintf("%s\n%dms", sanitizeConnectionError(err.Error(), password, passphrase), result.Elapsed.Milliseconds())
+			result.Summary = locales.Deferred(func() string { return connectionErrorSummary(err) })
+			result.Detail = locales.Raw(
+				fmt.Sprintf("%s\n%dms", sanitizeConnectionError(err.Error(), password, passphrase), result.Elapsed.Milliseconds()),
+			)
 		}
 		return result
 	}
@@ -153,7 +173,7 @@ func (a *app) prepareConnectionTest(h host, password, passphrase string, passphr
 func sanitizeConnectionError(detail string, secrets ...string) string {
 	for _, secret := range secrets {
 		if secret != "" {
-			detail = strings.ReplaceAll(detail, secret, "[已隐藏]")
+			detail = strings.ReplaceAll(detail, secret, locales.MessageHidden())
 		}
 	}
 	return detail
@@ -166,24 +186,24 @@ func connectionErrorSummary(err error) string {
 	var op *net.OpError
 	switch {
 	case errors.As(err, &changed):
-		return "主机密钥已变更"
+		return locales.MessageHostKeyChanged()
 	case errors.Is(err, context.DeadlineExceeded):
-		return "连接超时"
+		return locales.MessageConnectionTimedOut()
 	case errors.Is(err, context.Canceled), errors.Is(err, errSSHConnectCanceled):
-		return "测试已取消"
+		return locales.MessageTestCancelled()
 	case errors.As(err, &cert), errors.As(err, &unknown):
-		return "证书不受信任"
+		return locales.MessageUntrustedCertificate()
 	case strings.Contains(err.Error(), "unable to authenticate"), strings.Contains(err.Error(), "530"), strings.Contains(err.Error(), "no supported methods"):
-		return "认证失败"
+		return locales.MessageAuthenticationFailed()
 	case strings.Contains(err.Error(), "connection refused"):
-		return "连接被拒绝"
+		return locales.MessageConnectionRefused()
 	case errors.As(err, &op):
 		if op.Timeout() {
-			return "连接超时"
+			return locales.MessageConnectionTimedOut()
 		}
-		return "主机不可达"
+		return locales.MessageHostUnreachable()
 	default:
-		return "协议错误"
+		return locales.MessageProtocolError()
 	}
 }
 
@@ -194,7 +214,7 @@ func closeOnCancel(ctx context.Context, conn net.Conn) func() bool {
 func testFTP(ctx context.Context, h host, password string, result *connectionTestResult, dial gatewayDialFunc) error {
 	options := h.session.Files
 	if options == nil {
-		return errors.New("缺少 FTP 设置")
+		return locales.NewError(locales.MessageMissingFtpSettings)
 	}
 	user := h.user
 	if h.session.Auth == "anonymous" {

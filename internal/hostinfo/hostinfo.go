@@ -8,8 +8,9 @@ package hostinfo
 
 import (
 	"context"
-	"errors"
-	"fmt"
+
+	"sshdesk/internal/locales"
+
 	"strings"
 	"time"
 )
@@ -36,11 +37,11 @@ func (p Platform) DisplayName() string {
 	case Windows:
 		return "Windows"
 	}
-	return "其他系统"
+	return locales.MessageOtherSystem()
 }
 
 // ErrUnsupported reports a platform without monitoring support.
-var ErrUnsupported = errors.New("该系统暂不支持监控")
+var ErrUnsupported = locales.NewError(locales.MessageMonitoringIsNotSupportedOnThisSystemYet)
 
 // Runner is the access a collector needs to one remote host.
 type Runner interface {
@@ -153,11 +154,11 @@ func Detect(ctx context.Context, r Runner, banner string) (Detection, error) {
 	}
 	output, err := r.Exec(ctx, "uname -snr")
 	if err != nil {
-		return Detection{}, fmt.Errorf("无法识别远端系统，可在会话设置中手动指定：%w", err)
+		return Detection{}, locales.Errorf(locales.MessageUnableToDetectTheRemoteSystemSetItManuallyInSessionSettings, err)
 	}
 	fields := strings.Fields(string(output))
 	if len(fields) == 0 {
-		return Detection{}, errors.New("无法识别远端系统，可在会话设置中手动指定：uname 无输出")
+		return Detection{}, locales.NewError(locales.MessageUnableToDetectTheRemoteSystemSetItManuallyInSessionSettingsUname)
 	}
 	d := Detection{System: fields[0], Platform: Other}
 	if len(fields) > 1 {

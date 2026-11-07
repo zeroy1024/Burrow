@@ -68,6 +68,8 @@ DMG 使用 [assets/dmg/background.tiff](../assets/dmg/background.tiff) 的浅色
 
 ## 已有检查
 
+修改界面文案后运行 `mise run i18n`，同步提交语言资源和生成文件；资源规则见[界面语言](i18n.md)。
+
 在仓库根目录运行：
 
 ```sh

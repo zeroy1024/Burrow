@@ -3,10 +3,10 @@ package desktop
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"time"
 
 	"github.com/egoist/mygo"
+	"sshdesk/internal/locales"
 	"sshdesk/internal/store"
 	"sshdesk/internal/uikit"
 )
@@ -76,11 +76,15 @@ func (a *app) commitCatalogSecretsAsync(changes *store.VaultChanges, change func
 	})
 }
 
-func (a *app) persistenceNotice(title string, err error) {
+func (a *app) persistenceNotice(title func() string, err error) {
 	if err == nil {
 		return
 	}
-	a.files.notice = &uikit.ToastProps{ID: "database-write-error", Tone: uikit.ToneDanger, Title: title, Detail: err.Error()}
+	a.files.notice = &uikit.ToastProps{ID: "database-write-error", Tone: uikit.ToneDanger, Title: locales.Deferred(
+		title,
+	), Detail: locales.ErrorText(
+		err,
+	)}
 	if a.window != nil {
 		a.window.Invalidate()
 	}
@@ -93,13 +97,13 @@ func (a *app) persistTransfers() {
 func (a *app) persistTransfersDone(done func(error)) {
 	if a.store == nil || a.transfers.quitting || a.transfers.storeErr != nil {
 		if done != nil {
-			done(errors.New("传输存储不可用"))
+			done(locales.NewError(locales.MessageTransferStorageIsUnavailable))
 		}
 		return
 	}
 	saved := a.transferSnapshot()
 	if err := validateTransferQueue(saved); err != nil {
-		a.persistenceNotice("保存传输记录失败", err)
+		a.persistenceNotice(locales.MessageUnableToSaveTransferHistory, err)
 		if done != nil {
 			done(err)
 		}
@@ -107,7 +111,7 @@ func (a *app) persistTransfersDone(done func(error)) {
 	}
 	q, err := encodeTransfers(saved)
 	if err != nil {
-		a.persistenceNotice("保存传输记录失败", err)
+		a.persistenceNotice(locales.MessageUnableToSaveTransferHistory, err)
 		if done != nil {
 			done(err)
 		}
@@ -137,7 +141,7 @@ func (a *app) persistTransfersDone(done func(error)) {
 		}
 		if err != nil {
 			a.transfers.writeErr = err
-			a.persistenceNotice("保存传输记录失败", err)
+			a.persistenceNotice(locales.MessageUnableToSaveTransferHistory, err)
 			return
 		}
 		a.transfers.writeErr = nil

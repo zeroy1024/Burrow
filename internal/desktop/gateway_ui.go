@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/egoist/mygo/ui"
+	"sshdesk/internal/locales"
 	"sshdesk/internal/theme"
 	"sshdesk/internal/uikit"
 	"sshdesk/internal/vault"
@@ -23,7 +24,8 @@ type gatewayDraft struct {
 	initial                        [8]string
 	editing                        bool
 	value                          gatewayConfig
-	port, password, errorText      string
+	port, password                 string
+	errorText                      locales.Text
 	auth                           int // 0 无认证，1 用户名密码（SOCKS5）
 	passwordChanged, clearPassword bool
 	deleting                       bool
@@ -104,7 +106,9 @@ const (
 	gatewayRefRuntime
 )
 
-var gatewayRefGroups = [...]string{"应用设置", "主机与站点", "下游网关", "运行中"}
+func gatewayRefGroups() []string {
+	return []string{locales.MessageAppSettings(), locales.MessageHostsAndSites(), locales.MessageDownstreamGateways(), locales.MessageRunning()}
+}
 
 type gatewayRef struct {
 	kind          gatewayRefKind
@@ -116,14 +120,14 @@ type gatewayRef struct {
 // hostGatewayOptions disables the gateways whose route would come back to
 // the edited host, such as one built on the host itself.
 func (a *app) hostGatewayOptions(d *hostDraft) []uikit.Option[string] {
-	options := []uikit.Option[string]{{Value: "", Label: "跟随应用默认"}, {Value: directGateway, Label: "直连"}}
+	options := []uikit.Option[string]{{Value: "", Label: locales.MessageUseAppDefault()}, {Value: directGateway, Label: locales.MessageDirect()}}
 	catalog := a.gatewayCatalog()
 	for _, g := range a.gateways {
 		option := uikit.Option[string]{Value: g.ID, Label: g.Name, Detail: gatewayKindLabel(g.Kind)}
 		if d.editing {
 			var loop *gatewayLoop
 			if _, err := catalog.hostRoute(a.hosts[d.id].session.ID, g.ID, nil); errors.As(err, &loop) {
-				option.Detail, option.Disabled = "会经过本主机", true
+				option.Detail, option.Disabled = locales.MessageRoutesThroughThisHost(), true
 			}
 		}
 		options = append(options, option)
@@ -133,12 +137,12 @@ func (a *app) hostGatewayOptions(d *hostDraft) []uikit.Option[string] {
 
 func (a *app) gatewayName(id string) string {
 	if id == "" || id == directGateway {
-		return "直连"
+		return locales.MessageDirect()
 	}
 	if g, ok := a.gatewayByID(id); ok {
 		return g.Name
 	}
-	return "网关已不存在"
+	return locales.MessageTheGatewayNoLongerExists()
 }
 
 func (a *app) gatewayByID(id string) (gatewayConfig, bool) {
@@ -243,9 +247,9 @@ func gatewayDashes(c *ui.Context, width float32) ui.Element {
 
 func hostKindLabel(h host) string {
 	if h.protocol == "" {
-		return "SSH 主机"
+		return locales.MessageSshHost()
 	}
-	return strings.ToUpper(h.protocol) + " 站点"
+	return strings.ToUpper(h.protocol) + locales.MessageSite()
 }
 
 func (a *app) gatewayFollowers() int {
@@ -261,7 +265,9 @@ func (a *app) gatewayFollowers() int {
 func (a *app) gatewayReferences(id string) []gatewayRef {
 	refs := []gatewayRef{}
 	if a.defaultGateway == id {
-		refs = append(refs, gatewayRef{kind: gatewayRefDefault, label: "应用默认出口", detail: fmt.Sprintf("跟随默认的 %d 个会话", a.gatewayFollowers())})
+		refs = append(refs, gatewayRef{kind: gatewayRefDefault, label: locales.MessageDefaultAppGateway(), detail: locales.GatewayDefaultFollowers(
+			a.gatewayFollowers(),
+		)})
 	}
 	for index, h := range a.hosts {
 		if h.session.Gateway == id {
@@ -270,7 +276,7 @@ func (a *app) gatewayReferences(id string) []gatewayRef {
 	}
 	for _, g := range a.gateways {
 		if g.UpstreamID == id {
-			refs = append(refs, gatewayRef{kind: gatewayRefGateway, label: g.Name, detail: "以本网关为上游", gateway: g.ID})
+			refs = append(refs, gatewayRef{kind: gatewayRefGateway, label: g.Name, detail: locales.MessageUsesThisGatewayUpstream(), gateway: g.ID})
 		}
 	}
 	return append(refs, a.gatewayRuntimeReferences(id)...)
@@ -279,14 +285,14 @@ func (a *app) gatewayReferences(id string) []gatewayRef {
 func (a *app) gatewayRuntimeReferences(id string) []gatewayRef {
 	refs := []gatewayRef{}
 	runtime := func(label string) {
-		refs = append(refs, gatewayRef{kind: gatewayRefRuntime, label: label, detail: "关闭后解除"})
+		refs = append(refs, gatewayRef{kind: gatewayRefRuntime, label: label, detail: locales.MessageReleasedWhenClosed()})
 	}
 	if a.gatewayPool.inUse(id) {
-		runtime("正在使用的网关连接")
+		runtime(locales.MessageActiveGatewayConnection())
 	}
 	for _, group := range a.runtimeSSHGroups() {
 		if slices.ContainsFunc(group.plan.route, func(h gatewayHop) bool { return h.ID == id }) {
-			runtime("终端、传输或可恢复标签")
+			runtime(locales.MessageTerminalTransferOrRecoverableTab())
 			break
 		}
 	}
@@ -309,7 +315,7 @@ func (a *app) gatewayRuntimeReferences(id string) []gatewayRef {
 	for _, session := range files {
 		route := session.endpoint.session.GatewayRoute
 		if route != nil && slices.ContainsFunc(*route, func(h gatewayHop) bool { return h.ID == id }) {
-			runtime("文件会话或传输任务")
+			runtime(locales.MessageFileSessionOrTransfer())
 			break
 		}
 	}
@@ -319,7 +325,10 @@ func (a *app) gatewayRuntimeReferences(id string) []gatewayRef {
 func (a *app) gatewayLive(id string) bool { return len(a.gatewayRuntimeReferences(id)) > 0 }
 
 func (a *app) setDefaultGateway(id string) {
-	a.commitCatalogMoveAsync(func() { a.defaultGateway = id }, func(err error) { a.persistenceNotice("保存默认网关失败", err) })
+	a.commitCatalogMoveAsync(
+		func() { a.defaultGateway = id },
+		func(err error) { a.persistenceNotice(locales.MessageUnableToSaveDefaultGateway, err) },
+	)
 }
 
 func (a *app) selectGateway(id string) {
@@ -369,11 +378,11 @@ func (a *app) startGatewayDraft(g gatewayConfig, deleting bool) {
 
 func (a *app) gatewayMenu(g gatewayConfig) []uikit.MenuEntry {
 	return []uikit.MenuEntry{
-		{ID: "test", Label: "测试连接", Icon: uikit.IconPlay, Disabled: a.gatewayTestRunning(g.ID), OnChoose: func() { a.startGatewayTest(g.ID) }},
-		{ID: "edit", Label: "编辑网关…", Icon: uikit.IconEdit, OnChoose: func() { a.startGatewayDraft(g, false) }},
-		{ID: "default", Label: "设为应用默认出口", Icon: uikit.IconRoute, Disabled: a.defaultGateway == g.ID, OnChoose: func() { a.setDefaultGateway(g.ID) }},
+		{ID: "test", Label: locales.MessageTestConnection(), Icon: uikit.IconPlay, Disabled: a.gatewayTestRunning(g.ID), OnChoose: func() { a.startGatewayTest(g.ID) }},
+		{ID: "edit", Label: locales.MessageEditGateway(), Icon: uikit.IconEdit, OnChoose: func() { a.startGatewayDraft(g, false) }},
+		{ID: "default", Label: locales.MessageSetAsAppDefaultGateway(), Icon: uikit.IconRoute, Disabled: a.defaultGateway == g.ID, OnChoose: func() { a.setDefaultGateway(g.ID) }},
 		{ID: "before-delete", Separator: true},
-		{ID: "delete", Label: "删除网关…", Icon: uikit.IconTrash, Danger: true, OnChoose: func() { a.startGatewayDraft(g, true) }},
+		{ID: "delete", Label: locales.MessageDeleteGateway(), Icon: uikit.IconTrash, Danger: true, OnChoose: func() { a.startGatewayDraft(g, true) }},
 	}
 }
 
@@ -403,10 +412,10 @@ func (a *app) gatewayDefaultBar(c *ui.Context) {
 	uikit.Card(c).Key("gateway-default-bar").FillWidth().Shrink(0).Padding(t.Space.N10, t.Space.N16).Children(func() {
 		ui.Row(c).FillWidth().AlignItems(ui.Center).Gap(t.Space.N12).Children(func() {
 			uikit.Icon(c, routeIcon, uikit.IconProps{Tone: uikit.ToneSecondary})
-			uikit.Text(c, "应用默认出口", uikit.TextProps{Style: uikit.TextBodyStrong}).Shrink(0)
+			uikit.Text(c, locales.MessageDefaultAppGateway(), uikit.TextProps{Style: uikit.TextBodyStrong}).Shrink(0)
 			selected := a.defaultGateway
 			glyph := t.C.IconButton.IconSizeXs
-			options := []uikit.Option[string]{{Value: "", Label: "直连", Detail: "不经过网关", Leading: func() {
+			options := []uikit.Option[string]{{Value: "", Label: locales.MessageDirect(), Detail: locales.MessageNoGateway(), Leading: func() {
 				gatewayTile(c, uikit.IconSVG(uikit.IconLaptop), color.NRGBA{}, t.Space.N18, glyph, t.Radius.Chip)
 			}}}
 			for _, g := range a.gateways {
@@ -414,7 +423,12 @@ func (a *app) gatewayDefaultBar(c *ui.Context) {
 					gatewayKindTile(c, g.Kind, t.Space.N18, glyph, t.Radius.Chip)
 				}})
 			}
-			input := uikit.Select(c, &selected, options, uikit.SelectProps{Label: "应用默认出口", Disabled: len(a.gateways) == 0}).
+			input := uikit.Select(
+				c,
+				&selected,
+				options,
+				uikit.SelectProps{Label: locales.MessageDefaultAppGateway(), Disabled: len(a.gateways) == 0},
+			).
 				Width(t.Size.Sider).Shrink(0)
 			if input.Changed() {
 				a.setDefaultGateway(selected)
@@ -422,10 +436,18 @@ func (a *app) gatewayDefaultBar(c *ui.Context) {
 			ui.Row(c).MinWidth(0).Shrink(1).Gap(t.Space.N4).AlignItems(ui.Center).Children(func() {
 				chain := a.gatewayChain(a.defaultGateway)
 				if len(chain) == 0 {
-					uikit.Text(c, "连接直接从本机发出", uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneSecondary}).SingleLine()
+					uikit.Text(
+						c,
+						locales.MessageConnectDirectlyFromThisComputer(),
+						uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneSecondary},
+					).SingleLine()
 					return
 				}
-				uikit.Text(c, "本机", uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneSecondary}).Shrink(0)
+				uikit.Text(
+					c,
+					locales.MessageThisComputer(),
+					uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneSecondary},
+				).Shrink(0)
 				for _, hop := range chain {
 					uikit.Icon(c, uikit.IconArrowRight, uikit.IconProps{Size: uikit.SizeXs, Tone: uikit.ToneTertiary})
 					uikit.Text(c, hop.Name, uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneSecondary, Mono: true}).
@@ -445,20 +467,20 @@ func (a *app) gatewayDefaultBar(c *ui.Context) {
 					uikit.Text(c, value, uikit.TextProps{Style: uikit.TextBodyStrong, Tone: tone}).FontFeatures("tnum")
 				})
 			}
-			stat("跟随默认", strconv.Itoa(a.gatewayFollowers()), uikit.ToneNeutral)
-			stat("网关", strconv.Itoa(len(a.gateways)), uikit.ToneNeutral)
+			stat(locales.MessageUseDefault(), strconv.Itoa(a.gatewayFollowers()), uikit.ToneNeutral)
+			stat(locales.GatewaysTitle(), strconv.Itoa(len(a.gateways)), uikit.ToneNeutral)
 			liveTone := uikit.ToneNeutral
 			if live > 0 {
 				liveTone = uikit.ToneSuccess
 			}
-			stat("使用中", strconv.Itoa(live), liveTone)
+			stat(locales.MessageInUse(), strconv.Itoa(live), liveTone)
 		})
 	})
 }
 
 func (a *app) gatewayEmptyState(c *ui.Context) {
 	t := theme.Current()
-	uikit.Card(c).Key("gateway-empty").Grow(1).FillWidth().Center().Role(ui.RoleStatus).Label("还没有连接网关").Children(func() {
+	uikit.Card(c).Key("gateway-empty").Grow(1).FillWidth().Center().Role(ui.RoleStatus).Label(locales.MessageNoGatewaysYet()).Children(func() {
 		ui.Column(c).AlignItems(ui.Center).Gap(t.Space.N10).Children(func() {
 			ui.Row(c).AlignItems(ui.Center).Margin(0, 0, t.Space.N10, 0).Children(func() {
 				tile := t.C.IconTile.SizeLg
@@ -471,8 +493,8 @@ func (a *app) gatewayEmptyState(c *ui.Context) {
 				gatewayDashes(c, t.Space.N24*2)
 				gatewayTile(c, serverIcon, color.NRGBA{}, tile, t.Size.Icon, t.C.IconTile.RadiusLg)
 			})
-			uikit.Text(c, "还没有连接网关", uikit.TextProps{Style: uikit.TextTitle})
-			uikit.Text(c, "网关决定连接从哪里出发。添加 SSH 跳板或 SOCKS5 代理后，可以在主机和文件站点中选择经由哪个网关，也可以设为应用默认出口。",
+			uikit.Text(c, locales.MessageNoGatewaysYet(), uikit.TextProps{Style: uikit.TextTitle})
+			uikit.Text(c, locales.MessageGatewaysRouteYourConnectionsAddAnSshJumpHostOrSocks5ProxyThen(),
 				uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneSecondary}).MaxWidth(t.C.EmptyState.MaxWidth).TextAlign(ui.Center)
 			ui.Row(c).Gap(t.Space.N10).Margin(t.Space.N14, 0, 0, 0).Children(func() {
 				choice := func(kind, title, detail string) {
@@ -495,8 +517,8 @@ func (a *app) gatewayEmptyState(c *ui.Context) {
 						})
 					})
 				}
-				choice("ssh", "添加 SSH 网关", "复用已保存的 SSH 主机作为跳板，可继续串联上游")
-				choice("socks5", "添加 SOCKS5 代理", "填写代理地址，支持无认证或用户名密码认证")
+				choice("ssh", locales.MessageAddSshGateway(), locales.MessageUseASavedSshHostAsAJumpHostWithOptionalUpstreamGateways())
+				choice("socks5", locales.MessageAddSocks5Proxy(), locales.MessageEnterAProxyAddressWithOptionalUsernameAndPasswordAuthentication())
 			})
 		})
 	})
@@ -512,11 +534,11 @@ func (a *app) gatewayList(c *ui.Context) {
 			live++
 		}
 	}
-	result := uikit.Sider(c, "网关", uikit.SiderProps{
-		Label: "网关列表", AddLabel: "新增网关", AddIcon: plusIcon, FooterIcon: routeIcon,
-		Footer: fmt.Sprintf("%d 个网关 · %d 个使用中", len(a.gateways), live),
+	result := uikit.Sider(c, locales.GatewaysTitle(), uikit.SiderProps{
+		Label: locales.MessageGatewayList(), AddLabel: locales.MessageAddGateway(), AddIcon: plusIcon, FooterIcon: routeIcon,
+		Footer: locales.GatewaysCount(len(a.gateways), live),
 		Query:  &page.query,
-		Search: uikit.SearchProps{Label: "搜索网关", Placeholder: "搜索网关、地址", Icon: searchIcon,
+		Search: uikit.SearchProps{Label: locales.MessageSearchGateways(), Placeholder: locales.MessageSearchGatewaysAndAddresses(), Icon: searchIcon,
 			Handle: &page.search, Kbd: shortcutDisplay(a.shortcutBinding("host.search"))},
 	}, func() { a.gatewayListBody(c) })
 	result.Root.Width(page.sidebarWidth)
@@ -548,9 +570,9 @@ func (a *app) gatewayListBody(c *ui.Context) {
 					}
 					// A search shows every match without changing the saved collapse.
 					open := query != "" || !state.collapsed[kind]
-					title := "SSH 网关"
+					title := locales.MessageSshGateway()
 					if kind == "socks5" {
-						title = "SOCKS5 代理"
+						title = locales.MessageSocks5Proxy()
 					}
 					group := uikit.SiderGroup(c, uikit.SiderGroupProps{
 						Key: "gateway-group-" + kind, Title: title, Count: len(items), Open: &open, Chevron: chevronIcon,
@@ -575,11 +597,17 @@ func (a *app) gatewayListBody(c *ui.Context) {
 					shown += len(items)
 				}
 				if shown == 0 {
-					uikit.EmptyMessage(c, "没有匹配的网关", uikit.EmptyCatalogSearch)
+					uikit.EmptyMessage(c, locales.MessageNoMatchingGateways(), uikit.EmptyCatalogSearch)
 				}
 			})
 		})
-		uikit.Scrollbars(c, viewport, content, &state.listScroll, uikit.ScrollbarProps{Label: "网关列表滚动条"})
+		uikit.Scrollbars(
+			c,
+			viewport,
+			content,
+			&state.listScroll,
+			uikit.ScrollbarProps{Label: locales.MessageGatewayListScrollbar()},
+		)
 	})
 }
 
@@ -626,12 +654,16 @@ func (a *app) gatewayRow(c *ui.Context, g gatewayConfig) {
 		if isDefault || hops > 1 {
 			ui.Column(c).Shrink(0).AlignItems(ui.End).Gap(t.Space.N2).PassThrough().Children(func() {
 				if isDefault {
-					uikit.Badge(c, "默认", uikit.BadgeProps{Tone: uikit.ToneAccent}).PassThrough()
+					uikit.Badge(c, locales.MessageDefault(), uikit.BadgeProps{Tone: uikit.ToneAccent}).PassThrough()
 				}
 				if hops > 1 {
 					ui.Row(c).Gap(t.Space.N3).AlignItems(ui.Center).PassThrough().Children(func() {
 						uikit.Icon(c, routeIcon, uikit.IconProps{Size: uikit.SizeXs, Tone: uikit.ToneTertiary}).PassThrough()
-						uikit.Text(c, fmt.Sprintf("%d 跳", hops), uikit.TextProps{Style: uikit.TextCaption, Tone: uikit.ToneTertiary}).PassThrough()
+						uikit.Text(
+							c,
+							locales.GatewayHopCount(hops),
+							uikit.TextProps{Style: uikit.TextCaption, Tone: uikit.ToneTertiary},
+						).PassThrough()
 					})
 				}
 			})
@@ -655,20 +687,32 @@ func (a *app) gatewayDetail(c *ui.Context) {
 				uikit.Text(c, g.Name, uikit.TextProps{Style: uikit.TextTitle}).SingleLine().Ellipsis("…").MinWidth(0).Shrink(1)
 				uikit.Badge(c, gatewayKindLabel(g.Kind), uikit.BadgeProps{})
 				if a.defaultGateway == g.ID {
-					uikit.Badge(c, "默认出口", uikit.BadgeProps{Tone: uikit.ToneAccent})
+					uikit.Badge(c, locales.MessageDefaultGateway(), uikit.BadgeProps{Tone: uikit.ToneAccent})
 				}
 				if live {
-					uikit.Badge(c, "使用中", uikit.BadgeProps{Tone: uikit.ToneSuccess, Dot: true})
+					uikit.Badge(c, locales.MessageInUse(), uikit.BadgeProps{Tone: uikit.ToneSuccess, Dot: true})
 				}
 			})
 			uikit.Text(c, a.gatewayAddress(g), uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneSecondary, Mono: true}).
 				SingleLine().Ellipsis("…").Selectable()
 		})
 		ui.Row(c).Shrink(0).Gap(t.Space.N6).AlignItems(ui.Center).Children(func() {
-			uikit.Button(c, "测试连接", uikit.ButtonProps{Icon: uikit.IconPlay, Disabled: a.gatewayTestRunning(g.ID)}).
+			uikit.Button(
+				c,
+				locales.MessageTestConnection(),
+				uikit.ButtonProps{Icon: uikit.IconPlay, Disabled: a.gatewayTestRunning(g.ID)},
+			).
 				OnClick(func() { a.startGatewayTest(g.ID) })
-			uikit.Button(c, "编辑", uikit.ButtonProps{Icon: uikit.IconEdit}).OnClick(func() { a.startGatewayDraft(g, false) })
-			more := uikit.IconButton(c, moreIcon, uikit.IconButtonProps{Key: "gateway-more", Label: "更多网关操作", Variant: uikit.IconFilled})
+			uikit.Button(
+				c,
+				locales.MessageEdit(),
+				uikit.ButtonProps{Icon: uikit.IconEdit},
+			).OnClick(func() { a.startGatewayDraft(g, false) })
+			more := uikit.IconButton(
+				c,
+				moreIcon,
+				uikit.IconButtonProps{Key: "gateway-more", Label: locales.MessageMoreGatewayActions(), Variant: uikit.IconFilled},
+			)
 			uikit.MenuOn(c, more, a.gatewayMenu(g))
 		})
 	})
@@ -677,25 +721,31 @@ func (a *app) gatewayDetail(c *ui.Context) {
 		content := ui.Scroll(c.Key("gateway-detail-scroll")).TrackScroll(&state.scroll).Fill().MinHeight(0).Children(func() {
 			ui.Column(c).FillWidth().Padding(t.Space.N18, t.Space.N20, t.Space.N24, t.Space.N20).Gap(t.Space.N24).Children(func() {
 				ui.Column(c).Key("route").FillWidth().Children(func() {
-					gatewaySectionTitle(c, "连接路径", "终端、文件传输和 MCP 经此网关时的出站顺序", nil)
+					gatewaySectionTitle(c, locales.MessageConnectionRoute(), locales.MessageOutboundRouteForTerminalFileTransferAndMcpConnectionsUsingThisGateway(), nil)
 					a.gatewayRoute(c, g)
 					a.gatewayTestStrip(c, g)
 				})
 				ui.Column(c).Key("facts").FillWidth().Children(func() {
-					gatewaySectionTitle(c, "配置", "", nil)
+					gatewaySectionTitle(c, locales.MessageConfiguration(), "", nil)
 					a.gatewayFacts(c, g)
 				})
 				ui.Column(c).Key("references").FillWidth().Children(func() {
 					note := ""
 					if len(refs) > 0 {
-						note = "删除网关前需先解除全部引用"
+						note = locales.MessageRemoveAllReferencesBeforeDeletingThisGateway()
 					}
-					gatewaySectionTitle(c, "引用", note, func() { uikit.Count(c, len(refs), uikit.CountProps{}) })
+					gatewaySectionTitle(c, locales.MessageReferences(), note, func() { uikit.Count(c, len(refs), uikit.CountProps{}) })
 					a.gatewayReferenceGroups(c, refs)
 				})
 			})
 		})
-		uikit.Scrollbars(c, viewport, content, &state.scroll, uikit.ScrollbarProps{Label: "网关详情滚动条"})
+		uikit.Scrollbars(
+			c,
+			viewport,
+			content,
+			&state.scroll,
+			uikit.ScrollbarProps{Label: locales.MessageGatewayDetailsScrollbar()},
+		)
 	})
 }
 
@@ -732,13 +782,13 @@ func (a *app) gatewayRoute(c *ui.Context, g gatewayConfig) {
 	reduced := a.reduceMotion(c)
 	ui.Row(c).Key("gateway-route").FillWidth().Padding(t.Space.N24, t.Space.N18, t.Space.N22, t.Space.N18).
 		Radius(t.Radius.Card).Background(uikit.Color(t.Color.Surface.Field)).AlignItems(ui.Center).Children(func() {
-		gatewayRouteEnd(c, uikit.IconSVG(uikit.IconLaptop), "起点", "本机", "本地网络", false)
+		gatewayRouteEnd(c, uikit.IconSVG(uikit.IconLaptop), locales.MessageOrigin(), locales.MessageThisComputer(), locales.MessageLocalNetwork(), false)
 		for index, hop := range chain {
-			label := "直连"
+			label := locales.MessageDirect()
 			if index > 0 {
-				label = "经代理"
+				label = locales.MessageViaProxy()
 				if chain[index-1].Kind == "ssh" {
-					label = "SSH 通道"
+					label = locales.MessageSshTunnel()
 				}
 			}
 			// Each hop lights once the test has connected through it.
@@ -746,13 +796,13 @@ func (a *app) gatewayRoute(c *ui.Context, g gatewayConfig) {
 			gatewayRouteLink(c.Key("link-"+hop.ID), label, link, reduced)
 			a.gatewayRouteNode(c, hop, hop.ID == g.ID, mark)
 		}
-		label := "经代理"
+		label := locales.MessageViaProxy()
 		if g.Kind == "ssh" {
-			label = "SSH 通道"
+			label = locales.MessageSshTunnel()
 		}
 		// The test stops at this gateway, so the last leg stays an outline.
 		gatewayRouteLink(c.Key("link-target"), label, gatewayLinkTarget, reduced)
-		gatewayRouteEnd(c, serverIcon, "终点", "目标主机", "由主机或站点决定", true)
+		gatewayRouteEnd(c, serverIcon, locales.MessageDestination2(), locales.MessageTargetHost(), locales.MessageDeterminedByTheHostOrSite(), true)
 	})
 }
 
@@ -779,7 +829,7 @@ func (a *app) gatewayRouteNode(c *ui.Context, hop gatewayConfig, current bool, m
 	if current {
 		node = uikit.Shadow(ui.Column(c).Key(hop.ID), t.Shadow.ControlFocus)
 	} else {
-		node = ui.ButtonBase(c).Key(hop.ID).Column().AlignItems(ui.Stretch).Label("查看网关 " + hop.Name).FocusRing(false)
+		node = ui.ButtonBase(c).Key(hop.ID).Column().AlignItems(ui.Stretch).Label(locales.MessageViewGateway() + hop.Name).FocusRing(false)
 		border := t.Color.Border.Raised
 		if node.Hovered() {
 			border = t.Color.Border.ControlHover
@@ -798,7 +848,7 @@ func (a *app) gatewayRouteNode(c *ui.Context, hop gatewayConfig, current bool, m
 			ui.Spacer(c).PassThrough()
 			switch mark {
 			case gatewayLinkFlow:
-				uikit.Spinner(c, uikit.SpinnerProps{Size: uikit.SizeXs, Tone: uikit.ToneAccent, Label: "正在测试",
+				uikit.Spinner(c, uikit.SpinnerProps{Size: uikit.SizeXs, Tone: uikit.ToneAccent, Label: locales.MessageTesting2(),
 					Motion: uikit.MotionOverride(a.reduceMotion(c))}).PassThrough()
 			case gatewayLinkOK, gatewayLinkFail:
 				icon, fill := uikit.IconCheck, t.Color.Success.Default
@@ -815,7 +865,7 @@ func (a *app) gatewayRouteNode(c *ui.Context, hop gatewayConfig, current bool, m
 			SingleLine().Ellipsis("…").MinWidth(0)
 		uikit.Tip(c, endpoint, a.gatewayAddress(hop), "")
 		if current {
-			uikit.Badge(c, "本网关", uikit.BadgeProps{Tone: uikit.ToneOnAccent}).Absolute().
+			uikit.Badge(c, locales.MessageThisGateway(), uikit.BadgeProps{Tone: uikit.ToneOnAccent}).Absolute().
 				Top(-t.C.Badge.HeightSm / 2).Left(t.Space.N10).PassThrough()
 		}
 	})
@@ -873,7 +923,11 @@ func (a *app) gatewayTestStrip(c *ui.Context, g gatewayConfig) {
 			Gap(p.Gap).Radius(p.Radius).Background(uikit.Color(background)).AlignItems(ui.Center).Role(ui.RoleStatus).Label(label)
 	}
 	retry := func() {
-		uikit.Button(c, "重新测试", uikit.ButtonProps{Variant: uikit.ButtonPlain, Size: uikit.SizeSm, Icon: uikit.IconRefresh}).
+		uikit.Button(
+			c,
+			locales.MessageTestAgain(),
+			uikit.ButtonProps{Variant: uikit.ButtonPlain, Size: uikit.SizeSm, Icon: uikit.IconRefresh},
+		).
 			Shrink(0).OnClick(func() { a.startGatewayTest(g.ID) })
 	}
 	chain := a.gatewayChain(g.ID)
@@ -881,55 +935,59 @@ func (a *app) gatewayTestStrip(c *ui.Context, g gatewayConfig) {
 	test := a.gatewayTestHops(g.ID)
 	if a.gatewayTestRunning(g.ID) {
 		hop := test.route[test.connecting].Name
-		message := "正在连接「" + hop + "」…"
+		message := locales.GatewayConnecting(hop)
 		if len(test.route) > 1 {
-			message = fmt.Sprintf("正在连接第 %d/%d 跳「%s」…", test.connecting+1, len(test.route), hop)
+			message = fmt.Sprintf(locales.MessageConnectingToHop(), test.connecting+1, len(test.route), hop)
 		}
 		strip(p.InfoBg, message).Children(func() {
-			uikit.Spinner(c, uikit.SpinnerProps{Size: uikit.SizeXs, Tone: uikit.ToneAccent, Label: "正在测试",
+			uikit.Spinner(c, uikit.SpinnerProps{Size: uikit.SizeXs, Tone: uikit.ToneAccent, Label: locales.MessageTesting2(),
 				Motion: uikit.MotionOverride(a.reduceMotion(c))})
 			ui.Text(c, message).FontSize(t.Font.Size.Small).TextColor(uikit.Color(p.InfoText)).Grow(1).MinWidth(0).SingleLine().Ellipsis("…")
-			uikit.Button(c, "取消", uikit.ButtonProps{Variant: uikit.ButtonPlain, Size: uikit.SizeSm}).Shrink(0).OnClick(a.cancelGatewayTest)
+			uikit.Button(
+				c,
+				locales.CommonCancel(),
+				uikit.ButtonProps{Variant: uikit.ButtonPlain, Size: uikit.SizeSm},
+			).Shrink(0).OnClick(a.cancelGatewayTest)
 		})
 		return
 	}
 	record, tested := a.gatewayUI.results[g.ID]
 	result := record.result
 	if !tested {
-		scope := "检查 SOCKS5 协商与认证方式"
-		if g.Kind == "ssh" {
-			scope = "检查 SSH 握手、主机信任与认证"
-		}
-		via := "直接"
+		via := locales.MessageDirectly()
 		if len(chain) > 1 {
-			via = "经上游"
+			via = locales.MessageViaUpstreamGateway()
 		}
 		ui.Row(c).Key("gateway-test-hint").FillWidth().Margin(t.Space.N10, 0, 0, 0).Gap(t.Space.N6).AlignItems(ui.Center).Children(func() {
 			uikit.Icon(c, infoIcon, uikit.IconProps{Size: uikit.SizeXs, Tone: uikit.ToneTertiary})
-			uikit.Text(c, "测试会"+via+"连接本网关，"+scope+"；不访问目标主机。", uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneSecondary}).
+			uikit.Text(
+				c,
+				locales.GatewayTestHint(via, g.Kind),
+				uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneSecondary},
+			).
 				Grow(1).MinWidth(0)
 		})
 		return
 	}
 	if result.Err == nil {
-		strip(t.Color.Success.Subtle, result.Summary).Children(func() {
+		strip(t.Color.Success.Subtle, result.Summary.String()).Children(func() {
 			uikit.Icon(c, sessionCheckIcon, uikit.IconProps{Size: uikit.SizeSm, Tone: uikit.ToneSuccess})
-			uikit.Text(c, result.Summary, uikit.TextProps{Style: uikit.TextBodyStrong, Tone: uikit.ToneSuccess}).Shrink(0)
-			uikit.Text(c, result.Detail, uikit.TextProps{Style: uikit.TextSmall}).Grow(1).MinWidth(0).SingleLine().Ellipsis("…")
+			uikit.Text(c, result.Summary.String(), uikit.TextProps{Style: uikit.TextBodyStrong, Tone: uikit.ToneSuccess}).Shrink(0)
+			uikit.Text(c, result.Detail.String(), uikit.TextProps{Style: uikit.TextSmall}).Grow(1).MinWidth(0).SingleLine().Ellipsis("…")
 			retry()
 		})
 		return
 	}
 	// Name the hop that failed: 「test」连接失败 rather than the gateway under test.
-	summary := result.Summary
+	summary := result.Summary.String()
 	if test.failed >= 0 {
-		summary = "「" + test.route[test.failed].Name + "」" + strings.TrimPrefix(summary, "网关")
+		summary = locales.GatewayFailureAtHop(test.route[test.failed].Name, summary)
 	}
 	strip(p.DangerBg, summary).AlignItems(ui.Start).Children(func() {
 		uikit.Icon(c, sessionAlertIcon, uikit.IconProps{Size: uikit.SizeSm}).TextColor(uikit.Color(p.DangerIcon)).Margin(t.Space.N2, 0, 0, 0)
 		ui.Column(c).Grow(1).MinWidth(0).Gap(t.Space.N2).Children(func() {
 			uikit.Text(c, summary, uikit.TextProps{Style: uikit.TextBodyStrong, Tone: uikit.ToneDanger})
-			uikit.Text(c, result.Detail, uikit.TextProps{Style: uikit.TextFootnote, Mono: true}).Selectable()
+			uikit.Text(c, result.Detail.String(), uikit.TextProps{Style: uikit.TextFootnote, Mono: true}).Selectable()
 		})
 		retry()
 	})
@@ -964,56 +1022,60 @@ func (a *app) gatewayFacts(c *ui.Context, g gatewayConfig) {
 	}
 	// The gateway just before this one, whether chosen here (SOCKS5) or
 	// followed from the source host (SSH).
-	previous := func() { uikit.Text(c, "直连", uikit.TextProps{}).Shrink(0) }
+	previous := func() { uikit.Text(c, locales.MessageDirect(), uikit.TextProps{}).Shrink(0) }
 	if chain := a.gatewayChain(g.ID); len(chain) > 1 {
 		u := chain[len(chain)-2]
 		previous = chip("upstream", func() { gatewayKindTile(c, u.Kind, tile, glyph, t.Radius.Chip) }, u.Name,
 			func() { a.selectGateway(u.ID) })
 	}
-	upstream := fact{label: "上游网关", render: func() {
+	upstream := fact{label: locales.MessageUpstreamGateway(), render: func() {
 		previous()
 		if g.Kind == "ssh" {
-			uikit.Text(c, "跟随源主机", uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneTertiary}).SingleLine().Ellipsis("…").MinWidth(0)
+			uikit.Text(
+				c,
+				locales.MessageUseSourceHostRoute(),
+				uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneTertiary},
+			).SingleLine().Ellipsis("…").MinWidth(0)
 		}
 	}}
 	var facts []fact
-	note := "目标主机名交由代理解析；FTP / FTPS 经网关时仅支持被动模式。"
+	note := locales.MessageTheProxyResolvesTheTargetHostnameFtpFtpsThroughAGatewayRequiresPassive()
 	var editHost func()
 	if g.Kind == "ssh" {
 		h, id, _ := a.gatewayHost(g)
-		auth := map[string]string{"password": "密码", "key": "私钥", "agent": "SSH Agent"}[h.session.Auth]
+		auth := map[string]string{"password": locales.CommonPassword(), "key": locales.MessagePrivateKeys(), "agent": "SSH Agent"}[h.session.Auth]
 		if h.session.Auth == "password" && h.session.PasswordSaved {
-			auth += " · 已保存"
+			auth += locales.MessageSaved()
 		}
-		keepalive := "关闭"
+		keepalive := locales.CommonClose()
 		if h.session.SSH != nil && h.session.SSH.KeepAlive > 0 {
-			keepalive = strconv.Itoa(h.session.SSH.KeepAlive) + " 秒"
+			keepalive = strconv.Itoa(h.session.SSH.KeepAlive) + locales.MessageS()
 		}
 		editHost = func() { a.openGatewayReference(gatewayRef{kind: gatewayRefHost, host: id}) }
 		facts = []fact{
-			{label: "源主机", render: chip("source", func() { gatewayTile(c, terminalIcon, color.NRGBA{}, tile, glyph, t.Radius.Chip) }, h.name, editHost)},
-			{label: "地址", value: a.gatewayAddress(g), mono: true},
-			{label: "认证", value: auth},
+			{label: locales.MessageSourceHost(), render: chip("source", func() { gatewayTile(c, terminalIcon, color.NRGBA{}, tile, glyph, t.Radius.Chip) }, h.name, editHost)},
+			{label: locales.MessageAddress(), value: a.gatewayAddress(g), mono: true},
+			{label: locales.MessageAuthentication(), value: auth},
 			{label: "Keepalive", value: keepalive},
 			upstream,
-			{label: "连接复用", value: "多个目标共享同一条 SSH 连接"},
+			{label: locales.MessageConnectionSharing(), value: locales.MessageMultipleTargetsShareOneSshConnection()},
 		}
-		note = "地址、认证、Keepalive 和上游均取自 SSH 主机「" + h.name + "」及其连接网关，修改请编辑该主机。网关不执行其初始命令。"
+		note = locales.GatewaySourceSettings(h.name)
 	} else {
-		auth, user, password := "无认证", "—", "—"
+		auth, user, password := locales.MessageNoAuthentication(), "—", "—"
 		if g.SOCKS.Username != "" {
-			auth, user, password = "用户名密码", g.SOCKS.Username, "连接时输入"
+			auth, user, password = locales.MessageUsernameAndPassword(), g.SOCKS.Username, locales.MessageAskWhenConnecting()
 			if g.SOCKS.PasswordSaved {
-				password = "已保存在 Vault"
+				password = locales.MessageSavedInVault()
 			}
 		}
 		facts = []fact{
-			{label: "地址", value: a.gatewayEndpoint(g), mono: true},
-			{label: "认证", value: auth},
-			{label: "用户名", value: user, mono: g.SOCKS.Username != ""},
-			{label: "密码", value: password},
+			{label: locales.MessageAddress(), value: a.gatewayEndpoint(g), mono: true},
+			{label: locales.MessageAuthentication(), value: auth},
+			{label: locales.MessageUsername(), value: user, mono: g.SOCKS.Username != ""},
+			{label: locales.CommonPassword(), value: password},
 			upstream,
-			{label: "连接方式", value: "每个目标单独建立连接"},
+			{label: locales.MessageConnectionMode(), value: locales.MessageASeparateConnectionForEachTarget()},
 		}
 	}
 	for start := 0; start < len(facts); start += 2 {
@@ -1036,7 +1098,11 @@ func (a *app) gatewayFacts(c *ui.Context, g gatewayConfig) {
 		uikit.Icon(c, infoIcon, uikit.IconProps{Size: uikit.SizeXs, Tone: uikit.ToneTertiary}).Margin(t.Space.N2, 0, 0, 0)
 		uikit.Text(c, note, uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneSecondary}).Grow(1).MinWidth(0)
 		if editHost != nil {
-			uikit.Button(c, "编辑主机", uikit.ButtonProps{Variant: uikit.ButtonPlain, Size: uikit.SizeSm}).Shrink(0).OnClick(editHost)
+			uikit.Button(
+				c,
+				locales.MessageEditHost(),
+				uikit.ButtonProps{Variant: uikit.ButtonPlain, Size: uikit.SizeSm},
+			).Shrink(0).OnClick(editHost)
 		}
 	})
 }
@@ -1047,12 +1113,16 @@ func (a *app) gatewayReferenceGroups(c *ui.Context, refs []gatewayRef) {
 		ui.Row(c).FillWidth().Padding(t.Space.N12, t.Space.N14).Gap(t.Space.N8).AlignItems(ui.Center).Radius(t.Radius.Lift).
 			Border(t.Size.Divider, uikit.Color(t.Color.Border.Subtle)).Children(func() {
 			uikit.Icon(c, sessionCheckIcon, uikit.IconProps{Size: uikit.SizeSm, Tone: uikit.ToneSuccess})
-			uikit.Text(c, "没有会话、网关或运行中的连接引用此网关，可以直接删除。", uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneSecondary})
+			uikit.Text(
+				c,
+				locales.MessageNoSessionsGatewaysOrActiveConnectionsReferenceThisGatewayItCanBeDeleted(),
+				uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneSecondary},
+			)
 		})
 		return
 	}
 	groups := [][]gatewayRef{}
-	for kind := range gatewayRefGroups {
+	for kind := range gatewayRefGroups() {
 		group := []gatewayRef{}
 		for _, ref := range refs {
 			if ref.kind == gatewayRefKind(kind) {
@@ -1073,7 +1143,7 @@ func (a *app) gatewayReferenceGroups(c *ui.Context, refs []gatewayRef) {
 					ui.Column(c).Key(group[0].kind).FillWidth().Padding(t.Space.N6).Radius(t.Radius.Lift).
 						Border(t.Size.Divider, uikit.Color(t.Color.Border.Subtle)).Children(func() {
 						ui.Row(c).Padding(t.Space.N4, t.Space.N6, t.Space.N6, t.Space.N6).Gap(t.Space.N6).AlignItems(ui.Center).Children(func() {
-							uikit.Text(c, gatewayRefGroups[group[0].kind], uikit.TextProps{Style: uikit.TextLabel, Tone: uikit.ToneSecondary})
+							uikit.Text(c, gatewayRefGroups()[group[0].kind], uikit.TextProps{Style: uikit.TextLabel, Tone: uikit.ToneSecondary})
 							uikit.Count(c, len(group), uikit.CountProps{})
 						})
 						for position, ref := range group {
@@ -1091,9 +1161,9 @@ func (a *app) gatewayReferenceRow(c *ui.Context, ref gatewayRef, interactive boo
 	navigable := interactive && (ref.kind == gatewayRefHost || ref.kind == gatewayRefGateway)
 	var row ui.Element
 	if navigable {
-		label := "编辑 " + ref.label
+		label := locales.MessageEdit2() + ref.label
 		if ref.kind == gatewayRefGateway {
-			label = "查看网关 " + ref.label
+			label = locales.MessageViewGateway() + ref.label
 		}
 		row = ui.ButtonBase(c).Label(label).FocusRing(false)
 		background := ui.Transparent
@@ -1173,7 +1243,14 @@ func (a *app) startGatewayTest(id string) {
 	progress := &gatewayTestProgress{}
 	work, err := a.prepareGatewayTest(id, progress)
 	if err != nil {
-		a.recordGatewayTest(id, gatewayTestRecord{result: connectionTestResult{Summary: "无法测试网关", Detail: err.Error(), Err: err}, failed: -1})
+		a.recordGatewayTest(
+			id,
+			gatewayTestRecord{result: connectionTestResult{Summary: locales.Deferred(
+				locales.MessageUnableToTestGateway,
+			), Detail: locales.ErrorText(
+				err,
+			), Err: err}, failed: -1},
+		)
 		return
 	}
 	ctx, cancel := context.WithCancel(a.ctx)
@@ -1205,7 +1282,7 @@ func (a *app) collectGatewayTest(c *ui.Context) {
 		}
 		a.cancelGatewayTest()
 		a.recordGatewayTest(id, record)
-		c.Announce(result.Summary)
+		c.Announce(result.Summary.String())
 	default:
 		c.After(theme.Current().C.TestResult.Crossfade)
 	}
@@ -1234,31 +1311,35 @@ func (a *app) gatewayDeleteDialog(c *ui.Context, d *gatewayDraft) {
 	t := theme.Current()
 	refs := a.gatewayReferences(d.value.ID)
 	uikit.Modal(c.Key(d.value.ID).Key("delete"), &a.gatewayUI.open, uikit.ModalProps{
-		Controller: &d.modal, Title: "删除网关「" + d.value.Name + "」？", Width: t.C.Dialog.HostWidth,
+		Controller: &d.modal, Title: locales.GatewayDeleteTitle(d.value.Name), Width: t.C.Dialog.HostWidth,
 		Compact: true, Disabled: a.catalogSaving, Motion: uikit.MotionOverride(a.reduceMotion(c)),
 	}, func(parts uikit.ModalParts) {
 		if len(refs) > 0 {
-			uikit.Banner(c, fmt.Sprintf("仍有 %d 项引用。请先将它们改为其他网关或直连，再删除此网关。", len(refs)),
+			uikit.Banner(c, locales.GatewayReferencesRemain(len(refs)),
 				uikit.BannerProps{Tone: uikit.ToneWarning, Icon: sessionAlertIcon})
 			ui.Column(c).FillWidth().Padding(t.Space.N4).Radius(t.Radius.Lift).Border(t.Size.Divider, uikit.Color(t.Color.Border.Subtle)).Children(func() {
 				for index, ref := range refs {
-					ref.detail = gatewayRefGroups[ref.kind]
+					ref.detail = gatewayRefGroups()[ref.kind]
 					a.gatewayReferenceRow(c.Key(index), ref, false)
 				}
 			})
 		} else {
-			message := "删除后不可恢复。"
+			message := locales.MessageThisCannotBeUndone()
 			if d.value.SOCKS != nil && d.value.SOCKS.PasswordSaved {
-				message += "已保存的 SOCKS5 密码会一并从 Vault 移除。"
+				message += locales.MessageTheSavedSocks5PasswordWillAlsoBeRemovedFromVault()
 			}
 			uikit.Text(c, message, uikit.TextProps{Tone: uikit.ToneSecondary})
 		}
-		if d.errorText != "" {
-			uikit.Banner(c, d.errorText, uikit.BannerProps{Tone: uikit.ToneDanger, Icon: sessionAlertIcon})
+		if !d.errorText.Empty() {
+			uikit.Banner(c, d.errorText.String(), uikit.BannerProps{Tone: uikit.ToneDanger, Icon: sessionAlertIcon})
 		}
 		ui.Row(c).FillWidth().Gap(t.Space.N8).Justify(ui.End).Children(func() {
-			uikit.Button(c, "取消", uikit.ButtonProps{}).OnClick(parts.RequestDismiss)
-			uikit.Button(c, "删除", uikit.ButtonProps{Variant: uikit.ButtonDanger, Disabled: len(refs) > 0}).OnClick(func() { a.deleteGateway(d) })
+			uikit.Button(c, locales.CommonCancel(), uikit.ButtonProps{}).OnClick(parts.RequestDismiss)
+			uikit.Button(
+				c,
+				locales.CommonDelete(),
+				uikit.ButtonProps{Variant: uikit.ButtonDanger, Disabled: len(refs) > 0},
+			).OnClick(func() { a.deleteGateway(d) })
 		})
 	})
 }
@@ -1266,14 +1347,14 @@ func (a *app) gatewayDeleteDialog(c *ui.Context, d *gatewayDraft) {
 func (a *app) gatewayEditDialog(c *ui.Context, d *gatewayDraft) {
 	t := theme.Current()
 	p := t.C.Modal
-	title := "新增网关"
+	title := locales.MessageAddGateway()
 	if d.editing {
-		title = "编辑网关"
+		title = locales.MessageEditGateway2()
 	}
 	dirty := d.inputValues() != d.initial || d.passwordChanged || d.clearPassword
 	result := uikit.Modal(c.Key(d.value.ID), &a.gatewayUI.open, uikit.ModalProps{
 		Controller: &d.modal, Title: title, Dirty: dirty, Disabled: a.catalogSaving,
-		CloseKey: "gateway-close", CloseLabel: "关闭网关设置", Motion: uikit.MotionOverride(a.reduceMotion(c)),
+		CloseKey: "gateway-close", CloseLabel: locales.MessageCloseGatewaySettings(), Motion: uikit.MotionOverride(a.reduceMotion(c)),
 		Header: func(uikit.ModalParts) {
 			ui.Row(c).FillWidth().Shrink(0).Padding(p.HeaderPaddingTop, p.HeaderPaddingRight, p.HeaderPaddingBottom, p.HeaderPaddingLeft).
 				Gap(p.HeaderGap).AlignItems(ui.Center).Children(func() {
@@ -1283,7 +1364,7 @@ func (a *app) gatewayEditDialog(c *ui.Context, d *gatewayDraft) {
 				})
 				ui.Column(c).Grow(1).MinWidth(0).Gap(t.Space.N2).PaddingEnd(t.C.IconButton.Size).Children(func() {
 					uikit.Text(c, title, uikit.TextProps{Style: uikit.TextTitle}).SingleLine()
-					subtitle := "保存后可在主机、文件站点和应用默认出口中选择"
+					subtitle := locales.MessageAfterSavingSelectThisGatewayForHostsFileSitesOrTheAppDefault()
 					if d.editing {
 						subtitle = a.gatewayName(d.value.ID) + " · " + gatewayKindLabel(d.value.Kind)
 					}
@@ -1294,8 +1375,16 @@ func (a *app) gatewayEditDialog(c *ui.Context, d *gatewayDraft) {
 		Footer: func(parts uikit.ModalParts) {
 			uikit.ModalFooter(c).Children(func() {
 				ui.Spacer(c)
-				uikit.Button(c, "取消", uikit.ButtonProps{Variant: uikit.ButtonPlain}).Padding(0, p.ButtonPaddingX).OnClick(parts.RequestDismiss)
-				uikit.Button(c, "保存", uikit.ButtonProps{Variant: uikit.ButtonPrimary, Kbd: "↩"}).Padding(0, p.ButtonPaddingX).Shrink(0).
+				uikit.Button(
+					c,
+					locales.CommonCancel(),
+					uikit.ButtonProps{Variant: uikit.ButtonPlain},
+				).Padding(0, p.ButtonPaddingX).OnClick(parts.RequestDismiss)
+				uikit.Button(
+					c,
+					locales.CommonSave(),
+					uikit.ButtonProps{Variant: uikit.ButtonPrimary, Kbd: "↩"},
+				).Padding(0, p.ButtonPaddingX).Shrink(0).
 					OnClick(func() { a.saveGateway(d) })
 			})
 		},
@@ -1307,17 +1396,23 @@ func (a *app) gatewayEditDialog(c *ui.Context, d *gatewayDraft) {
 			kind := slices.Index(gatewayKinds, d.value.Kind)
 			ui.Column(c).FillWidth().Shrink(0).Padding(0, p.BodyPaddingX, t.Space.N8, p.BodyPaddingX).Children(func() {
 				uikit.Segmented(c.Key("gateway-kind"), &kind, []uikit.SegItem{
-					{Label: "SSH 网关", IconSVG: terminalIcon, IconTone: uikit.ToneAccent, Detail: "复用已保存的 SSH 主机"},
-					{Label: "SOCKS5 代理", IconSVG: globeIcon, IconTone: uikit.ToneTertiary, Detail: "经代理服务器转发连接"},
-				}, uikit.SegmentedProps{Label: "网关类型", Fill: true, Cards: true})
+					{Label: locales.MessageSshGateway(), IconSVG: terminalIcon, IconTone: uikit.ToneAccent, Detail: locales.MessageUseASavedSshHost()},
+					{Label: locales.MessageSocks5Proxy(), IconSVG: globeIcon, IconTone: uikit.ToneTertiary, Detail: locales.MessageRouteConnectionsThroughAProxyServer()},
+				}, uikit.SegmentedProps{Label: locales.MessageGatewayType(), Fill: true, Cards: true})
 			})
 			if gatewayKinds[kind] != d.value.Kind {
-				d.value.Kind, d.errorText = gatewayKinds[kind], ""
+				d.value.Kind, d.errorText = gatewayKinds[kind], locales.Text{}
 			}
 			uikit.FormSection(c, "", func() { a.gatewayDraftFields(c, d) }).
 				Padding(t.Space.N8, p.BodyPaddingX, t.Space.N16, p.BodyPaddingX)
 		})
-		uikit.Scrollbars(c, parts.Panel, scroller, &d.scroll, uikit.ScrollbarProps{Label: "网关表单滚动条"})
+		uikit.Scrollbars(
+			c,
+			parts.Panel,
+			scroller,
+			&d.scroll,
+			uikit.ScrollbarProps{Label: locales.MessageGatewayFormScrollbar()},
+		)
 	})
 	if result.Submit {
 		a.saveGateway(d)
@@ -1326,8 +1421,12 @@ func (a *app) gatewayEditDialog(c *ui.Context, d *gatewayDraft) {
 
 func (a *app) gatewayDraftFields(c *ui.Context, d *gatewayDraft) {
 	t := theme.Current()
-	uikit.FormRow(c, "名称", uikit.FormRowProps{Key: "name"}, func() ui.Element {
-		return uikit.Input(c, &d.value.Name, uikit.InputProps{Label: "网关名称", Placeholder: "例如 bastion-hk"})
+	uikit.FormRow(c, locales.CommonName(), uikit.FormRowProps{Key: "name"}, func() ui.Element {
+		return uikit.Input(
+			c,
+			&d.value.Name,
+			uikit.InputProps{Label: locales.MessageGatewayName(), Placeholder: locales.MessageForExampleBastionHk()},
+		)
 	})
 	catalog := a.gatewayCatalog()
 	// loops reports whether the draft, changed by edit, would reach itself.
@@ -1346,29 +1445,34 @@ func (a *app) gatewayDraftFields(c *ui.Context, d *gatewayDraft) {
 			}
 			option := uikit.Option[string]{Value: h.session.ID, Label: h.name, Detail: h.user + "@" + h.address + ":" + strconv.Itoa(h.port)}
 			if loops(func(g *gatewayConfig) { g.SSHProfileID = h.session.ID }) {
-				option.Detail, option.Disabled = "会形成环路", true
+				option.Detail, option.Disabled = locales.MessageWouldCreateARoutingLoop(), true
 			}
 			options = append(options, option)
 		}
-		uikit.FormRow(c, "SSH 主机", uikit.FormRowProps{Key: "ssh-host", Help: "地址、认证与 Keepalive 取自该主机；不执行其初始命令。"}, func() ui.Element {
-			return uikit.Select(c, &d.value.SSHProfileID, options, uikit.SelectProps{Label: "SSH 主机", Placeholder: "选择已保存的 SSH 主机"})
+		uikit.FormRow(c, locales.MessageSshHost(), uikit.FormRowProps{Key: "ssh-host", Help: locales.MessageUsesThisHostSAddressAuthenticationAndKeepaliveSettingsItsInitialCommandIs()}, func() ui.Element {
+			return uikit.Select(
+				c,
+				&d.value.SSHProfileID,
+				options,
+				uikit.SelectProps{Label: locales.MessageSshHost(), Placeholder: locales.MessageSelectASavedSshHost()},
+			)
 		})
-		uikit.FormRow(c, "上游网关", uikit.FormRowProps{Key: "upstream", Help: "SSH 网关沿用源主机的「连接网关」，与直接连接该主机时的路径一致；请在主机设置中修改。"}, func() ui.Element {
+		uikit.FormRow(c, locales.MessageUpstreamGateway(), uikit.FormRowProps{Key: "upstream", Help: locales.MessageAnSshGatewayUsesItsSourceHostSGatewayRouteJustLikeA()}, func() ui.Element {
 			return ui.Row(c).FillWidth().Height(t.C.Input.Height).Gap(t.Space.N6).AlignItems(ui.Center).Children(func() {
 				source, ok := catalog.sshHost(d.value.SSHProfileID)
 				if !ok {
-					uikit.Text(c, "选择 SSH 主机后确定", uikit.TextProps{Tone: uikit.ToneTertiary})
+					uikit.Text(c, locales.MessageSelectAnSshHostFirst(), uikit.TextProps{Tone: uikit.ToneTertiary})
 					return
 				}
-				selection := "跟随应用默认"
+				selection := locales.MessageUseAppDefault()
 				switch source.session.Gateway {
 				case "":
 				case directGateway:
-					selection = "直连"
+					selection = locales.MessageDirect()
 				default:
 					selection = a.gatewayName(source.session.Gateway)
 				}
-				uikit.Text(c, "跟随「"+source.name+"」", uikit.TextProps{}).Shrink(0)
+				uikit.Text(c, locales.GatewayFollowName(source.name), uikit.TextProps{}).Shrink(0)
 				uikit.Text(c, "· "+selection, uikit.TextProps{Tone: uikit.ToneSecondary}).SingleLine().Ellipsis("…").MinWidth(0)
 			})
 		})
@@ -1376,56 +1480,73 @@ func (a *app) gatewayDraftFields(c *ui.Context, d *gatewayDraft) {
 		if d.value.SOCKS == nil {
 			d.value.SOCKS = &socksGateway{Port: 1080}
 		}
-		uikit.FormRow(c, "代理地址", uikit.FormRowProps{Key: "socks-address"}, func() ui.Element {
+		uikit.FormRow(c, locales.MessageProxyAddress(), uikit.FormRowProps{Key: "socks-address"}, func() ui.Element {
 			return ui.Row(c).FillWidth().Gap(t.Space.N8).Children(func() {
-				uikit.Input(c, &d.value.SOCKS.Address, uikit.InputProps{Label: "SOCKS5 地址", Placeholder: "主机名或 IP", Mono: true}).Grow(1)
-				uikit.PortInput(c, &d.port, uikit.InputProps{Label: "SOCKS5 端口", Width: t.C.Dialog.PortWidth}).Shrink(0)
+				uikit.Input(
+					c,
+					&d.value.SOCKS.Address,
+					uikit.InputProps{Label: locales.MessageSocks5Address(), Placeholder: locales.MessageHostnameOrIp(), Mono: true},
+				).Grow(1)
+				uikit.PortInput(
+					c,
+					&d.port,
+					uikit.InputProps{Label: locales.MessageSocks5Port(), Width: t.C.Dialog.PortWidth},
+				).Shrink(0)
 			})
 		})
-		uikit.FormRow(c, "认证", uikit.FormRowProps{Key: "socks-auth", Align: uikit.RowAlignCenter}, func() ui.Element {
-			return uikit.Segmented(c, &d.auth, uikit.SegmentItems([]string{"无认证", "用户名密码"}), uikit.SegmentedProps{Label: "SOCKS5 认证", Size: uikit.SizeSm})
+		uikit.FormRow(c, locales.MessageAuthentication(), uikit.FormRowProps{Key: "socks-auth", Align: uikit.RowAlignCenter}, func() ui.Element {
+			return uikit.Segmented(
+				c,
+				&d.auth,
+				uikit.SegmentItems([]string{locales.MessageNoAuthentication(), locales.MessageUsernameAndPassword()}),
+				uikit.SegmentedProps{Label: locales.MessageSocks5Authentication2(), Size: uikit.SizeSm},
+			)
 		})
 		if d.auth == 1 {
-			uikit.FormRow(c, "用户名", uikit.FormRowProps{Key: "socks-user"}, func() ui.Element {
-				return uikit.Input(c, &d.value.SOCKS.Username, uikit.InputProps{Label: "SOCKS5 用户名"})
+			uikit.FormRow(c, locales.MessageUsername(), uikit.FormRowProps{Key: "socks-user"}, func() ui.Element {
+				return uikit.Input(c, &d.value.SOCKS.Username, uikit.InputProps{Label: locales.MessageSocks5Username()})
 			})
-			placeholder, help := "留空则连接时输入", "保存的密码经 Vault 加密存储。"
+			placeholder, help := locales.MessageLeaveBlankToEnterWhenConnecting(), locales.MessageSavedPasswordsAreEncryptedInVault()
 			if d.value.SOCKS.PasswordSaved {
-				placeholder, help = "已保存在 Vault · 留空保持不变", ""
+				placeholder, help = locales.MessageSavedInVaultLeaveBlankToKeepUnchanged(), ""
 			}
-			uikit.FormRow(c, "密码", uikit.FormRowProps{Key: "socks-password", Help: help}, func() ui.Element {
-				input := uikit.PasswordInput(c, &d.password, uikit.InputProps{Label: "SOCKS5 密码", Placeholder: placeholder}).Input
+			uikit.FormRow(c, locales.CommonPassword(), uikit.FormRowProps{Key: "socks-password", Help: help}, func() ui.Element {
+				input := uikit.PasswordInput(
+					c,
+					&d.password,
+					uikit.InputProps{Label: locales.MessageSocks5Password(), Placeholder: placeholder},
+				).Input
 				if input.Changed() {
 					d.passwordChanged = true
 				}
 				return input
 			})
 			if d.value.SOCKS.PasswordSaved {
-				uikit.FormRow(c, "已保存密码", uikit.FormRowProps{Key: "socks-clear", Inline: true}, func() ui.Element {
-					return uikit.Checkbox(c, &d.clearPassword, "清除已保存的密码")
+				uikit.FormRow(c, locales.MessageSavedPassword(), uikit.FormRowProps{Key: "socks-clear", Inline: true}, func() ui.Element {
+					return uikit.Checkbox(c, &d.clearPassword, locales.MessageClearSavedPasswords())
 				})
 			}
 		}
-		options := []uikit.Option[string]{{Value: "", Label: "直连", Detail: "本机网络"}}
+		options := []uikit.Option[string]{{Value: "", Label: locales.MessageDirect(), Detail: locales.MessageLocalNetwork2()}}
 		for _, g := range a.gateways {
 			if g.ID == d.value.ID {
 				continue
 			}
 			option := uikit.Option[string]{Value: g.ID, Label: g.Name, Detail: gatewayKindLabel(g.Kind)}
 			if loops(func(candidate *gatewayConfig) { candidate.UpstreamID = g.ID }) {
-				option.Detail, option.Disabled = "会形成环路", true
+				option.Detail, option.Disabled = locales.MessageWouldCreateARoutingLoop(), true
 			}
 			options = append(options, option)
 		}
-		uikit.FormRow(c, "上游网关", uikit.FormRowProps{Key: "upstream", Help: "代理服务器经由哪个出口连接。"}, func() ui.Element {
-			return uikit.Select(c, &d.value.UpstreamID, options, uikit.SelectProps{Label: "上游网关"})
+		uikit.FormRow(c, locales.MessageUpstreamGateway(), uikit.FormRowProps{Key: "upstream", Help: locales.MessageTheOutboundRouteUsedToConnectToTheProxyServer()}, func() ui.Element {
+			return uikit.Select(c, &d.value.UpstreamID, options, uikit.SelectProps{Label: locales.MessageUpstreamGateway()})
 		})
 	}
-	uikit.FormRow(c, "路径预览", uikit.FormRowProps{Key: "route-preview"}, func() ui.Element {
+	uikit.FormRow(c, locales.MessageRoutePreview(), uikit.FormRowProps{Key: "route-preview"}, func() ui.Element {
 		return a.gatewayRoutePreview(c, d)
 	})
-	if d.errorText != "" {
-		uikit.Banner(c, d.errorText, uikit.BannerProps{Tone: uikit.ToneDanger, Icon: sessionAlertIcon})
+	if !d.errorText.Empty() {
+		uikit.Banner(c, d.errorText.String(), uikit.BannerProps{Tone: uikit.ToneDanger, Icon: sessionAlertIcon})
 	}
 }
 
@@ -1446,7 +1567,7 @@ func (a *app) gatewayRoutePreview(c *ui.Context, d *gatewayDraft) ui.Element {
 	chain = chain[:len(chain)-1]
 	name := strings.TrimSpace(d.value.Name)
 	if name == "" {
-		name = "新网关"
+		name = locales.MessageNewGateway()
 	}
 	box, glyph := t.Space.N18, t.C.IconButton.IconSizeXs
 	chip := func(key string, leading func(), label string, current, target bool) {
@@ -1475,7 +1596,7 @@ func (a *app) gatewayRoutePreview(c *ui.Context, d *gatewayDraft) ui.Element {
 	}
 	return ui.Row(c).FillWidth().Wrap().Gap(t.Space.N6).Padding(t.Space.N8, t.Space.N10).AlignItems(ui.Center).
 		Radius(t.Radius.Control).Background(uikit.Color(t.Color.Surface.Field)).Children(func() {
-		chip("local", func() { gatewayTile(c, uikit.IconSVG(uikit.IconLaptop), color.NRGBA{}, box, glyph, t.Radius.Chip) }, "本机", false, false)
+		chip("local", func() { gatewayTile(c, uikit.IconSVG(uikit.IconLaptop), color.NRGBA{}, box, glyph, t.Radius.Chip) }, locales.MessageThisComputer(), false, false)
 		for _, hop := range chain {
 			arrow()
 			chip(hop.ID, func() { gatewayKindTile(c, hop.Kind, box, glyph, t.Radius.Chip) }, hop.Name, false, false)
@@ -1483,7 +1604,7 @@ func (a *app) gatewayRoutePreview(c *ui.Context, d *gatewayDraft) ui.Element {
 		arrow()
 		chip("self", func() { gatewayKindTile(c, d.value.Kind, box, glyph, t.Radius.Chip) }, name, true, false)
 		arrow()
-		chip("target", nil, "目标主机", false, true)
+		chip("target", nil, locales.MessageTargetHost(), false, true)
 	})
 }
 
@@ -1513,14 +1634,14 @@ func (a *app) saveGateway(d *gatewayDraft) {
 		}
 		if d.passwordChanged && d.password != "" && options.Username != "" {
 			if len(d.password) > 255 {
-				d.errorText = "SOCKS5 密码不能超过 255 字节"
+				d.errorText = locales.Deferred(locales.MessageTheSocks5PasswordCannotExceedBytes)
 				return
 			}
 			options.PasswordSaved = true
 			options.PasswordRevision = newSessionID()
 			data, err := json.Marshal(sessionCredential{Revision: options.PasswordRevision, Secret: d.password})
 			if err != nil {
-				d.errorText = err.Error()
+				d.errorText = locales.ErrorText(err)
 				return
 			}
 			defer clear(data)
@@ -1546,12 +1667,12 @@ func (a *app) saveGateway(d *gatewayDraft) {
 	err := a.validateGateways()
 	a.gateways = previous
 	if err != nil {
-		d.errorText = err.Error()
+		d.errorText = locales.ErrorText(err)
 		return
 	}
 	changes, err := a.vault.Prepare(items, deleted)
 	if err != nil {
-		d.errorText = err.Error()
+		d.errorText = locales.ErrorText(err)
 		return
 	}
 	a.commitCatalogSecretsAsync(changes, func() {
@@ -1562,7 +1683,7 @@ func (a *app) saveGateway(d *gatewayDraft) {
 		}
 	}, func(err error) {
 		if err != nil {
-			d.errorText = err.Error()
+			d.errorText = locales.ErrorText(err)
 			return
 		}
 		a.cancelGatewayTest()
@@ -1575,19 +1696,19 @@ func (a *app) saveGateway(d *gatewayDraft) {
 
 func (a *app) deleteGateway(d *gatewayDraft) {
 	if refs := a.gatewayReferences(d.value.ID); len(refs) > 0 {
-		d.errorText = "网关仍被引用"
+		d.errorText = locales.Deferred(locales.MessageTheGatewayIsStillReferenced)
 		return
 	}
 	changes, err := a.vault.Prepare(nil, []string{gatewayCredentialKey(d.value.ID)})
 	if err != nil {
-		d.errorText = err.Error()
+		d.errorText = locales.ErrorText(err)
 		return
 	}
 	a.commitCatalogSecretsAsync(changes, func() {
 		a.gateways = slices.DeleteFunc(a.gateways, func(g gatewayConfig) bool { return g.ID == d.value.ID })
 	}, func(err error) {
 		if err != nil {
-			d.errorText = err.Error()
+			d.errorText = locales.ErrorText(err)
 			return
 		}
 		if a.gatewayUI.testGateway == d.value.ID {

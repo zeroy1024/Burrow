@@ -15,6 +15,7 @@ import (
 	"unicode/utf8"
 
 	"sshdesk/internal/fileclient"
+	"sshdesk/internal/locales"
 	"sshdesk/internal/store"
 )
 
@@ -42,24 +43,24 @@ func decodeInput(name string, raw json.RawMessage) (Input, error) {
 	}
 	var object map[string]json.RawMessage
 	if err := json.Unmarshal(raw, &object); err != nil || object == nil {
-		return in, fail("invalid_argument", "工具参数必须是 JSON 对象")
+		return in, fail("invalid_argument", locales.MessageToolArgumentsMustBeAJsonObject())
 	}
 	schema := toolSchema(name)
 	for key := range object {
 		if _, ok := schema["properties"].(map[string]any)[key]; !ok {
-			return in, fail("invalid_argument", "包含不支持的工具参数")
+			return in, fail("invalid_argument", locales.MessageUnsupportedToolArgument())
 		}
 	}
 	for _, key := range schema["required"].([]string) {
 		if value, ok := object[key]; !ok || string(value) == "null" {
-			return in, fail("invalid_argument", "缺少必需工具参数")
+			return in, fail("invalid_argument", locales.MessageMissingRequiredToolArgument())
 		}
 	}
 	if err := json.Unmarshal(raw, &in); err != nil {
-		return in, fail("invalid_argument", "工具参数类型不正确")
+		return in, fail("invalid_argument", locales.MessageIncorrectToolArgumentType())
 	}
 	if in.Timeout < 0 || in.Timeout > 120 || in.Offset < 0 || in.Offset > 1000000 || in.Limit < 0 || in.Limit > 1000 || in.Length < 0 || in.Length > MaxText {
-		return in, fail("invalid_argument", "参数超过服务端限制")
+		return in, fail("invalid_argument", locales.MessageArgumentsExceedServerLimits())
 	}
 	if in.Limit == 0 {
 		in.Limit = 100
@@ -71,20 +72,20 @@ func decodeInput(name string, raw json.RawMessage) (Input, error) {
 		in.Length = 65536
 	}
 	if len(in.Path) > 4096 || len(in.LocalPath) > 4096 || len(in.Command) > 65536 || len(in.Text) > MaxText || strings.ContainsRune(in.Command, 0) || strings.ContainsRune(in.Path, 0) {
-		return in, fail("invalid_argument", "命令、路径或文本超过限制或含无效字符")
+		return in, fail("invalid_argument", locales.MessageTheCommandPathOrTextExceedsLimitsOrContainsInvalidCharacters())
 	}
 	if name == "ssh_exec" && strings.TrimSpace(in.Command) == "" {
-		return in, fail("invalid_argument", "命令不能为空")
+		return in, fail("invalid_argument", locales.MessageCommandCannotBeEmpty())
 	}
 	if strings.HasPrefix(name, "files_") && (!path.IsAbs(in.Path) || in.Path == "") {
-		return in, fail("invalid_argument", "远端路径必须是绝对路径")
+		return in, fail("invalid_argument", locales.MessageRemotePathMustBeAbsolute())
 	}
 	if name == "files_write" && in.Mode != "create" && in.Mode != "replace" {
-		return in, fail("invalid_argument", "写入模式必须为 create 或 replace")
+		return in, fail("invalid_argument", locales.MessageWriteModeMustBeCreateOrReplace())
 	}
 	if name == "files_upload" || name == "files_download" {
 		if !slices.Contains([]string{"error", "overwrite", "skip", "rename"}, in.Conflict) {
-			return in, fail("invalid_argument", "必须指定 error、overwrite、skip 或 rename 冲突策略")
+			return in, fail("invalid_argument", locales.MessageSpecifyAnErrorOverwriteSkipOrRenameConflictPolicy())
 		}
 	}
 	return in, nil
@@ -106,7 +107,7 @@ func (s *Service) Call(parent context.Context, keyID, name string, raw json.RawM
 	s.mu.Lock()
 	if s.closing {
 		s.mu.Unlock()
-		return out, fail("service_stopped", "MCP 服务已停止")
+		return out, fail("service_stopped", locales.MessageMcpServiceStopped())
 	}
 	s.operations.Add(1)
 	s.mu.Unlock()
@@ -132,7 +133,7 @@ func (s *Service) Call(parent context.Context, keyID, name string, raw json.RawM
 			return out, s.storageFault(err)
 		}
 		out["operation_id"] = busy.ID
-		return out, fail("busy", "MCP 同时执行的调用已达到上限")
+		return out, fail("busy", locales.MessageTheMaximumNumberOfConcurrentMcpCallsHasBeenReached())
 	}
 	op := store.MCPOperation{ID: rand.Text(), KeyID: keyID, Action: name, Status: "running", StartedAt: time.Now().UTC(), Timeline: []store.MCPEvent{{Stage: "accepted", At: time.Now().UTC()}}}
 	if inbound != nil {
@@ -216,13 +217,13 @@ func (s *Service) Call(parent context.Context, keyID, name string, raw json.RawM
 		s.Changed()
 	}()
 	if key.State != "active" || s.fault.Load() {
-		return out, fail("permission_denied", "授权密钥无效或 MCP 存储不可用")
+		return out, fail("permission_denied", locales.MessageTheAccessKeyIsInvalidOrMcpStorageIsUnavailable())
 	}
 	if !s.Accepting() && !strings.HasPrefix(name, "tasks_") {
-		return out, fail("service_stopped", "MCP 服务已停止")
+		return out, fail("service_stopped", locales.MessageMcpServiceStopped())
 	}
 	if toolDescription(name) == "" {
-		return out, fail("unknown_tool", "不支持的工具")
+		return out, fail("unknown_tool", locales.MessageUnsupportedTool())
 	}
 	in, err := decodeInput(name, raw)
 	if err != nil {
@@ -305,7 +306,7 @@ func (s *Service) Call(parent context.Context, keyID, name string, raw json.RawM
 	}
 	if name == "ssh_exec" {
 		if connection.Protocol != "ssh" {
-			return out, fail("invalid_argument", "该连接不支持 SSH 命令")
+			return out, fail("invalid_argument", locales.MessageThisConnectionDoesNotSupportSshCommands())
 		}
 		if err := s.CheckCommand(ctx, key.ID, connection.ID, in.Command); err != nil {
 			return out, err
@@ -328,7 +329,7 @@ func (s *Service) Call(parent context.Context, keyID, name string, raw json.RawM
 			return out, errors.Join(err, encodeErr)
 		}
 		if result.Truncated {
-			return out, fail("output_limit", "命令输出超过服务端限制，输出已截断")
+			return out, fail("output_limit", locales.MessageCommandOutputExceededTheServerLimitAndWasTruncated())
 		}
 		return out, err
 	}
@@ -398,7 +399,7 @@ func (s *Service) Call(parent context.Context, keyID, name string, raw json.RawM
 		return out, err
 	}
 	if entry.Symlink && name != "files_stat" {
-		return out, fail("path_unverifiable", "文件工具不跟随符号链接")
+		return out, fail("path_unverifiable", locales.MessageFileToolsDoNotFollowSymbolicLinks())
 	}
 	observedBytes := int64(0)
 	switch name {
@@ -414,7 +415,7 @@ func (s *Service) Call(parent context.Context, keyID, name string, raw json.RawM
 		out["entries"], out["total"], out["has_more"] = entries[from:min(from+in.Limit, len(entries))], len(entries), from+in.Limit < len(entries)
 	case "files_read":
 		if entry.Directory || entry.ModeKnown && !entry.Mode.IsRegular() {
-			return out, fail("invalid_argument", "只能读取普通文本文件")
+			return out, fail("invalid_argument", locales.MessageOnlyRegularTextFilesCanBeRead())
 		}
 		reader, err := client.OpenRead(ctx, in.Path, int64(in.Offset))
 		if err != nil {
@@ -433,7 +434,7 @@ func (s *Service) Call(parent context.Context, keyID, name string, raw json.RawM
 			data = data[:end]
 		}
 		if !utf8.Valid(data) {
-			return out, fail("invalid_argument", "读取范围不是有效的 UTF-8 文本")
+			return out, fail("invalid_argument", locales.MessageTheRequestedRangeIsNotValidUtfText())
 		}
 		// Permissions and rules may have tightened during a slow read. Do not
 		// deliver already-buffered content after that access has been removed.
@@ -446,7 +447,7 @@ func (s *Service) Call(parent context.Context, keyID, name string, raw json.RawM
 		out["text"], out["offset"], out["bytes"], out["truncated"] = string(data), in.Offset, len(data), truncated || int64(in.Offset+len(data)) < entry.Size
 		observedBytes = int64(len(data))
 	default:
-		return out, fail("unknown_tool", "不支持的工具")
+		return out, fail("unknown_tool", locales.MessageUnsupportedTool())
 	}
 	op.Result, err = json.Marshal(map[string]any{"bytes": observedBytes, "offset": in.Offset, "truncated": out["truncated"], "total": out["total"]})
 	if err != nil {
@@ -484,7 +485,7 @@ func (s *Service) taskTool(ctx context.Context, keyID, name string, in Input, ou
 	task, err := s.Store.MCPTask(ctx, in.TaskID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return out, fail("permission_denied", "任务不存在或不属于当前密钥")
+			return out, fail("permission_denied", locales.MessageTheTaskDoesNotExistOrDoesNotBelongToThisKey())
 		}
 		if ctx.Err() != nil {
 			return out, ctx.Err()
@@ -492,7 +493,7 @@ func (s *Service) taskTool(ctx context.Context, keyID, name string, in Input, ou
 		return out, s.storageFault(err)
 	}
 	if task.KeyID != keyID {
-		return out, fail("permission_denied", "任务不存在或不属于当前密钥")
+		return out, fail("permission_denied", locales.MessageTheTaskDoesNotExistOrDoesNotBelongToThisKey())
 	}
 	if name == "tasks_cancel" {
 		if err := s.Backend.ControlTask(ctx, task.ID, "cancel"); err != nil {
@@ -519,6 +520,6 @@ func (s *Service) recoveryTool(ctx context.Context, key store.MCPKey, name strin
 		return out, err
 	}
 	out["audit_persisted"] = false
-	out["audit_warning"] = "审计存储故障；本次查询或取消未能落盘"
+	out["audit_warning"] = locales.MessageAuditStorageFailedThisQueryOrCancellationCouldNotBePersisted()
 	return s.taskTool(ctx, key.ID, name, in, out)
 }

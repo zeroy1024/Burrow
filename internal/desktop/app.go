@@ -3,13 +3,13 @@ package desktop
 import (
 	"context"
 	"errors"
-	"fmt"
 	"path/filepath"
 	"runtime"
 	"slices"
 	"sync"
 	"time"
 
+	"sshdesk/internal/locales"
 	"sshdesk/internal/localfs"
 	"sshdesk/internal/store"
 	"sshdesk/internal/termtheme"
@@ -224,18 +224,17 @@ func Run() (runErr error) {
 	if err != nil {
 		return err
 	}
-	mygo.App.SetLanguages("zh-Hans", "en")
 	if err := localfs.MkdirAll(directory, 0700); err != nil {
-		return fmt.Errorf("保护应用数据目录：%w", err)
+		return locales.Errorf(locales.MessageProtectAppDataDirectory, err)
 	}
 	if err := nativeterm.Load(); err != nil {
-		return fmt.Errorf("加载原生终端：%w", err)
+		return locales.Errorf(locales.MessageLoadNativeTerminal, err)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	db, err := store.Open(ctx, filepath.Join(directory, "burrow.db"))
 	if err != nil {
 		cancel()
-		return fmt.Errorf("打开应用数据库：%w", err)
+		return locales.Errorf(locales.MessageOpenAppDatabase, err)
 	}
 
 	a := &app{ctx: ctx, cancel: cancel, store: db, dataDirectory: directory, tabs: []*workspaceTab{}, statusFactsOpen: true}
@@ -257,11 +256,11 @@ func Run() (runErr error) {
 	}
 	a.terminalError = a.loadTerminalSettings()
 	if err := a.loadAppPreferences(); err != nil {
-		a.security.errorText = err.Error()
+		a.security.errorText = locales.ErrorText(err)
 	}
 	a.vault, err = vault.OpenWithKeyStore(ctx, db, directory, platformUnlockKeys())
 	if err != nil {
-		a.security.errorText = err.Error()
+		a.security.errorText = locales.ErrorText(err)
 		a.security.status = "blocked"
 	} else {
 		a.security.migration = a.vault.State() == "pending_migration"
@@ -351,7 +350,9 @@ func Run() (runErr error) {
 		if a.mcpBusy() || a.credentials.busy || a.terminal.importing || a.savingSession() || a.catalogSaving || a.files.dialog != nil && a.files.dialog.busy {
 			a.resetQuitAttempt()
 			e.PreventDefault()
-			a.files.notice = &uikit.ToastProps{ID: "work-before-quit", Tone: uikit.ToneWarning, Title: "文件或凭据操作进行中，完成后再退出。"}
+			a.files.notice = &uikit.ToastProps{ID: "work-before-quit", Tone: uikit.ToneWarning, Title: locales.Deferred(
+				locales.MessageAFileOrCredentialOperationIsInProgressWaitForItToFinish,
+			)}
 			if a.window != nil {
 				a.window.Show()
 				a.window.Invalidate()
@@ -364,20 +365,20 @@ func Run() (runErr error) {
 			a.persistBeforeClose(func(err error) {
 				if err != nil {
 					a.quitPending = false
-					a.persistenceNotice("退出前保存失败", err)
+					a.persistenceNotice(locales.MessageUnableToSaveBeforeQuitting, err)
 					a.window.Show()
 					return
 				}
 				a.stopMCPForQuit(func(err error) {
 					if err != nil {
 						a.quitPending = false
-						a.persistenceNotice("停止 MCP 服务失败", err)
+						a.persistenceNotice(locales.MessageUnableToStopTheMcpService, err)
 						return
 					}
 					a.prepareTransferQuit(func(err error) {
 						a.quitPending = false
 						if err != nil {
-							a.persistenceNotice("保存传输记录失败", err)
+							a.persistenceNotice(locales.MessageUnableToSaveTransferHistory, err)
 							a.window.Show()
 							return
 						}
@@ -500,7 +501,14 @@ func (a *app) view(c *ui.Context) {
 	})
 	a.showCatalogError(c)
 	if a.terminalError != nil {
-		uikit.Toast(c, uikit.ToastProps{Title: "终端设置", Detail: a.terminalError.Error(), Tone: uikit.ToneDanger})
+		uikit.Toast(
+			c,
+			uikit.ToastProps{Title: locales.Deferred(
+				locales.MessageTerminalSettings,
+			), Detail: locales.ErrorText(
+				a.terminalError,
+			), Tone: uikit.ToneDanger},
+		)
 		a.terminalError = nil
 	}
 	if active.hasCatalog() {
@@ -544,7 +552,7 @@ func (a *app) view(c *ui.Context) {
 	uikit.ToastViewport(c, uikit.MotionOverride(a.reduceMotion(c)))
 	if a.interactionBlocked() {
 		ui.Overlay(c.Key("application-input-shield"), func() {
-			uikit.InputShield(c).Modal().AutoFocus().Role(ui.RoleStatus).Label("正在处理")
+			uikit.InputShield(c).Modal().AutoFocus().Role(ui.RoleStatus).Label(locales.MessageProcessing2())
 		})
 	}
 }
@@ -570,7 +578,7 @@ func (a *app) navigation(c *ui.Context) {
 		a.navigationButton(
 			c,
 			sectionGateways,
-			"网关",
+			locales.GatewaysTitle(),
 			routeIcon,
 		)
 		a.navigationButton(
@@ -583,7 +591,7 @@ func (a *app) navigation(c *ui.Context) {
 		a.navigationButton(
 			c,
 			sectionSettings,
-			"设置",
+			locales.SettingsTitle(),
 			settingsIcon,
 		)
 	})
@@ -646,12 +654,12 @@ func (a *app) workspace(c *ui.Context, shown float32) {
 
 func (a *app) sidebarResizeHandle(c *ui.Context, shown float32) {
 	t := theme.Current()
-	label := "调整会话栏宽度"
+	label := locales.MessageResizeSessionSidebar()
 	switch a.section {
 	case sectionFiles:
-		label = "调整站点栏宽度"
+		label = locales.MessageResizeSiteSidebar()
 	case sectionSettings:
-		label = "调整设置栏宽度"
+		label = locales.MessageResizeSettingsSidebar()
 	}
 	// The transparent resize target covers the gap above both cards.
 	edge := uikit.SidebarDivider(c, label, a.page().sidebarWidth*shown, shown)

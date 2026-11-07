@@ -2,6 +2,7 @@ package uikit
 
 import (
 	"github.com/egoist/mygo/ui"
+	"sshdesk/internal/locales"
 	"sshdesk/internal/theme"
 )
 
@@ -147,7 +148,7 @@ func menuPopup(
 			Kind   string
 			Anchor uint64
 		}{"uikit.menu", anchor.ID()})
-		StyleSelectPopup(panel).Role(ui.RoleMenu).Label("操作菜单").Column().KeepFocus()
+		StyleSelectPopup(panel).Role(ui.RoleMenu).Label(locales.MessageActionsMenu2()).Column().KeepFocus()
 		outside = panel.PressedOutside()
 		x, y, _ := panel.PointerPosition()
 		pointer := ui.Point{X: x, Y: y}
@@ -182,7 +183,7 @@ func menuPopup(
 		if submenu || point != nil {
 			scroll := ui.Local(viewport, "uikit.menu.scroll", func() ui.ScrollState { return ui.ScrollState{} })
 			viewport.TrackScroll(scroll)
-			Scrollbars(c, panel, viewport, scroll, ScrollbarProps{Label: "菜单滚动条"})
+			Scrollbars(c, panel, viewport, scroll, ScrollbarProps{Label: locales.MessageMenuScrollbar()})
 		}
 		viewport.FocusGroup(ui.Vertical).Children(func() {
 			first := true

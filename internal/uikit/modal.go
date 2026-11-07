@@ -3,6 +3,7 @@ package uikit
 import (
 	"time"
 
+	"sshdesk/internal/locales"
 	"sshdesk/internal/theme"
 
 	"github.com/egoist/mygo/ui"
@@ -195,7 +196,7 @@ func Modal(c *ui.Context, open *bool, props ModalProps, body func(ModalParts)) M
 			if !props.Compact {
 				closeLabel := props.CloseLabel
 				if closeLabel == "" {
-					closeLabel = "关闭窗口"
+					closeLabel = locales.MessageCloseWindow()
 				}
 				closeButton := IconButton(c, IconClose, IconButtonProps{
 					Key: props.CloseKey, Label: closeLabel, Size: SizeSm, Disabled: dismissDisabled,
@@ -220,28 +221,28 @@ func Modal(c *ui.Context, open *bool, props ModalProps, body func(ModalParts)) M
 			}
 			if props.Disabled || state.Closing {
 				ui.Overlay(c.Key(modalLayerKey{owner: anchor.ID(), part: "input"}), func() {
-					InputShield(c).Modal().AutoFocus().Role(ui.RoleStatus).Label("正在处理")
+					InputShield(c).Modal().AutoFocus().Role(ui.RoleStatus).Label(locales.MessageProcessing2())
 				})
 			}
 		})
 	})
 	if state.Confirm {
 		confirm := Modal(c.Key(modalLayerKey{owner: anchor.ID(), part: "confirm"}), &state.Confirm, ModalProps{
-			Title: "放弃未保存的更改？", Compact: true, Motion: props.Motion, ContentGap: compact.Gap,
+			Title: locales.MessageDiscardUnsavedChanges(), Compact: true, Motion: props.Motion, ContentGap: compact.Gap,
 		}, func(parts ModalParts) {
 			t := theme.Current()
-			Text(c, "关闭后将丢失此窗口中尚未保存的修改。", TextProps{})
+			Text(c, locales.MessageUnsavedChangesInThisWindowWillBeLostIfYouCloseIt(), TextProps{})
 			ui.Row(c).FillWidth().Justify(ui.End).Gap(t.Space.N8).Children(func() {
-				if Button(c, "继续编辑", ButtonProps{}).Clicked() {
+				if Button(c, locales.MessageKeepEditing(), ButtonProps{}).Clicked() {
 					parts.RequestDismiss()
 				}
-				if Button(c, "放弃更改", ButtonProps{Variant: ButtonDanger}).Clicked() {
+				if Button(c, locales.MessageDiscardChanges(), ButtonProps{Variant: ButtonDanger}).Clicked() {
 					state.Discard = true
 					parts.Close()
 				}
 			})
 		})
-		confirm.Panel.Role(ui.RoleAlertDialog).Label("放弃未保存的更改")
+		confirm.Panel.Role(ui.RoleAlertDialog).Label(locales.MessageDiscardUnsavedChanges2())
 		if confirm.Submit {
 			state.Discard = true
 			confirm.Close()

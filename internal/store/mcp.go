@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"sshdesk/internal/locales"
 )
 
 type MCPGrant struct {
@@ -383,7 +385,7 @@ func mcpManagement(ctx context.Context, tx *sql.Tx, action string, target any) e
 	}
 	now := time.Now().UTC()
 	return mcpInsertOperation(ctx, tx, MCPOperation{
-		ID: "op_" + rand.Text(), KeyName: "Burrow 本地用户", Action: action, Status: "completed",
+		ID: "op_" + rand.Text(), KeyName: locales.MessageBurrowLocalUser(), Action: action, Status: "completed",
 		StartedAt: now, FinishedAt: now, Target: value,
 		Timeline: []MCPEvent{{Stage: "completed", Detail: action, At: now}},
 	})

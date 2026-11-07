@@ -2,7 +2,6 @@ package desktop
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"regexp"
 	"slices"
@@ -12,6 +11,7 @@ import (
 
 	"github.com/egoist/mygo/ui"
 	"sshdesk/internal/hostinfo"
+	"sshdesk/internal/locales"
 	"sshdesk/internal/uikit"
 )
 
@@ -29,7 +29,7 @@ type hostDraft struct {
 	passwordChanged, passphraseChanged, passwordSaved     bool
 	advanced, closing, selectedName, creatingGroup        bool
 	modal                                                 uikit.ModalController
-	errors                                                map[string]string
+	errors                                                map[string]locales.Text
 	focused                                               map[string]bool
 	handles                                               map[string]*ui.Handle
 	scroll                                                ui.ScrollState
@@ -153,7 +153,7 @@ func (a *app) startEditHostDraft(id hostID) {
 }
 
 func (d *hostDraft) initState() {
-	d.errors, d.focused, d.handles = map[string]string{}, map[string]bool{}, map[string]*ui.Handle{}
+	d.errors, d.focused, d.handles = map[string]locales.Text{}, map[string]bool{}, map[string]*ui.Handle{}
 	d.generation = newSessionID()
 	d.initialValues, d.initialEnv, d.initialPortEdited = d.inputValues(), slices.Clone(d.env), d.portEdited
 }
@@ -216,7 +216,7 @@ func (d *hostDraft) hasAdvanced() bool {
 
 func (d *hostDraft) advancedSummary(a *app) string {
 	if !d.hasAdvanced() {
-		return "均为默认"
+		return locales.MessageAllDefaults()
 	}
 	parts := []string{}
 	if d.files {
@@ -224,26 +224,26 @@ func (d *hostDraft) advancedSummary(a *app) string {
 			parts = append(parts, d.remoteDir)
 		}
 		if d.localDir != "" {
-			parts = append(parts, "本地目录")
+			parts = append(parts, locales.MessageLocalDirectories())
 		}
 		if d.encoding != "UTF-8" {
 			parts = append(parts, d.encoding)
 		}
 		if d.protocol == "FTP" {
-			parts = append(parts, map[string]string{"none": "无加密", "explicit": "显式 TLS", "implicit": "隐式 TLS"}[d.ftpTLS])
+			parts = append(parts, map[string]string{"none": locales.MessageUnencrypted(), "explicit": locales.MessageExplicitTls(), "implicit": locales.MessageImplicitTls()}[d.ftpTLS])
 		}
 	} else {
 		if d.keepalive != "30" {
-			parts = append(parts, "Keepalive "+d.keepalive+" 秒")
+			parts = append(parts, "Keepalive "+d.keepalive+locales.MessageS())
 		}
 		if d.initCommand != "" {
-			parts = append(parts, "初始命令")
+			parts = append(parts, locales.MessageInitialCommand())
 		}
 		if d.termScheme != "" {
 			parts = append(parts, strings.TrimPrefix(d.termScheme, "fixed:"))
 		}
 		if len(d.env) > 0 {
-			parts = append(parts, fmt.Sprintf("%d 个环境变量", len(d.env)))
+			parts = append(parts, locales.SessionEnvironmentCount(len(d.env)))
 		}
 		if d.platform != "" {
 			parts = append(parts, hostinfo.Platform(d.platform).DisplayName())
@@ -274,50 +274,50 @@ func validSessionHost(value string) bool {
 	return true
 }
 
-func (a *app) draftError(d *hostDraft, field string) string {
+func (a *app) draftError(d *hostDraft, field string) locales.Text {
 	switch field {
 	case "host":
 		h := strings.TrimSpace(d.address)
 		if h == "" {
-			return "请填写主机"
+			return locales.Deferred(locales.MessageEnterAHost)
 		}
 		if !validSessionHost(h) {
-			return "主机格式不正确"
+			return locales.Deferred(locales.MessageInvalidHostFormat)
 		}
 	case "port":
 		p, err := strconv.Atoi(d.port)
 		if err != nil || p < 1 || p > 65535 {
-			return "端口需在 1–65535 之间"
+			return locales.Deferred(locales.MessagePortMustBeBetweenAnd)
 		}
 	case "user":
 		if d.files && d.protocol == "FTP" && d.auth != "anonymous" && strings.TrimSpace(d.user) == "" {
-			return "请填写用户名"
+			return locales.Deferred(locales.MessageEnterAUsername)
 		}
 	case "key":
 		if d.auth == "key" && !slices.ContainsFunc(a.keys, func(k managedKey) bool { return k.ID == d.keyID }) {
-			return "请选择私钥"
+			return locales.Deferred(locales.MessageSelectAPrivateKey)
 		}
 	case "keepalive":
 		if !d.files {
 			p, err := strconv.Atoi(d.keepalive)
 			if err != nil || p < 0 || p > 3600 {
-				return "0–3600 秒"
+				return locales.Deferred(locales.MessageSeconds)
 			}
 		}
 	case "env":
 		if !d.files {
 			for _, v := range d.env {
 				if !environmentPattern.MatchString(v) {
-					return "格式应为 KEY=VALUE"
+					return locales.Deferred(locales.MessageUseTheFormatKeyValue)
 				}
 			}
 			if d.envInput != "" && !environmentPattern.MatchString(d.envInput) {
-				return "格式应为 KEY=VALUE"
+				return locales.Deferred(locales.MessageUseTheFormatKeyValue)
 			}
 		}
 	case "name":
 		if d.creatingGroup {
-			return ""
+			return locales.Text{}
 		}
 		name := strings.TrimSpace(d.name)
 		if name == "" {
@@ -327,7 +327,7 @@ func (a *app) draftError(d *hostDraft, field string) string {
 			if group.name == d.group {
 				for _, id := range group.hosts {
 					if (!d.editing || id != d.id) && strings.EqualFold(name, a.hosts[id].name) {
-						return "此分组已有同名会话"
+						return locales.Deferred(locales.MessageASessionWithThisNameAlreadyExistsInThisGroup)
 					}
 				}
 			}
@@ -335,23 +335,23 @@ func (a *app) draftError(d *hostDraft, field string) string {
 	case "group":
 		if d.creatingGroup {
 			if strings.TrimSpace(d.newGroup) == "" {
-				return "请填写分组名称"
+				return locales.Deferred(locales.MessageEnterAGroupName)
 			}
 			for _, group := range a.catalogGroups() {
 				if strings.EqualFold(strings.TrimSpace(d.newGroup), group.name) {
-					return "此分组名称已存在"
+					return locales.Deferred(locales.MessageThisGroupNameAlreadyExists)
 				}
 			}
 		}
 	}
-	return ""
+	return locales.Text{}
 }
 
 func (a *app) validateDraft(d *hostDraft) bool {
-	d.errors = map[string]string{}
+	d.errors = map[string]locales.Text{}
 	first := ""
 	for _, field := range []string{"name", "host", "port", "user", "key", "group", "keepalive", "env"} {
-		if message := a.draftError(d, field); message != "" {
+		if message := a.draftError(d, field); !message.Empty() {
 			d.errors[field] = message
 			if first == "" {
 				first = field
@@ -420,7 +420,11 @@ func (a *app) startDraftTest(c *ui.Context, d *hostDraft) {
 		}
 		password, err = a.sessionPassword(credentialHost)
 		if err != nil {
-			d.testResult = &connectionTestResult{Summary: "无法读取已保存的密码", Detail: err.Error(), Err: err}
+			d.testResult = &connectionTestResult{Summary: locales.Deferred(
+				locales.MessageUnableToReadSavedPassword,
+			), Detail: locales.ErrorText(
+				err,
+			), Err: err}
 			d.testVisible = true
 			return
 		}
@@ -428,7 +432,7 @@ func (a *app) startDraftTest(c *ui.Context, d *hostDraft) {
 	ctx, cancel := context.WithCancel(a.ctx)
 	results := make(chan connectionTestResult, 1)
 	d.testCancel, d.testResults, d.testResult, d.testVisible = cancel, results, nil, true
-	c.Announce("正在连接…")
+	c.Announce(locales.MessageConnecting())
 	passphrase := d.passphrase
 	passphraseEdited := d.passphraseChanged
 	test := a.prepareConnectionTest(h, password, passphrase, passphraseEdited)
@@ -451,7 +455,7 @@ func (a *app) saveSessionDraft(c *ui.Context, d *hostDraft, connect bool) {
 	if facts != nil {
 		plan, err := a.captureSSHPlan(h)
 		if err != nil {
-			a.persistenceNotice("保存主机基础信息失败", err)
+			a.persistenceNotice(locales.MessageUnableToSaveHostInformation, err)
 			d.saving = false
 			return
 		}
@@ -462,7 +466,7 @@ func (a *app) saveSessionDraft(c *ui.Context, d *hostDraft, connect bool) {
 		var err error
 		password, err = a.sessionPassword(*d.credentialSource)
 		if err != nil {
-			a.persistenceNotice("读取来源会话密码失败", err)
+			a.persistenceNotice(locales.MessageUnableToReadTheSourceSessionPassword, err)
 			d.saving = false
 			return
 		}
@@ -470,7 +474,14 @@ func (a *app) saveSessionDraft(c *ui.Context, d *hostDraft, connect bool) {
 	}
 	changes, err := a.prepareSessionSecrets(&h, password, passwordChanged, d.passphrase, d.passphraseChanged)
 	if err != nil {
-		uikit.Toast(c, uikit.ToastProps{Tone: uikit.ToneDanger, Title: "保存凭据失败", Detail: err.Error()})
+		uikit.Toast(
+			c,
+			uikit.ToastProps{Tone: uikit.ToneDanger, Title: locales.Deferred(
+				locales.MessageUnableToSaveCredentials,
+			), Detail: locales.ErrorText(
+				err,
+			)},
+		)
 		d.saving = false
 		return
 	}
@@ -502,7 +513,7 @@ func (a *app) saveSessionDraft(c *ui.Context, d *hostDraft, connect bool) {
 	}, func(err error) {
 		d.saving = false
 		if err != nil {
-			a.persistenceNotice("保存会话失败", err)
+			a.persistenceNotice(locales.MessageUnableToSaveSession, err)
 			return
 		}
 		if facts != nil {
@@ -560,7 +571,7 @@ func (a *app) draftOpenTabs(d *hostDraft) int {
 
 func (d *hostDraft) schemeName() string {
 	if d.termScheme == "" {
-		return "跟随全局"
+		return ""
 	}
 	return strings.TrimPrefix(d.termScheme, "fixed:")
 }

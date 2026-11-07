@@ -4,6 +4,7 @@ import (
 	"image/color"
 
 	"github.com/egoist/mygo/ui"
+	"sshdesk/internal/locales"
 	"sshdesk/internal/theme"
 	"sshdesk/internal/uikit"
 )
@@ -18,7 +19,7 @@ type terminalScrollState struct {
 func terminalScrollbar(c *ui.Context, frame, output ui.Element, state *terminalScrollState, background color.NRGBA, input func(ui.InputEvent) bool) {
 	t := theme.Current()
 	uikit.Scrollbars(c, frame, output, &state.offset, uikit.ScrollbarProps{
-		Label: "终端滚动条", State: &state.scrollbarState,
+		Label: locales.MessageTerminalScrollbar(), State: &state.scrollbarState,
 		Top: t.C.Pane.HeaderHeight, Bottom: t.C.StatusBar.HeightPane,
 		Color: terminalScrollbarColor(background), Input: input,
 	})

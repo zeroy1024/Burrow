@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	"sshdesk/internal/locales"
 	"sshdesk/internal/theme"
 
 	"github.com/egoist/mygo/ui"
@@ -41,13 +42,13 @@ const (
 func (state ConnState) Label() string {
 	switch state {
 	case ConnConnected:
-		return "已连接"
+		return locales.MessageConnected()
 	case ConnConnecting:
-		return "连接中"
+		return locales.MessageConnecting2()
 	case ConnError:
-		return "连接失败"
+		return locales.MessageConnectionFailed()
 	}
-	return "已断开"
+	return locales.MessageDisconnected()
 }
 
 type SessionTabVariant uint8
@@ -340,7 +341,7 @@ func SessionTabs(c *ui.Context, items []TabItem, active *int, options ...Session
 				} else {
 					for index, item := range items {
 						props := SessionTabProps{Key: item.ID, Title: item.Title, Hint: item.Hint, State: item.State, Extra: item.Extra,
-							Selected: index == *active, CloseLabel: "关闭标签 " + item.Title, CloseIcon: IconSVG(IconClose),
+							Selected: index == *active, CloseLabel: locales.MessageCloseTab2() + item.Title, CloseIcon: IconSVG(IconClose),
 							ReduceMotion: MotionReduced(c, props.Motion), PositionAnimation: Anim(c, t.C.Tab.StateTransition, props.Motion)}
 						tab := SessionTab(c, props)
 						input := SessionTabInput(c, result.Row, tab, index, len(items))
@@ -452,7 +453,7 @@ func sessionTabsActions(c *ui.Context, parts *TabsResult, scroll *ui.ScrollState
 			props.BuildAdd()
 			return
 		}
-		add := IconButton(c, IconPlus, IconButtonProps{Key: "add-tab", Label: "新建选项卡"})
+		add := IconButton(c, IconPlus, IconButtonProps{Key: "add-tab", Label: locales.MessageNewTab()})
 		parts.Add = add.Clicked()
 	})
 	// Layout updates the scroll range after the view built the edge fades.

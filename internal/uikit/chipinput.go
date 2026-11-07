@@ -4,6 +4,7 @@ import (
 	"slices"
 	"strings"
 
+	"sshdesk/internal/locales"
 	"sshdesk/internal/theme"
 
 	"github.com/egoist/mygo/ui"
@@ -102,7 +103,7 @@ func ChipInput(c *ui.Context, values *[]string, props ChipInputProps) ChipInputR
 					text.Font(strings.Join(p.MonoFont, ", "))
 				}
 				if !props.ReadOnly {
-					button := IconButton(c, IconClose, IconButtonProps{Key: "remove", Label: "删除 " + item.Value, Size: SizeXs}).
+					button := IconButton(c, IconClose, IconButtonProps{Key: "remove", Label: locales.MessageDelete3() + item.Value, Size: SizeXs}).
 						Size(t.Size.IconSm, t.Size.IconSm).Shrink(0)
 					if button.Clicked() {
 						remove = index

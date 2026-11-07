@@ -12,6 +12,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"sshdesk/internal/locales"
 	"sshdesk/internal/store"
 )
 
@@ -39,7 +40,7 @@ type inboundAudit struct {
 }
 
 func redactAuditKey(value []byte, secret string) []byte {
-	return bytes.ReplaceAll(value, []byte(secret), []byte("[已隐藏授权密钥]"))
+	return bytes.ReplaceAll(value, []byte(secret), []byte(locales.MessageAccessKeyHidden()))
 }
 
 type auditResponseWriter struct {
@@ -94,7 +95,7 @@ func auditValue(value any, tool string, request bool) any {
 			credential := sensitive == "authorization" || sensitive == "secretkey" || sensitive == "password" ||
 				sensitive == "passphrase" || sensitive == "privatekey" || sensitive == "token" || sensitive == "apikey" || sensitive == "secret"
 			if credential {
-				v[key] = "[已隐藏认证信息]"
+				v[key] = locales.MessageAuthenticationInformationHidden()
 				continue
 			}
 			fileBody := key == "text" && (request && tool == "files_write" || !request && tool == "files_read")
@@ -161,7 +162,7 @@ func (s *Service) auditHTTP(w http.ResponseWriter, r *http.Request, key store.MC
 		action = tool
 	}
 	if !valid {
-		request = map[string]any{"http_method": r.Method, "body_bytes": len(raw), "body_omitted": "请求正文不是有效的 JSON 或超过大小限制"}
+		request = map[string]any{"http_method": r.Method, "body_bytes": len(raw), "body_omitted": locales.MessageTheRequestBodyIsNotValidJsonOrExceedsTheSizeLimit()}
 	}
 	requestJSON, err := json.Marshal(auditRequestValue(request))
 	if err != nil {
@@ -201,7 +202,7 @@ func (s *Service) auditHTTP(w http.ResponseWriter, r *http.Request, key store.MC
 	if !capture.truncated && decodeAuditJSON(capture.body.Bytes(), &body) == nil {
 		body = auditValue(body, tool, false)
 	} else if capture.truncated {
-		body = map[string]any{"body_omitted": "响应超过审计大小上限，未保存不完整正文"}
+		body = map[string]any{"body_omitted": locales.MessageTheResponseExceedsTheAuditSizeLimitItsIncompleteBodyWasNotSaved()}
 	} else if strings.HasPrefix(capture.Header().Get("Content-Type"), "text/event-stream") {
 		events := []any{}
 		for _, line := range bytes.Split(capture.body.Bytes(), []byte("\n")) {
@@ -236,11 +237,11 @@ func (s *Service) auditHTTP(w http.ResponseWriter, r *http.Request, key store.MC
 		}
 		if object, ok := body.(map[string]any); ok && object["error"] != nil {
 			op.Status, op.ErrorCode = "failed", "protocol_error"
-			op.Error = "MCP 协议请求失败，请查看响应详情"
+			op.Error = locales.MessageTheMcpProtocolRequestFailedSeeResponseDetails()
 		}
 		if object, ok := body.(map[string]any); ok {
 			if result, ok := object["result"].(map[string]any); ok && result["isError"] == true {
-				op.Status, op.ErrorCode, op.Error = "failed", "tool_error", "工具请求失败，请查看响应详情"
+				op.Status, op.ErrorCode, op.Error = "failed", "tool_error", locales.MessageTheToolRequestFailedSeeResponseDetails()
 			}
 		}
 		op.Timeline = append(op.Timeline, store.MCPEvent{Stage: op.Status, At: op.FinishedAt, Detail: op.Error})

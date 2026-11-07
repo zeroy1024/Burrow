@@ -3,7 +3,6 @@ package desktop
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net"
 	"strconv"
@@ -12,6 +11,7 @@ import (
 	"time"
 
 	"golang.org/x/net/proxy"
+	"sshdesk/internal/locales"
 	"sshdesk/internal/sshclient"
 	"sshdesk/internal/store"
 )
@@ -216,7 +216,7 @@ func (a *app) gatewayDialer(ctx context.Context, plan sshDialPlan) (gatewayDialF
 			})
 			if err != nil {
 				release()
-				return nil, nil, fmt.Errorf("网关「%s」：%w", hop.Name, err)
+				return nil, nil, locales.Errorf(locales.MessageGateway, hop.Name, err)
 			}
 			releases = append(releases, stop)
 			if plan.hopProgress != nil {
@@ -242,7 +242,7 @@ func (a *app) socksGatewayAuth(ctx context.Context, hop gatewayHop) (*proxy.Auth
 		if options.PasswordSaved {
 			data, err := a.vault.Get(ctx, gatewayCredentialKey(hop.ID))
 			if err != nil {
-				return nil, fmt.Errorf("读取密码：%w", err)
+				return nil, locales.Errorf(locales.MessageReadPassword, err)
 			}
 			var credential sessionCredential
 			err = json.Unmarshal(data, &credential)
@@ -251,12 +251,14 @@ func (a *app) socksGatewayAuth(ctx context.Context, hop gatewayHop) (*proxy.Auth
 				return nil, err
 			}
 			if credential.Revision != options.PasswordRevision {
-				return nil, errors.New("SOCKS5 保存的密码已更新，请重新连接")
+				return nil, locales.NewError(locales.MessageTheSavedSocks5PasswordHasChangedReconnectToUseIt)
 			}
 			password = credential.Secret
 		} else {
 			answer := a.askSSH(ctx, &sshPrompt{
-				title: "输入 SOCKS5 网关密码", address: hop.Name + " · " + options.Username + "@" + options.Address,
+				title: locales.Deferred(
+					locales.MessageEnterSocks5GatewayPassword,
+				), address: hop.Name + " · " + options.Username + "@" + options.Address,
 			})
 			if !answer.accepted {
 				return nil, errSSHConnectCanceled
@@ -264,7 +266,7 @@ func (a *app) socksGatewayAuth(ctx context.Context, hop gatewayHop) (*proxy.Auth
 			password = answer.secret
 		}
 		if len(password) == 0 || len(password) > 255 {
-			return nil, errors.New("SOCKS5 密码需为 1–255 字节")
+			return nil, locales.NewError(locales.MessageTheSocks5PasswordMustBeBytes)
 		}
 		auth = &proxy.Auth{User: options.Username, Password: password}
 	}
@@ -300,11 +302,11 @@ func (a *app) socksGatewayDialer(hop gatewayHop, upstream gatewayDialFunc) gatew
 	return func(ctx context.Context, network, address string) (net.Conn, error) {
 		once.Do(func() { dialer, initializeErr = initialize(ctx) })
 		if initializeErr != nil {
-			return nil, fmt.Errorf("网关「%s」：%w", hop.Name, initializeErr)
+			return nil, locales.Errorf(locales.MessageGateway, hop.Name, initializeErr)
 		}
 		connection, err := dialer.DialContext(ctx, network, address)
 		if err != nil {
-			return nil, fmt.Errorf("网关「%s」：%w", hop.Name, err)
+			return nil, locales.Errorf(locales.MessageGateway, hop.Name, err)
 		}
 		return connection, nil
 	}

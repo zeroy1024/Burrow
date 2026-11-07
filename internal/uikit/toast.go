@@ -4,15 +4,17 @@ import (
 	"time"
 
 	"github.com/egoist/mygo/ui"
+	"sshdesk/internal/locales"
 	"sshdesk/internal/theme"
 )
 
 type ToastProps struct {
-	ID, Title, Detail, Action string
-	Tone                      Tone
-	Shortcut                  string
-	Timeout                   time.Duration
-	OnAction                  func()
+	ID                    string
+	Title, Detail, Action locales.Text
+	Tone                  Tone
+	Shortcut              string
+	Timeout               time.Duration
+	OnAction              func()
 }
 
 // Toast uses the SDK queue, announcements, hover pause and action lifetime.
@@ -32,14 +34,14 @@ func Toast(c *ui.Context, props ToastProps) string {
 		kind = "warning"
 	}
 	return c.AddToast(ui.Toast{
-		ID: props.ID, Title: props.Title, Description: props.Detail, Type: kind,
-		Timeout: timeout, Action: props.Action, OnAction: props.OnAction, Data: props.Shortcut,
+		ID: props.ID, Title: props.Title.String(), Description: props.Detail.String(), Type: kind,
+		Timeout: timeout, Action: props.Action.String(), OnAction: props.OnAction, Data: props,
 	})
 }
 
 // Notify retains message-based deduplication for simple notices.
 func Notify(c *ui.Context, message string) {
-	Toast(c, ToastProps{ID: message, Title: message})
+	Toast(c, ToastProps{ID: message, Title: locales.Raw(message)})
 }
 
 var (
@@ -60,6 +62,8 @@ func ToastViewport(c *ui.Context, modes ...MotionMode) ui.Element {
 	return ui.ToastViewportBase(c, func(viewport ui.Element, toasts []ui.Toast) {
 		viewport.Bottom(t.Space.N24).AlignItems(ui.Center).Gap(p.Gap).Padding(0, t.Space.N12)
 		for _, toast := range toasts {
+			content := toast.Data.(ToastProps)
+			toast.Title, toast.Description, toast.Action = content.Title.String(), content.Detail.String(), content.Action.String()
 			parts := ui.ToastBase(c, toast)
 			root := Shadow(parts.Root.Row().Width(p.Width).MaxWidth(width-2*t.Space.N12).
 				Padding(p.PaddingY, p.PaddingX).Gap(p.Gap).Radius(p.Radius).
@@ -91,14 +95,14 @@ func ToastViewport(c *ui.Context, modes ...MotionMode) ui.Element {
 					parts.ActionButton().Label(toast.Action).Padding(t.Space.N4, t.Space.N6).Gap(p.Gap).
 						Radius(t.Radius.ControlSm).TextColor(Color(p.Action)).Children(func() {
 						ui.Text(c, toast.Action).FontSize(t.Font.Size.Small).SingleLine().PassThrough()
-						if shortcut, ok := toast.Data.(string); ok && shortcut != "" {
-							Kbd(c, shortcut, KbdProps{Tone: KbdOnInk})
+						if content.Shortcut != "" {
+							Kbd(c, content.Shortcut, KbdProps{Tone: KbdOnInk})
 						}
 					})
 				}
-				close := StyleIconButton(parts.CloseButton().Label("关闭通知"), t).
+				close := StyleIconButton(parts.CloseButton().Label(locales.MessageDismissNotification()), t).
 					Size(t.C.IconButton.SizeXs, t.C.IconButton.SizeXs).TextColor(Color(p.Detail))
-				Tip(c, close, "关闭通知")
+				Tip(c, close, locales.MessageDismissNotification())
 				close.Children(func() { ui.Icon(c, toastCloseIcon).Size(t.Size.IconSm, t.Size.IconSm).PassThrough() })
 			})
 		}

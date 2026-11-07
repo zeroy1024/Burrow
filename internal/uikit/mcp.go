@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/egoist/mygo/ui"
+	"sshdesk/internal/locales"
 	"sshdesk/internal/theme"
 )
 
@@ -28,7 +29,7 @@ func CopyField(c *ui.Context, value string, props CopyFieldProps) CopyFieldResul
 	t := theme.Current()
 	label := props.Label
 	if label == "" {
-		label = "复制 " + value
+		label = locales.MessageCopy() + value
 	}
 	root := ui.ButtonBase(c).Height(t.Size.ControlSm).Padding(0, t.Space.N8).Gap(t.Space.N6).
 		Radius(t.Radius.ControlSm).Border(t.Size.Hairline, Color(t.Color.Border.Control)).
@@ -71,7 +72,7 @@ func CopyField(c *ui.Context, value string, props CopyFieldProps) CopyFieldResul
 		if props.ButtonLabel != "" {
 			btnText := props.ButtonLabel
 			if copied {
-				btnText = "已复制"
+				btnText = locales.MessageCopied()
 			}
 			ui.Row(c).Gap(t.Space.N4).AlignItems(ui.Center).PassThrough().Children(func() {
 				ui.Icon(c, IconSVG(icon)).Size(t.Size.IconSm, t.Size.IconSm).TextColor(Color(ink)).PassThrough()
@@ -160,14 +161,14 @@ func Pagination(c *ui.Context, page *int, props PaginationProps) ui.Element {
 	}
 	summary := props.Summary
 	if summary == "" {
-		summary = fmt.Sprintf("共 %d 条 · 每页 %d 条", props.Total, pageSize)
+		summary = locales.McpPaginationSummary(props.Total, pageSize)
 	}
 	return ui.Row(c).FillWidth().Height(t.Size.StatusBar+t.Space.N8).Shrink(0).
 		Padding(0, t.Space.N14).BorderWidth(t.Size.Divider, 0, 0, 0).BorderColor(Color(t.Color.Border.Divider)).
 		AlignItems(ui.Center).Gap(t.Space.N8).Children(func() {
 		ui.Text(c, summary).FontSize(t.Font.Size.Footnote).TextColor(Color(t.Color.Text.Secondary)).FontFeatures("tnum")
 		ui.Spacer(c)
-		prev := IconButton(c.Key("prev"), IconArrowLeft, IconButtonProps{Label: "上一页", Size: SizeXs, Disabled: *page <= 1})
+		prev := IconButton(c.Key("prev"), IconArrowLeft, IconButtonProps{Label: locales.MessagePreviousPage(), Size: SizeXs, Disabled: *page <= 1})
 		if prev.Clicked() && *page > 1 {
 			*page--
 		}
@@ -181,7 +182,7 @@ func Pagination(c *ui.Context, page *int, props PaginationProps) ui.Element {
 			pageNum := idx
 			active := *page == pageNum
 			btn := ui.ButtonBase(c.Key(pageNum)).Size(t.Size.ControlXs, t.Size.ControlXs).Radius(t.Radius.ControlSm).
-				Center().FocusRing(false).Label("第 " + strconv.Itoa(pageNum) + " 页")
+				Center().FocusRing(false).Label(locales.McpPageNumber(pageNum))
 			bg, fg := ui.Transparent, Color(t.Color.Text.Secondary)
 			if active {
 				bg, fg = Color(t.Color.Accent.Default), Color(t.Color.Text.OnAccent)
@@ -197,7 +198,7 @@ func Pagination(c *ui.Context, page *int, props PaginationProps) ui.Element {
 				*page = pageNum
 			}
 		}
-		next := IconButton(c.Key("next"), IconArrowRight, IconButtonProps{Label: "下一页", Size: SizeXs, Disabled: *page >= totalPages})
+		next := IconButton(c.Key("next"), IconArrowRight, IconButtonProps{Label: locales.MessageNextPage(), Size: SizeXs, Disabled: *page >= totalPages})
 		if next.Clicked() && *page < totalPages {
 			*page++
 		}
@@ -276,9 +277,9 @@ func PermissionMatrix(c *ui.Context, rows []PermissionMatrixRow, empty string, o
 	return Inset(c, InsetProps{Raised: true}).FillWidth().Padding(0).Clip().Children(func() {
 		ui.Row(c).FillWidth().Height(t.Size.ControlLg).Padding(0, t.Space.N12).Gap(t.Space.N4).
 			Background(Color(t.Color.Surface.Sunken)).AlignItems(ui.Center).Children(func() {
-			Text(c, "连接", TextProps{Style: TextFootnote, Tone: ToneSecondary}).
+			Text(c, locales.MessageConnect(), TextProps{Style: TextFootnote, Tone: ToneSecondary}).
 				FontWeight(t.Font.Weight.Medium).Grow(1).MinWidth(0)
-			for _, header := range []string{"文件读取", "文件写入", "命令执行"} {
+			for _, header := range []string{locales.MessageFileRead(), locales.MessageFileWrite(), locales.MessageCommandExecution()} {
 				Text(c, header, TextProps{Style: TextFootnote, Tone: ToneSecondary}).
 					FontWeight(t.Font.Weight.Medium).Width(colW).Shrink(0).TextAlign(ui.Center)
 			}
@@ -311,7 +312,7 @@ func PermissionMatrix(c *ui.Context, rows []PermissionMatrixRow, empty string, o
 								Text(c, item.Name, TextProps{Style: TextBody}).FontWeight(t.Font.Weight.Semibold).
 									SingleLine().Ellipsis("…").MinWidth(0)
 								if item.Merged > 1 {
-									Badge(c, fmt.Sprintf("合并 %d 条配置", item.Merged), BadgeProps{Tone: ToneMuted})
+									Badge(c, locales.McpMergedConfigurations(item.Merged), BadgeProps{Tone: ToneMuted})
 								}
 							})
 							ui.Row(c).FillWidth().AlignItems(ui.Center).Gap(t.Space.N6).Children(func() {
@@ -326,7 +327,7 @@ func PermissionMatrix(c *ui.Context, rows []PermissionMatrixRow, empty string, o
 						ui.Box(c).Key(capKey).Width(colW).Shrink(0).Center().Children(func() {
 							if !supported {
 								ui.Text(c, "—").FontSize(t.Font.Size.Small).TextColor(Color(t.Color.Text.Muted)).
-									Label(strings.ToUpper(item.Protocol) + " 不支持" + capLabel)
+									Label(strings.ToUpper(item.Protocol) + locales.MessageIsNotSupported() + capLabel)
 								return
 							}
 							val := current
@@ -335,9 +336,9 @@ func PermissionMatrix(c *ui.Context, rows []PermissionMatrixRow, empty string, o
 							}
 						})
 					}
-					cell("read", "文件读取", item.SupportsFiles, item.AllowRead)
-					cell("write", "文件写入", item.SupportsFiles, item.AllowWrite)
-					cell("exec", "命令执行", item.SupportsSSH, item.AllowExec)
+					cell("read", locales.MessageFileRead(), item.SupportsFiles, item.AllowRead)
+					cell("write", locales.MessageFileWrite(), item.SupportsFiles, item.AllowWrite)
+					cell("exec", locales.MessageCommandExecution(), item.SupportsSSH, item.AllowExec)
 				})
 				if item.Warning != "" {
 					Banner(c, item.Warning, BannerProps{Tone: ToneWarning, Icon: IconSVG(IconAlertCircle)})
@@ -355,13 +356,13 @@ type PolicyActionItem struct {
 // DefaultFilePolicyActions returns the 7 file interception actions defined in the MCP spec.
 func DefaultFilePolicyActions() []PolicyActionItem {
 	return []PolicyActionItem{
-		{ID: "browse", Label: "浏览", Hint: "目录与属性"},
-		{ID: "read", Label: "读取", Hint: "正文与传输"},
-		{ID: "create", Label: "创建", Hint: "新建与上传"},
-		{ID: "write", Label: "写入", Hint: "修改与覆盖"},
-		{ID: "rename", Label: "改名", Hint: "工具待上线", Deferred: true},
-		{ID: "move", Label: "移动", Hint: "工具待上线", Deferred: true},
-		{ID: "delete", Label: "删除", Hint: "工具待上线", Deferred: true},
+		{ID: "browse", Label: locales.MessageBrowse(), Hint: locales.MessageDirectoriesAndAttributes()},
+		{ID: "read", Label: locales.MessageRead(), Hint: locales.MessageContentsAndTransfers()},
+		{ID: "create", Label: locales.MessageCreate(), Hint: locales.MessageCreateAndUpload()},
+		{ID: "write", Label: locales.MessageWrite(), Hint: locales.MessageModifyAndOverwrite()},
+		{ID: "rename", Label: locales.MessageRename3(), Hint: locales.MessageToolNotAvailableYet(), Deferred: true},
+		{ID: "move", Label: locales.MessageMove(), Hint: locales.MessageToolNotAvailableYet(), Deferred: true},
+		{ID: "delete", Label: locales.CommonDelete(), Hint: locales.MessageToolNotAvailableYet(), Deferred: true},
 	}
 }
 
@@ -392,7 +393,7 @@ func PolicyActionMatrix(c *ui.Context, selected map[string]bool, items []PolicyA
 			tile := ui.ButtonBase(c.Key(item.ID)).Grow(1).Basis(0).MinWidth(0).Padding(t.Space.N6, t.Space.N6).
 				Radius(t.Radius.ControlSm).Background(Color(bg)).Border(t.Size.Hairline, Color(border)).
 				Column().AlignItems(ui.Start).Gap(t.Space.N2).FocusRing(false).
-				Role(ui.RoleCheckBox).Checked(checked).Label("禁止" + item.Label)
+				Role(ui.RoleCheckBox).Checked(checked).Label(locales.MessageBlock2() + item.Label)
 			if tile.Hovered() && !checked {
 				tile.Background(Color(t.Color.State.Hover))
 			}
@@ -437,15 +438,15 @@ func DirectoryListEditor(c *ui.Context, paths []string, props DirectoryListEdito
 			ui.Column(c).Grow(1).MinWidth(0).Gap(t.Space.N2).Children(func() {
 				ui.Row(c).AlignItems(ui.Center).Gap(t.Space.N6).Children(func() {
 					Text(c, props.Title, TextProps{Style: TextBody}).FontWeight(t.Font.Weight.Semibold).SingleLine()
-					count := "未添加"
+					count := locales.MessageNoneAdded()
 					if len(paths) > 0 {
-						count = fmt.Sprintf("%d 个", len(paths))
+						count = fmt.Sprintf(locales.Message2(), len(paths))
 					}
 					Badge(c, count, BadgeProps{Tone: ToneMuted})
 				})
 				Text(c, props.Description, TextProps{Style: TextCaption, Tone: ToneSecondary})
 			})
-			if Button(c.Key("add"), "添加目录", ButtonProps{Variant: ButtonPlain, Size: SizeSm, Icon: IconPlus}).
+			if Button(c.Key("add"), locales.MessageAddDirectory(), ButtonProps{Variant: ButtonPlain, Size: SizeSm, Icon: IconPlus}).
 				TextColor(Color(t.Color.Text.Accent)).Clicked() && props.OnAdd != nil {
 				props.OnAdd()
 			}
@@ -462,7 +463,7 @@ func DirectoryListEditor(c *ui.Context, paths []string, props DirectoryListEdito
 					ui.Row(c).FillWidth().AlignItems(ui.Center).Gap(t.Space.N8).Children(func() {
 						Icon(c, IconFolder, IconProps{Size: SizeSm})
 						Text(c, dirPath, TextProps{Style: TextMono}).Grow(1).MinWidth(0).SingleLine().Ellipsis("…")
-						if IconButton(c, IconClose, IconButtonProps{Key: "rm", Label: "移除目录 " + dirPath, Size: SizeXs}).Clicked() && props.OnRemove != nil {
+						if IconButton(c, IconClose, IconButtonProps{Key: "rm", Label: locales.MessageRemoveDirectory() + dirPath, Size: SizeXs}).Clicked() && props.OnRemove != nil {
 							props.OnRemove(removeIdx)
 						}
 					})
@@ -482,23 +483,23 @@ type OneTimeSecretProps struct {
 func OneTimeSecretCard(c *ui.Context, props OneTimeSecretProps) ui.Element {
 	t := theme.Current()
 	return ui.Column(c).FillWidth().Gap(t.Space.N10).Children(func() {
-		Banner(c, "请复制并妥善保存密钥，关闭后无法再次查看明文。", BannerProps{
+		Banner(c, locales.MessageCopyAndSaveThisKeySecurelyItsPlainTextCannotBeViewedAgain(), BannerProps{
 			Tone: ToneWarning, Icon: IconSVG(IconAlertCircle),
 		})
 		ui.Column(c).FillWidth().Gap(t.Space.N4).Children(func() {
-			Text(c, "密钥明文（"+props.KeyName+"）", TextProps{Style: TextFootnote, Tone: ToneSecondary})
+			Text(c, locales.McpPlainTextKeyName(props.KeyName), TextProps{Style: TextFootnote, Tone: ToneSecondary})
 			copyRes := CopyField(c, props.Secret, CopyFieldProps{
-				Key: "secret-copy", Label: "复制授权密钥", ButtonLabel: "复制密钥", Fill: true,
+				Key: "secret-copy", Label: locales.MessageCopyAccessKey(), ButtonLabel: locales.MessageCopyKey(), Fill: true,
 			})
 			if copyRes.Copied && props.OnCopySecret != nil {
 				props.OnCopySecret()
 			}
 		})
-		if CodeBlock(c.Key("config"), "客户端配置（请替换密钥占位符）", props.ConfigJSON).Copy && props.OnCopyConfig != nil {
+		if CodeBlock(c.Key("config"), locales.MessageClientConfigurationReplaceTheKeyPlaceholder(), props.ConfigJSON).Copy && props.OnCopyConfig != nil {
 			props.OnCopyConfig()
 		}
 		if props.Confirmed != nil {
-			Checkbox(c, props.Confirmed, "我已复制并妥善保存密钥")
+			Checkbox(c, props.Confirmed, locales.MessageIHaveCopiedAndSecurelySavedTheKey())
 		}
 	})
 }

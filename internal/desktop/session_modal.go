@@ -7,6 +7,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"sshdesk/internal/locales"
 	"sshdesk/internal/theme"
 	"sshdesk/internal/uikit"
 
@@ -28,7 +29,7 @@ func (a *app) hostDialog(c *ui.Context) {
 		requested := false
 		result := uikit.Modal(c.Key("delete-site-dialog"), &page.addHostOpen, uikit.ModalProps{
 			Controller: &d.modal,
-			Title:      "删除会话「" + d.name + "」？", Compact: true,
+			Title:      locales.SessionDeleteTitle(d.name), Compact: true,
 			Width: theme.Current().C.Dialog.HostWidth, Motion: uikit.MotionOverride(a.reduceMotion(c)),
 		}, func(parts uikit.ModalParts) {
 			requested = a.deleteSiteDialogContents(c, parts)
@@ -65,7 +66,7 @@ func (a *app) hostDialog(c *ui.Context) {
 	dialog := uikit.Modal(c.Key(d.generation), &page.addHostOpen, uikit.ModalProps{
 		Title: a.sessionDraftTitle(d), Disabled: d.saving, Dirty: d.dirty(),
 		Controller: &d.modal, Motion: uikit.MotionOverride(a.reduceMotion(c)),
-		CloseKey: "session-close", CloseLabel: "关闭会话设置",
+		CloseKey: "session-close", CloseLabel: locales.MessageCloseSessionSettings(),
 		Header: func(uikit.ModalParts) { a.sessionDraftHeader(c, d) },
 	}, func(parts uikit.ModalParts) {
 		panel, bounds := parts.Panel, parts.Bounds
@@ -75,7 +76,7 @@ func (a *app) hostDialog(c *ui.Context) {
 			// padding rather than adding margins outside an already full width.
 			notice := ui.Box(c).FillWidth().MinWidth(0).Shrink(0).
 				Padding(0, p.BodyPaddingX, t.Space.N12, p.BodyPaddingX).Children(func() {
-				uikit.Banner(c, fmt.Sprintf("此会话已在 %d 个选项卡中打开，修改将在下次连接时生效。", count), uikit.BannerProps{Icon: infoIcon})
+				uikit.Banner(c, locales.SessionOpenTabsNotice(count), uikit.BannerProps{Icon: infoIcon})
 			})
 			noticeHeight = notice.LayoutBounds().H
 		}
@@ -91,7 +92,7 @@ func (a *app) hostDialog(c *ui.Context) {
 			a.sessionAdvanced(c, d)
 		})
 		a.sessionDraftFooter(c, d, parts.RequestDismiss)
-		uikit.Scrollbars(c, panel, formScroll, &d.scroll, uikit.ScrollbarProps{Label: "会话表单滚动条"})
+		uikit.Scrollbars(c, panel, formScroll, &d.scroll, uikit.ScrollbarProps{Label: locales.MessageSessionFormScrollbar()})
 		if !d.closing && !d.saving {
 			if panel.OverlayShortcut(ui.Super, ui.KeyS) {
 				a.saveSessionDraft(c, d, false)
@@ -123,12 +124,12 @@ func (a *app) hostDialog(c *ui.Context) {
 
 func (a *app) sessionDraftTitle(d *hostDraft) string {
 	if d.editing {
-		return "编辑会话"
+		return locales.MessageEditSession2()
 	}
 	if d.files {
-		return "新建 FTP/SFTP 会话"
+		return locales.MessageNewFtpSftpSession()
 	}
-	return "新建 SSH 会话"
+	return locales.MessageNewSshSession()
 }
 
 func (a *app) sessionDraftHeader(c *ui.Context, d *hostDraft) {
@@ -156,9 +157,9 @@ func (a *app) sessionDraftHeader(c *ui.Context, d *hostDraft) {
 		})
 		ui.Column(c).Grow(1).MinWidth(0).Gap(t.Space.N2).PaddingEnd(t.C.IconButton.Size).Children(func() {
 			uikit.Text(c, a.sessionDraftTitle(d), uikit.TextProps{Style: uikit.TextTitle}).SingleLine()
-			subtitle := "终端会话 · 保存后出现在左侧「会话」"
+			subtitle := locales.MessageTerminalSessionAppearsUnderSessionsAfterSaving()
 			if d.files {
-				subtitle = "文件传输会话 · 保存后出现在左侧「站点」"
+				subtitle = locales.MessageFileTransferSessionAppearsUnderSitesAfterSaving()
 			}
 			if d.editing {
 				subtitle = a.hosts[d.id].name + " · " + d.protocol
@@ -177,9 +178,9 @@ func (a *app) sessionProtocolPicker(c *ui.Context, d *hostDraft) {
 	before := selected
 	ui.Column(c).FillWidth().Shrink(0).Padding(0, t.C.Modal.BodyPaddingX, t.Space.N8, t.C.Modal.BodyPaddingX).Children(func() {
 		uikit.Segmented(c.Key("file-protocol"), &selected, []uikit.SegItem{
-			{Label: "SFTP", IconSVG: folderLockIcon, IconTone: uikit.ToneAccent, Detail: "基于 SSH，加密传输"},
-			{Label: "FTP", IconSVG: folderIcon, IconTone: uikit.ToneTertiary, Detail: "经典 FTP，可选 TLS"},
-		}, uikit.SegmentedProps{Label: "协议", Fill: true, Cards: true})
+			{Label: "SFTP", IconSVG: folderLockIcon, IconTone: uikit.ToneAccent, Detail: locales.MessageEncryptedTransferOverSsh()},
+			{Label: "FTP", IconSVG: folderIcon, IconTone: uikit.ToneTertiary, Detail: locales.MessageClassicFtpWithOptionalTls()},
+		}, uikit.SegmentedProps{Label: locales.MessageProtocol(), Fill: true, Cards: true})
 	})
 	if before != selected {
 		a.setModalAdvancedOpen(strings.ToLower(d.protocol), d.advanced)
@@ -195,11 +196,11 @@ func (a *app) sessionField(c *ui.Context, d *hostDraft, key, label, description 
 			uikit.FieldMessage(c, description, uikit.FieldMessageProps{})
 		}
 		message := d.errors[key]
-		if key == "host" && message == "" {
+		if key == "host" && message.Empty() {
 			message = d.errors["port"]
 		}
-		if message != "" {
-			uikit.FieldMessage(c, message, uikit.FieldMessageProps{Tone: uikit.ToneDanger})
+		if !message.Empty() {
+			uikit.FieldMessage(c, message.String(), uikit.FieldMessageProps{Tone: uikit.ToneDanger})
 		}
 	})
 }
@@ -250,7 +251,7 @@ func (a *app) sessionInputState(d *hostDraft, key string, value *string, e ui.El
 		d.errors[key] = a.draftError(d, key)
 	}
 	d.focused[key] = e.Focused()
-	uikit.StyleFormControl(e, d.errors[key])
+	uikit.StyleFormControl(e, d.errors[key].String())
 	if e.Submitted() {
 		d.submitted = true
 	}
@@ -259,33 +260,52 @@ func (a *app) sessionInputState(d *hostDraft, key string, value *string, e ui.El
 
 func (a *app) sessionDraftFields(c *ui.Context, d *hostDraft, dismiss func()) {
 	t := theme.Current()
-	a.sessionField(c, d, "name", "名称", "", func() ui.Element {
-		return a.sessionInput(c, d, "name", "名称", &d.name, false).Placeholder("可选，默认用主机名")
+	a.sessionField(c, d, "name", locales.CommonName(), "", func() ui.Element {
+		return a.sessionInput(
+			c,
+			d,
+			"name",
+			locales.CommonName(),
+			&d.name,
+			false,
+		).Placeholder(locales.MessageOptionalDefaultsToHostname())
 	})
-	a.sessionField(c, d, "host", "主机", "", func() ui.Element {
+	a.sessionField(c, d, "host", locales.MessageHost(), "", func() ui.Element {
 		var input ui.Element
 		ui.Row(c).FillWidth().Gap(t.Space.N8).AlignItems(ui.Center).Children(func() {
-			input = a.sessionInput(c, d, "host", "主机", &d.address, true).Grow(1).Placeholder("主机名或 IP")
-			ui.Text(c, "端口").Shrink(0).FontSize(t.C.FormRow.LabelSize).TextColor(uikit.Color(t.C.FormRow.Label))
+			input = a.sessionInput(
+				c,
+				d,
+				"host",
+				locales.MessageHost(),
+				&d.address,
+				true,
+			).Grow(1).Placeholder(locales.MessageHostnameOrIp())
+			ui.Text(c, locales.MessagePort()).Shrink(0).FontSize(t.C.FormRow.LabelSize).TextColor(uikit.Color(t.C.FormRow.Label))
 			a.sessionPortInput(c, d)
 		})
 		return input
 	})
-	a.sessionField(c, d, "user", "用户名", "", func() ui.Element {
+	a.sessionField(c, d, "user", locales.MessageUsername(), "", func() ui.Element {
 		if d.auth == "anonymous" {
 			anonymous := "anonymous"
-			return a.sessionInput(c, d, "anonymous", "用户名", &anonymous, true)
+			return a.sessionInput(c, d, "anonymous", locales.MessageUsername(), &anonymous, true)
 		} else {
-			return a.sessionInput(c, d, "user", "用户名", &d.user, true).Placeholder("root")
+			return a.sessionInput(c, d, "user", locales.MessageUsername(), &d.user, true).Placeholder("root")
 		}
 	})
-	a.sessionField(c, d, "auth", "认证方式", "", func() ui.Element {
-		values, labels := []string{"password", "key", "agent"}, []string{"密码", "私钥", "Agent"}
+	a.sessionField(c, d, "auth", locales.MessageAuthenticationMethod(), "", func() ui.Element {
+		values, labels := []string{"password", "key", "agent"}, []string{locales.CommonPassword(), locales.MessagePrivateKeys(), "Agent"}
 		if d.protocol == "FTP" {
-			values, labels = []string{"password", "anonymous"}, []string{"密码", "匿名"}
+			values, labels = []string{"password", "anonymous"}, []string{locales.CommonPassword(), locales.MessageAnonymous()}
 		}
 		index := slices.Index(values, d.auth)
-		input := uikit.Segmented(c.Key("auth"), &index, uikit.SegmentItems(labels), uikit.SegmentedProps{Label: "认证方式"})
+		input := uikit.Segmented(
+			c.Key("auth"),
+			&index,
+			uikit.SegmentItems(labels),
+			uikit.SegmentedProps{Label: locales.MessageAuthenticationMethod()},
+		)
 		if input.Changed() {
 			d.auth = values[index]
 			d.changed("auth")
@@ -297,17 +317,28 @@ func (a *app) sessionDraftFields(c *ui.Context, d *hostDraft, dismiss func()) {
 		ui.Column(c).Key("auth-" + d.auth).FillWidth().Gap(t.C.FormRow.RowGap).Transition(transition).Children(func() {
 			switch d.auth {
 			case "password":
-				a.sessionPasswordField(c, d, "password", "密码", "保存在系统钥匙串", &d.password)
+				a.sessionPasswordField(
+					c,
+					d,
+					"password",
+					locales.CommonPassword(),
+					locales.MessageSaveInSystemCredentialStore(),
+					&d.password,
+				)
 			case "key":
-				a.sessionField(c, d, "key", "私钥", "", func() ui.Element {
+				a.sessionField(c, d, "key", locales.MessagePrivateKeys(), "", func() ui.Element {
 					var input ui.Element
 					ui.Row(c).FillWidth().Gap(t.Space.N8).AlignItems(ui.Center).Children(func() {
 						input = a.sessionKeySelect(c, d)
-						uikit.Button(c, "管理…", uikit.ButtonProps{Size: uikit.SizeSm}).Shrink(0).OnClick(func() { d.afterClose = a.openCredentialSettings; dismiss() })
+						uikit.Button(
+							c,
+							locales.MessageManage(),
+							uikit.ButtonProps{Size: uikit.SizeSm},
+						).Shrink(0).OnClick(func() { d.afterClose = a.openCredentialSettings; dismiss() })
 					})
 					return input
 				})
-				a.sessionPasswordField(c, d, "passphrase", "口令", "", &d.passphrase)
+				a.sessionPasswordField(c, d, "passphrase", locales.MessagePassphrase(), "", &d.passphrase)
 			case "agent":
 				if !d.listedAgent {
 					results := make(chan sessionAgentResult, 1)
@@ -317,11 +348,15 @@ func (a *app) sessionDraftFields(c *ui.Context, d *hostDraft, dismiss func()) {
 				}
 				a.sessionField(c, d, "agent", "Agent", "", func() ui.Element {
 					if d.agentResults != nil {
-						return uikit.Text(c, "正在检测 ssh-agent…", uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneSecondary})
+						return uikit.Text(
+							c,
+							locales.MessageCheckingSshAgent(),
+							uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneSecondary},
+						)
 					}
-					color, icon, text := t.Color.Success.Text, sessionCheckIcon, fmt.Sprintf("已检测到 ssh-agent · %d 把密钥", d.agentCount)
+					color, icon, text := t.Color.Success.Text, sessionCheckIcon, locales.KeysAgentDetectedCount(d.agentCount)
 					if d.agentError != nil {
-						color, icon, text = t.Color.Warning.Text, sessionAlertIcon, "未检测到 ssh-agent（SSH_AUTH_SOCK）"
+						color, icon, text = t.Color.Warning.Text, sessionAlertIcon, locales.MessageSshAgentNotDetectedSshAuthSock()
 					}
 					return ui.Row(c).Height(t.C.Input.Height).Gap(t.Space.N6).AlignItems(ui.Center).Children(func() {
 						uikit.Icon(c, icon, uikit.IconProps{Size: uikit.SizeSm}).TextColor(uikit.Color(color))
@@ -332,22 +367,34 @@ func (a *app) sessionDraftFields(c *ui.Context, d *hostDraft, dismiss func()) {
 		})
 	}
 
-	a.sessionField(c, d, "gateway", "连接网关", "", func() ui.Element {
-		input := uikit.Select(c, &d.gateway, a.hostGatewayOptions(d), uikit.SelectProps{Label: "连接网关"})
+	a.sessionField(c, d, "gateway", locales.MessageConnectionGateway(), "", func() ui.Element {
+		input := uikit.Select(
+			c,
+			&d.gateway,
+			a.hostGatewayOptions(d),
+			uikit.SelectProps{Label: locales.MessageConnectionGateway()},
+		)
 		if input.Changed() {
 			d.changed("gateway")
 		}
 		return input
 	})
-	a.sessionField(c, d, "group", "分组", "", func() ui.Element {
+	a.sessionField(c, d, "group", locales.MessageGroup(), "", func() ui.Element {
 		if d.creatingGroup {
-			return a.sessionInput(c, d, "group", "新建分组", &d.newGroup, false).Placeholder("新建分组名称")
+			return a.sessionInput(
+				c,
+				d,
+				"group",
+				locales.MessageNewGroup(),
+				&d.newGroup,
+				false,
+			).Placeholder(locales.MessageNewGroupName())
 		}
-		options := append(a.groupNames(), "新建分组…")
+		options := append(a.groupNames(), locales.MessageNewGroup2())
 		previous := d.group
-		input := uikit.Select(c, &d.group, uikit.StringOptions(options), uikit.SelectProps{Label: "分组"})
+		input := uikit.Select(c, &d.group, uikit.StringOptions(options), uikit.SelectProps{Label: locales.MessageGroup()})
 		if input.Changed() {
-			if d.group == "新建分组…" {
+			if d.group == locales.MessageNewGroup2() {
 				d.group = previous
 				d.creatingGroup = true
 			}
@@ -361,7 +408,7 @@ func (a *app) sessionPortInput(c *ui.Context, d *hostDraft) {
 	t := theme.Current()
 	p := t.C.Input
 	ui.Box(c).Key("port-field").Width(p.PortWidth).Height(p.Height).Shrink(0).Children(func() {
-		input := a.sessionInput(c, d, "port", "端口", &d.port, true)
+		input := a.sessionInput(c, d, "port", locales.MessagePort(), &d.port, true)
 		if input.Focused() || d.portEdited {
 			return
 		}
@@ -402,7 +449,7 @@ func (a *app) sessionPasswordField(c *ui.Context, d *hostDraft, key, label, desc
 			})
 		}
 		if key == "passphrase" {
-			input.Placeholder("私钥口令（无则留空）")
+			input.Placeholder(locales.MessagePrivateKeyPassphraseLeaveBlankIfNone())
 		}
 		return input
 	})
@@ -414,14 +461,14 @@ func (a *app) sessionKeySelect(c *ui.Context, d *hostDraft) ui.Element {
 		d.handles["key"] = &ui.Handle{}
 	}
 	options := make([]uikit.Option[string], 0, len(a.keys)+2)
-	options = append(options, uikit.Option[string]{Value: "", Label: "请选择私钥", Disabled: true})
+	options = append(options, uikit.Option[string]{Value: "", Label: locales.MessageSelectAPrivateKey(), Disabled: true})
 	for _, key := range a.keys {
 		options = append(options, uikit.Option[string]{Value: key.ID, Label: key.Name,
 			Detail: key.Type + " · " + abbreviateFingerprint(key.Fingerprint)})
 	}
-	options = append(options, uikit.Option[string]{Value: "__import__", Label: "导入私钥…"})
+	options = append(options, uikit.Option[string]{Value: "__import__", Label: locales.MessageImportPrivateKey2()})
 	input := uikit.Select(c.Key("private-key"), &d.keyID, options, uikit.SelectProps{
-		Label: "私钥", Placeholder: "请选择私钥", Handle: d.handles["key"], Error: d.errors["key"],
+		Label: locales.MessagePrivateKeys(), Placeholder: locales.MessageSelectAPrivateKey(), Handle: d.handles["key"], Error: d.errors["key"].String(),
 		Leading: func() {
 			uikit.Icon(c, sessionKeyIcon, uikit.IconProps{Size: uikit.SizeSm, Tone: uikit.ToneTertiary}).PassThrough()
 		},
@@ -455,16 +502,28 @@ func (a *app) sessionDraftFooter(c *ui.Context, d *hostDraft, dismiss func()) {
 	p := t.C.Modal
 	uikit.ModalFooter(c).Children(func() {
 		disabled := strings.TrimSpace(d.address) == ""
-		uikit.Button(c, "测试连接", uikit.ButtonProps{Disabled: disabled || d.testResults != nil}).Padding(0, p.ButtonPaddingX).Shrink(0).OnClick(func() { a.startDraftTest(c, d) })
+		uikit.Button(
+			c,
+			locales.MessageTestConnection(),
+			uikit.ButtonProps{Disabled: disabled || d.testResults != nil},
+		).Padding(0, p.ButtonPaddingX).Shrink(0).OnClick(func() { a.startDraftTest(c, d) })
 		a.sessionTestResult(c, d)
 		ui.Spacer(c)
-		uikit.Button(c, "取消", uikit.ButtonProps{Variant: uikit.ButtonPlain}).Padding(0, p.ButtonPaddingX).OnClick(dismiss)
-		label := "仅保存"
+		uikit.Button(
+			c,
+			locales.CommonCancel(),
+			uikit.ButtonProps{Variant: uikit.ButtonPlain},
+		).Padding(0, p.ButtonPaddingX).OnClick(dismiss)
+		label := locales.MessageSaveOnly()
 		if d.editing {
-			label = "保存"
+			label = locales.CommonSave()
 		}
 		uikit.Button(c, label, uikit.ButtonProps{Disabled: disabled}).Padding(0, p.ButtonPaddingX).Shrink(0).OnClick(func() { a.saveSessionDraft(c, d, false) })
-		uikit.Button(c, "保存并连接", uikit.ButtonProps{Variant: uikit.ButtonPrimary, Kbd: "↩", Disabled: disabled}).Padding(0, p.ButtonPaddingX).Shrink(0).OnClick(func() { a.saveSessionDraft(c, d, true) })
+		uikit.Button(
+			c,
+			locales.MessageSaveAndConnect(),
+			uikit.ButtonProps{Variant: uikit.ButtonPrimary, Kbd: "↩", Disabled: disabled},
+		).Padding(0, p.ButtonPaddingX).Shrink(0).OnClick(func() { a.saveSessionDraft(c, d, true) })
 	})
 }
 
@@ -478,7 +537,7 @@ func (a *app) sessionTestResult(c *ui.Context, d *hostDraft) {
 		if d.testResult.Err != nil {
 			state.State = uikit.TestFailed
 		}
-		state.Summary, state.Detail = d.testResult.Summary, d.testResult.Detail
+		state.Summary, state.Detail = d.testResult.Summary.String(), d.testResult.Detail.String()
 		state.ID, state.Elapsed = fmt.Sprintf("%p", d.testResult), d.testResult.Elapsed
 	}
 	uikit.TestResult(c, &state, uikit.TestResultProps{Motion: uikit.MotionOverride(a.reduceMotion(c)),
@@ -492,14 +551,14 @@ func (a *app) chooseSessionDirectory(d *hostDraft) {
 	d.choosingDirectory = true
 	generation := d.generation
 	go func() {
-		paths, err := mygo.Dialog.Open(mygo.OpenDialogOptions{Parent: a.window, Title: "选择本地目录", Directory: true})
+		paths, err := mygo.Dialog.Open(mygo.OpenDialogOptions{Parent: a.window, Title: locales.MessageChooseLocalDirectory(), Directory: true})
 		mygo.RunOnMain(func() {
 			if d.generation != generation {
 				return
 			}
 			d.choosingDirectory = false
 			if err != nil {
-				a.terminalError = fmt.Errorf("选择本地目录：%w", err)
+				a.terminalError = locales.Errorf(locales.MessageChooseLocalDirectory2, err)
 			} else if len(paths) > 0 {
 				d.localDir = paths[0]
 				d.changed("localDir")

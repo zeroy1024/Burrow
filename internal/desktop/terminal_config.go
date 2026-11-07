@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"sshdesk/internal/locales"
 	"sshdesk/internal/store"
 	"sshdesk/internal/termtheme"
 	"sshdesk/internal/theme"
@@ -153,7 +154,7 @@ func (a *app) chooseTerminalTheme() {
 	a.terminal.importing = true
 	window := a.window
 	a.sshWorkers.Go(func() {
-		paths, err := mygo.Dialog.Open(mygo.OpenDialogOptions{Parent: window, Title: "导入终端配色", Message: "选择 Ghostty 格式的配色文件"})
+		paths, err := mygo.Dialog.Open(mygo.OpenDialogOptions{Parent: window, Title: locales.MessageImportTerminalColorScheme(), Message: locales.MessageChooseAGhosttyColorSchemeFile()})
 		var source *termtheme.Scheme
 		filename := ""
 		if err == nil && len(paths) > 0 {
@@ -183,7 +184,10 @@ func (a *app) persistImportedTheme(path string) (*termtheme.Scheme, string, erro
 		return nil, "", fmt.Errorf("import terminal theme: %w", err)
 	}
 	if termtheme.IsBundled(source.Name) {
-		return nil, "", fmt.Errorf("内置配色 %q 不能覆盖，请修改 name 后导入", source.Name)
+		return nil, "", locales.Errorf(
+			locales.MessageBuiltInColorSchemeCannotBeOverwrittenChangeItsNameBeforeImporting,
+			source.Name,
+		)
 	}
 	if err := a.store.SaveTheme(a.ctx, store.Theme{Name: source.Name, Filename: filename, Source: data}); err != nil {
 		return nil, "", err

@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/egoist/mygo/ui"
+	"sshdesk/internal/locales"
 	"sshdesk/internal/theme"
 )
 
@@ -83,7 +84,7 @@ func SearchField(c *ui.Context, value *string, props SearchProps) SearchParts {
 			}
 		})
 		if clear {
-			parts.Clear = IconButton(c, IconClose, IconButtonProps{Key: "clear", Label: "清除搜索"}).
+			parts.Clear = IconButton(c, IconClose, IconButtonProps{Key: "clear", Label: locales.MessageClearSearch()}).
 				Absolute().Top(0).Bottom(0).Right(0).Size(height, height).KeepFocus()
 			if parts.Clear.Clicked() {
 				*value = ""

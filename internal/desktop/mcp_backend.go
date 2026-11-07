@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"sshdesk/internal/fileclient"
+	"sshdesk/internal/locales"
 	"sshdesk/internal/mcpserver"
 	"sshdesk/internal/sshclient"
 	"sshdesk/internal/store"
@@ -323,7 +324,10 @@ func (b *mcpDesktop) keepWriteCleanup(ctx context.Context, c mcpserver.Connectio
 			LocalRoot: root, Conflict: "overwrite", CleanupOnly: true, CreatedAt: time.Now().UTC()}
 		task := &transferTask{id: a.transfers.nextID, mcp: owner, job: job,
 			session: a.snapshotTransferSession(c.Runtime.(*fileSession)),
-			state:   transferFailed, cleanupPending: true, errorText: "写入后的临时文件等待清理：" + cause.Error(),
+			state:   transferFailed, cleanupPending: true, errorText: locales.Concat(
+				locales.Deferred(locales.MessageTemporaryFileAwaitingCleanupAfterWriting),
+				locales.ErrorText(cause),
+			),
 			sourcePath: job.sourcePath, targetPath: job.targetPath, total: job.total, transferred: job.doneBytes,
 			entry: fileEntry{name: job.name, path: job.sourcePath, size: job.root.entry.Size}}
 		a.transfers.tasks = append(a.transfers.tasks, task)
@@ -342,7 +346,7 @@ func (b *mcpDesktop) keepWriteCleanup(ctx context.Context, c mcpserver.Connectio
 	if err != nil {
 		return b.service.FailStorage(err)
 	}
-	return errors.New("自有临时文件尚未清理，已保存关联清理任务，可在审计详情中重试清理")
+	return locales.NewError(locales.MessageAnOwnedTemporaryFileStillNeedsCleanupACleanupTaskHasBeenSaved)
 }
 
 func (b *mcpDesktop) Enqueue(ctx context.Context, request mcpserver.TransferRequest) (store.MCPTask, error) {
@@ -393,7 +397,7 @@ func (b *mcpDesktop) Enqueue(ctx context.Context, request mcpserver.TransferRequ
 	_, err = mcpOnUI(acceptCtx, b, func() (bool, error) {
 		a := b.a
 		if !a.businessReady() || !b.service.Accepting() || a.quitPending || len(a.transfers.tasks) >= 1000 || a.transfers.quitting || a.transfers.storeErr != nil || a.transfers.writeErr != nil {
-			return false, errors.New("传输队列不可用或已达到容量限制")
+			return false, locales.NewError(locales.MessageTheTransferQueueIsUnavailableOrAtCapacity)
 		}
 		a.transfers.nextID++
 		a.transfers.nextBatchID++
@@ -442,7 +446,7 @@ func (b *mcpDesktop) Enqueue(ctx context.Context, request mcpserver.TransferRequ
 
 func (b *mcpDesktop) ControlTask(ctx context.Context, id int, action string) error {
 	if action == "resume" && !b.service.Accepting() {
-		return errors.New("MCP 服务未开启，不能继续任务")
+		return locales.NewError(locales.MessageTheMcpServiceIsOffThisTaskCannotBeResumed)
 	}
 	_, err := mcpOnUI(ctx, b, func() (bool, error) {
 		if action == "resume" && !b.a.businessReady() {

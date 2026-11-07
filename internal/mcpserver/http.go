@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"sshdesk/internal/locales"
 	"sshdesk/internal/store"
 )
 
@@ -22,7 +23,7 @@ func (s *Service) Configure(ctx context.Context, cfg Config) error {
 	s.lifecycle.Lock()
 	defer s.lifecycle.Unlock()
 	if cfg.Host == "" || cfg.Port < 1 || cfg.Port > 65535 || cfg.RetentionDays < 1 || cfg.RetentionDays > 3650 {
-		return fail("invalid_argument", "无效的 MCP 监听或保留配置")
+		return fail("invalid_argument", locales.MessageInvalidMcpListenerOrRetentionConfiguration())
 	}
 	previous, running, _, _ := s.Status()
 	restart := running != cfg.Enabled || previous.Host != cfg.Host || previous.Port != cfg.Port || s.fault.Load()
@@ -72,7 +73,7 @@ func (s *Service) start(ctx context.Context) error {
 	}
 	for _, ip := range ips {
 		if !ip.Unmap().IsLoopback() {
-			err = errors.New("MCP 首版只允许监听本机回环地址")
+			err = locales.NewError(locales.MessageMcpCurrentlyOnlySupportsListeningOnALocalLoopbackAddress)
 			break
 		}
 	}
@@ -210,19 +211,19 @@ func (s *Service) Handler(cfg Config) http.Handler {
 		if strings.HasPrefix(token, "Bearer ") && len(r.Header.Values("Authorization")) == 1 {
 			key, err = s.Authenticate(r.Context(), strings.TrimPrefix(token, "Bearer "))
 		} else {
-			err = fail("authentication_failed", "缺少授权密钥")
+			err = fail("authentication_failed", locales.MessageMissingAccessKey())
 		}
 		if err != nil {
 			op := store.MCPOperation{ID: rand.Text(), Action: "authentication", Status: "authentication_failed",
 				KeyID: key.ID, KeyName: key.Name, StartedAt: time.Now().UTC(), FinishedAt: time.Now().UTC(), ErrorCode: "authentication_failed"}
 			if op.KeyName == "" {
-				op.KeyName = "未知客户端"
+				op.KeyName = locales.MessageUnknownClient()
 			}
 			auditCtx, auditCancel := context.WithTimeout(context.WithoutCancel(r.Context()), 5*time.Second)
 			defer auditCancel()
 			payload := store.MCPAuditPayload{
-				Request:  json.RawMessage(`{"body_omitted":"认证失败，不记录认证请求正文"}`),
-				Response: json.RawMessage(`{"http_status":401,"data":{"error":{"code":"authentication_failed","message":"认证失败"}}}`),
+				Request:  json.RawMessage(`{"body_omitted":"Authentication failed; authentication request body omitted"}`),
+				Response: json.RawMessage(`{"http_status":401,"data":{"error":{"code":"authentication_failed","message":"Authentication failed"}}}`),
 			}
 			if auditErr := s.Store.MCPBeginWithPayload(auditCtx, op, payload); auditErr != nil {
 				s.storageFault(auditErr)
@@ -264,7 +265,7 @@ func (s *Service) protocolServer(key store.MCPKey, requestContext context.Contex
 			detail := map[string]any{"code": errorCode(err), "message": err.Error()}
 			var failure *Failure
 			if errors.As(err, &failure) && len(failure.Hits) > 0 {
-				detail["hits"], detail["hint"] = agentHits(failure), interceptHint
+				detail["hits"], detail["hint"] = agentHits(failure), locales.McpInterceptionHint()
 			}
 			result["error"] = detail
 		}
@@ -302,7 +303,6 @@ func (s *Service) protocolServer(key store.MCPKey, requestContext context.Contex
 // Policies guard against mistakes rather than isolate the agent, so the hit
 // explains what to change; the hint keeps that from reading as a puzzle to
 // rewrite around.
-const interceptHint = "该操作命中了用户设置的拦截策略。请勿通过改写、拆分、转义或换用等效命令绕过；如果任务确实需要，请向用户说明原因，由用户调整策略。"
 
 func agentHits(failure *Failure) []map[string]any {
 	hits := make([]map[string]any, 0, len(failure.Hits))

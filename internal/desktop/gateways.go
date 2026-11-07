@@ -3,10 +3,10 @@ package desktop
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"slices"
 	"strings"
 
+	"sshdesk/internal/locales"
 	"sshdesk/internal/store"
 )
 
@@ -107,9 +107,12 @@ func (r gatewayCatalog) sshHost(id string) (host, bool) {
 }
 
 // gatewayLoop names the host or gateway at which a route came back to itself.
-type gatewayLoop struct{ key, message string }
+type gatewayLoop struct {
+	key     string
+	message locales.Text
+}
 
-func (e *gatewayLoop) Error() string { return e.message }
+func (e *gatewayLoop) Error() string { return e.message.String() }
 
 // hostRoute returns the gateway IDs, first hop first, that reach the host
 // with this session ID and gateway selection. A host that follows the default
@@ -124,7 +127,7 @@ func (r gatewayCatalog) hostRoute(id, selection string, visiting []string) ([]st
 			if index := slices.IndexFunc(r.hosts, func(h host) bool { return h.session.ID == id }); index >= 0 {
 				name = r.hosts[index].name
 			}
-			return nil, &gatewayLoop{key: key, message: fmt.Sprintf("主机「%s」的连接路径会经过它自己", name)}
+			return nil, &gatewayLoop{key: key, message: locales.Format(locales.MessageTheRouteForHostPassesThroughItself, name)}
 		}
 		visiting = append(visiting[:len(visiting):len(visiting)], key)
 	}
@@ -149,11 +152,11 @@ func (r gatewayCatalog) hostRoute(id, selection string, visiting []string) ([]st
 func (r gatewayCatalog) gatewayRoute(id string, visiting []string) ([]string, error) {
 	g, ok := r.gateway(id)
 	if !ok {
-		return nil, fmt.Errorf("网关不存在：%s", id)
+		return nil, locales.Errorf(locales.MessageGatewayDoesNotExist, id)
 	}
 	key := "gateway:" + id
 	if slices.Contains(visiting, key) {
-		return nil, &gatewayLoop{key: key, message: fmt.Sprintf("网关「%s」形成环路", g.Name)}
+		return nil, &gatewayLoop{key: key, message: locales.Format(locales.MessageGatewayCreatesARoutingLoop, g.Name)}
 	}
 	visiting = append(visiting[:len(visiting):len(visiting)], key)
 	upstream := []string{}
@@ -162,18 +165,18 @@ func (r gatewayCatalog) gatewayRoute(id string, visiting []string) ([]string, er
 	case "ssh":
 		source, ok := r.sshHost(g.SSHProfileID)
 		if !ok {
-			return nil, fmt.Errorf("网关「%s」引用的 SSH 主机不存在", g.Name)
+			return nil, locales.Errorf(locales.MessageTheSshHostReferencedByGatewayDoesNotExist, g.Name)
 		}
 		upstream, err = r.hostRoute(source.session.ID, source.session.Gateway, visiting)
 	case "socks5":
 		if g.SOCKS == nil {
-			return nil, errors.New("SOCKS5 网关缺少配置")
+			return nil, locales.NewError(locales.MessageMissingSocks5GatewayConfiguration)
 		}
 		if g.UpstreamID != "" {
 			upstream, err = r.gatewayRoute(g.UpstreamID, visiting)
 		}
 	default:
-		return nil, errors.New("未知网关类型")
+		return nil, locales.NewError(locales.MessageUnknownGatewayType)
 	}
 	if err != nil {
 		return nil, err
@@ -219,26 +222,26 @@ func validateGatewayRoute(route []gatewayHop) error {
 	seen := map[string]bool{}
 	for _, hop := range route {
 		if hop.ID == "" || seen[hop.ID] {
-			return errors.New("网关快照标识无效或形成环路")
+			return locales.NewError(locales.MessageInvalidGatewaySnapshotIdOrRoutingLoop)
 		}
 		seen[hop.ID] = true
 		switch hop.Kind {
 		case "ssh":
 			if hop.SSH == nil || hop.SOCKS != nil || hop.SSH.Protocol != "" || hop.SSH.GatewayRoute != nil {
-				return errors.New("SSH 网关快照无效")
+				return locales.NewError(locales.MessageInvalidSshGatewaySnapshot)
 			}
 			if err := validateTransferEndpoint(*hop.SSH, false); err != nil {
 				return err
 			}
 		case "socks5":
 			if hop.SSH != nil || hop.SOCKS == nil {
-				return errors.New("SOCKS5 网关快照无效")
+				return locales.NewError(locales.MessageInvalidSocks5GatewaySnapshot)
 			}
 			if err := validateSOCKS(*hop.SOCKS); err != nil {
 				return err
 			}
 		default:
-			return errors.New("未知网关快照类型")
+			return locales.NewError(locales.MessageUnknownGatewaySnapshotType)
 		}
 	}
 	return nil
@@ -246,10 +249,10 @@ func validateGatewayRoute(route []gatewayHop) error {
 
 func validateSOCKS(s socksGateway) error {
 	if !validSessionHost(s.Address) || s.Port < 1 || s.Port > 65535 {
-		return errors.New("SOCKS5 地址或端口无效")
+		return locales.NewError(locales.MessageInvalidSocks5AddressOrPort)
 	}
 	if len(s.Username) > 255 || s.PasswordSaved && (s.Username == "" || s.PasswordRevision == "") {
-		return errors.New("SOCKS5 认证信息无效")
+		return locales.NewError(locales.MessageInvalidSocks5AuthenticationInformation)
 	}
 	return nil
 }
@@ -258,29 +261,29 @@ func (a *app) validateGateways() error {
 	ids := map[string]bool{}
 	for _, g := range a.gateways {
 		if g.ID == "" || g.ID == directGateway || ids[g.ID] || strings.TrimSpace(g.Name) == "" {
-			return errors.New("网关名称或标识无效")
+			return locales.NewError(locales.MessageInvalidGatewayNameOrId)
 		}
 		ids[g.ID] = true
 		if g.Kind == "ssh" {
 			if g.SOCKS != nil || !slices.ContainsFunc(a.hosts, func(h host) bool { return h.session.ID == g.SSHProfileID && h.protocol == "" }) {
-				return fmt.Errorf("网关「%s」引用的 SSH 主机不存在", g.Name)
+				return locales.Errorf(locales.MessageTheSshHostReferencedByGatewayDoesNotExist, g.Name)
 			}
 			if g.UpstreamID != "" {
-				return fmt.Errorf("SSH 网关「%s」的上游由源主机的连接网关决定", g.Name)
+				return locales.Errorf(locales.MessageTheUpstreamRouteForSshGatewayIsDeterminedByItsSourceHostS, g.Name)
 			}
 		} else if g.Kind == "socks5" {
 			if g.SSHProfileID != "" || g.SOCKS == nil {
-				return errors.New("SOCKS5 网关配置无效")
+				return locales.NewError(locales.MessageInvalidSocks5GatewayConfiguration)
 			}
 			if err := validateSOCKS(*g.SOCKS); err != nil {
 				return err
 			}
 		} else {
-			return errors.New("未知网关类型")
+			return locales.NewError(locales.MessageUnknownGatewayType)
 		}
 	}
 	if a.defaultGateway != "" && !ids[a.defaultGateway] {
-		return errors.New("默认网关不存在")
+		return locales.NewError(locales.MessageTheDefaultGatewayDoesNotExist)
 	}
 	for _, g := range a.gateways {
 		if _, err := a.captureGatewayRoute(host{session: sessionConfig{Gateway: g.ID}}); err != nil {
@@ -290,7 +293,7 @@ func (a *app) validateGateways() error {
 	catalog := a.gatewayCatalog()
 	for _, h := range a.hosts {
 		if id := gatewayReference(h.session.Gateway); id != "" && !ids[id] {
-			return errors.New("会话引用的网关不存在")
+			return locales.NewError(locales.MessageTheGatewayReferencedByThisSessionDoesNotExist)
 		}
 		if _, err := catalog.hostRoute(h.session.ID, h.session.Gateway, nil); err != nil {
 			return err

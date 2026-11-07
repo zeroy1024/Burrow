@@ -1,0 +1,1947 @@
+{
+  "@@locale": "zh-Hans",
+  "messageBits": "%s · %d 位",
+  "messageBurrowAndOpenSourceLicenses": "Burrow 与开源许可",
+  "messageWithMultipleSshPanesSwitchPanesWithOnePaneOrInFileTransfer": "SSH 多分屏时优先切换分屏；单窗格及文件传输页切换选项卡。Ctrl+Tab / Ctrl+Shift+Tab 始终切换选项卡。",
+  "messageFrostedWindowBackgroundOnMacosAndBlurWithinBarsDisabledWhenTheSystem": "macOS 全局毛玻璃及栏内模糊；系统「降低透明度」开启时自动关闭",
+  "messageAboutSshAgent": "ssh-agent 使用说明",
+  "messageUnderline": "▁ 下划线",
+  "messageBlock": "▉ 块",
+  "messageBar": "▏竖线",
+  "messageLight": "☀ 浅色",
+  "messageDark": "☾ 深色",
+  "messagePreviousPaneOrTab": "上一个分屏或选项卡",
+  "messagePreviousTab": "上一个选项卡",
+  "messageNextPaneOrTab": "下一个分屏或选项卡",
+  "messageNextTab": "下一个选项卡",
+  "messageUnderlineCursor": "下划线光标",
+  "messageBuiltInSchemesCannotBeDeleted": "不能删除内置配色",
+  "messageConflictsWith": "与「%s」冲突",
+  "messageMatchCard": "与卡片一致",
+  "messageThePasswordsDoNotMatch": "两次输入的密码不一致",
+  "messagePrimary": "主按钮",
+  "messageThemeAccentAndMotion": "主题、强调色与动态效果",
+  "messageSessions": "会话",
+  "messageSessionPassword": "会话密码",
+  "messageSessionRestoredNotConnectedYet": "会话已恢复，尚未连接。",
+  "messageTransfers": "传输",
+  "commonSave": "保存",
+  "messageKeepWindow": "保留窗口",
+  "messageChangePassword": "修改密码",
+  "messageChangePassword2": "修改密码…",
+  "messageRenameGroup": "修改组名",
+  "messageChangeUnlockPassword": "修改解锁密码",
+  "messageCursor": "光标",
+  "messageCursorBlink": "光标闪烁",
+  "messageUsedByTheGlobalTerminal": "全局终端正在使用",
+  "messageResetAll": "全部恢复默认",
+  "messageClearAll": "全部清除",
+  "messageClearAll2": "全部清除…",
+  "aboutTitle": "关于",
+  "commonClose": "关闭",
+  "messageClosePaneOrTab": "关闭分屏或选项卡",
+  "messageBurrowWillOpenWithoutAnUnlockPasswordYourSavedCredentialsWillBeKept": "关闭后，打开 Burrow 将不再要求输入解锁密码，已保存的凭据会保留。",
+  "messageCloseKeyWindow": "关闭密钥窗口",
+  "messageSystemReducedMotionStillAppliesToMygoControlsWhenAppReducedMotionIs": "关闭应用内动态效果时，系统减少动态效果仍对 MyGo 内建控件生效。",
+  "messageDisableAppUnlock": "关闭应用解锁",
+  "messageWhenTheLastTabCloses": "关闭最后一个选项卡时",
+  "messageConfirmBeforeClosingAnActiveConnection": "关闭活动连接前确认",
+  "messageCloseWindow": "关闭窗口",
+  "messageCloseTab": "关闭选项卡",
+  "messageReduceMovementAndScalingWhileRetainingFadesAndColorTransitions": "减少位移与缩放，保留透明度和颜色过渡",
+  "messageReduceMotion": "减少动态效果",
+  "messageGroupName": "分组名称",
+  "messageSelectPaneOrTab": "切换到第 1 个分屏或选项卡",
+  "messageSelectPaneOrTab2": "切换到第 2 个分屏或选项卡",
+  "messageSelectPaneOrTab3": "切换到第 3 个分屏或选项卡",
+  "messageSelectPaneOrTab4": "切换到第 4 个分屏或选项卡",
+  "messageCreate": "创建",
+  "commonDelete": "删除",
+  "messageDelete": "删除…",
+  "messageDeleteGroupConnectionProfilesOpenSessionsAndTransfersWillBeRetained": "删除「%s」分组，连接配置、已打开的会话和传输任务会保留。",
+  "messageDeleteHost": "删除主机",
+  "messageDeleteGroup": "删除分组",
+  "messageDeleteGroup2": "删除分组？",
+  "messageDeleteKey": "删除密钥",
+  "messageDeleteSite": "删除站点",
+  "messageDeleteScheme": "删除配色",
+  "messageRefresh": "刷新",
+  "messageSaveTheKeyPassphraseWithEncryption": "加密保存私钥口令",
+  "messageMatchingSettingNamesAndDescriptionsChangesApplyImmediately": "匹配设置名称与说明 · 修改立即生效",
+  "messageOriginalKeyPassphrase": "原私钥口令",
+  "commonCancel": "取消",
+  "messageCancelConnection": "取消连接",
+  "messagePassphrase": "口令",
+  "messageNameConflicts": "同名冲突",
+  "messageConcurrentTransfers": "同时传输数",
+  "commonName": "名称",
+  "messageStartupTabs": "启动与选项卡",
+  "messageRestoreSessionsOnStartup": "启动时恢复会话",
+  "messageScrollback": "回滚",
+  "messageScrollbackLines": "回滚行数",
+  "messageFixedScheme": "固定一种",
+  "messageShowInFileManager": "在文件管理器中显示",
+  "messageBlockCursor": "块状光标",
+  "commonCopy": "复制",
+  "messageCopyPublicKey": "复制公钥",
+  "messageCopyAddress": "复制地址",
+  "messageCopyFingerprint": "复制指纹",
+  "messageCopyPrivateKeyFingerprint": "复制私钥指纹",
+  "messageAppearance": "外观",
+  "messageAlwaysOn": "始终开启",
+  "messageFont": "字体",
+  "messageFontSize": "字号",
+  "messagePasswordsAndKeyPassphrasesAreEncryptedOnThisDevice": "密码和私钥口令加密保存在本机",
+  "messageKeysCredentials": "密钥与凭据",
+  "messageThisKeyIsUsedByASessionAndCannotBeDeleted": "密钥仍被会话使用，不能删除",
+  "messageKeyName": "密钥名称",
+  "messageTheKeyNoLongerExists": "密钥已不存在",
+  "messageKeyActions": "密钥操作",
+  "messageKeyComment": "密钥注释",
+  "messageKeyType": "密钥类型",
+  "messageImport": "导入",
+  "messageImport2": "导入…",
+  "messageImportPrivateKey": "导入私钥",
+  "messageImportScheme": "导入配色…",
+  "messageTheExportedFileContainsAPrivateKeyKeepItSafe": "导出的文件包含私钥，请妥善保管。",
+  "messageExportPrivateKey": "导出私钥",
+  "messageExportPrivateKey2": "导出私钥…",
+  "messageDragHostsIntoGroupsToOrganizeTheCatalog": "将主机拖入分组，整理主机目录。",
+  "messageNoPrivateKeysYetImportAKeyToUseItWithSshOr": "尚未导入私钥。导入后可用于 SSH 或 SFTP 会话。",
+  "messageSshAgentNotChecked": "尚未检测 ssh-agent",
+  "messageDirectoryOpenedWhenShowingTheLocalPane": "展开本地面板时打开的目录",
+  "messageUsedByASavedSession": "已保存的会话正在使用",
+  "messageSavedPasswords": "已保存的密码",
+  "messageEncryptedInBurrow": "已加密托管",
+  "messageUsedByAnOpenSession": "已打开的会话正在使用",
+  "messageApp": "应用",
+  "messageAppTheme": "应用主题",
+  "messageAppUnlock": "应用解锁",
+  "messageSwitchPreview": "开关预览",
+  "messageRequireTheUnlockPasswordEachTimeBurrowStarts": "开启后，每次启动 Burrow 都需要输入解锁密码。",
+  "messageOpenSourceLicenses": "开源许可",
+  "messageAccentColor": "强调色",
+  "messageCurrentPassword": "当前密码",
+  "messageQuickAddToSftp": "快捷添加到 SFTP…",
+  "messageQuickAddToSsh": "快捷添加到 SSH…",
+  "messageKeyboardShortcuts": "快捷键",
+  "messageReset": "恢复默认",
+  "messageReset2": "恢复默认：",
+  "messageRequireUnlockingWhenOpeningTheApp": "打开应用时需要解锁",
+  "messageUngroupSessions": "拆分会话",
+  "messageSplitPane": "拆分窗格",
+  "messagePressEnterToConnectTo": "按 Enter 连接 %s",
+  "messagePressEnterToReconnect": "按 Enter 重新连接",
+  "messagePressANewShortcut": "按下新的快捷键…",
+  "messageSearch": "搜索",
+  "messageSearchCurrentPage": "搜索当前页面",
+  "messageSearchResults": "搜索结果",
+  "messageSearchSettings": "搜索设置",
+  "messageShowFewer": "收起 ▴",
+  "filesTitle": "文件传输",
+  "messageFileTransferMode": "文件传输模式",
+  "messageDisconnectSession": "断开当前会话",
+  "messageDisconnectFileSession": "断开文件会话",
+  "messageNewPassword": "新密码",
+  "messageNewSession": "新建会话",
+  "messageNewGroup": "新建分组",
+  "messageMode": "方案",
+  "messageUnableToOpenTheApp": "无法打开应用",
+  "messageUnableToUnlockCheckYourPasswordOrCredentialData": "无法解锁，请检查密码或凭据数据",
+  "messageToggleSidebar": "显示/隐藏侧栏",
+  "messageChangesApplyImmediately": "更改后立即生效",
+  "messageReplace": "替换",
+  "messageSshAgentNotDetected": "未检测到 ssh-agent",
+  "messageUnassigned": "未设置",
+  "messageView": "查看",
+  "messageStyle": "样式",
+  "messageOrange": "橙色",
+  "messageProcessing": "正在处理…",
+  "messageProcessingKey": "正在处理密钥…",
+  "messageOpeningTheApp": "正在打开应用…",
+  "messageCheckingSshAgent": "正在检测 ssh-agent…",
+  "messageThisGroupNameAlreadyExists": "此分组名称已存在",
+  "messageLinesOfOutputKeptPerSessionTheOldestAreDiscardedBeyondThis": "每个会话保留的输出行数，超过后丢弃最早的输出。",
+  "messageNoMatchingSettings": "没有匹配的设置",
+  "messageComment": "注释",
+  "messageLight2": "浅色",
+  "messageLightAppearance": "浅色外观时",
+  "messageUsedByTheLightOrDarkSchemeSlot": "浅色或深色配色槽正在使用",
+  "messageDark2": "深色",
+  "messageDarkAppearance": "深色外观时",
+  "commonAdd": "添加",
+  "messageAddHost": "添加主机",
+  "messageAddSite": "添加站点",
+  "messageClearAllSavedSessionPasswordsYouWillNeedToEnterThemAgainWhen": "清除已保存的全部会话密码。下次连接时需要重新输入。",
+  "messageClearSavedPasswords": "清除已保存的密码",
+  "messageClickACardToAssignItsLightOrDarkSlotImportAcceptsGhostty": "点击卡片：按配色自身明暗放进浅色或深色槽位。导入支持 Ghostty 主题格式。",
+  "messageClickAShortcutToRecordEscCancelsDeleteClears": "点击快捷键录制 · Esc 取消 · Delete 清除",
+  "messageGenerate": "生成",
+  "messageGenerateSshKey": "生成 SSH 密钥",
+  "messageGenerate2": "生成…",
+  "messageDirectories": "目录",
+  "messageDirectoriesTransfersAndNameConflicts": "目录、传输与同名文件",
+  "messageGraphite": "石墨",
+  "messageDeleteTheManagedPrivateKeyThisCannotBeUndone": "确认删除「%s」的托管私钥？此操作无法撤销。",
+  "messageConfirmPassword": "确认密码",
+  "messagePrivateKeys": "私钥",
+  "messagePrivateKeysSshAgentAndSavedPasswords": "私钥、ssh-agent 与已保存的密码",
+  "messagePrivateKeyPassphrase": "私钥口令",
+  "messageWindowTranslucency": "窗口半透明",
+  "messageBarCursor": "竖线光标",
+  "messageType": "类型",
+  "messagePink": "粉色",
+  "messagePurple": "紫色",
+  "messageRed": "红色",
+  "messageTerminal": "终端",
+  "messageTerminalMode": "终端模式",
+  "messageTerminalBackground": "终端背景",
+  "messageGreen": "绿色",
+  "messageEdit": "编辑",
+  "messageEditHost": "编辑主机",
+  "messageEditSession": "编辑会话…",
+  "messageEditSite": "编辑站点",
+  "messageBackground": "背景",
+  "messageBlue": "蓝色",
+  "messageLineHeight": "行高",
+  "messageOverwrite": "覆盖",
+  "messageView2": "视图",
+  "messageUnlock": "解锁",
+  "messageUnlockPassword": "解锁密码",
+  "messageTheUnlockPasswordMustBeCharactersLong": "解锁密码长度须为 6–64 个字符",
+  "settingsTitle": "设置",
+  "messageSettings": "设置…",
+  "messageSetUnlockPassword": "设置解锁密码",
+  "messageAsk": "询问",
+  "settingsLanguage": "语言",
+  "messageLanguageStartupAndTabs": "语言、启动与选项卡",
+  "messageEnterTheNewPasswordAgain": "请再次输入新密码",
+  "messageEnterAKeyName": "请填写密钥名称",
+  "messageEnterTheCurrentPassword": "请填写当前密码",
+  "messageEnterANewPassword": "请填写新密码",
+  "messageKeepYourUnlockPasswordSafeSavedPasswordsAndManagedPrivateKeysCannotBe": "请妥善保存解锁密码。忘记后无法恢复已保存的密码和托管私钥。",
+  "messageReadAndMigrateCredentials": "读取旧凭据并迁移",
+  "messageFollowAppAppearance": "跟随应用明暗",
+  "settingsLanguageSystem": "跟随系统",
+  "messageFollowSwitchBetweenTheLightAndDarkSchemesWithAppAppearance": "跟随：按应用当前明暗，在下方两种配色间自动切换",
+  "messageSkip": "跳过",
+  "messageAccessibility": "辅助功能",
+  "messageEnterANewGroupName": "输入新的分组名称。",
+  "messageEnterYourUnlockPasswordToOpenTheApp": "输入解锁密码以打开应用",
+  "messageMigrateSavedCredentials": "迁移已保存的凭据",
+  "messageConnect": "连接",
+  "messageConnectHost": "连接主机",
+  "messageConnectSession": "连接当前会话",
+  "messageConnectSite": "连接站点",
+  "messageQuitApp": "退出应用",
+  "messageChooseLocalDirectory": "选择本地目录",
+  "messageTabs": "选项卡",
+  "messageGeneral": "通用",
+  "messageScheme": "配色",
+  "messageColorsBackgroundFontAndCursorChangesApplyImmediately": "配色、背景、字体与光标 · 修改立即生效",
+  "messageColorSchemes": "配色方案",
+  "messageSchemeDefault": "配色自带（默认）",
+  "messageSchemeUseItsBackgroundInAnyAppearanceMatchCardUseTheCardBackground": "配色自带：任何外观都用配色的背景色。与卡片一致：用卡片底色",
+  "messageRename": "重命名",
+  "messageRename2": "重命名…",
+  "messageRenameGroup2": "重命名分组",
+  "messageRenameKey": "重命名密钥",
+  "messageReopenTabsFromThePreviousSessionWithoutSubmittingPasswords": "重新打开上次退出时的选项卡（不会自动输入密码）",
+  "messageReopenClosedTab": "重新打开关闭的选项卡",
+  "messageReconnect": "重新连接",
+  "messageReconnectCurrentSession": "重新连接当前会话",
+  "messageBlink": "闪烁",
+  "messageReadExistingSystemCredentialsAndManagedKeysOnceToMigrateThemNormalUse": "需要一次性读取旧系统凭据和托管私钥。迁移完成后，日常使用不再访问系统凭据库。旧副本会保留，请在确认迁移成功后另行清理。",
+  "messageOne": "项目一",
+  "messageTwo": "项目二",
+  "messagePreview": "预览",
+  "messageYellow": "黄色",
+  "messageDefaultLocalDirectory": "默认本地目录",
+  "messageProtectAppDataDirectory": "保护应用数据目录：%w",
+  "messageLoadNativeTerminal": "加载原生终端：%w",
+  "messageOpenAppDatabase": "打开应用数据库：%w",
+  "messageAFileOrCredentialOperationIsInProgressWaitForItToFinish": "文件或凭据操作进行中，完成后再退出。",
+  "messageUnableToSaveBeforeQuitting": "退出前保存失败",
+  "messageUnableToStopTheMcpService": "停止 MCP 服务失败",
+  "messageUnableToSaveTransferHistory": "保存传输记录失败",
+  "messageTerminalSettings": "终端设置",
+  "messageProcessing2": "正在处理",
+  "gatewaysTitle": "网关",
+  "messageResizeSessionSidebar": "调整会话栏宽度",
+  "messageResizeSiteSidebar": "调整站点栏宽度",
+  "messageResizeSettingsSidebar": "调整设置栏宽度",
+  "messageClosingThisTabWillEndItsSessions": "关闭此选项卡将结束其中的会话。",
+  "messageClosingThisTabWillEndTheFileSession": "关闭此选项卡将结束文件会话。",
+  "messageClosingThisPaneWillEndItsSession": "关闭此窗格将结束其中的会话。",
+  "messageClosePane": "关闭窗格",
+  "messageCloseActiveConnection": "关闭活动连接？",
+  "messageTheAppIsLockedOrItsUnlockSettingsAreBeingUpdatedTryAgain": "应用尚未解锁或正在更新解锁设置，请稍后重试",
+  "messageUnableToReadHostInformation": "读取主机基础信息失败",
+  "messageUnableToInitializeMcp": "初始化 MCP 失败",
+  "messageUnlockSettingsSavedButPreviousUnlockMaterialCouldNotBeCleanedUp": "解锁设置已保存，旧解锁材料清理失败：",
+  "messageUnableToSaveOrderPreviousPositionsRestored": "保存排序失败，已恢复原位置",
+  "messageUnableToLoadHostConfiguration": "无法加载主机配置",
+  "messageNoMatchingHosts": "没有匹配的主机",
+  "messageSessionSidebarScrollbar": "会话栏滚动条",
+  "messageUnableToSaveGroupState": "保存分组状态失败",
+  "messageCancelOrRemoveThisSessionSTransfersFirst": "请先取消或清除该会话的传输任务",
+  "messageHostKeyChangedPreviousFingerprint": "主机密钥已变更\n原指纹 ",
+  "messageNewFingerprint": "\n新指纹 ",
+  "messageEnterFtpPassword": "输入 FTP 密码",
+  "messageConnectedMs": "连接成功 · %dms",
+  "messageHostFingerprintVerified": " · 已确认主机指纹",
+  "messageHostname": "主机名",
+  "messageOperatingSystem": "系统",
+  "messageKernel": "内核",
+  "messageArchitecture": "架构",
+  "messageDefaultShell": "默认 Shell",
+  "messageUnableToRetrieveHostInformation": " · 基础信息获取失败",
+  "messageHidden": "[已隐藏]",
+  "messageHostKeyChanged": "主机密钥已变更",
+  "messageConnectionTimedOut": "连接超时",
+  "messageTestCancelled": "测试已取消",
+  "messageUntrustedCertificate": "证书不受信任",
+  "messageAuthenticationFailed": "认证失败",
+  "messageConnectionRefused": "连接被拒绝",
+  "messageHostUnreachable": "主机不可达",
+  "messageProtocolError": "协议错误",
+  "messageMissingFtpSettings": "缺少 FTP 设置",
+  "messagePublicKeyCopied": "公钥已复制",
+  "messageAllSavedSessionPasswordsCleared": "已清除所有保存的会话密码",
+  "messageImportSshPrivateKey": "导入 SSH 私钥",
+  "messageChoosePrivateKey": "选择私钥：%w",
+  "messageReadPrivateKey": "读取私钥：%w",
+  "messageParsePrivateKey": "解析私钥：%w",
+  "messageReadCurrentUsername": "读取当前用户名：",
+  "messageReadLocalHostname": "读取本机名称：",
+  "messageIncorrectKeyPassphraseOrUnsupportedFormat": "私钥口令错误或格式不支持：%w",
+  "messageGeneratePrivateKey": "生成私钥：%w",
+  "messageEncodePrivateKey": "编码私钥：%w",
+  "messageUnknownKeyOperation": "未知密钥操作",
+  "messageReadPublicKey": "读取公钥：%w",
+  "messageKeySavedYouCanSelectItInTheSessionAuthenticationOptions": "密钥已保存，可从会话认证列表中选择。",
+  "messageManagedPrivateKeyDeleted": "托管私钥已删除",
+  "messageFileSessionIsNotConnected": "文件会话未连接",
+  "messageTheSelectedItemNoLongerExistsRefreshTheDirectory": "操作的项目已不存在，请刷新目录。",
+  "messageNoItemsSelectedForDeletion": "未选择要删除的项目",
+  "messageDeletedItems": "已删除 %d/%d 项；%s：%w",
+  "messageUnsupportedFileOperation": "不支持的文件操作 %q",
+  "messageFileOperationFailed": "文件操作失败",
+  "messageDirectoryNestingIsTooDeepDeletionStopped": "目录层级过深，已停止删除",
+  "messageTheServerReturnedAnInvalidDirectoryEntry": "服务器返回了非法目录项",
+  "messageActiveFtpDoesNotSupportGatewaysSelectPassiveMode": "FTP 主动模式暂不支持连接网关，请选择被动模式",
+  "messageFileConnectionClosed": "文件连接已断开",
+  "messageThisFileConnectionCannotResolveDirectoryLinks": "此文件连接不支持解析目录链接",
+  "messageUnableToReadDirectory": "读取目录失败",
+  "messageSaveDirectoryHistory": "保存目录历史：",
+  "messageDirectoryCannotBeEmpty": "目录不能为空",
+  "messageInvalidFilePaneSettings": "无效的文件面板设置",
+  "messageUnableToSaveFileTransferPreferences": "保存文件传输偏好失败：",
+  "messageUnableToSaveFileTransferPreferences2": "保存文件传输偏好失败",
+  "messageTheOriginalConfigurationCouldNotBeReadOverwritingBlocked": "原配置读取失败，已阻止覆盖：%w",
+  "messageFile": "文件",
+  "messageLocal": "本地",
+  "messageFolder": "文件夹",
+  "messageRemote": "远程",
+  "messageFilePreview": "文件预览",
+  "messageCloseFilePreview": "关闭文件预览",
+  "messageCopyPath": "复制路径",
+  "messageSize": "大小",
+  "messageModified": "修改时间",
+  "messagePermissions": "权限",
+  "messageOwner": "所有者",
+  "messagePath": "路径",
+  "messageFilePath": "文件路径",
+  "messageFilePreviewScrollbar": "文件预览滚动条",
+  "messageNewFolder": "新建文件夹",
+  "messageDeleteFile": "删除文件",
+  "messageThisOperationAffectsActualFilesInTheCurrentDirectory": "操作将应用到当前目录中的实际文件。",
+  "messageDelete2": "确认删除「%s」？",
+  "messageEnterAValidNameWithoutAndDoNotUseOr": "请输入有效名称，不能包含 /，也不能使用 . 或 ..。",
+  "messageAFileOrFolderWithThisNameAlreadyExistsInThisDirectory": "此目录中已存在同名文件或文件夹。",
+  "messageAnItemWithThisNameAlreadyExists": "目标中已存在同名项目",
+  "messageDestination": "目标：",
+  "messageApplyThisChoiceToAllConflicts": "对所有重名项应用此选择",
+  "messageKeepBoth": "保留两者",
+  "messageUnableToLocateFile": "无法定位文件",
+  "messageCollapseSiteSidebar": "收起站点栏",
+  "messageExpandSiteSidebar": "展开站点栏",
+  "messageNewFileSession": "新建文件会话",
+  "messageConnectingTo": "正在连接 ",
+  "messageDisconnectedSelectToReconnect": "已断开 · 选择后可重新连接",
+  "messageCloseFileTab": "关闭文件标签 ",
+  "messageThisHostIsReferencedByGatewayUpdateTheGatewayFirst": "主机被网关「%s」引用，请先修改该网关",
+  "messageThisHostIsUsedByAGatewayConnectionCloseRelatedSessionsAndTransfers": "主机仍被网关连接使用，请先关闭相关会话和传输",
+  "messageRemoveThisEntryFromTheCurrentCatalogAndCloseItsSessionsServerFiles": "将从当前页面的目录移除，并关闭此条目的会话。服务器文件不受影响。",
+  "messageUnableToDeleteSession": "删除会话失败",
+  "messageTheFilenameCannotBeSafelyUsedInTheDestinationPath": "文件名不能安全地用于目标路径",
+  "messageRemaining": "剩余 —",
+  "messageAlmostDone": "即将完成",
+  "messageAboutRemaining": "剩余约 %02d:%02d",
+  "messageNoTransfersInThisCategory": "此分类暂无传输",
+  "messageNoTransfersYet": "暂无传输任务",
+  "messageTransferListScrollbar": "传输任务滚动条",
+  "messageResizeTransferPanel": "调整传输面板高度",
+  "messageDragToResizeDoubleClickToReset": "拖动调整高度 · 双击恢复默认",
+  "messageReopenTheTransferSTabWithoutConnectingOrResumingTheTransfer": "重新打开传输所属标签，不会自动连接或继续传输",
+  "messageTotalSpeed": "总速度 ",
+  "messagePauseAll": "全部暂停",
+  "messageResumeAll": "全部继续",
+  "messageClearCompleted": "清除已完成",
+  "messageCollapseTransferList": "折叠传输列表",
+  "messageExpandTransferList": "展开传输列表",
+  "messageAll": "全部",
+  "messageInProgress": "进行中",
+  "messageCompleted": "已完成",
+  "messageTransferCategory": "传输分类",
+  "messageCompletedInS": "用时 %.1f 秒",
+  "messageCompleted2": " 完成",
+  "messageShowInFolder": "在文件夹中显示",
+  "messageTransferFailed": " 传输失败",
+  "messageRetry": "重试",
+  "messageSelectASiteToBrowseRemoteFiles": "选择站点，浏览远程文件",
+  "messageOpenAnSftpFtpSessionFromTheSiteSidebar": "从左侧站点目录打开 SFTP / FTP 会话",
+  "messageSessionDisconnected": "会话已断开",
+  "messageConnectionFailed": "连接失败",
+  "messageRemoteFiles": "远程文件",
+  "messageLocalFiles": "本地文件",
+  "messageThisFolderIsEmpty": "此文件夹为空",
+  "messageReadingDirectory": "正在读取目录…",
+  "messageShowLocalPane": "显示本地面板",
+  "messageHideLocalPane": "隐藏本地面板",
+  "messageSearchCurrentFolder": "搜索当前文件夹",
+  "messageCloseSearch": "收起搜索",
+  "messageUploadFiles": "上传文件",
+  "messageMoreFileActions": "更多文件操作",
+  "messageSearchFiles": "搜索文件",
+  "messageSortByName": "按名称排序",
+  "messageSortBySize": "按大小排序",
+  "messageSortByModifiedDate": "按修改时间排序",
+  "messageSortByPermissions": "按权限排序",
+  "messageSortByOwner": "按所有者排序",
+  "messageUploadSelectedItems": "上传所选项目",
+  "messageDownloadSelectedItems": "下载所选项目",
+  "messageDeleteSelectedItems": "删除所选项目",
+  "messageThisComputer": "本机",
+  "messageThisDirectoryIsNotWritable": "此目录不可写",
+  "messageChooseFilesToUpload": "选择上传文件",
+  "messageUploadToTheCurrentRemoteDirectory": "上传到当前远程目录。",
+  "messageUnableToOpenFilePicker": "打开文件选择器失败：",
+  "messageUnableToOpenFilePicker2": "打开文件选择器失败",
+  "messageUnableToReadFileInformation": "无法读取文件信息：",
+  "messageUnableToReadFileInformation2": "无法读取文件信息",
+  "messageSshHandshakeAndAuthenticationSucceeded": "SSH 握手与认证成功",
+  "messageGatewayConnectionFailed": "网关连接失败",
+  "messageSocks5Handshake": "SOCKS5 握手：%w",
+  "messageTheServerDidNotReturnAValidSocks5Response": "服务器未返回有效的 SOCKS5 协议响应",
+  "messageSocks5HandshakeSucceededNoAuthenticationRequired": "SOCKS5 握手成功，无需认证",
+  "messageTheSocks5ServerRequiresAUsernameAndPasswordConfigureAuthentication": "SOCKS5 服务器要求用户名密码认证，请配置认证信息",
+  "messageTheSocks5ServerDoesNotAcceptThisAuthenticationMethod": "SOCKS5 服务器不接受当前认证方式",
+  "messageTheSocks5ServerSelectedAnUnsupportedAuthenticationMethod": "SOCKS5 服务器选择了不支持的认证方式：%d",
+  "messageSocks5Authentication": "SOCKS5 认证：%w",
+  "messageTheSocks5ServerReturnedAnInvalidAuthenticationResponse": "SOCKS5 服务器返回了无效的认证响应",
+  "messageSocks5UsernameAndPasswordAuthenticationFailed": "SOCKS5 用户名密码认证失败",
+  "messageSocks5HandshakeAndAuthenticationSucceeded": "SOCKS5 握手与认证成功",
+  "messageGateway": "网关「%s」：%w",
+  "messageReadPassword": "读取密码：%w",
+  "messageTheSavedSocks5PasswordHasChangedReconnectToUseIt": "SOCKS5 保存的密码已更新，请重新连接",
+  "messageEnterSocks5GatewayPassword": "输入 SOCKS5 网关密码",
+  "messageTheSocks5PasswordMustBeBytes": "SOCKS5 密码需为 1–255 字节",
+  "messageAppSettings": "应用设置",
+  "messageHostsAndSites": "主机与站点",
+  "messageDownstreamGateways": "下游网关",
+  "messageRunning": "运行中",
+  "messageUseAppDefault": "跟随应用默认",
+  "messageDirect": "直连",
+  "messageRoutesThroughThisHost": "会经过本主机",
+  "messageTheGatewayNoLongerExists": "网关已不存在",
+  "messageSshHost": "SSH 主机",
+  "messageSite": " 站点",
+  "messageDefaultAppGateway": "应用默认出口",
+  "messageUsesThisGatewayUpstream": "以本网关为上游",
+  "messageReleasedWhenClosed": "关闭后解除",
+  "messageActiveGatewayConnection": "正在使用的网关连接",
+  "messageTerminalTransferOrRecoverableTab": "终端、传输或可恢复标签",
+  "messageFileSessionOrTransfer": "文件会话或传输任务",
+  "messageUnableToSaveDefaultGateway": "保存默认网关失败",
+  "messageTestConnection": "测试连接",
+  "messageEditGateway": "编辑网关…",
+  "messageSetAsAppDefaultGateway": "设为应用默认出口",
+  "messageDeleteGateway": "删除网关…",
+  "messageNoGateway": "不经过网关",
+  "messageConnectDirectlyFromThisComputer": "连接直接从本机发出",
+  "messageUseDefault": "跟随默认",
+  "messageInUse": "使用中",
+  "messageNoGatewaysYet": "还没有连接网关",
+  "messageGatewaysRouteYourConnectionsAddAnSshJumpHostOrSocks5ProxyThen": "网关决定连接从哪里出发。添加 SSH 跳板或 SOCKS5 代理后，可以在主机和文件站点中选择经由哪个网关，也可以设为应用默认出口。",
+  "messageAddSshGateway": "添加 SSH 网关",
+  "messageUseASavedSshHostAsAJumpHostWithOptionalUpstreamGateways": "复用已保存的 SSH 主机作为跳板，可继续串联上游",
+  "messageAddSocks5Proxy": "添加 SOCKS5 代理",
+  "messageEnterAProxyAddressWithOptionalUsernameAndPasswordAuthentication": "填写代理地址，支持无认证或用户名密码认证",
+  "messageGatewayList": "网关列表",
+  "messageAddGateway": "新增网关",
+  "messageSearchGateways": "搜索网关",
+  "messageSearchGatewaysAndAddresses": "搜索网关、地址",
+  "messageSshGateway": "SSH 网关",
+  "messageSocks5Proxy": "SOCKS5 代理",
+  "messageNoMatchingGateways": "没有匹配的网关",
+  "messageGatewayListScrollbar": "网关列表滚动条",
+  "messageDefault": "默认",
+  "messageDefaultGateway": "默认出口",
+  "messageMoreGatewayActions": "更多网关操作",
+  "messageConnectionRoute": "连接路径",
+  "messageOutboundRouteForTerminalFileTransferAndMcpConnectionsUsingThisGateway": "终端、文件传输和 MCP 经此网关时的出站顺序",
+  "messageConfiguration": "配置",
+  "messageRemoveAllReferencesBeforeDeletingThisGateway": "删除网关前需先解除全部引用",
+  "messageReferences": "引用",
+  "messageGatewayDetailsScrollbar": "网关详情滚动条",
+  "messageOrigin": "起点",
+  "messageLocalNetwork": "本地网络",
+  "messageViaProxy": "经代理",
+  "messageSshTunnel": "SSH 通道",
+  "messageDestination2": "终点",
+  "messageTargetHost": "目标主机",
+  "messageDeterminedByTheHostOrSite": "由主机或站点决定",
+  "messageViewGateway": "查看网关 ",
+  "messageTesting2": "正在测试",
+  "messageThisGateway": "本网关",
+  "messageTestAgain": "重新测试",
+  "messageConnectingToHop": "正在连接第 %d/%d 跳「%s」…",
+  "messageDirectly": "直接",
+  "messageViaUpstreamGateway": "经上游",
+  "messageUpstreamGateway": "上游网关",
+  "messageUseSourceHostRoute": "跟随源主机",
+  "messageTheProxyResolvesTheTargetHostnameFtpFtpsThroughAGatewayRequiresPassive": "目标主机名交由代理解析；FTP / FTPS 经网关时仅支持被动模式。",
+  "commonPassword": "密码",
+  "messageSaved": " · 已保存",
+  "messageS": " 秒",
+  "messageSourceHost": "源主机",
+  "messageAddress": "地址",
+  "messageAuthentication": "认证",
+  "messageConnectionSharing": "连接复用",
+  "messageMultipleTargetsShareOneSshConnection": "多个目标共享同一条 SSH 连接",
+  "messageNoAuthentication": "无认证",
+  "messageUsernameAndPassword": "用户名密码",
+  "messageAskWhenConnecting": "连接时输入",
+  "messageSavedInVault": "已保存在 Vault",
+  "messageUsername": "用户名",
+  "messageConnectionMode": "连接方式",
+  "messageASeparateConnectionForEachTarget": "每个目标单独建立连接",
+  "messageNoSessionsGatewaysOrActiveConnectionsReferenceThisGatewayItCanBeDeleted": "没有会话、网关或运行中的连接引用此网关，可以直接删除。",
+  "messageEdit2": "编辑 ",
+  "messageUnableToTestGateway": "无法测试网关",
+  "messageThisCannotBeUndone": "删除后不可恢复。",
+  "messageTheSavedSocks5PasswordWillAlsoBeRemovedFromVault": "已保存的 SOCKS5 密码会一并从 Vault 移除。",
+  "messageEditGateway2": "编辑网关",
+  "messageCloseGatewaySettings": "关闭网关设置",
+  "messageAfterSavingSelectThisGatewayForHostsFileSitesOrTheAppDefault": "保存后可在主机、文件站点和应用默认出口中选择",
+  "messageUseASavedSshHost": "复用已保存的 SSH 主机",
+  "messageRouteConnectionsThroughAProxyServer": "经代理服务器转发连接",
+  "messageGatewayType": "网关类型",
+  "messageGatewayFormScrollbar": "网关表单滚动条",
+  "messageGatewayName": "网关名称",
+  "messageForExampleBastionHk": "例如 bastion-hk",
+  "messageWouldCreateARoutingLoop": "会形成环路",
+  "messageUsesThisHostSAddressAuthenticationAndKeepaliveSettingsItsInitialCommandIs": "地址、认证与 Keepalive 取自该主机；不执行其初始命令。",
+  "messageSelectASavedSshHost": "选择已保存的 SSH 主机",
+  "messageAnSshGatewayUsesItsSourceHostSGatewayRouteJustLikeA": "SSH 网关沿用源主机的「连接网关」，与直接连接该主机时的路径一致；请在主机设置中修改。",
+  "messageSelectAnSshHostFirst": "选择 SSH 主机后确定",
+  "messageProxyAddress": "代理地址",
+  "messageSocks5Address": "SOCKS5 地址",
+  "messageHostnameOrIp": "主机名或 IP",
+  "messageSocks5Port": "SOCKS5 端口",
+  "messageSocks5Authentication2": "SOCKS5 认证",
+  "messageSocks5Username": "SOCKS5 用户名",
+  "messageLeaveBlankToEnterWhenConnecting": "留空则连接时输入",
+  "messageSavedPasswordsAreEncryptedInVault": "保存的密码经 Vault 加密存储。",
+  "messageSavedInVaultLeaveBlankToKeepUnchanged": "已保存在 Vault · 留空保持不变",
+  "messageSocks5Password": "SOCKS5 密码",
+  "messageSavedPassword": "已保存密码",
+  "messageLocalNetwork2": "本机网络",
+  "messageTheOutboundRouteUsedToConnectToTheProxyServer": "代理服务器经由哪个出口连接。",
+  "messageRoutePreview": "路径预览",
+  "messageNewGateway": "新网关",
+  "messageTheSocks5PasswordCannotExceedBytes": "SOCKS5 密码不能超过 255 字节",
+  "messageTheGatewayIsStillReferenced": "网关仍被引用",
+  "messageTheRouteForHostPassesThroughItself": "主机「%s」的连接路径会经过它自己",
+  "messageGatewayDoesNotExist": "网关不存在：%s",
+  "messageGatewayCreatesARoutingLoop": "网关「%s」形成环路",
+  "messageTheSshHostReferencedByGatewayDoesNotExist": "网关「%s」引用的 SSH 主机不存在",
+  "messageMissingSocks5GatewayConfiguration": "SOCKS5 网关缺少配置",
+  "messageUnknownGatewayType": "未知网关类型",
+  "messageInvalidGatewaySnapshotIdOrRoutingLoop": "网关快照标识无效或形成环路",
+  "messageInvalidSshGatewaySnapshot": "SSH 网关快照无效",
+  "messageInvalidSocks5GatewaySnapshot": "SOCKS5 网关快照无效",
+  "messageUnknownGatewaySnapshotType": "未知网关快照类型",
+  "messageInvalidSocks5AddressOrPort": "SOCKS5 地址或端口无效",
+  "messageInvalidSocks5AuthenticationInformation": "SOCKS5 认证信息无效",
+  "messageInvalidGatewayNameOrId": "网关名称或标识无效",
+  "messageTheUpstreamRouteForSshGatewayIsDeterminedByItsSourceHostS": "SSH 网关「%s」的上游由源主机的连接网关决定",
+  "messageInvalidSocks5GatewayConfiguration": "SOCKS5 网关配置无效",
+  "messageTheDefaultGatewayDoesNotExist": "默认网关不存在",
+  "messageTheGatewayReferencedByThisSessionDoesNotExist": "会话引用的网关不存在",
+  "messageInvalidHostInformationFormat": "主机基础信息格式无效",
+  "messageInvalidHostInformationRecord": "主机基础信息记录无效",
+  "messageUnableToSaveHostInformation": "保存主机基础信息失败",
+  "messageUnableToRetrieveHostInformation2": "获取主机基础信息失败",
+  "messageSftpReadOf": "SFTP 读取 ",
+  "messageExceededTheCollectionLimit": " 超过采集上限",
+  "messageTemporaryFileAwaitingCleanupAfterWriting": "写入后的临时文件等待清理：",
+  "messageAnOwnedTemporaryFileStillNeedsCleanupACleanupTaskHasBeenSaved": "自有临时文件尚未清理，已保存关联清理任务，可在审计详情中重试清理",
+  "messageTheTransferQueueIsUnavailableOrAtCapacity": "传输队列不可用或已达到容量限制",
+  "messageTheMcpServiceIsOffThisTaskCannotBeResumed": "MCP 服务未开启，不能继续任务",
+  "messageConnectionDetailsChangedAndThePreviousGrantIsInvalidSelectPermissionsAgainAnd": "连接信息已变更，原授权已失效；请重新选择权限并保存确认",
+  "messageShownAsOneConnectionExistingFileGrantsRetainTheOriginalSftpSettingsNew": "已合并显示；已有文件授权仍使用原 SFTP 配置，新增权限使用 SSH 配置。",
+  "messageUnableToStartTheMcpService": "启动 MCP 服务失败",
+  "messagePolicyManagement": "策略管理",
+  "messageProtocolRequest": "协议请求",
+  "messageUnableToReadMcpConnections": "读取 MCP 连接失败",
+  "messageUnableToReadMcpData": "读取 MCP 数据失败",
+  "messageRead": "读取",
+  "messageWrite": "写入",
+  "messageExecute": "执行",
+  "messageRequiresAuthorizationAgain": "（需重新授权）",
+  "messageNeverUsed": "从未使用",
+  "messageSubjectToEnabledInterceptionPolicies": "受当前启用的拦截策略约束",
+  "messageAllConnections": "全部连接",
+  "messageIncludesConnectionsAddedLater": "含后续新增连接",
+  "messageIncludesFuzzyMatchingFalsePositivesArePossible": " · 含模糊匹配，可能误报",
+  "messageUnableToParseMcpAuditData": "解析 MCP 审计失败",
+  "messageMcpUnavailable": "MCP 不可用",
+  "messageTheMcpBackendWasNotInitializedSuccessfully": "MCP 后端未成功初始化",
+  "messageMcpOperationNotPerformed": "MCP 操作未执行",
+  "messageAnotherMcpManagementOperationIsInProgressTryAgainShortly": "另一个 MCP 管理操作进行中，请稍后重试",
+  "messageMcpOperationFailed": "MCP 操作失败",
+  "messageInvalidListeningPort": "无效的监听端口",
+  "messageInvalidAuditRetentionPeriod": "无效的审计保留周期",
+  "messageInvalidRetentionPeriod": "无效的保留周期",
+  "messageEnterAPolicyName": "请输入策略名称",
+  "messageThePolicyNameIsTooLongUseNoMoreThanBytes": "策略名称过长，请缩短后重试（最多 200 字节）",
+  "messageInvalidTaskId": "无效的任务标识",
+  "messageConnectionDiscovery": "连接发现",
+  "messageCommandExecution": "命令执行",
+  "messageDirectoryListing": "目录浏览",
+  "messageFileInformation": "文件信息",
+  "messageFileRead": "文件读取",
+  "messageFileWrite": "文件写入",
+  "messageFileUpload": "文件上传",
+  "messageFileDownload": "文件下载",
+  "messageTaskList": "任务列表",
+  "messageTaskLookup": "任务查询",
+  "messageTaskCancellation": "任务取消",
+  "messageManagementOperation": "管理操作",
+  "messageUnknownOrNotExecuted": "—（未知或未执行）",
+  "messageFilePolicy": "文件策略",
+  "messageCommandPolicy": "命令策略",
+  "messageMatchOf": "第 %d / %d 条命中",
+  "messageOwnedTemporaryFileCleanup": "自有临时文件清理 → ",
+  "messageWaitingForAManualCleanupRetry": "等待手动重试清理",
+  "messageCleaningUp": "正在清理",
+  "messageCleanupComplete": "清理完成",
+  "messageWaitingForUser": "等待用户：",
+  "messageEditInterceptionPolicy": "编辑拦截策略",
+  "messageNewInterceptionPolicy": "新增拦截策略",
+  "messageDraftV1": "草稿 · v1",
+  "messageClosePolicyWindow": "关闭策略窗口",
+  "messageCheckedActionsAreBlockedRenameMoveAndDeleteToolsAreNotAvailableYet": "勾选即禁止；改名、移动、删除工具暂未提供。",
+  "messageSavePolicy": "保存策略",
+  "messagePolicyFormScrollbar": "策略表单滚动条",
+  "messageDetailsAndScope": "基本信息与适用范围",
+  "messageSavingUpdatesThisPolicyToVItTakesEffectWhenEnabled": "保存后更新至 v%d，启用后参与拦截",
+  "messagePolicyName": "策略名称",
+  "messageForExampleProductionConfigurationProtection": "例如：生产配置保护",
+  "messageEnable": "启用",
+  "messageEnableThisPolicy": "启用该策略",
+  "messageDescription": "用途说明",
+  "messageDescribeWhatThisPolicyBlocksAndProtects": "请输入拦截目的与保护范围",
+  "messagePolicyCategory": "策略分类",
+  "messageOnlyConnectionsSupportedByThisCategoryAreShown": "仅显示当前分类支持的连接",
+  "messageApplicableConnections": "适用连接",
+  "messageOriginalConfiguration": "（原配置）",
+  "messageAllConnectionsLeaveEmptyForAll": "全部连接（留空默认全部）",
+  "messageApplicableKeys": "适用密钥",
+  "messageAllKeysLeaveEmptyForAll": "全部密钥（留空默认全部）",
+  "messageFileInterceptionRules": "文件拦截规则",
+  "messageAddPathRule": "+ 添加路径规则",
+  "messageRule": "规则 #%d",
+  "messageLocation": "位置",
+  "messageRemotePath": "远端路径",
+  "messageLocalPath": "本地路径",
+  "messageProtectedPath": "受保护路径",
+  "messageIncludeSubdirectories": "包含子目录",
+  "messageCommandInterceptionRules": "命令拦截规则",
+  "messageAddCommandRule": "+ 添加命令规则",
+  "messageCommandMatch": "命令匹配",
+  "messageExactMatch": "精确匹配",
+  "messageRegularExpression": "正则匹配",
+  "messageSubstringMatch": "模糊匹配",
+  "messageMatchMode": "匹配方式",
+  "messageMatchPattern": "匹配内容",
+  "messageBlockMatches": "命中拦截",
+  "messageSubstringMatchingAlsoMatchesRmInWordsSuchAsFormatCommandMatchingIs": "模糊匹配按子串判定，rm 也会命中 format 等词，建议改用命令匹配。",
+  "messageIgnoreCaseInArguments": "参数忽略大小写",
+  "messageCommandMatchingChecksCommandNamesAndArgumentsIncludingCombinationsWithPipesSudoBash": "命令匹配按命令名和参数判定，可识别 &&、管道、sudo、bash -c、ssh 等组合写法；精确匹配完整命令；正则匹配表达式；模糊匹配包含文本，区分大小写。",
+  "messageCommandPoliciesHelpPreventMistakesUnparseablePartsAreConservativelyBlockedByKeywordsThey": "命令策略用于防误操作：无法解析的部分按关键词从严拦截，但不检查脚本文件和解释器（如 python -c）内部的操作，也不能限制已授权命令的文件访问。",
+  "messageOperationDetails": "操作详情",
+  "messageCopyOperationId": "复制操作 ID",
+  "messageCloseDetailsDrawer": "关闭详情抽屉",
+  "messageDetails": "基本信息",
+  "messageKeyId": "密钥标识",
+  "messageStarted": "开始时间",
+  "messageFinished": "结束时间",
+  "messageActionType": "操作类型",
+  "messageResult": "结果",
+  "messageTargetSnapshot": "目标快照",
+  "messageConnectionDetailsCapturedAtCallTimeLaterChangesDoNotAffectThisRecord": "保留调用时的连接信息，后续修改不影响",
+  "messageHost": "主机",
+  "messagePort": "端口",
+  "messageAccount": "账号",
+  "messageProtocol": "协议",
+  "messageCommandDetails": "命令信息",
+  "messageCommandsMayContainSensitiveArgumentsTreatAuditRecordsAsSensitiveLocalDataAutomatic": "命令原文可能包含敏感参数；审计按本地敏感数据管理，不承诺已自动识别全部秘密。",
+  "messageCommandsMayContainSensitiveArgumentsKeepAuditRecordsSecure": "命令可能含敏感参数，请妥善保管审计记录",
+  "messageOriginalCommand": "命令原文",
+  "messageExitCode": "退出码",
+  "messageOutputAndStatus": "输出与状态",
+  "messageTransferStatistics": "传输统计",
+  "messageLoadingRequestAndResponse": "正在读取请求与响应…",
+  "messageTheFullRequestAndResponseWereNotSavedOnlyAvailableSummariesAreShown": "该记录未保存完整请求与响应正文，以下仅显示已有摘要。",
+  "messageFileContentsAreNotStoredInTheAuditRequestsAndResponsesRetainPaths": "文件正文不写入审计；请求与响应中保留路径、字节数及处理结果。",
+  "messageRequestData": "请求数据",
+  "messageOutput": "输出",
+  "messageResponseView": "响应查看方式",
+  "messageTheResponseExceededTheAuditCollectionLimitAndItsBodyWasNotSaved": "响应超过审计采集上限，正文未保存；请查看响应摘要中的大小信息。",
+  "messageNoResponseHasBeenRecordedTheCallMayStillBeRunningOrMay": "响应尚未记录；调用可能仍在进行，或在返回前中断。",
+  "messageStandardOutputStdout": "标准输出 stdout",
+  "messageStandardErrorStderr": "标准错误 stderr",
+  "messageResponseData": "响应数据",
+  "messageMatchedInterceptionPolicies": "命中拦截策略",
+  "messageRulesCapturedAtDecisionTimeLaterChangesDoNotAffectThisRecord": "保留判定时的策略规则，后续修改不影响",
+  "messageMatchedRule": "命中规则：",
+  "messageTextMatch": "文本匹配",
+  "messageConservativeKeywordRejection": "关键词保守拒绝：",
+  "messageDecisionBasis": "判定依据：",
+  "messageVia": "经由：",
+  "messageMatchedFragment": "触发片段",
+  "messageContainingText": "所在文本",
+  "messageRelatedTask": "关联任务",
+  "messageContinuesAfterTheClientDisconnects": " · 客户端断开后继续运行",
+  "messagePause": "暂停",
+  "messageResume": "继续",
+  "messageRetryCleanup": "重试清理",
+  "messageCancellationRequested": "已请求取消",
+  "messageTaskTransferProgress": "任务传输进度",
+  "messageAcknowledgedAndHidden": "已确认并隐藏",
+  "messageLifecycle": "生命周期",
+  "messagePerFileDetails": "逐文件明细",
+  "messageSucceeded": "成功",
+  "messageIntercepted": "被拦截",
+  "messageFailed": "失败",
+  "messageIncomplete": "未完成",
+  "messageFilterPerFileResults": "逐文件结果筛选",
+  "messageBlockedByPolicy": "被策略拦截",
+  "messageCreated": " · 创建于 ",
+  "messageChooseDownloadDestination": "选择下载目标目录",
+  "messageChooseUploadSource": "选择上传来源目录",
+  "messageNewAccessKey": "新增授权密钥",
+  "messageGenerateCredentialsForAnMcpClientAndGrantPermissionsPerConnection": "为 MCP 客户端生成访问凭据，并按连接授予权限",
+  "messageEditAccessKey": "编辑授权密钥",
+  "messageAccessKeyCreated": "授权密钥已生成",
+  "messageThisKeyIsShownOnlyOnceCopyAndSaveItThenConfirmBelow": "密钥仅显示一次，请复制保存后勾选确认",
+  "messageIfYouLoseThisKeyRevokeItAndGenerateANewOne": "密钥丢失后，请撤销旧密钥并生成新密钥。",
+  "messageDone": "完成并关闭",
+  "messageTheKeyIsShownInPlainTextOnlyOnceAfterCreationCopyAnd": "密钥明文仅在生成后显示一次，请及时复制保存。",
+  "messageGenerateKey": "生成密钥",
+  "messageSaveKey": "保存密钥",
+  "messageKeyAuthorizationFormScrollbar": "密钥授权表单滚动条",
+  "messageForExampleClaudeDesktop": "例如：claude-desktop",
+  "messageUseASeparateKeyForEachClientSoYouCanDisableOrRevoke": "建议每个客户端使用独立密钥，便于单独停用或撤销。",
+  "messageConnectionPermissions": "连接权限",
+  "messageNoPermissionsAreGrantedByDefaultGrantedActionsRemainSubjectToInterceptionPolicies": "默认不授予任何权限；已授予的操作仍受拦截策略限制。",
+  "messageSearchConnections": "搜索连接",
+  "messageSearchNamesOrAddresses": "搜索名称或地址",
+  "messageShowAuthorizedOnly": "仅看已授权",
+  "messageNoMatchingConnections": "没有匹配的连接",
+  "messageNoSavedConnectionsYet": "暂无已保存的连接",
+  "messageSshFileAccessUsesSftpCommandExecutionCanReadAndWriteRemoteFiles": "SSH 连接的文件读写通过 SFTP 完成。命令执行可直接读写远端文件，不受上方文件权限约束。",
+  "messageLocalDirectories": "本地目录",
+  "messageLimitMcpTransfersToTheseLocalDirectoriesAndTheirSubdirectoriesFilePoliciesStill": "限定 MCP 传输可使用的本机目录（含子目录），仍受文件策略限制；未添加则拒绝该方向的传输。",
+  "messageUploadSources": "上传来源",
+  "messageLocalFilesCanBeReadFromTheseDirectoriesAndUploadedToTheRemote": "可从这些目录读取本机文件，上传到远端",
+  "messageDownloadDestinations": "下载目标",
+  "messageRemoteFilesCanBeDownloadedToTheseDirectories": "可将远端文件下载到这些目录",
+  "messageDisableKey": "停用密钥「%s」？",
+  "messageDisableKey2": "停用密钥",
+  "messageRevokeKey": "撤销密钥「%s」？",
+  "messageRevokeKey2": "撤销密钥",
+  "messageImmediatelyRejectSubsequentMcpRequestsUsingThisKey": "• 立即拒绝该密钥的后续 MCP 请求。",
+  "messageRetainAuditHistoryAndTheKeyNameRecordedAtTheTime": "• 保留历史审计记录与当时的密钥名称。",
+  "messageToSuspendAccessTemporarilyChooseDisableKeyPermanentRevocationCannotBeUndone": "若仅需临时暂停访问，请选择「停用密钥」；永久撤销不可恢复。",
+  "messageDeletePolicy": "删除策略「%s」？",
+  "messageAfterDeletionThisPolicyWillNoLongerBlockFutureOperationsThisCannotBe": "删除后，该策略将不再参与后续操作的拦截判定。此操作不可恢复，历史命中审计与规则快照保留。",
+  "messageDeletePolicy2": "删除策略",
+  "messageEditListenerConfiguration": "编辑监听配置",
+  "messageOnlyLocalListeningIsSupportedSavingAlsoUpdatesTheClientConfiguration": "仅支持本机监听，保存后同步更新客户端配置。",
+  "messageListeningHost": "监听主机",
+  "messageEnterAListeningHost": "请输入监听主机",
+  "messageEnterOnlyAnIpAddressOrHostnameWithoutASchemePathOrPort": "仅填写 IP 地址或主机名，不含协议、路径或端口",
+  "messageEnterAValidIpv6AddressOrAHostnameWithoutAPort": "请输入有效的 IPv6 地址，或不含端口的主机名",
+  "messageListeningPort": "监听端口",
+  "messageSaveConfiguration": "保存配置",
+  "messageAuditRetention": "审计保留设置",
+  "messageCleanupRemovesFinishedOperationsAndTheirPerFileDetailsActiveTasksUnverifiedStates": "清理以已结束的操作及关联逐文件明细为单位；活动任务、待核实状态和待恢复记录不在清理范围内。",
+  "messageRetentionPeriod": "保留周期",
+  "messageKeepTheLast": "保留最近",
+  "messageDays": "7 天",
+  "messageDays2": "30 天",
+  "messageDays3": "90 天",
+  "messageCleanUpRecords": "清理记录",
+  "messageClientConfiguration": "客户端配置",
+  "messageConfigurationCopiedReplaceYourSecretKeyWithYourSavedKey": "配置已复制，请将 <YOUR_SECRET_KEY> 替换为已保存的密钥。",
+  "messageConfigurationContent": "配置内容",
+  "messageDone2": "完成",
+  "messageInvalidRegularExpression": "正则表达式无效：",
+  "messageUnableToRecordMcpWaitingState": "记录 MCP 待处理状态失败",
+  "messageTheTaskSConnectionIdentityHasChanged": "任务的连接身份已改变",
+  "messageTheTransferEndpointIdentityHasChangedAuthorizationIsRequiredAgain": "传输端点身份已改变，需要重新授权",
+  "messageMcpDirectoryLimitExceededEntriesPerDirectoryPerTask": "MCP 目录超出限制（单目录 10000 条，单任务 100000 条）",
+  "messageUnableToSaveMcpTask": "保存 MCP 任务失败",
+  "messageViewRelatedTasks": "查看关联任务",
+  "messageResizeAuditDetails": "调整审计详情宽度",
+  "messageEnableMcpService": "启用 MCP 服务",
+  "messageMcpService": "MCP 服务",
+  "messageOff": "已关闭",
+  "messageListeningAddress": "监听地址",
+  "messageCopyListeningAddress": "复制监听地址",
+  "messageUptime": "运行时长",
+  "messageEnableKey": "启用密钥",
+  "messageEnablePolicy": "启用策略",
+  "messageCallsToday": "今日调用",
+  "messageBlockedToday": "今日拦截",
+  "messageCopyClientConfiguration": "复制客户端配置",
+  "messageAccessKeys": "授权密钥",
+  "messageInterceptionPolicies": "拦截策略",
+  "messageAuditLog": "审计记录",
+  "messageMcpTabs": "MCP 功能标签页",
+  "messageNewKey": "新增密钥",
+  "messageNewPolicy": "新增策略",
+  "messageRefreshAuditLog": "刷新审计记录",
+  "messageKeyNameId": "密钥名称 / 标识",
+  "messageStatus": "状态",
+  "messageConnectionGrants": "连接授权",
+  "messageDirectoryGrants": "目录授权",
+  "messageLastUsedCreated": "最近使用 / 创建",
+  "messagePolicyNameDescription": "策略名称 / 用途",
+  "messageCategory": "分类",
+  "messageRuleSummary": "规则摘要",
+  "messageStatusMatches": "状态 / 命中",
+  "messageTime": "时间",
+  "messageTargetConnection": "目标连接",
+  "messageCommandOrPathSummary": "命令或路径摘要",
+  "messageDuration": "耗时",
+  "messageAccessKeyList": "授权密钥列表",
+  "messageNoAccessKeysYet": "还没有授权密钥",
+  "messageCreateAKeyAndGrantConnectionAccessSoAnMcpClientCanUse": "新增密钥并授权连接后，MCP 客户端才能通过它访问服务器。",
+  "messageEditKey": "编辑密钥",
+  "messageUploadNotAuthorized": "上传：未授权",
+  "messageUpload2": "上传：",
+  "messageDownloadNotAuthorized": "下载：未授权",
+  "messageDownload2": "下载：",
+  "messageFilterPolicyCategories": "策略分类筛选",
+  "messageEnabled": "已启用",
+  "messageDisabled": "已停用",
+  "messageAnActionIsAllowedOnlyIfTheKeyIsAuthorizedAndNoEnabled": "执行条件：密钥已授权，且未命中已启用的拦截策略；任一规则命中即拦截。",
+  "messageNoInterceptionPoliciesYet": "还没有拦截策略",
+  "messageCreateAPolicyToBlockMcpCommandsOrFileOperationsThatMatchIts": "新增策略后，命中规则的 MCP 命令或文件操作会被拦截。",
+  "messageNoMatchingResults": "筛选无结果",
+  "messageNoInterceptionPoliciesMatchTheCurrentFilters": "当前筛选条件下没有匹配的拦截策略。",
+  "messageResetFilters": "重置筛选条件",
+  "messageDisablePolicy": "停用策略",
+  "messageEditPolicy": "编辑策略",
+  "messageViewMatchingAuditRecords": "命中审计",
+  "messageAllKeys": "全部密钥",
+  "messageIncludesKeysAddedLater": "含后续新增密钥",
+  "messageToday2": "今天",
+  "messageLastDays": "最近 7 天",
+  "messageLastDays2": "最近 30 天",
+  "messagePermissionDeniedAuthenticationFailed": "权限拒绝 / 认证失败",
+  "messageNoAuditRecordsMatchTheCurrentFilters": "当前筛选条件下没有匹配的审计记录。",
+  "messageDaysHours": "41 天 6 小时",
+  "messageDaysHours2": "28 天 3 小时",
+  "messageDaysHours3": "64 天 2 小时",
+  "messageDaysHours4": "17 天 4 小时",
+  "messageDaysHours5": "12 天 4 小时",
+  "messageDaysHours6": "23 天 8 小时",
+  "messageDaysHour": "3 天 1 小时",
+  "messageDaysHours7": "78 天 9 小时",
+  "messageDaysHours8": "9 天 5 小时",
+  "messageSessionDisconnected2": "会话已断开。",
+  "messageResizeTerminalPanes": "调整终端分屏比例",
+  "messageTransferStorageIsUnavailable": "传输存储不可用",
+  "messageChooseSshShortcutTarget": "选择 SSH 快捷目标",
+  "messageFtpUsesASeparateLoginSelectASavedSshHostToSwitchBetween": "FTP 使用独立登录。选择已有 SSH 主机后，本次会话可双向跳转。",
+  "messageSshShortcutTargetScrollbar": "SSH 快捷目标滚动条",
+  "messageCloseSessionSettings": "关闭会话设置",
+  "messageSessionFormScrollbar": "会话表单滚动条",
+  "messageEditSession2": "编辑会话",
+  "messageNewFtpSftpSession": "新建 FTP/SFTP 会话",
+  "messageNewSshSession": "新建 SSH 会话",
+  "messageTerminalSessionAppearsUnderSessionsAfterSaving": "终端会话 · 保存后出现在左侧「会话」",
+  "messageFileTransferSessionAppearsUnderSitesAfterSaving": "文件传输会话 · 保存后出现在左侧「站点」",
+  "messageEncryptedTransferOverSsh": "基于 SSH，加密传输",
+  "messageClassicFtpWithOptionalTls": "经典 FTP，可选 TLS",
+  "messageOptionalDefaultsToHostname": "可选，默认用主机名",
+  "messageAuthenticationMethod": "认证方式",
+  "messageAnonymous": "匿名",
+  "messageSaveInSystemCredentialStore": "保存在系统钥匙串",
+  "messageManage": "管理…",
+  "messageSshAgentNotDetectedSshAuthSock": "未检测到 ssh-agent（SSH_AUTH_SOCK）",
+  "messageConnectionGateway": "连接网关",
+  "messageGroup": "分组",
+  "messageNewGroupName": "新建分组名称",
+  "messageNewGroup2": "新建分组…",
+  "messagePrivateKeyPassphraseLeaveBlankIfNone": "私钥口令（无则留空）",
+  "messageSelectAPrivateKey": "请选择私钥",
+  "messageImportPrivateKey2": "导入私钥…",
+  "messageSaveOnly": "仅保存",
+  "messageSaveAndConnect": "保存并连接",
+  "messageChooseLocalDirectory2": "选择本地目录：%w",
+  "messageAdvanced": "高级",
+  "messageRemoteSystem": "远端系统",
+  "messageDetectAutomatically": "自动识别",
+  "messageKeepaliveSeconds": "Keepalive 秒",
+  "messageSecondsDisablesKeepalive": "秒 · 0 为关闭",
+  "messageInitialCommand": "初始命令",
+  "messageTerminalColorScheme": "终端配色",
+  "messageEnvironmentVariables": "环境变量",
+  "messageUseGlobalSetting": "跟随全局",
+  "messageEnvironmentVariableKeyValue": "环境变量 KEY=VALUE",
+  "messageUseTheFormatKeyValue": "格式应为 KEY=VALUE",
+  "messageRemoteDirectory": "远程目录",
+  "messageDirectoryOpenedAfterConnectingLeaveBlankForTheLoginDirectory": "连接后打开的目录，留空 = 登录目录",
+  "messageOpenedWhenShowingTheLocalPaneLeaveBlankForTheDefaultInSettings": "展开本地面板时打开，留空 = 设置里的默认目录",
+  "messageFilenameEncoding": "文件名编码",
+  "messageTransferMode": "传输模式",
+  "messagePassivePasv": "被动 (PASV)",
+  "messageActivePort": "主动 (PORT)",
+  "messageFtpMode": "FTP 模式",
+  "messageUnencryptedPasswordsCanBeIntercepted": "明文传输，密码可被截获",
+  "messageAuthTlsUsesTheSamePort": "AUTH TLS，端口不变",
+  "messageImplicitTlsDefaultPort": "隐式 TLS 默认端口 990",
+  "messageEncryption": "加密",
+  "messageNone": "无",
+  "messageExplicitTls": "显式 TLS",
+  "messageImplicitTls": "隐式 TLS",
+  "messageAllDefaults": "均为默认",
+  "messageUnencrypted": "无加密",
+  "messageEnterAHost": "请填写主机",
+  "messageInvalidHostFormat": "主机格式不正确",
+  "messagePortMustBeBetweenAnd": "端口需在 1–65535 之间",
+  "messageEnterAUsername": "请填写用户名",
+  "messageSeconds": "0–3600 秒",
+  "messageASessionWithThisNameAlreadyExistsInThisGroup": "此分组已有同名会话",
+  "messageEnterAGroupName": "请填写分组名称",
+  "messageUnableToReadSavedPassword": "无法读取已保存的密码",
+  "messageConnecting": "正在连接…",
+  "messageUnableToReadTheSourceSessionPassword": "读取来源会话密码失败",
+  "messageUnableToSaveCredentials": "保存凭据失败",
+  "messageUnableToSaveSession": "保存会话失败",
+  "messageTheSavedPasswordHasChangedEnterItAgainForThisSession": "保存的密码已更新，请为此会话重新输入：%w",
+  "messageInvalidSavedSessionCredentialFormat": "保存的会话凭据格式无效",
+  "messageTheSavedPasswordDoesNotMatchThisSessionSnapshotEnterItAgain": "保存的密码与此会话快照不匹配，请重新输入：%w",
+  "messageReadSessionPassword": "读取会话密码：%w",
+  "messageTheSavedPasswordForThisSessionIsNoLongerAvailableEnterItAgain": "此会话保存的密码已不可用，请重新输入：%w",
+  "messageRemoteHostCatalog": "远程主机目录",
+  "messageSearchHostsAddressesOrOperatingSystems": "搜索主机、地址或系统",
+  "messageSearchHostsOrTags": "搜索主机、标签",
+  "messageRemoteSessions": "远程会话",
+  "messageFileSiteCatalog": "文件站点目录",
+  "messageSearchSitesAddressesOrOperatingSystems": "搜索站点、地址或系统",
+  "messageSearchSitesOrTags": "搜索站点、标签",
+  "messageUnableToSaveGroup": "保存分组失败",
+  "messageUnableToDeleteGroup": "删除分组失败",
+  "messageSettingsContentScrollbar": "设置内容滚动条",
+  "messageColorSchemeMode": "配色方案模式",
+  "messageCursorStyle": "光标样式",
+  "messageUnableToChooseLocalDirectory": "选择本地目录失败：",
+  "messageUnableToChooseLocalDirectory2": "选择本地目录失败",
+  "messageReadSettings": "读取设置：%w",
+  "messageInvalidInterfaceLanguage": "无效的界面语言",
+  "messageSettingsMapsCannotBeNull": "设置映射不能为 null",
+  "messageUnsupportedSettingsVersion": "不支持的设置版本 %d",
+  "messageInvalidAppTheme": "无效的应用主题",
+  "messageInvalidReducedMotionSetting": "无效的减少动态效果设置",
+  "messageInvalidTabCloseSetting": "无效的选项卡关闭设置",
+  "messageInvalidFileConflictSetting": "无效的文件冲突设置",
+  "messageInvalidTerminalBackgroundSource": "无效的终端背景来源",
+  "messageInvalidTerminalColorSchemeMode": "无效的终端配色模式",
+  "messageTheTerminalColorSchemeDoesNotExist": "终端配色不存在",
+  "messageTheLightOrDarkTerminalColorSchemeDoesNotExist": "浅色或深色终端配色不存在",
+  "messageConcurrentTransfersMustBeBetweenAnd": "同时传输数必须在 1–8 之间",
+  "messageScrollbackMustBeBetweenAndLines": "回滚行数必须在 1000–200000 之间",
+  "messageInvalidAccentColor": "无效的强调色：%w",
+  "messageInvalidShortcut": "无效的快捷键 %q",
+  "messageUnableToSaveSettings": "保存设置失败",
+  "messageTheOriginalSettingsCouldNotBeReadOverwritingBlocked": "原设置读取失败，已阻止覆盖：%w",
+  "messageGhosttyVtAndNativeDependencies": "Ghostty VT 及原生依赖",
+  "messagePkgSftpAndKrFs": "pkg/sftp 及 kr/fs",
+  "messageGoStandardLibraryGolangOrgXSys": "Go 标准库 / golang.org/x/sys",
+  "messageModerncSqliteAndRuntimeDependencies": "modernc SQLite 及运行依赖",
+  "messageMcpGoSdkAndRuntimeDependencies": "MCP Go SDK 及运行依赖",
+  "messageSimpleIconsOperatingSystemLogos": "Simple Icons 16.35.0（系统 logo）",
+  "messageBurrowVersion": "版本 Burrow",
+  "messageLicenseTextScrollbar": "许可证正文滚动条",
+  "messageUsedByARecoverableSession": "可恢复的会话正在使用",
+  "messageUsedByAConnectionSnapshot": "连接快照正在使用",
+  "messageUnableToDeleteColorScheme": "删除配色失败",
+  "messageProcessingColorScheme": "正在处理配色",
+  "messageColorSchemeFileNotFound": "找不到配色文件 %q",
+  "messageThisIsYourFirstConnectionToThisServerVerifyTheHostKeyFingerprint": "首次连接此服务器。请与服务器管理员核对主机密钥指纹后再信任。",
+  "messageUsedOnlyForThisConnectionAndNotSavedInTheConfiguration": "仅用于本次连接，不保存到配置。",
+  "messageTrustAndConnect": "信任并连接",
+  "messageSshInteractiveAuthentication": "SSH 交互认证",
+  "messageEnterSshPassword": "输入 SSH 密码",
+  "messageReadPrivateKeyPassphrase": "读取私钥口令：%w",
+  "messageEnterPrivateKeyPassphrase": "输入私钥口令",
+  "messageUnsupportedSshAuthenticationMethod": "不支持的 SSH 认证方式 %q",
+  "messageTrustTheServerSHostKey": "信任服务器主机密钥？",
+  "messageSshConnectionCancelled": "SSH 连接已取消",
+  "messageConnectionFailed2": "连接失败：",
+  "messageSshSessionEnded": "SSH 会话结束：",
+  "messageUnableToStartTerminal": "无法启动终端：",
+  "messageSshTerminal": " SSH 终端",
+  "messageServerStatus": "服务器状态",
+  "messageCloseServerStatus": "关闭服务器状态",
+  "messageSelectATerminalToViewItsStatus": "选择一个终端查看状态",
+  "messageNotMonitored": "未监控",
+  "messageDoesNotSupportMonitoringYet": " 暂不支持监控",
+  "messageMonitoringMetricsAreCurrentlyAvailableOnlyForLinuxBasicInformationIsStillAvailable": "目前只有 Linux 提供监控指标，基础信息仍可查看",
+  "messageCollecting": "采集中",
+  "messageLive": "实时",
+  "messageMountInformation": "挂载信息",
+  "messageCollectionFailed": "采集失败",
+  "messageMemory": "内存",
+  "messageNetwork": "网络",
+  "messageTopProcesses": "进程 Top",
+  "messagePressEnterInTheTerminalToReconnect": "在终端中按 Enter 重新连接",
+  "messageConnecting2": "连接中",
+  "messageConnecting3": "正在连接",
+  "messageServerStatusCollectionStartsAfterConnecting": "连接后开始采集服务器状态",
+  "messageDisconnected": "已断开",
+  "messageUpdatingHostInformation": "正在更新主机基础信息…",
+  "messageUnableToRetrieveHostInformation3": "基础信息获取失败：",
+  "messageFollowsTheFocusedTerminal": "跟随当前聚焦的终端",
+  "messageAverageLoadOverAndMinutes": "1、5、15 分钟平均负载",
+  "messageLoad": "负载 1 · 5 · 15",
+  "messageTwoSamplesAreRequiredToEstablishABaseline": "需要两次采样建立基线",
+  "messageCpuUsageTrend": "CPU 使用率趋势",
+  "messageAboutMinutes": "约 2 分钟 · 0–%.0f%%",
+  "messagePeak": "峰值 %.0f%%",
+  "messageGbAvailable": "可用 %.1f GB",
+  "messageDisk": "磁盘",
+  "messageDefaultRouteInterface": "默认路由接口",
+  "messageDownload3": "↓ 下行",
+  "messageUpload3": "↑ 上行",
+  "messageTrend": "趋势",
+  "messageUp": "运行 ",
+  "messageUptime2": "运行时间",
+  "messageMonitoringCollectionFailed": "监控采集失败：",
+  "messageDiskCapacity": "磁盘容量",
+  "messageUnavailable": "不可用：",
+  "messageDH": "%d 天 %d 小时",
+  "messageHMin": "%d 小时 %d 分",
+  "messageDHMin": "%d 天 %d 小时 %d 分",
+  "messageSelectAHostToStartASession": "选择一台主机，开始会话",
+  "messageDragAHostFromTheSidebarIntoATerminalPane": "左侧主机可拖入终端窗格",
+  "messageAddSshHost": "添加 SSH 主机",
+  "messageDragPane": "拖动窗格 ",
+  "messageSplit": "分栏 ",
+  "messageMaximizePane": "放大窗格 ",
+  "messageRestorePane": "恢复窗格 ",
+  "messageClosePane2": "关闭窗格 ",
+  "messageLatency": "延迟",
+  "messageImportTerminalColorScheme": "导入终端配色",
+  "messageChooseAGhosttyColorSchemeFile": "选择 Ghostty 格式的配色文件",
+  "messageBuiltInColorSchemeCannotBeOverwrittenChangeItsNameBeforeImporting": "内置配色 %q 不能覆盖，请修改 name 后导入",
+  "messageTheSourcePaneIsHiddenUsingAnIndependentTerminalStateSnapshot": "源窗格未显示，使用独立终端状态快照",
+  "messageTheSourceTerminalHasNoRenderedContentYetUsingAnIndependentTerminalState": "源终端尚无已绘制正文，使用独立终端状态快照",
+  "messageUnableToCaptureSourceTerminal": "捕获源终端失败：",
+  "messageUnableToCropSourceTerminal": "裁切源终端失败：",
+  "messageTerminalContentExtendsBeyondTheCapturedWindow": "终端正文超出所捕获窗口范围",
+  "messageUnableToDisplayTerminalSnapshot": "无法显示终端快照：",
+  "messageTerminalScrollbar": "终端滚动条",
+  "messageCollapseSessionSidebar": "收起会话栏",
+  "messageExpandSessionSidebar": "展开会话栏",
+  "messageServerMonitoring": "服务器监控",
+  "messageDisconnectedReconnectFromTheMenu": "已断开 · 可从菜单重新连接",
+  "messageCloseTab2": "关闭标签 ",
+  "messageDragTab": "拖动标签 ",
+  "messageTransferCancelled": "传输已取消",
+  "messageMcpServiceStopped": "MCP 服务已停止",
+  "messageSaveTransferCheckpoint": "保存传输检查点：%w",
+  "messageUnableToCleanUpTemporaryFilesAfterCancellation": "取消后的临时文件清理失败：",
+  "messageTemporaryFilesAwaitingCleanupAfterCancellation": "取消后的临时文件等待清理",
+  "messageDirectoryNestingIsTooDeepTransferStopped": "目录层级过深，已停止传输",
+  "messageSymbolicLinksAreNotFollowedRecursively": "符号链接不会被递归跟随：%s",
+  "messageTransferringSpecialFilesIsNotSupported": "不支持传输特殊文件：%s",
+  "messageInvalidFileSize": "文件大小无效：%s",
+  "messageTheDirectoryResponseContainsInvalidOrDuplicateFilenames": "目录响应包含无效或重复文件名",
+  "messageTheTotalTransferSizeExceedsTheSupportedRange": "传输总大小超过支持范围",
+  "messageTheSourceFileChangedDuringTransfer": "源文件在传输期间已改变：%s",
+  "messageTheDestinationIsNotARegularDirectory": "目标不是普通目录：%s",
+  "messageUnableToVerifyTheExistingDestinationSPermissionsOverwritingBlocked": "无法确认已有目标的权限，未执行覆盖：%s",
+  "messageThisConnectionCannotSafelyCreateAPrivateTemporaryFileBeforeUploadingOverwritingThe": "此连接无法在上传前安全创建私有临时文件，未执行受限权限文件的覆盖：%s",
+  "messagePrivateStagingDirectoryPermissionsChangedUploadWillNotContinue": "私有暂存目录权限已改变，拒绝继续上传",
+  "messageThePreviousTemporaryFileIsOutsideThePrivateDirectoryTheRestrictedDestinationCannot": "旧临时文件不在私有目录中，不能安全覆盖受限目标",
+  "messageTheTemporaryFilenameIsTheSameAsTheDestination": "临时文件名称与目标相同",
+  "messageTheTemporaryFilenameIsAlreadyInUse": "临时文件名称已被占用",
+  "messageTheSourceFileSizeChangedDuringTransfer": "源文件大小在传输期间已改变：%s",
+  "messageTheDestinationTemporaryFileSizeDoesNotMatch": "目标临时文件大小不匹配：%s",
+  "messageUnableToCommitTransferredFile": "提交传输文件失败：%w",
+  "messageTheCommitResultIsUncertainRetryingWillVerifyTheStagedFileAndDestination": "提交结果不确定，重试时将核对暂存文件和目标：%w",
+  "messageInvalidTemporaryFileState": "临时文件状态无效：%s",
+  "messageTheVerifiedTemporaryFileHasChanged": "已验证的临时文件已改变：%s",
+  "messageTheRecordedPartialFileHasChanged": "已记录的部分文件已改变：%s",
+  "messageTheStagedFileHasNoVerifiableCheckpoint": "暂存文件缺少可验证的检查点",
+  "messageInvalidTransferPrefixCheckpoint": "传输前缀检查点无效",
+  "messageUnableToVerifyTheTransferredPortionItWasNotReused": "无法校验已传部分，未继续复用：%s：%w",
+  "messageTheTransferredContentHasChangedItWasNotReused": "已传部分的内容已改变，未继续复用：%s",
+  "messageThePartialFileChangedDuringVerification": "部分文件在核对期间已改变：%s",
+  "messageUnableToPreserveDestinationPermissionsFileNotCommitted": "保留目标权限失败，未提交：%s：%w",
+  "messageTheStagedFileHasChangedFileNotCommitted": "暂存文件已改变，未提交：%s",
+  "messageTheDestinationIsNotARegularFileOverwritingBlocked": "目标不是普通文件，未执行覆盖：%s",
+  "messageTheDestinationDoesNotSupportPreservingFilePermissionsFileNotCommitted": "目标不支持保留文件权限，未提交：%s",
+  "messageUnableToVerifyStagedFilePermissionsFileNotCommitted": "无法确认暂存文件权限，未提交：%s",
+  "messageTheVerificationFileSizeHasChanged": "核对文件大小已改变：%s",
+  "messageTheCompletedDestinationHasChangedQueueItAgain": "已完成目标已改变，请重新排队：%s：%w",
+  "messageTheCompletedDestinationTypeOrSizeHasChangedQueueItAgain": "已完成目标类型或大小已改变，请重新排队：%s",
+  "messageTheCommitResultIsStillUncertainVerifyItThenRetryOrCancelAnd": "提交结果仍不确定，请核对后重试或取消并重新排队：%s：%w",
+  "messageTheStagedFileTypeOrSizeHasChanged": "暂存文件类型或大小已改变",
+  "messageTheVerifiedStagedFileHasChanged": "已验证的暂存文件已改变",
+  "messageNeitherTheStagedFileNorTheDestinationExists": "暂存文件和目标都不存在",
+  "messageTheDestinationTypeOrSizeDoesNotMatch": "目标类型或大小不匹配",
+  "messageTheCommitCheckpointIsMissingItsDigest": "提交检查点缺少摘要",
+  "messageUnableToReadBackTheDestinationForVerification": "无法读回目标核对：%w",
+  "messageTheDestinationChangedDuringVerification": "目标在核对期间已改变",
+  "messageTheDestinationContentsDoNotMatch": "目标内容不匹配",
+  "messageDestinationContentsVerifiedButTheStagedCopyCouldNotBeCleanedUp": "目标内容已确认，但暂存副本清理失败：%w",
+  "messageTheDestinationHasADifferentTypeOrIsASymbolicLinkChooseKeep": "目标类型不同或为符号链接，请选择保留两者：%s",
+  "messageTheTemporaryFileWasReplacedDeletionBlocked": "临时文件已被替换，未执行删除",
+  "messageThePrivateStagingDirectoryWasReplacedCleanupBlocked": "私有暂存目录已被替换，未执行清理",
+  "messageTransferHistoryCouldNotBeReadOverwritingBlocked": "传输记录读取失败，已阻止覆盖：%w",
+  "messageTheTransferHistoryDirectoryIsUnavailable": "传输记录目录不可用",
+  "messageInvalidTransferHistoryState": "传输记录状态无效：%w",
+  "messageMcpTransferOwnershipDoesNotMatchTheQueue": "MCP 传输归属与队列不一致",
+  "messageInvalidTransferSessionSnapshot": "无效的传输会话快照",
+  "messageInvalidTransferSessionProtocol": "传输会话协议无效",
+  "messageInvalidTransferAuthenticationMethod": "传输认证方式无效",
+  "messageInvalidTransferPrivateKeyReference": "传输私钥引用无效",
+  "messageInvalidTransferKeepalive": "传输Keepalive无效",
+  "messageInvalidTransferRemoteSystem": "传输远端系统无效",
+  "messageInvalidTransferFilenameEncoding": "传输文件名编码无效",
+  "messageInvalidFtpTransferOptions": "FTP传输选项无效",
+  "messageInvalidTransferHistoryVersionOrCount": "传输记录版本或计数无效",
+  "messageInvalidTransferBatch": "传输批次无效",
+  "messageDuplicateOrInvalidTransferConnectionId": "传输连接ID重复或无效",
+  "messageTransferJumpHostSnapshotsContainALoop": "传输跳板机快照成环",
+  "messageInvalidTransferGatewaySnapshotOrder": "传输网关快照顺序无效",
+  "messageInvalidTransferGatewaySnapshotCount": "传输网关快照数量无效",
+  "messageTheTransferConnectionTargetDoesNotMatchItsSnapshot": "传输连接目标与快照不同",
+  "messageDuplicateOrInvalidTransferFileSessionId": "传输文件会话ID重复或无效",
+  "messageInvalidFileSessionIdForTransfer": "传输所属文件会话标识无效",
+  "messageInvalidTransferBrowsingPath": "传输浏览路径无效",
+  "messageInvalidTransferSourceSessionId": "传输来源会话ID无效",
+  "messageFtpCannotReferenceAnSshConnection": "FTP不能引用SSH连接",
+  "messageTheSftpConnectionSnapshotDoesNotMatch": "SFTP连接快照不匹配",
+  "messageInvalidMcpTransferIdentity": "MCP 传输身份无效",
+  "messageInvalidTransferTaskRecord": "传输任务记录无效",
+  "messageATransferTaskWithoutAManifestContainsPartialFiles": "无清单的传输任务包含部分文件",
+  "messageInvalidTransferRootDirectoryPath": "传输根目录路径无效",
+  "messageTheTransferSourceNameDoesNotMatchTheManifest": "传输源名称与清单不一致",
+  "messageTheDisplayedTransferDestinationDoesNotMatchTheManifest": "传输显示目标与清单不一致",
+  "messageTransferManifestTotalsDoNotMatch": "传输清单总量不一致",
+  "messageACompletedTransferStillHasAnIncompleteManifest": "已完成传输仍有未完成清单",
+  "messageTheTransferTemporaryFileSetDoesNotMatch": "传输临时文件集合不匹配",
+  "messageATransferTemporaryFileIsNotInTheManifest": "传输临时文件不属于清单",
+  "messageInvalidTransferManifestNode": "传输清单节点无效",
+  "messageInvalidTransferCommitPhase": "传输提交阶段无效",
+  "messageInvalidTransferContentBaseline": "传输内容基线无效",
+  "messageInvalidTransferStagingBaseline": "传输暂存基线无效",
+  "messageInvalidTransferPartialFileBaseline": "传输部分文件基线无效",
+  "messageTheTransferCommitIsMissingAVerifiedBaseline": "传输提交缺少已验证基线",
+  "messageTheTransferDestinationEscapesItsDirectory": "传输目标越过所属目录",
+  "messageThePrivateStagingDirectoryEscapesItsDestination": "私有暂存目录越过所属目标",
+  "messageInvalidTransferPartialFilePath": "传输部分文件路径无效",
+  "messageInvalidTransferConflictBaseline": "传输冲突基线无效",
+  "messageTheFileManifestContainsChildNodesOrAnIncorrectSize": "文件清单包含子节点或错误大小",
+  "messageACompletedFileHasNoDestinationPath": "已完成文件没有目标路径",
+  "messageACompletedDirectoryHasNoDestinationPath": "已完成目录没有目标路径",
+  "messageASkippedDirectoryAlreadyContainsDestinationState": "跳过目录已包含目标状态",
+  "messageTheTransferManifestContainsDuplicateOrInvalidChildNodes": "传输清单包含重复或无效子节点",
+  "messageASkippedDirectoryContainsProcessedChildren": "跳过目录包含已处理子项",
+  "messageAChildDestinationHasNoParentDirectory": "子节点目标没有所属目录",
+  "messageTransferManifestSizeOverflow": "传输清单大小溢出",
+  "messageACompletedDirectoryStillHasIncompleteChildren": "已完成目录仍有未完成子项",
+  "messageDirectoryManifestTotalSizesDoNotMatch": "目录清单总大小不一致",
+  "messageASkippedDirectoryContainsCommittedChildren": "跳过目录包含已提交子项",
+  "messageTheExportDestinationMustBeARegularFile": "导出目标必须是普通文件",
+  "messageCleanUpExportStagingFile": "回收导出暂存文件：%w",
+  "messageExportPrivateKey3": "导出私钥：%w",
+  "messagePrivateKeyExported": "私钥已导出",
+  "messageMigratingPrivateKey": "迁移私钥「",
+  "messageRequiresItsOriginalPassphrase": "」需要原私钥口令",
+  "messageMigratingSession": "迁移会话「",
+  "messageRequiresTheMissingSavedPasswordToBeEnteredAgain": "」需要重新输入已丢失的保存密码",
+  "messageTheReEnteredPasswordOrPreviousCredentialVersionIsInvalid": "重新输入的密码或旧凭据版本无效",
+  "messageMigratePasswordForSession": "迁移会话「%s」的密码：%w",
+  "messageInvalidLegacySessionCredentialFormat": "旧会话凭据格式无效",
+  "messageInvalidLegacyManagedPrivateKeyPath": "旧托管私钥路径无效",
+  "messageMigratePrivateKey": "迁移私钥「%s」：%w",
+  "messageALegacyManagedPrivateKeyMustBeARegularFile": "旧托管私钥必须是普通文件",
+  "messageVerifyPrivateKey": "验证私钥「%s」：%w",
+  "messageTheMigratedPublicKeyDoesNotMatchTheSavedFingerprint": "迁移私钥公钥与已保存指纹不匹配",
+  "messageUnableToSaveWorkspace": "保存工作区失败",
+  "messageUpdateTerminalScrollback": "更新终端回滚行数：%w",
+  "messageUnableToReadMacosHostnameOrKernelVersion": "无法读取 macOS 主机名或内核版本",
+  "messageOtherSystem": "其他系统",
+  "messageMonitoringIsNotSupportedOnThisSystemYet": "该系统暂不支持监控",
+  "messageUnableToDetectTheRemoteSystemSetItManuallyInSessionSettings": "无法识别远端系统，可在会话设置中手动指定：%w",
+  "messageUnableToDetectTheRemoteSystemSetItManuallyInSessionSettingsUname": "无法识别远端系统，可在会话设置中手动指定：uname 无输出",
+  "messageTheSftpRootMountDoesNotMatchTheCurrentSshSession": "SFTP 根挂载与当前 SSH 会话不一致",
+  "messageTheServerReturnedUnrecognizedMonitoringData": "服务器返回了无法识别的采集数据",
+  "messageTheServerReturnedDuplicateMonitoringRecords": "服务器返回了重复的采集记录",
+  "messageLoad2": "负载",
+  "messageProcessCount": "进程数量",
+  "messageUnableToReadLinuxHostnameOrKernelVersion": "无法读取 Linux 主机名或内核版本",
+  "messageTheServerReturnedUnrecognizedWindowsInformation": "服务器返回了无法识别的 Windows 基础信息",
+  "messageUnableToReadWindowsInformation": "读取 Windows 基础信息失败：",
+  "messageUnableToReadWindowsHostnameOrSystemVersion": "无法读取 Windows 主机名或系统版本",
+  "messageAccessKeyHidden": "[已隐藏授权密钥]",
+  "messageAuthenticationInformationHidden": "[已隐藏认证信息]",
+  "messageTheRequestBodyIsNotValidJsonOrExceedsTheSizeLimit": "请求正文不是有效的 JSON 或超过大小限制",
+  "messageTheResponseExceedsTheAuditSizeLimitItsIncompleteBodyWasNotSaved": "响应超过审计大小上限，未保存不完整正文",
+  "messageTheMcpProtocolRequestFailedSeeResponseDetails": "MCP 协议请求失败，请查看响应详情",
+  "messageTheToolRequestFailedSeeResponseDetails": "工具请求失败，请查看响应详情",
+  "messageInvalidMcpListenerOrRetentionConfiguration": "无效的 MCP 监听或保留配置",
+  "messageMcpCurrentlyOnlySupportsListeningOnALocalLoopbackAddress": "MCP 首版只允许监听本机回环地址",
+  "messageMissingAccessKey": "缺少授权密钥",
+  "messageUnknownClient": "未知客户端",
+  "messageEnterAValidPolicyNameUpToBytes": "请填写有效的策略名称（最多 200 字节）",
+  "messageSelectApplicableConnectionsOrUseAllConnections": "请选择适用连接或使用全部连接",
+  "messageAPolicyCanApplyToAtMostConnections": "适用连接最多 1000 个",
+  "messageSelectApplicableKeys": "请选择适用密钥",
+  "messageTheNumberOfCommandRulesMustBeBetweenAnd": "命令规则数量必须为 1 至 100",
+  "messageTheCommandRuleIsEmptyOrTooLong": "命令规则为空或超长",
+  "messageOnlyCommandMatchingSupportsCaseInsensitiveArguments": "仅命令匹配支持忽略参数大小写",
+  "messageInvalidRegularExpression2": "正则表达式无效：%w",
+  "messageInvalidCommandMatchMode": "无效的命令匹配类型",
+  "messageInvalidFilePolicyOrNumberOfRules": "无效的文件策略或规则数量",
+  "messageInvalidFilePathRule": "无效的文件路径规则",
+  "messageRemoteRulesMustUseAbsolutePaths": "远端规则必须使用绝对路径",
+  "messageInvalidFileActionType": "无效的文件操作类型",
+  "messageCaseInsensitiveArguments": "（参数忽略大小写）",
+  "messagePolicyRule": "策略「%s」的规则 %s",
+  "messageTheSavedPolicyIsInvalidExecutionDenied": "已保存的策略无效，拒绝执行",
+  "messageConservativelyMatchedByKeyword": " 按关键词从严命中（%s）：%q",
+  "messageMatchedCommand": " 命中命令 %q",
+  "messageExactlyMatchesTheFullCommand": " 与整条命令完全一致",
+  "messageMatchedEmptyTextAtByte": " 在第 %d 字节处匹配到空文本",
+  "messageMatchedIn": " 命中 %q（位于 %q）",
+  "messageMatched": " 命中 %q",
+  "messageCommandDeniedByInterceptionPolicy": "命令被拦截策略拒绝：",
+  "messageUnableToVerifyTheActualLocationOfTheProtectedPath": "无法核实被保护路径的实际位置",
+  "messageUnableToVerifyTheActualPathOfTheInterceptionRule": "无法核实拦截规则的实际路径",
+  "messagePolicyRuleBlocksActualPathIsProtected": "策略「%s」的规则 %s 禁止 %s，实际路径 %q 受保护",
+  "messageFileOperationDeniedByInterceptionPolicy": "文件操作被拦截策略拒绝：",
+  "messageLocalTransferPathsCannotTraverseSymbolicLinks": "本地传输路径不能经过符号链接",
+  "messageTheLocalPathIsOutsideThisKeySAuthorizedDirectories": "本地路径不在该密钥授权目录内",
+  "messageMcpStorageIsUnavailableNewOperationsAreBlocked": "MCP 存储不可用，已阻止新的操作",
+  "messageInvalidAccessKey": "无效的授权密钥",
+  "messageEnterAValidKeyNameUpToBytes": "请填写有效的密钥名称（最多 200 字节）",
+  "messageAnAuthorizedConnectionIsMissingOrDuplicated": "授权连接不存在或重复",
+  "messageTheConnectionProtocolDoesNotMatchTheGrantedCapabilities": "连接协议与授权能力不匹配",
+  "messageConnectionDetailsChangedConfirmAuthorizationAgain": "连接信息已变更，请重新确认授权",
+  "messageARevokedKeyCannotBeRestored": "已撤销的密钥不可恢复",
+  "messageInvalidKeyState": "无效的密钥状态",
+  "messageTheKeyNoLongerExistsRefreshAndTryAgain": "密钥已不存在，请刷新后重试",
+  "messageAPolicyConnectionDoesNotExistOrHasAnIncompatibleProtocol": "策略适用连接不存在或协议不匹配",
+  "messageTheNumberOfPolicyConnectionsExceedsTheLimit": "策略适用连接超过限制",
+  "messageThePolicyNoLongerExistsRefreshAndTryAgain": "策略已不存在，请刷新后重试",
+  "messageTheAccessKeyIsNoLongerValidOrTheServiceHasStoppedAccepting": "授权密钥已失效或服务已停止接收操作",
+  "messageTheConnectionIsUnauthorizedPermissionsAreInsufficientOrTheEndpointIdentityHasChanged": "连接未获授权、权限不足或端点身份已改变",
+  "messageLocalPathCannotBeEmpty": "本地路径不能为空",
+  "messageLocalPathMustBeAbsolute": "本地路径必须是绝对路径",
+  "messageToolArgumentsMustBeAJsonObject": "工具参数必须是 JSON 对象",
+  "messageUnsupportedToolArgument": "包含不支持的工具参数",
+  "messageMissingRequiredToolArgument": "缺少必需工具参数",
+  "messageIncorrectToolArgumentType": "工具参数类型不正确",
+  "messageArgumentsExceedServerLimits": "参数超过服务端限制",
+  "messageTheCommandPathOrTextExceedsLimitsOrContainsInvalidCharacters": "命令、路径或文本超过限制或含无效字符",
+  "messageCommandCannotBeEmpty": "命令不能为空",
+  "messageRemotePathMustBeAbsolute": "远端路径必须是绝对路径",
+  "messageWriteModeMustBeCreateOrReplace": "写入模式必须为 create 或 replace",
+  "messageSpecifyAnErrorOverwriteSkipOrRenameConflictPolicy": "必须指定 error、overwrite、skip 或 rename 冲突策略",
+  "messageTheMaximumNumberOfConcurrentMcpCallsHasBeenReached": "MCP 同时执行的调用已达到上限",
+  "messageTheAccessKeyIsInvalidOrMcpStorageIsUnavailable": "授权密钥无效或 MCP 存储不可用",
+  "messageUnsupportedTool": "不支持的工具",
+  "messageThisConnectionDoesNotSupportSshCommands": "该连接不支持 SSH 命令",
+  "messageCommandOutputExceededTheServerLimitAndWasTruncated": "命令输出超过服务端限制，输出已截断",
+  "messageFileToolsDoNotFollowSymbolicLinks": "文件工具不跟随符号链接",
+  "messageOnlyRegularTextFilesCanBeRead": "只能读取普通文本文件",
+  "messageTheRequestedRangeIsNotValidUtfText": "读取范围不是有效的 UTF-8 文本",
+  "messageTheTaskDoesNotExistOrDoesNotBelongToThisKey": "任务不存在或不属于当前密钥",
+  "messageAuditStorageFailedThisQueryOrCancellationCouldNotBePersisted": "审计存储故障；本次查询或取消未能落盘",
+  "messageNestingDepthOrParsingVolumeExceedsTheLimit": "嵌套层数或解析量超过上限",
+  "messageUnableToFullyParseTheCommand": "命令无法完整解析：",
+  "messageTheCommandNameCannotBeDeterminedStatically": "命令名无法静态确定",
+  "messageTheNumberOfCommandsExceedsTheLimit": "命令数量超过上限",
+  "messageStandardInput": "标准输入",
+  "messageStandardInputContainsDynamicContent": "标准输入含动态内容",
+  "messageEvalArgumentsContainDynamicContent": "eval 的参数含动态内容",
+  "messageCommandStringContainsDynamicContent": " 的命令字符串含动态内容",
+  "messageCommandContainsDynamicContent": " 的命令含动态内容",
+  "messageCCommandStringContainsDynamicContent": " -c 的命令字符串含动态内容",
+  "messageCmdCCommandContainsDynamicContent": "cmd /c 的命令含动态内容",
+  "messageArgumentsContainDynamicContent": " 的参数含动态内容",
+  "messageEncodedCommandCannotBeDecoded": " 的编码命令无法解码",
+  "messagePowershellCommandContainsDynamicContent": "PowerShell 命令含动态内容",
+  "messageUnableToParseCommandRule": "命令规则无法解析：%w",
+  "messageACommandRuleCanContainOnlyOneCommandSplitCombinedCommandsIntoSeparate": "命令规则只能包含一条命令，组合命令请拆成多条规则",
+  "messageCommandRulesCannotContainVariablesCommandSubstitutionsOrArithmeticExpansions": "命令规则不能包含变量、命令替换或算术展开",
+  "messageTheCommandRuleIsMissingACommandName": "命令规则缺少命令名",
+  "messageBurrowLocalUser": "Burrow 本地用户",
+  "messageAColorSchemeFileNamedAlreadyExists": "已存在同名配色文件 %q",
+  "messageColorSchemeNameIsAlreadyUsedByFile": "配色名称 %q 已由文件 %q 使用",
+  "messageAColorSchemeFileNamedAlreadyExistsRenameItBeforeImporting": "已存在同名配色文件 %q，请重命名后导入",
+  "messageTheColorSchemeDoesNotExist": "配色不存在",
+  "messageConnected": "已连接",
+  "messagePaused": "已暂停",
+  "messagePartiallyBlocked": "部分拦截",
+  "messagePermissionDenied": "权限拒绝",
+  "messagePartiallyFailed": "部分失败",
+  "messageRevoked": "已撤销",
+  "messageStopping": "停止中",
+  "messageInterruptedUnknown": "中断 / 未知",
+  "messageSessionBell": "会话响铃",
+  "messageNewOutput": "新输出",
+  "messageDelete3": "删除 ",
+  "messageScrollbar": "滚动条",
+  "messageConnectedDemo": " 已连接 · 演示",
+  "messageHosts2": " 台",
+  "messageConnectedMs2": "连接成功 · %d ms",
+  "messageResizeLocalPane": "调整本地面板宽度",
+  "messageBack": "后退",
+  "messageForward": "前进",
+  "messageShowPassword": "显示密码",
+  "messageHidePassword": "隐藏密码",
+  "messageCopy": "复制 ",
+  "messageCopied": "已复制",
+  "messagePreviousPage": "上一页",
+  "messageNextPage": "下一页",
+  "messageIsNotSupported": " 不支持",
+  "messageBrowse": "浏览",
+  "messageDirectoriesAndAttributes": "目录与属性",
+  "messageContentsAndTransfers": "正文与传输",
+  "messageCreateAndUpload": "新建与上传",
+  "messageModifyAndOverwrite": "修改与覆盖",
+  "messageRename3": "改名",
+  "messageToolNotAvailableYet": "工具待上线",
+  "messageMove": "移动",
+  "messageBlock2": "禁止",
+  "messageNoneAdded": "未添加",
+  "message2": "%d 个",
+  "messageAddDirectory": "添加目录",
+  "messageRemoveDirectory": "移除目录 ",
+  "messageCopyAndSaveThisKeySecurelyItsPlainTextCannotBeViewedAgain": "请复制并妥善保存密钥，关闭后无法再次查看明文。",
+  "messageCopyAccessKey": "复制授权密钥",
+  "messageCopyKey": "复制密钥",
+  "messageClientConfigurationReplaceTheKeyPlaceholder": "客户端配置（请替换密钥占位符）",
+  "messageIHaveCopiedAndSecurelySavedTheKey": "我已复制并妥善保存密钥",
+  "messageActionsMenu2": "操作菜单",
+  "messageMenuScrollbar": "菜单滚动条",
+  "messageDiscardUnsavedChanges": "放弃未保存的更改？",
+  "messageUnsavedChangesInThisWindowWillBeLostIfYouCloseIt": "关闭后将丢失此窗口中尚未保存的修改。",
+  "messageKeepEditing": "继续编辑",
+  "messageDiscardChanges": "放弃更改",
+  "messageDiscardUnsavedChanges2": "放弃未保存的更改",
+  "messageRemove": "移除 ",
+  "messageClosePane3": "关闭面板",
+  "messageCurrentDirectory": "当前目录 ",
+  "messageMainNavigation": "主导航",
+  "messageClearSearch": "清除搜索",
+  "messageOptionsScrollbar": "选项滚动条",
+  "messageMoreActionsFor": "更多操作 ",
+  "messageAscending": "升序",
+  "messageDescending": "降序",
+  "messageDataRow": "数据行",
+  "messageRowHeading": "行标题 · ",
+  "messageCurrentlySortPriority": "%s，当前%s，第%d排序条件",
+  "messageCurrently": "%s，当前%s",
+  "messageNewTab": "新建选项卡",
+  "messageDismissNotification": "关闭通知",
+  "messageTransferProgress": "传输进度",
+  "messageTransferFailed2": "传输失败",
+  "messageQueued": "排队中",
+  "messagePauseTransfer": "暂停传输",
+  "messageResumeTransfer": "继续传输",
+  "messageRetryTransfer": "重试传输",
+  "messageCancelTransfer": "取消传输",
+  "messageRemoveFailedTask": "移除失败任务",
+  "messageTheCredentialVaultIsLocked": "凭据库尚未解锁",
+  "messageTheCredentialDoesNotExist": "凭据不存在",
+  "messageUnableToConfirmTheCredentialVaultCommitResult": "无法确认凭据库提交结果：%w",
+  "messageInconsistentCredentialVaultCommitState": "凭据库提交状态不一致",
+  "messageCredentialIntegrityCheckFailed": "凭据完整性校验失败：%w",
+  "messageThisCredentialVaultRequiresMacosKeychainToUnlockRestoreItUsingItsMatching": "此凭据库需要 macOS 钥匙串解锁，请使用配套备份恢复",
+  "messageSaveKeychainUnlockKey": "保存钥匙串解锁密钥：%w",
+  "messageVerifyKeychainUnlockKey": "核对钥匙串解锁密钥：%w",
+  "messageTheSavedKeychainUnlockKeyDoesNotMatch": "钥匙串解锁密钥保存后不匹配",
+  "messageReadLocalUnlockKey": "读取本机解锁密钥：%w",
+  "messageReadAutomaticUnlockKey": "读取自动解锁密钥：%w",
+  "messageTheLocalUnlockKeyDoesNotMatchTheCredentialVault": "本机解锁密钥与凭据库不匹配",
+  "messageACommandRuleMustBeASingleSimpleCommandWithoutPipesRedirectionsVariable": "命令规则只能是一条简单命令，不能包含 &&、|、重定向、变量赋值或控制结构",
+  "commonItemCount": "{count} 项",
+  "@commonItemCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "commonFileCount": "{count} 个文件",
+  "@commonFileCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "filesDeleteSelectedConfirm": "确认删除选中的 {count} 项？",
+  "@filesDeleteSelectedConfirm": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "keysUsageCount": "被 {count} 个会话使用",
+  "@keysUsageCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "keysAgentConnectedCount": "已连接 · {count} 把密钥",
+  "@keysAgentConnectedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "keysAgentDetectedCount": "已检测到 ssh-agent · {count} 把密钥",
+  "@keysAgentDetectedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "keysSavedPasswordCount": "{count} 个会话保存了密码",
+  "@keysSavedPasswordCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "keysDeleteUsedCount": "删除（被 {count} 个会话使用）",
+  "@keysDeleteUsedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "hostsCount": "{count} 台主机",
+  "@hostsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "sitesCount": "{count} 个站点",
+  "@sitesCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsSchemesCount": "全部 {count} 种 ▾",
+  "@settingsSchemesCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "mcpSelectedConnectionsCount": "指定 {count} 个连接",
+  "@mcpSelectedConnectionsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "mcpSelectedKeysCount": "指定 {count} 个密钥",
+  "@mcpSelectedKeysCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "mcpRuleCount": "共 {count} 条规则",
+  "@mcpRuleCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "mcpKeysCount": "共 {count} 条授权密钥",
+  "@mcpKeysCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "mcpPoliciesCount": "共 {count} 条拦截策略",
+  "@mcpPoliciesCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "mcpAuditsCount": "共 {count} 条审计记录",
+  "@mcpAuditsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "sessionEnvironmentCount": "{count} 个环境变量",
+  "@sessionEnvironmentCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "mcpMergedConfigurations": "合并 {count} 条配置",
+  "@mcpMergedConfigurations": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "transferRecoverCount": "找回任务 ({count})",
+  "@transferRecoverCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "gatewaysCount": "{count} 个网关 · {active} 个使用中",
+  "@gatewaysCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "active": {
+        "type": "int"
+      }
+    }
+  },
+  "mcpPaginationSummary": "共 {count} 条 · 每页 {pageSize} 条",
+  "@mcpPaginationSummary": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "pageSize": {
+        "type": "int"
+      }
+    }
+  },
+  "mcpPageNumber": "第 {page} 页",
+  "@mcpPageNumber": {
+    "placeholders": {
+      "page": {
+        "type": "int"
+      }
+    }
+  },
+  "tableSelectionDescription": "{rows} 行，{columns} 列，已选 {selected} 项；支持多选",
+  "@tableSelectionDescription": {
+    "placeholders": {
+      "rows": {
+        "type": "int"
+      },
+      "columns": {
+        "type": "int"
+      },
+      "selected": {
+        "type": "int"
+      }
+    }
+  },
+  "filesSelectionSummary": "{total} 项 · 已选 {selected} 项（{size}）",
+  "@filesSelectionSummary": {
+    "placeholders": {
+      "total": {
+        "type": "int"
+      },
+      "selected": {
+        "type": "int"
+      },
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "gatewayConnecting": "正在连接「{name}」…",
+  "@gatewayConnecting": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "gatewayDeleteTitle": "删除网关「{name}」？",
+  "@gatewayDeleteTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "sessionDeleteTitle": "删除会话「{name}」？",
+  "@sessionDeleteTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "gatewayFollowName": "跟随「{name}」",
+  "@gatewayFollowName": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "gatewaySourceSettings": "地址、认证、Keepalive 和上游均取自 SSH 主机「{name}」及其连接网关，修改请编辑该主机。网关不执行其初始命令。",
+  "@gatewaySourceSettings": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "gatewayTestHint": "测试会{via}连接本网关，{kind, select, ssh {检查 SSH 握手、主机信任与认证} other {检查 SOCKS5 协商与认证方式}}；不访问目标主机。",
+  "@gatewayTestHint": {
+    "placeholders": {
+      "via": {
+        "type": "String"
+      },
+      "kind": {
+        "type": "String"
+      }
+    }
+  },
+  "gatewayFailureAtHop": "「{name}」：{reason}",
+  "@gatewayFailureAtHop": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "filesDropTarget": "松开以{direction, select, upload {上传} other {下载}}到 {target}",
+  "@filesDropTarget": {
+    "placeholders": {
+      "direction": {
+        "type": "String"
+      },
+      "target": {
+        "type": "String"
+      }
+    }
+  },
+  "filesPreviewSubtitle": "{source}{kind}",
+  "@filesPreviewSubtitle": {
+    "placeholders": {
+      "source": {
+        "type": "String"
+      },
+      "kind": {
+        "type": "String"
+      }
+    }
+  },
+  "actionsForName": "{name} 操作菜单",
+  "@actionsForName": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "tableSortByColumn": "按{column}排序",
+  "@tableSortByColumn": {
+    "placeholders": {
+      "column": {
+        "type": "String"
+      }
+    }
+  },
+  "tableResizeColumn": "调整{column}列宽",
+  "@tableResizeColumn": {
+    "placeholders": {
+      "column": {
+        "type": "String"
+      }
+    }
+  },
+  "mcpRetentionAction": "保留最近 {days} 天 · 清理",
+  "@mcpRetentionAction": {
+    "placeholders": {
+      "days": {
+        "type": "String"
+      }
+    }
+  },
+  "mcpOutputSummary": "stdout {stdout} · stderr {stderr} · {truncated, select, true {已截断} other {未截断}}",
+  "@mcpOutputSummary": {
+    "placeholders": {
+      "stdout": {
+        "type": "String"
+      },
+      "stderr": {
+        "type": "String"
+      },
+      "truncated": {
+        "type": "String"
+      }
+    }
+  },
+  "hostUnsupportedMacos": "不是 macOS 主机",
+  "@hostUnsupportedMacos": {
+    "placeholders": {}
+  },
+  "hostLinuxProcUnavailable": "Linux /proc 不可用",
+  "@hostLinuxProcUnavailable": {
+    "placeholders": {}
+  },
+  "mcpInterceptionHint": "该操作命中了用户设置的拦截策略。请勿通过改写、拆分、转义或换用等效命令绕过；如果任务确实需要，请向用户说明原因，由用户调整策略。",
+  "@mcpInterceptionHint": {
+    "placeholders": {}
+  },
+  "mcpPlainTextKeyName": "密钥明文（{name}）",
+  "@mcpPlainTextKeyName": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "mcpStateAccepted": "已接受",
+  "@mcpStateAccepted": {
+    "placeholders": {}
+  },
+  "mcpStateValidated": "校验通过",
+  "@mcpStateValidated": {
+    "placeholders": {}
+  },
+  "mcpStateWaiting": "等待中",
+  "@mcpStateWaiting": {
+    "placeholders": {}
+  },
+  "mcpStateWaitingUser": "等待用户确认",
+  "@mcpStateWaitingUser": {
+    "placeholders": {}
+  },
+  "mcpStateTimedOut": "已超时",
+  "@mcpStateTimedOut": {
+    "placeholders": {}
+  },
+  "mcpStateCancelled": "已取消",
+  "@mcpStateCancelled": {
+    "placeholders": {}
+  },
+  "mcpStateInterrupted": "已中断",
+  "@mcpStateInterrupted": {
+    "placeholders": {}
+  },
+  "mcpStateSkipped": "已跳过",
+  "@mcpStateSkipped": {
+    "placeholders": {}
+  },
+  "mcpStateCleaning": "正在清理",
+  "@mcpStateCleaning": {
+    "placeholders": {}
+  },
+  "mcpStateCleanupPending": "等待清理",
+  "@mcpStateCleanupPending": {
+    "placeholders": {}
+  },
+  "commonNameWithReason": "{name}（{reason}）",
+  "@commonNameWithReason": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "policyVia": "（经由 {via}）",
+  "@policyVia": {
+    "placeholders": {
+      "via": {
+        "type": "String"
+      }
+    }
+  },
+  "filesDropCount": " · {count} 项 · {size}",
+  "@filesDropCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "commonListSeparator": "、",
+  "gatewayDefaultFollowers": "跟随默认的 {count} 个会话",
+  "@gatewayDefaultFollowers": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "gatewayHopCount": "{count} 跳",
+  "@gatewayHopCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "gatewayReferencesRemain": "仍有 {count} 项引用。请先将它们改为其他网关或直连，再删除此网关。",
+  "@gatewayReferencesRemain": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "mcpAuthorizedConnections": "已授权 {granted} / {total} 个连接",
+  "@mcpAuthorizedConnections": {
+    "placeholders": {
+      "granted": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "mcpCommandGrantWarning": "已为 {count} 个连接开启命令执行。命令可直接读写远端文件，不受上方文件权限约束，仍受拦截策略限制。",
+  "@mcpCommandGrantWarning": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "mcpCancelQueuedTasks": "• 自动取消 {count} 个排队任务，并向关联的执行中任务请求取消。",
+  "@mcpCancelQueuedTasks": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "mcpStoppedTransferNotice": "MCP 服务已关闭：{count} 个后台传输任务已暂停保存；重新开启服务不会自动继续旧任务。",
+  "@mcpStoppedTransferNotice": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "sessionOpenTabsNotice": "此会话已在 {count} 个选项卡中打开，修改将在下次连接时生效。",
+  "@sessionOpenTabsNotice": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "monitorProcessesCount": "{count} 个进程 · CPU",
+  "@monitorProcessesCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "policyMatchCount": "，共 {count} 处",
+  "@policyMatchCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "groupDeleteAndMove": "删除「{group}」分组后，组内 {count} 个条目将移至「{destination}」。连接配置、已打开的会话和传输任务会保留。",
+  "@groupDeleteAndMove": {
+    "placeholders": {
+      "group": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      },
+      "destination": {
+        "type": "String"
+      }
+    }
+  },
+  "monitorCoreCount": "{count} 核",
+  "@monitorCoreCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
+}

@@ -8,10 +8,11 @@ import (
 	"strconv"
 	"time"
 
+	"sshdesk/internal/locales"
 	"sshdesk/internal/sshclient"
 )
 
-var errSSHConnectCanceled = errors.New("SSH 连接已取消")
+var errSSHConnectCanceled = locales.NewError(locales.MessageSshConnectionCancelled)
 
 // The group outlives each view's request and owns one authenticated transport.
 // All group fields and request callbacks are owned by the window thread.
@@ -83,7 +84,7 @@ func (a *app) startSSHSession(session *remoteSession, refresh bool) {
 	session.ssh, session.state = run, connecting
 	session.hasNewOutput, session.hasBell = false, false
 	h := session.endpoint
-	showSSHMessage(session, "正在连接 "+h.user+"@"+net.JoinHostPort(h.address, strconv.Itoa(h.port))+"…")
+	showSSHMessage(session, locales.MessageConnectingTo()+h.user+"@"+net.JoinHostPort(h.address, strconv.Itoa(h.port))+"…")
 	request := &sshConnectionRequest{ctx: ctx, group: session.connection}
 	run.request = request
 	request.failed = func(err error) {
@@ -96,7 +97,7 @@ func (a *app) startSSHSession(session *remoteSession, refresh bool) {
 			session.state = disconnected
 			showSSHMessage(session, err.Error())
 		} else {
-			showSSHMessage(session, "连接失败："+err.Error())
+			showSSHMessage(session, locales.MessageConnectionFailed2()+err.Error())
 		}
 		showReconnectHint(session, false)
 	}

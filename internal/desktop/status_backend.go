@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"sshdesk/internal/hostinfo"
+	"sshdesk/internal/locales"
 	"sshdesk/internal/sshclient"
 
 	"github.com/egoist/mygo/ui"
@@ -56,7 +57,7 @@ type monitorState struct {
 	next            time.Time
 	metrics         *hostinfo.Metrics
 	history         monitorHistory
-	errorText       string
+	errorText       locales.Text
 	updatedAt       time.Time
 	diskPending     bool
 	diskNext        time.Time
@@ -106,7 +107,7 @@ func (a *app) updateMonitor(c *ui.Context) {
 		platform, known := a.groupPlatform(session.connection)
 		if !known {
 			// The first connection to a host waits for platform detection.
-			if group := session.connection; !group.facts.pending && group.facts.errorText != "" {
+			if group := session.connection; !group.facts.pending && !group.facts.errorText.Empty() {
 				m.errorText = group.facts.errorText
 			}
 			return
@@ -130,7 +131,7 @@ func (a *app) updateMonitorSample(c *ui.Context) {
 	release, err := connection.Retain()
 	if err != nil {
 		m.metrics, m.history = nil, monitorHistory{}
-		m.errorText = err.Error()
+		m.errorText = locales.ErrorText(err)
 		m.next = c.Now().Add(monitorInterval)
 		c.After(monitorInterval)
 		return
@@ -153,11 +154,11 @@ func (a *app) updateMonitorSample(c *ui.Context) {
 			}
 			if err != nil {
 				m.metrics, m.history = nil, monitorHistory{}
-				m.errorText = err.Error()
+				m.errorText = locales.ErrorText(err)
 				return
 			}
 			m.metrics = &metrics
-			m.errorText, m.updatedAt = "", time.Now()
+			m.errorText, m.updatedAt = locales.Text{}, time.Now()
 			m.history.add(metrics)
 		})
 	})
@@ -211,18 +212,18 @@ func (a *app) updateMonitorDisk(c *ui.Context) {
 // monitorNotice explains failed or missing metrics. Collection progress and
 // unsupported platforms show in the panel's host indicator instead.
 func monitorNotice(m *monitorState) string {
-	if m.errorText != "" {
-		return "监控采集失败：" + m.errorText
+	if !m.errorText.Empty() {
+		return locales.MessageMonitoringCollectionFailed() + m.errorText.String()
 	}
 	if m.metrics == nil {
 		return ""
 	}
 	unavailable := append([]string(nil), m.metrics.Unavailable...)
 	if m.diskError != "" {
-		unavailable = append(unavailable, "磁盘容量")
+		unavailable = append(unavailable, locales.MessageDiskCapacity())
 	}
 	if len(unavailable) > 0 {
-		return "不可用：" + strings.Join(unavailable, "、")
+		return locales.MessageUnavailable() + strings.Join(unavailable, locales.CommonListSeparator())
 	}
 	return ""
 }
@@ -256,10 +257,10 @@ func monitorUptime(value *float64, brief bool) string {
 	minutes := int64(*value) / 60
 	days, hours := minutes/1440, minutes/60%24
 	if brief && days > 0 {
-		return fmt.Sprintf("%d 天 %d 小时", days, hours)
+		return fmt.Sprintf(locales.MessageDH(), days, hours)
 	}
 	if brief {
-		return fmt.Sprintf("%d 小时 %d 分", hours, minutes%60)
+		return fmt.Sprintf(locales.MessageHMin(), hours, minutes%60)
 	}
-	return fmt.Sprintf("%d 天 %d 小时 %d 分", days, hours, minutes%60)
+	return fmt.Sprintf(locales.MessageDHMin(), days, hours, minutes%60)
 }

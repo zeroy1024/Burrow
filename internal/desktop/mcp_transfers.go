@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"sshdesk/internal/fileclient"
+	"sshdesk/internal/locales"
 	"sshdesk/internal/mcpserver"
 	"sshdesk/internal/store"
 )
@@ -24,7 +25,7 @@ func (b *mcpDesktop) preflightTransfer(ctx context.Context, task *transferTask) 
 		return err
 	}
 	if connection.Identity != task.mcp.Identity {
-		return &mcpserver.Failure{Code: "permission_denied", Message: "任务的连接身份已改变"}
+		return &mcpserver.Failure{Code: "permission_denied", Message: locales.MessageTheTaskSConnectionIdentityHasChanged()}
 	}
 	_, err = mcpserver.AuthorizeLocal(key, local, task.sourceRemote)
 	return err
@@ -41,7 +42,7 @@ func (b *mcpDesktop) checkTransfer(ctx context.Context, task *transferTask, name
 		return err
 	}
 	if connection.Identity != owner.Identity {
-		return &mcpserver.Failure{Code: "permission_denied", Message: "传输端点身份已改变，需要重新授权"}
+		return &mcpserver.Failure{Code: "permission_denied", Message: locales.MessageTheTransferEndpointIdentityHasChangedAuthorizationIsRequiredAgain()}
 	}
 	if side == "local" {
 		if _, err := mcpserver.AuthorizeLocal(key, name, task.sourceRemote); err != nil {
@@ -155,7 +156,7 @@ func (c *mcpSourceClient) ReadDir(ctx context.Context, name string) ([]fileclien
 	entries, err := c.Client.ReadDir(ctx, name)
 	c.entries += len(entries)
 	if len(entries) > 10000 || c.entries > 100000 {
-		err = errors.New("MCP 目录超出限制（单目录 10000 条，单任务 100000 条）")
+		err = locales.NewError(locales.MessageMcpDirectoryLimitExceededEntriesPerDirectoryPerTask)
 	}
 	if auditErr := c.b.service.FileEvent(context.WithoutCancel(ctx), c.task.mcp.OperationID, name, c.side, "browse", err, 0); auditErr != nil {
 		err = errors.Join(err, auditErr)
@@ -233,7 +234,7 @@ func (a *app) mcpTaskSnapshot(task *transferTask, result error) store.MCPTask {
 			state = "completed"
 		}
 	}
-	message := task.errorText
+	message := task.errorText.String()
 	if result != nil && task.state != transferPaused {
 		message = result.Error()
 	}
@@ -292,7 +293,7 @@ func (a *app) mcpTransferChanged(task *transferTask, result error) {
 		return a.store.MCPFinish(a.ctx, op)
 	}, func(err error) {
 		if err != nil {
-			a.persistenceNotice("保存 MCP 任务失败", err)
+			a.persistenceNotice(locales.MessageUnableToSaveMcpTask, err)
 			a.mcpBackend.service.FailStorage(err)
 		}
 		a.refreshMCPBackend()

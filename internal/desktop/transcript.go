@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"sshdesk/internal/locales"
 	"sshdesk/internal/termtheme"
 	"sshdesk/internal/theme"
 
@@ -22,11 +23,14 @@ func reconnectHint(c *ui.Context, session *remoteSession) []terminalLine {
 	if len(session.transcript) == 0 && len(session.output) == 0 {
 		h := session.endpoint
 		return []terminalLine{
-			{{Text: localize(c, "会话已恢复，尚未连接。")}},
-			{{Text: fmt.Sprintf(localize(c, "按 Enter 连接 %s"), fmt.Sprintf("%s@%s:%d", h.user, h.address, h.port)), Dim: true}},
+			{{Text: locales.MessageSessionRestoredNotConnectedYet()}},
+			{{Text: fmt.Sprintf(
+				locales.MessagePressEnterToConnectTo(),
+				fmt.Sprintf("%s@%s:%d", h.user, h.address, h.port),
+			), Dim: true}},
 		}
 	}
-	return []terminalLine{{{Text: localize(c, "按 Enter 重新连接"), Dim: true}}}
+	return []terminalLine{{{Text: locales.MessagePressEnterToReconnect(), Dim: true}}}
 }
 
 func demoTranscript(h host) []terminalLine {

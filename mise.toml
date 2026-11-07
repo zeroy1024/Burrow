@@ -5,3 +5,7 @@ uv = "0.13.6"
 [tasks.build]
 description = "构建当前平台产物，可用 --platform 指定 macOS/Windows/Linux"
 run = "uv run --script scripts/build.py"
+
+[tasks.i18n]
+description = "生成语言资源并检查中英文完整性"
+run = ["go tool mygo generate", "go tool mygo i18n check", "python3 scripts/i18n.py"]

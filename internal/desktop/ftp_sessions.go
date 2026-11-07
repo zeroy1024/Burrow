@@ -5,6 +5,7 @@ import (
 	"slices"
 	"time"
 
+	"sshdesk/internal/locales"
 	"sshdesk/internal/theme"
 	"sshdesk/internal/uikit"
 
@@ -27,7 +28,7 @@ type fileSession struct {
 	transferScroll ui.ScrollState
 	host           hostID
 	state          connectionState
-	errorText      string
+	errorText      locales.Text
 	connectedAt    time.Time
 	local          *filePaneState
 	remote         *filePaneState
@@ -129,9 +130,9 @@ func (a *app) fileTitleBar(c *ui.Context, shown float32) {
 	t := theme.Current()
 	uikit.TitleBar(c).PaddingEnd(t.C.Window.Gutter).Children(func() {
 		uikit.TitleBarLeading(c, t.C.Rail.Width+(a.page().sidebarWidth+t.C.Window.Gutter)*shown).Children(func() {
-			label := "收起站点栏"
+			label := locales.MessageCollapseSiteSidebar()
 			if a.page().sidebarCollapsed {
-				label = "展开站点栏"
+				label = locales.MessageExpandSiteSidebar()
 			}
 			uikit.IconButton(c, sidebarIcon, uikit.IconButtonProps{Key: "sidebar-toggle", Label: label, Variant: uikit.IconOnWindow, Disabled: a.activeSection() == sectionSettings}).
 				OnClick(func() { a.page().sidebarCollapsed = !a.page().sidebarCollapsed })
@@ -160,7 +161,11 @@ func (a *app) fileTitleBar(c *ui.Context, shown float32) {
 					entry.Disabled = len(entry.Children) == 0
 					menu = append(menu, entry)
 				}
-				add := uikit.IconButton(c, plusIcon, uikit.IconButtonProps{Key: "新建文件会话", Label: "新建文件会话", Variant: uikit.IconOnWindow})
+				add := uikit.IconButton(
+					c,
+					plusIcon,
+					uikit.IconButtonProps{Key: locales.MessageNewFileSession(), Label: locales.MessageNewFileSession(), Variant: uikit.IconOnWindow},
+				)
 				uikit.MenuOn(c, add, menu)
 			},
 		})
@@ -176,15 +181,15 @@ func (a *app) fileTabButton(c *ui.Context, list ui.Element, index int, session *
 	hint := fmt.Sprintf("%s@%s:%d", h.user, h.address, h.port)
 	switch session.state {
 	case connecting:
-		hint = "正在连接 " + h.address + "…"
+		hint = locales.MessageConnectingTo() + h.address + "…"
 	case disconnected:
-		hint = "已断开 · 选择后可重新连接"
+		hint = locales.MessageDisconnectedSelectToReconnect()
 	case connectionFailed:
-		hint = session.errorText
+		hint = session.errorText.String()
 	}
 	props := uikit.SessionTabProps{
 		Key: session, Title: h.name, Hint: hint, Selected: selected, Variant: uikit.SessionTabFiles,
-		State: connectionIndicatorState(session.state), CloseLabel: "关闭文件标签 " + h.name, CloseIcon: closeIcon,
+		State: connectionIndicatorState(session.state), CloseLabel: locales.MessageCloseFileTab() + h.name, CloseIcon: closeIcon,
 		ReduceMotion: a.reduceMotion(c),
 	}
 	button := uikit.SessionTab(c, props)
@@ -197,23 +202,23 @@ func (a *app) fileTabButton(c *ui.Context, list ui.Element, index int, session *
 	})
 	closing := input.Close
 	menu := []uikit.MenuEntry{
-		{ID: "edit", Label: localize(c, "编辑会话…"), Icon: uikit.IconEdit,
+		{ID: "edit", Label: locales.MessageEditSession(), Icon: uikit.IconEdit,
 			Disabled: session.temporary || session.host < 0, OnChoose: func() { a.startEditHostDraft(session.host) }},
 		{ID: "after-edit", Separator: true},
 	}
 	if session.state == connected || session.state == connecting {
 		menu = append(menu, uikit.MenuEntry{
-			ID: "disconnect", Label: localize(c, "断开文件会话"), Icon: uikit.IconPause,
+			ID: "disconnect", Label: locales.MessageDisconnectFileSession(), Icon: uikit.IconPause,
 			OnChoose: func() { a.disconnectFileSession(session) },
 		})
 	} else {
 		menu = append(menu, uikit.MenuEntry{
-			ID: "reconnect", Label: localize(c, "重新连接"), Icon: uikit.IconRetry,
+			ID: "reconnect", Label: locales.MessageReconnect(), Icon: uikit.IconRetry,
 			OnChoose: func() { a.reconnectFileSession(session) },
 		})
 	}
 	menu = append(menu, uikit.MenuEntry{ID: "before-close", Separator: true}, uikit.MenuEntry{
-		ID: "close", Label: localize(c, "关闭选项卡"), Icon: uikit.IconClose, Danger: true,
+		ID: "close", Label: locales.MessageCloseTab(), Icon: uikit.IconClose, Danger: true,
 		OnChoose: func() { closing = true },
 	})
 	button.Children(func() {
@@ -257,14 +262,14 @@ func (a *app) deleteFileSite(id hostID, done func(error)) {
 	deleted := a.hosts[id]
 	for _, g := range a.gateways {
 		if g.SSHProfileID == deleted.session.ID {
-			done(fmt.Errorf("主机被网关「%s」引用，请先修改该网关", g.Name))
+			done(locales.Errorf(locales.MessageThisHostIsReferencedByGatewayUpdateTheGatewayFirst, g.Name))
 			return
 		}
 	}
 	for _, group := range a.runtimeSSHGroups() {
 		for _, hop := range group.plan.route {
 			if hop.SSH != nil && hop.SSH.ID == deleted.session.ID {
-				done(fmt.Errorf("主机仍被网关连接使用，请先关闭相关会话和传输"))
+				done(locales.Errorf(locales.MessageThisHostIsUsedByAGatewayConnectionCloseRelatedSessionsAndTransfers))
 				return
 			}
 		}
@@ -373,23 +378,27 @@ func (a *app) deleteFileSite(id hostID, done func(error)) {
 func (a *app) deleteSiteDialogContents(c *ui.Context, parts uikit.ModalParts) bool {
 	t := theme.Current()
 	var confirm bool
-	uikit.Text(c, "将从当前页面的目录移除，并关闭此条目的会话。服务器文件不受影响。", uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneSecondary})
+	uikit.Text(
+		c,
+		locales.MessageRemoveThisEntryFromTheCurrentCatalogAndCloseItsSessionsServerFiles(),
+		uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneSecondary},
+	)
 	ui.Row(c).Justify(ui.End).Gap(t.Space.N8).Children(func() {
-		uikit.Button(c, "取消", uikit.ButtonProps{}).OnClick(parts.RequestDismiss)
-		confirm = uikit.Button(c, "删除", uikit.ButtonProps{Variant: uikit.ButtonDanger}).Clicked()
+		uikit.Button(c, locales.CommonCancel(), uikit.ButtonProps{}).OnClick(parts.RequestDismiss)
+		confirm = uikit.Button(c, locales.CommonDelete(), uikit.ButtonProps{Variant: uikit.ButtonDanger}).Clicked()
 	})
 	return confirm
 }
 
 func (a *app) confirmDeleteSite(c *ui.Context, id hostID) {
 	if a.fileSiteBusy(id) {
-		uikit.Notify(c, "请先取消或清除该会话的传输任务")
+		uikit.Notify(c, locales.MessageCancelOrRemoveThisSessionSTransfersFirst())
 		return
 	}
 	page := a.page()
 	a.deleteFileSite(id, func(err error) {
 		if err != nil {
-			a.persistenceNotice("删除会话失败", err)
+			a.persistenceNotice(locales.MessageUnableToDeleteSession, err)
 			return
 		}
 		page.draft.modal.Close()

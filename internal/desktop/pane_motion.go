@@ -4,6 +4,7 @@ import (
 	"math"
 	"time"
 
+	"sshdesk/internal/locales"
 	"sshdesk/internal/theme"
 
 	"github.com/egoist/mygo/plugins/glass"
@@ -217,7 +218,7 @@ func (a *app) terminalDivider(c *ui.Context, split splitPlacement) {
 	t := theme.Current()
 	node, r := split.node, split.rect
 	edge := ui.Box(c).Key(node).Absolute().Left(r.X).Top(r.Y).Size(r.W, r.H).
-		Center().Focusable().FocusRing(false).Role(ui.RoleSplitter).Label("调整终端分屏比例")
+		Center().Focusable().FocusRing(false).Role(ui.RoleSplitter).Label(locales.MessageResizeTerminalPanes())
 	axis, delta := split.parent.W-t.C.Pane.Gap, float32(0)
 	firstMin, secondMin := node.first.minimum().X, node.second.minimum().X
 	firstSize := r.X - split.parent.X

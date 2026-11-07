@@ -6,6 +6,7 @@ import (
 	"slices"
 	"time"
 
+	"sshdesk/internal/locales"
 	"sshdesk/internal/theme"
 	"sshdesk/internal/uikit"
 
@@ -36,7 +37,7 @@ type transferTask struct {
 	transferred, total     int64
 	speed                  float64
 	started, completed     time.Time
-	errorText              string
+	errorText              locales.Text
 	job                    *transferJob
 	run                    *transferRun
 	removeRequested        bool
@@ -185,7 +186,11 @@ func (a *app) enqueueFiles(
 	for _, entry := range entries {
 		if !transferSafeName(entry.name) {
 			uikit.Toast(c, uikit.ToastProps{ID: "transfer-invalid-name", Tone: uikit.ToneDanger,
-				Title: "文件名不能安全地用于目标路径", Detail: entry.name})
+				Title: locales.Deferred(
+					locales.MessageTheFilenameCannotBeSafelyUsedInTheDestinationPath,
+				), Detail: locales.Raw(
+					entry.name,
+				)})
 			continue
 		}
 		if snapshot == nil {
@@ -244,14 +249,14 @@ func transferBytes(bytes int64) string {
 
 func transferRemaining(bytes int64, speed float64) string {
 	if speed == 0 {
-		return "剩余 —"
+		return locales.MessageRemaining()
 	}
 	seconds := float64(bytes) / speed
 	if seconds < 1 {
-		return "即将完成"
+		return locales.MessageAlmostDone()
 	}
 	n := int(seconds)
-	return fmt.Sprintf("剩余约 %02d:%02d", n/60, n%60)
+	return fmt.Sprintf(locales.MessageAboutRemaining(), n/60, n%60)
 }
 
 func (a *app) transferDock(c *ui.Context, maxHeight float32) {
@@ -291,9 +296,9 @@ func (a *app) transferDock(c *ui.Context, maxHeight float32) {
 					Transition(ui.ElementTransition{Duration: t.Motion.Duration.Focus, Exit: &ui.Motion{}}).Children(func() {
 					ui.Column(c).FillWidth().Children(func() {
 						if len(rows) == 0 {
-							message := "此分类暂无传输"
+							message := locales.MessageNoTransfersInThisCategory()
 							if len(tasks) == 0 {
-								message = "暂无传输任务"
+								message = locales.MessageNoTransfersYet()
 							}
 							uikit.TransferDockEmpty(c, message)
 						}
@@ -302,14 +307,18 @@ func (a *app) transferDock(c *ui.Context, maxHeight float32) {
 						}
 					})
 				})
-				uikit.Scrollbars(c, card, scroller, scroll, uikit.ScrollbarProps{Label: "传输任务滚动条"})
+				uikit.Scrollbars(c, card, scroller, scroll, uikit.ScrollbarProps{Label: locales.MessageTransferListScrollbar()})
 			}
 		})
 		if q.collapsed || !dock.Settled("rows") {
 			return
 		}
 		// Keep the gap outside the clipped card so it remains a full-height hit target.
-		divider := uikit.TransferDockDivider(c, "调整传输面板高度", "拖动调整高度 · 双击恢复默认")
+		divider := uikit.TransferDockDivider(
+			c,
+			locales.MessageResizeTransferPanel(),
+			locales.MessageDragToResizeDoubleClickToReset(),
+		)
 		_, dy, dragging := divider.Dragged()
 		if dragging && dy != 0 {
 			height = min(max(height-dy, minHeight), maxHeight)
@@ -365,32 +374,41 @@ func (a *app) transferHeader(c *ui.Context, session *fileSession, tasks []*trans
 	header := uikit.TransferHeader(c)
 	compact := header.Bounds().W < t.C.TransferDock.CompactBreakpoint
 	header.Children(func() {
-		uikit.TransferHeaderTitle(c, "传输", filesIcon)
+		uikit.TransferHeaderTitle(c, locales.MessageTransfers(), filesIcon)
 		a.transferFilters(c, s, len(tasks))
 		ui.Spacer(c)
 		if count := a.detachedTransferCount(); count > 0 {
-			button := uikit.Button(c, fmt.Sprintf("找回任务 (%d)", count), uikit.ButtonProps{
+			button := uikit.Button(c, locales.TransferRecoverCount(count), uikit.ButtonProps{
 				Variant: uikit.ButtonPlain, Size: uikit.SizeSm,
 			}).Key("recover-transfers").Shrink(0)
-			uikit.Tip(c, button, "重新打开传输所属标签，不会自动连接或继续传输")
+			uikit.Tip(c, button, locales.MessageReopenTheTransferSTabWithoutConnectingOrResumingTheTransfer())
 			button.OnClick(func() { a.recoverTransferTabs(c) })
 		} else if !compact {
-			uikit.TransferHeaderSummary(c, "总速度 "+transferBytes(int64(s.speed))+"/s · "+transferRemaining(s.total-s.bytes, s.speed))
+			uikit.TransferHeaderSummary(
+				c,
+				locales.MessageTotalSpeed()+transferBytes(int64(s.speed))+"/s · "+transferRemaining(s.total-s.bytes, s.speed),
+			)
 		}
-		pauseIcon, pauseLabel := transferPauseIcon, "全部暂停"
+		pauseIcon, pauseLabel := transferPauseIcon, locales.MessagePauseAll()
 		if s.running+s.queued == 0 && s.paused > 0 {
-			pauseIcon, pauseLabel = transferPlayIcon, "全部继续"
+			pauseIcon, pauseLabel = transferPlayIcon, locales.MessageResumeAll()
 		}
 		uikit.TransferAction(c, "pause-all", pauseLabel, pauseIcon, s.running+s.queued+s.paused == 0).
 			OnClick(func() { a.pauseAllTransfers(c, session) })
-		uikit.TransferAction(c, "clear-done", "清除已完成", transferTrashIcon, s.done == 0).OnClick(func() {
+		uikit.TransferAction(
+			c,
+			"clear-done",
+			locales.MessageClearCompleted(),
+			transferTrashIcon,
+			s.done == 0,
+		).OnClick(func() {
 			q.tasks = slices.DeleteFunc(q.tasks, func(task *transferTask) bool {
 				return session != nil && task.view == session && task.state == transferDone
 			})
 		})
-		label := "折叠传输列表"
+		label := locales.MessageCollapseTransferList()
 		if q.collapsed {
-			label = "展开传输列表"
+			label = locales.MessageExpandTransferList()
 		}
 		button := uikit.TransferAction(c, "toggle-dock", label, chevronIcon, false).Expanded(!q.collapsed)
 		rotation := float32(0)
@@ -408,8 +426,8 @@ func (a *app) transferHeader(c *ui.Context, session *fileSession, tasks []*trans
 func (a *app) transferFilters(c *ui.Context, summary transferSummary, total int) {
 	q := &a.transfers
 	active, done := summary.running+summary.queued+summary.paused, summary.done
-	items := []uikit.SegItem{{Label: "全部", Count: &total}, {Label: "进行中", Count: &active}, {Label: "已完成", Count: &done}}
-	if uikit.TransferFilters(c, "传输分类", &q.filter, items).Changed() {
+	items := []uikit.SegItem{{Label: locales.MessageAll(), Count: &total}, {Label: locales.MessageInProgress(), Count: &active}, {Label: locales.MessageCompleted(), Count: &done}}
+	if uikit.TransferFilters(c, locales.MessageTransferCategory(), &q.filter, items).Changed() {
 		a.saveFilePreferences(c)
 	}
 }
@@ -426,7 +444,7 @@ func (a *app) transferRow(c *ui.Context, task *transferTask) {
 		Percent:    fmt.Sprintf("%d%%", int(transferFraction(task)*100)),
 		Value:      transferFraction(task),
 		State:      states[task.state], Download: task.sourceRemote, Zebra: task.id%2 == 0,
-		Speed: "0 B/s", Remaining: "剩余 —", Error: task.errorText,
+		Speed: "0 B/s", Remaining: locales.MessageRemaining(), Error: task.errorText.String(),
 		Motion: uikit.MotionOverride(a.reduceMotion(c)),
 	}
 	if task.state == transferRunning {
@@ -434,12 +452,12 @@ func (a *app) transferRow(c *ui.Context, task *transferTask) {
 		view.Remaining = transferRemaining(task.total-task.transferred, task.speed)
 	}
 	if task.state == transferDone {
-		view.Elapsed = fmt.Sprintf("用时 %.1f 秒", task.completed.Sub(task.started).Seconds())
-		view.Completed = task.completed.Format("15:04:05") + " 完成"
+		view.Elapsed = fmt.Sprintf(locales.MessageCompletedInS(), task.completed.Sub(task.started).Seconds())
+		view.Completed = task.completed.Format("15:04:05") + locales.MessageCompleted2()
 	}
 	result := uikit.TransferRow(c, &view)
 	menu := []uikit.MenuEntry{}
-	menu = append(menu, uikit.MenuEntry{ID: "reveal", Label: "在文件夹中显示", Icon: uikit.IconFolder, OnChoose: func() { a.revealTransferredFile(c, task) }})
+	menu = append(menu, uikit.MenuEntry{ID: "reveal", Label: locales.MessageShowInFolder(), Icon: uikit.IconFolder, OnChoose: func() { a.revealTransferredFile(c, task) }})
 	uikit.ContextMenuOn(c, result.Root, menu)
 	if result.Root.DoubleClicked() || result.Reveal {
 		a.revealTransferredFile(c, task)
@@ -457,8 +475,11 @@ func (a *app) transferRow(c *ui.Context, task *transferTask) {
 
 func (a *app) transferFailureNotice(c *ui.Context, task *transferTask) {
 	uikit.Toast(c, uikit.ToastProps{
-		ID: fmt.Sprintf("transfer-failed-%d", task.id), Title: task.entry.name + " 传输失败", Detail: task.errorText,
-		Tone: uikit.ToneDanger, Action: "重试", OnAction: func() {
+		ID: fmt.Sprintf("transfer-failed-%d", task.id), Title: locales.Concat(
+			locales.Raw(task.entry.name),
+			locales.Deferred(locales.MessageTransferFailed),
+		), Detail: task.errorText,
+		Tone: uikit.ToneDanger, Action: locales.Deferred(locales.MessageRetry), OnAction: func() {
 			if !slices.Contains(a.transfers.tasks, task) {
 				return
 			}
