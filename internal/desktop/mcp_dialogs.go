@@ -26,6 +26,13 @@ func (a *app) loadPolicyIntoDraft(pol *mcpPolicy) {
 		catSeg = 0
 	}
 	connections, keys := slices.Clone(pol.Connections), slices.Clone(pol.KeyIDs)
+	// A merged selection is stored with its member IDs. Show it once when
+	// editing, while preserving policies scoped only to a legacy member.
+	for _, c := range a.mcpBackend.connections {
+		if c.CanonicalID != "" && slices.Contains(pol.Connections, c.CanonicalID) {
+			connections = slices.DeleteFunc(connections, func(id string) bool { return id == c.ID })
+		}
+	}
 	if pol.AllConnections {
 		connections = []string{}
 	}
@@ -206,6 +213,14 @@ func (a *app) mcpPolicyFields(c *ui.Context) {
 		})
 		uikit.FormRow(c, "适用连接", uikit.FormRowProps{}, func() ui.Element {
 			candidates := a.mcpConnectionOptions(draft.CategorySeg, false)
+			// Keep a policy's explicit legacy member scopes selectable, rather
+			// than silently replacing them with the whole merged connection.
+			for _, connection := range a.mcpBackend.connections {
+				if slices.Contains(draft.Connections, connection.ID) &&
+					!slices.ContainsFunc(candidates, func(option uikit.Option[string]) bool { return option.Value == connection.ID }) {
+					candidates = append(candidates, uikit.Option[string]{Value: connection.ID, Label: connection.Name + "（原配置）"})
+				}
+			}
 			return uikit.MultiSelect(c.Key("policy-connections"), &draft.Connections, candidates, uikit.MultiSelectProps{
 				Label: "适用连接", Placeholder: "全部连接（留空默认全部）",
 			})
@@ -734,7 +749,7 @@ func (a *app) openNewMCPKeyModal() {
 func (a *app) openEditMCPKeyModal(id string) {
 	for _, k := range a.mcp.keys {
 		if k.ID == id {
-			grants := slices.Clone(k.Grants)
+			grants := cloneMCPGrants(k.Grants)
 			if len(grants) == 0 {
 				grants = a.mcpGrants()
 			}
@@ -906,14 +921,10 @@ func (a *app) mcpKeyModal(c *ui.Context) {
 							if index < 0 || index >= len(draft.Grants) {
 								return
 							}
-							switch capability {
-							case "read":
-								draft.Grants[index].AllowRead = enabled
-							case "write":
-								draft.Grants[index].AllowWrite = enabled
-							case "exec":
-								draft.Grants[index].AllowExec = enabled
-							}
+							draft.Grants[index].setPermission(capability, enabled)
+						})
+						uikit.Text(c, "SSH 文件操作使用 SFTP。命令执行可能访问远端文件；文件权限仅约束 MCP 文件工具。", uikit.TextProps{
+							Style: uikit.TextCaption, Tone: uikit.ToneSecondary,
 						})
 					})
 

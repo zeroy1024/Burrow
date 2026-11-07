@@ -35,6 +35,7 @@ type mcpTransferOwner struct {
 	Outcome                                                         string
 	CleanupOnly                                                     bool
 	CreatedAt                                                       time.Time
+	PolicyConnectionID                                              string `json:",omitempty"`
 }
 
 func mcpOnUI[T any](ctx context.Context, b *mcpDesktop, fn func() (T, error)) (T, error) {
@@ -141,7 +142,13 @@ func (b *mcpDesktop) captureConnections() ([]mcpserver.Connection, error) {
 		if session == nil || !sameGatewayRoute(session.endpoint.session.GatewayRoute, &plan.route) {
 			route := plan.route
 			h.session.GatewayRoute = &route
-			session = b.a.newFileSession(hostID(i), h, false, nil)
+			fileEndpoint := h
+			if protocol == "ssh" {
+				// Queue snapshots are file endpoints, even when the grant belongs
+				// to an SSH profile. Keep the original identity above unchanged.
+				fileEndpoint.protocol = "sftp"
+			}
+			session = b.a.newFileSession(hostID(i), fileEndpoint, false, nil)
 			session.gatewayScope = "mcp:" + session.restoreID
 			b.observeGroup(session.connection)
 			b.sessions[h.session.ID+":"+digest] = session
@@ -160,6 +167,7 @@ func (b *mcpDesktop) captureConnections() ([]mcpserver.Connection, error) {
 		}
 		connections = append(connections, connection)
 	}
+	b.groupConnections(connections)
 	return connections, nil
 }
 
@@ -311,7 +319,7 @@ func (b *mcpDesktop) keepWriteCleanup(ctx context.Context, c mcpserver.Connectio
 		a.transfers.nextID++
 		a.transfers.nextBatchID++
 		job.batch.id = a.transfers.nextBatchID
-		owner := &mcpTransferOwner{KeyID: op.KeyID, OperationID: op.ID, ConnectionID: c.ID, Identity: c.Identity,
+		owner := &mcpTransferOwner{KeyID: op.KeyID, OperationID: op.ID, ConnectionID: c.ID, Identity: c.Identity, PolicyConnectionID: c.CanonicalID,
 			LocalRoot: root, Conflict: "overwrite", CleanupOnly: true, CreatedAt: time.Now().UTC()}
 		task := &transferTask{id: a.transfers.nextID, mcp: owner, job: job,
 			session: a.snapshotTransferSession(c.Runtime.(*fileSession)),
@@ -397,7 +405,7 @@ func (b *mcpDesktop) Enqueue(ctx context.Context, request mcpserver.TransferRequ
 			source, target = request.RemotePath, request.LocalPath
 		}
 		owner := &mcpTransferOwner{KeyID: request.Key.ID, OperationID: request.Operation.ID,
-			ConnectionID: request.Connection.ID, Identity: request.Connection.Identity, LocalRoot: root,
+			ConnectionID: request.Connection.ID, Identity: request.Connection.Identity, PolicyConnectionID: request.Connection.CanonicalID, LocalRoot: root,
 			Conflict: request.Conflict, CreatedAt: time.Now().UTC()}
 		session := a.snapshotTransferSession(request.Connection.Runtime.(*fileSession))
 		task := &transferTask{id: a.transfers.nextID, session: session, sourceRemote: request.Download,

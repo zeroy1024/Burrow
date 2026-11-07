@@ -46,6 +46,9 @@ type Connection struct {
 	Shell    string `json:"shell,omitempty"`
 	Identity string `json:"-"`
 	Runtime  any    `json:"-"`
+	// CanonicalID groups equivalent SSH/SFTP profiles for display. Grants,
+	// policies and accepted work retain the actual source ID and identity.
+	CanonicalID string `json:"-"`
 }
 
 type TransferRequest struct {
@@ -311,7 +314,7 @@ func (s *Service) validateKey(ctx context.Context, key *store.MCPKey) error {
 		}
 		seen[g.ConnectionID] = true
 		c := connections[index]
-		if c.Protocol == "ssh" && (g.Read || g.Write) || c.Protocol != "ssh" && g.Exec {
+		if g.Read && !c.Supports("read") || g.Write && !c.Supports("write") || g.Exec && !c.Supports("exec") {
 			return fail("invalid_argument", "连接协议与授权能力不匹配")
 		}
 		if g.EndpointDigest == "" {
@@ -426,11 +429,29 @@ func (s *Service) SavePolicy(ctx context.Context, p store.MCPPolicy) error {
 	if err != nil {
 		return err
 	}
+	var scoped []string
 	for _, id := range p.ConnectionIDs {
 		i := slices.IndexFunc(connections, func(c Connection) bool { return c.ID == id })
-		if i < 0 || (connections[i].Protocol == "ssh") != (p.Category == "ssh") {
+		if i < 0 || p.Category == "ssh" && !connections[i].Supports("exec") || p.Category == "files" && !connections[i].Supports("read") {
 			return fail("invalid_argument", "策略适用连接不存在或协议不匹配")
 		}
+		if !slices.Contains(scoped, id) {
+			scoped = append(scoped, id)
+		}
+		// A newly selected merged file connection protects its members too.
+		// Persist those IDs so later regrouping cannot drop the restriction.
+		// Explicit legacy member scopes remain unchanged.
+		if p.Category == "files" && connections[i].DisplayID() == id {
+			for _, c := range connections {
+				if c.DisplayID() == id && !slices.Contains(scoped, c.ID) {
+					scoped = append(scoped, c.ID)
+				}
+			}
+		}
+	}
+	p.ConnectionIDs = scoped
+	if len(p.ConnectionIDs) > 1000 {
+		return fail("invalid_argument", "策略适用连接超过限制")
 	}
 	if p.ID == "" {
 		p.ID, p.Version = rand.Text(), 1
@@ -483,14 +504,20 @@ func (s *Service) Authorize(ctx context.Context, keyID, connectionID, capability
 	if err != nil {
 		return key, Connection{}, err
 	}
-	for _, c := range connections {
-		if c.ID != connectionID {
-			continue
+	index := slices.IndexFunc(connections, func(c Connection) bool { return c.ID == connectionID })
+	if index >= 0 {
+		requested := connections[index]
+		if grantedConnection(key, requested, capability) {
+			return key, requested, nil
 		}
-		for _, g := range key.Grants {
-			if g.ConnectionID == c.ID && g.EndpointDigest == c.Identity &&
-				(capability == "read" && g.Read || capability == "write" && g.Write || capability == "exec" && g.Exec) {
-				return key, c, nil
+		// The merged entry can use an existing member grant, but the returned
+		// source keeps that grant's credentials, policies and task identity.
+		// A legacy member ID never inherits permissions from another member.
+		if requested.ID == requested.DisplayID() {
+			for _, c := range connections {
+				if c.DisplayID() == requested.ID && grantedConnection(key, c, capability) {
+					return key, c, nil
+				}
 			}
 		}
 	}

@@ -10,6 +10,7 @@ import (
 
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
+	"sshdesk/internal/store"
 	"sshdesk/internal/theme"
 	"sshdesk/internal/uikit"
 )
@@ -22,6 +23,7 @@ type mcpKeyGrant struct {
 	SupportsSSH             bool
 	AllowRead, AllowWrite   bool
 	AllowExec               bool
+	Sources                 []store.MCPGrant
 }
 
 type mcpSecretKey struct {

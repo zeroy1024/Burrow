@@ -275,28 +275,21 @@ func (a *app) applyMCPData(data mcpData) {
 		grants := a.mcpGrants()
 		var summary []string
 		for i := range grants {
-			for _, g := range key.Grants {
-				if g.ConnectionID == grants[i].ConnectionID {
-					if g.EndpointDigest != grants[i].EndpointDigest {
-						grants[i].Warning = "连接信息已变更，原授权已失效；请重新选择权限并保存确认"
-						summary = append(summary, grants[i].Name+"（需重新授权）")
-						continue
-					}
-					grants[i].AllowRead, grants[i].AllowWrite, grants[i].AllowExec = g.Read, g.Write, g.Exec
-					var capabilities []string
-					if g.Read {
-						capabilities = append(capabilities, "读取")
-					}
-					if g.Write {
-						capabilities = append(capabilities, "写入")
-					}
-					if g.Exec {
-						capabilities = append(capabilities, "执行")
-					}
-					if len(capabilities) > 0 {
-						summary = append(summary, grants[i].Name+" ("+strings.Join(capabilities, "/")+")")
-					}
-				}
+			grants[i].loadPermissions(key.Grants)
+			var capabilities []string
+			if grants[i].AllowRead {
+				capabilities = append(capabilities, "读取")
+			}
+			if grants[i].AllowWrite {
+				capabilities = append(capabilities, "写入")
+			}
+			if grants[i].AllowExec {
+				capabilities = append(capabilities, "执行")
+			}
+			if len(capabilities) > 0 {
+				summary = append(summary, grants[i].Name+" ("+strings.Join(capabilities, "/")+")")
+			} else if grants[i].Warning != "" {
+				summary = append(summary, grants[i].Name+"（需重新授权）")
 			}
 		}
 		lastUsed := "从未使用"
@@ -318,20 +311,22 @@ func (a *app) applyMCPData(data mcpData) {
 			}
 		}
 		var names []string
+		seen := map[string]bool{}
 		for _, c := range b.connections {
 			matches := slices.Contains(p.ConnectionIDs, c.ID)
 			if p.AllConnections {
-				matches = (c.Protocol == "ssh") == (p.Category == "ssh")
+				matches = p.Category == "files" && c.Supports("read") || p.Category == "ssh" && c.Supports("exec")
 				if matches {
 					view.Connections = append(view.Connections, c.ID)
 				}
 			}
-			if matches {
+			if matches && !seen[c.DisplayID()] {
+				seen[c.DisplayID()] = true
 				names = append(names, c.Name)
 			}
 		}
 		view.ConnSummary = strings.Join(names, ", ")
-		view.ConnSub = fmt.Sprintf("指定 %d 个连接", len(p.ConnectionIDs))
+		view.ConnSub = fmt.Sprintf("指定 %d 个连接", len(names))
 		if p.AllConnections {
 			view.ConnSummary, view.ConnSub = "全部连接", "含后续新增连接"
 		}
@@ -381,19 +376,6 @@ func (a *app) applyMCPData(data mcpData) {
 	}
 }
 
-func (a *app) mcpGrants() []mcpKeyGrant {
-	var grants []mcpKeyGrant
-	if a.mcpBackend == nil {
-		return grants
-	}
-	for _, c := range a.mcpBackend.connections {
-		grants = append(grants, mcpKeyGrant{ConnectionID: c.ID, EndpointDigest: c.Identity, Name: c.Name,
-			Subtitle:      strings.ToUpper(c.Protocol) + " · " + c.User + "@" + c.Host,
-			SupportsFiles: c.Protocol != "ssh", SupportsSSH: c.Protocol == "ssh"})
-	}
-	return grants
-}
-
 func (a *app) mcpConnectionOptions(category int, all bool) []uikit.Option[string] {
 	var options []uikit.Option[string]
 	if all {
@@ -403,7 +385,10 @@ func (a *app) mcpConnectionOptions(category int, all bool) []uikit.Option[string
 		return options
 	}
 	for _, c := range a.mcpBackend.connections {
-		if category == 0 && c.Protocol != "ssh" || category == 1 && c.Protocol == "ssh" {
+		if category == 0 && !c.Supports("exec") || category == 1 && !c.Supports("read") {
+			continue
+		}
+		if c.ID != c.DisplayID() {
 			continue
 		}
 		options = append(options, uikit.Option[string]{Value: c.ID, Label: c.Name + " (" + strings.ToUpper(c.Protocol) + ")"})
@@ -510,8 +495,10 @@ func (a *app) saveMCPBackendKey() {
 		}
 	}
 	for _, g := range draft.Grants {
-		if g.AllowRead || g.AllowWrite || g.AllowExec {
-			key.Grants = append(key.Grants, store.MCPGrant{ConnectionID: g.ConnectionID, EndpointDigest: g.EndpointDigest, Read: g.AllowRead, Write: g.AllowWrite, Exec: g.AllowExec})
+		for _, source := range g.Sources {
+			if source.Read || source.Write || source.Exec {
+				key.Grants = append(key.Grants, source)
+			}
 		}
 	}
 	var secret string

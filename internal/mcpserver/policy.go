@@ -86,9 +86,12 @@ func ValidatePolicy(p store.MCPPolicy) error {
 	return nil
 }
 
-func applies(p store.MCPPolicy, keyID, connectionID, category string) bool {
-	return p.Enabled && p.Category == category && (p.AllConnections || slices.Contains(p.ConnectionIDs, connectionID)) &&
-		(p.AllKeys || slices.Contains(p.KeyIDs, keyID))
+func applies(p store.MCPPolicy, keyID, connectionID, category string, aliases ...string) bool {
+	connectionMatches := p.AllConnections || slices.Contains(p.ConnectionIDs, connectionID)
+	for _, alias := range aliases {
+		connectionMatches = connectionMatches || alias != "" && slices.Contains(p.ConnectionIDs, alias)
+	}
+	return p.Enabled && p.Category == category && connectionMatches && (p.AllKeys || slices.Contains(p.KeyIDs, keyID))
 }
 
 func (s *Service) CheckCommand(ctx context.Context, keyID, connectionID, command string) error {
@@ -215,7 +218,7 @@ func clip(text string) string {
 	return text[:cut] + "…"
 }
 
-func (s *Service) CheckFile(ctx context.Context, keyID, connectionID, side, name, action string, client fileclient.Client) error {
+func (s *Service) CheckFile(ctx context.Context, keyID, connectionID, side, name, action string, client fileclient.Client, aliases ...string) error {
 	policies, err := s.Store.MCPPolicies(ctx)
 	if err != nil {
 		if ctx.Err() != nil {
@@ -227,7 +230,7 @@ func (s *Service) CheckFile(ctx context.Context, keyID, connectionID, side, name
 	var matches []Match
 	var reasons []string
 	for _, p := range policies {
-		if !applies(p, keyID, connectionID, "files") {
+		if !applies(p, keyID, connectionID, "files", aliases...) {
 			continue
 		}
 		for _, r := range p.FileRules {

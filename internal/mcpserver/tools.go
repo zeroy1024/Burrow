@@ -250,14 +250,7 @@ func (s *Service) Call(parent context.Context, keyID, name string, raw json.RawM
 		if err != nil {
 			return out, err
 		}
-		visible := []map[string]any{}
-		for _, c := range connections {
-			for _, g := range key.Grants {
-				if g.ConnectionID == c.ID && g.EndpointDigest == c.Identity && (g.Read || g.Write || g.Exec) && (in.Protocol == "" || c.Protocol == in.Protocol) {
-					visible = append(visible, map[string]any{"connection": c, "files_read": g.Read, "files_write": g.Write, "ssh_exec": g.Exec})
-				}
-			}
-		}
+		visible := visibleConnections(key, connections, in.Protocol)
 		from := min(in.Offset, len(visible))
 		out["connections"], out["total"] = visible[from:min(from+in.Limit, len(visible))], len(visible)
 		return out, nil
@@ -269,6 +262,7 @@ func (s *Service) Call(parent context.Context, keyID, name string, raw json.RawM
 	if err != nil {
 		return out, err
 	}
+	op.ConnectionID = connection.ID
 	policies, err := s.Store.MCPPolicies(ctx)
 	if err != nil {
 		if ctx.Err() != nil {
@@ -278,11 +272,11 @@ func (s *Service) Call(parent context.Context, keyID, name string, raw json.RawM
 	}
 	versions := make(map[string]int)
 	category := "files"
-	if connection.Protocol == "ssh" {
+	if name == "ssh_exec" {
 		category = "ssh"
 	}
 	for _, p := range policies {
-		if applies(p, key.ID, connection.ID, category) {
+		if applies(p, key.ID, connection.ID, category, connection.DisplayID()) {
 			versions[p.ID] = p.Version
 		}
 	}
@@ -296,6 +290,7 @@ func (s *Service) Call(parent context.Context, keyID, name string, raw json.RawM
 	}
 	s.mu.Lock()
 	active = s.active[op.ID]
+	active.connectionID = connection.ID
 	active.identity = connection.Identity
 	s.active[op.ID] = active
 	s.mu.Unlock()
@@ -337,9 +332,6 @@ func (s *Service) Call(parent context.Context, keyID, name string, raw json.RawM
 		}
 		return out, err
 	}
-	if connection.Protocol == "ssh" {
-		return out, fail("invalid_argument", "文件工具仅适用于已保存的文件连接")
-	}
 	if name == "files_upload" || name == "files_download" {
 		download := name == "files_download"
 		localPath, err := AuthorizeLocal(key, in.LocalPath, download)
@@ -371,7 +363,7 @@ func (s *Service) Call(parent context.Context, keyID, name string, raw json.RawM
 				if exists {
 					action = "write"
 				}
-				return s.CheckFile(checkCtx, key.ID, connection.ID, "remote", target, action, client)
+				return s.CheckFile(checkCtx, key.ID, connection.ID, "remote", target, action, client, connection.DisplayID())
 			})
 		out["requested_bytes"] = len(in.Text)
 		out["commit_status"] = "unknown"
@@ -398,7 +390,7 @@ func (s *Service) Call(parent context.Context, keyID, name string, raw json.RawM
 	if name == "files_read" {
 		action = "read"
 	}
-	if err := s.CheckFile(ctx, key.ID, connection.ID, "remote", in.Path, action, client); err != nil {
+	if err := s.CheckFile(ctx, key.ID, connection.ID, "remote", in.Path, action, client, connection.DisplayID()); err != nil {
 		return out, err
 	}
 	entry, err := client.Stat(ctx, in.Path)
@@ -448,7 +440,7 @@ func (s *Service) Call(parent context.Context, keyID, name string, raw json.RawM
 		if _, _, err := s.Authorize(ctx, key.ID, connection.ID, "read"); err != nil {
 			return out, err
 		}
-		if err := s.CheckFile(ctx, key.ID, connection.ID, "remote", in.Path, "read", client); err != nil {
+		if err := s.CheckFile(ctx, key.ID, connection.ID, "remote", in.Path, "read", client, connection.DisplayID()); err != nil {
 			return out, err
 		}
 		out["text"], out["offset"], out["bytes"], out["truncated"] = string(data), in.Offset, len(data), truncated || int64(in.Offset+len(data)) < entry.Size

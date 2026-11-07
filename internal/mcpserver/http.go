@@ -326,7 +326,7 @@ func agentHits(failure *Failure) []map[string]any {
 
 func toolDescription(name string) string {
 	return map[string]string{
-		"connections_list": "List saved connections authorized to this key, with stable IDs; never returns credentials. SSH connections include os (linux, darwin, windows or other), os_name and arch once known, and shell (the default shell: cmd, powershell, pwsh, ...) for Windows.",
+		"connections_list": "List connections authorized to this key, with stable IDs; never returns credentials. Equivalent SSH/SFTP profiles are shown once. Use files_read, files_write and ssh_exec flags to choose operations: SSH connections can provide SFTP file tools. Explicit protocol filters retain original profile IDs. SSH connections include os (linux, darwin, windows or other), os_name and arch once known, and shell for Windows.",
 		"ssh_exec":         "Run one non-PTY command in the remote user's default shell (check connections_list os and, on Windows, shell). stdout, stderr and exit_code are separate; cancellation never reruns the command.",
 		"files_list":       "List one remote directory with bounded pagination; symlinks are not traversed.",
 		"files_stat":       "Read remote entry metadata without following symlinks.",

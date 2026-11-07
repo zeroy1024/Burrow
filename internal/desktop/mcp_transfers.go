@@ -48,7 +48,7 @@ func (b *mcpDesktop) checkTransfer(ctx context.Context, task *transferTask, name
 			return err
 		}
 	}
-	return b.service.CheckFile(ctx, owner.KeyID, owner.ConnectionID, side, name, action, client)
+	return b.service.CheckFile(ctx, owner.KeyID, owner.ConnectionID, side, name, action, client, owner.PolicyConnectionID, connection.DisplayID())
 }
 
 func (b *mcpDesktop) attachTransfer(task *transferTask) {
