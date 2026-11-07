@@ -5,11 +5,11 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"sshdesk/internal/termtheme"
-	"sshdesk/internal/theme"
+	"github.com/zeroy1024/Burrow/internal/termtheme"
+	"github.com/zeroy1024/Burrow/internal/theme"
 
 	"github.com/egoist/mygo/ui"
-	"sshdesk/internal/uikit"
+	"github.com/zeroy1024/Burrow/internal/uikit"
 )
 
 type terminalColorKind uint8

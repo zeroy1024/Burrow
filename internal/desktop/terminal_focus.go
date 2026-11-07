@@ -1,9 +1,9 @@
 package desktop
 
 import (
-	"sshdesk/internal/termtheme"
-	"sshdesk/internal/theme"
-	"sshdesk/internal/uikit"
+	"github.com/zeroy1024/Burrow/internal/termtheme"
+	"github.com/zeroy1024/Burrow/internal/theme"
+	"github.com/zeroy1024/Burrow/internal/uikit"
 
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/shader"

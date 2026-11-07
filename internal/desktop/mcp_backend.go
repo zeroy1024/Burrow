@@ -12,12 +12,12 @@ import (
 	"slices"
 	"time"
 
-	"sshdesk/internal/fileclient"
-	"sshdesk/internal/locales"
-	"sshdesk/internal/mcpserver"
-	"sshdesk/internal/sshclient"
-	"sshdesk/internal/store"
-	"sshdesk/internal/wggateway"
+	"github.com/zeroy1024/Burrow/internal/fileclient"
+	"github.com/zeroy1024/Burrow/internal/locales"
+	"github.com/zeroy1024/Burrow/internal/mcpserver"
+	"github.com/zeroy1024/Burrow/internal/sshclient"
+	"github.com/zeroy1024/Burrow/internal/store"
+	"github.com/zeroy1024/Burrow/internal/wggateway"
 )
 
 type mcpDesktop struct {

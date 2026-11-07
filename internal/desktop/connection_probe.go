@@ -10,11 +10,11 @@ import (
 	"strings"
 	"time"
 
-	"sshdesk/internal/fileclient"
-	"sshdesk/internal/hostinfo"
-	"sshdesk/internal/locales"
-	"sshdesk/internal/sshclient"
-	"sshdesk/internal/theme"
+	"github.com/zeroy1024/Burrow/internal/fileclient"
+	"github.com/zeroy1024/Burrow/internal/hostinfo"
+	"github.com/zeroy1024/Burrow/internal/locales"
+	"github.com/zeroy1024/Burrow/internal/sshclient"
+	"github.com/zeroy1024/Burrow/internal/theme"
 )
 
 type connectionTestResult struct {

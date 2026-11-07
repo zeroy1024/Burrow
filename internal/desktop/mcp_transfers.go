@@ -9,10 +9,10 @@ import (
 	"slices"
 	"time"
 
-	"sshdesk/internal/fileclient"
-	"sshdesk/internal/locales"
-	"sshdesk/internal/mcpserver"
-	"sshdesk/internal/store"
+	"github.com/zeroy1024/Burrow/internal/fileclient"
+	"github.com/zeroy1024/Burrow/internal/locales"
+	"github.com/zeroy1024/Burrow/internal/mcpserver"
+	"github.com/zeroy1024/Burrow/internal/store"
 )
 
 func (b *mcpDesktop) preflightTransfer(ctx context.Context, task *transferTask) error {

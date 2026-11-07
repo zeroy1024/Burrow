@@ -11,10 +11,10 @@ import (
 	"slices"
 	"strings"
 
-	"sshdesk/internal/fileclient"
-	"sshdesk/internal/hostinfo"
-	"sshdesk/internal/locales"
-	"sshdesk/internal/sshclient"
+	"github.com/zeroy1024/Burrow/internal/fileclient"
+	"github.com/zeroy1024/Burrow/internal/hostinfo"
+	"github.com/zeroy1024/Burrow/internal/locales"
+	"github.com/zeroy1024/Burrow/internal/sshclient"
 )
 
 type hostFactsState struct {

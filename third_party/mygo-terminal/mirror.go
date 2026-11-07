@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/egoist/mygo/sshdesk-terminal/internal/vt"
+	"github.com/egoist/mygo/burrow-terminal/internal/vt"
 )
 
 // Mirror frames what a terminal shows for another terminal to show, as a

@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"sshdesk/internal/sshclient"
+	"github.com/zeroy1024/Burrow/internal/sshclient"
 
 	"github.com/pkg/sftp"
 )

@@ -6,7 +6,7 @@ The driver traverses real local MCP HTTP, production `mcpDesktop`, native window
 
 ## Start fixtures
 
-Follow [local protocol integration](../ssh-integration/README.md). Set `SSHDESK_TEST_DIR` from the final JSON directory and set `SSHDESK_TEST_ADDRESS`. Temporary credentials/certificates stay in the `0700` fixture directory and must not be committed.
+Follow [local protocol integration](../ssh-integration/README.md). Set `BURROW_TEST_DIR` from the final JSON directory and set `BURROW_TEST_ADDRESS`. Temporary credentials/certificates stay in the `0700` fixture directory and must not be committed.
 
 ```sh
 python3 -B scripts/ssh-integration-server.py
@@ -22,8 +22,8 @@ FTPS verifies the temporary CA and hostname without installing system certificat
 Build a current-platform `Burrow.app` resource template or pass an existing bundle with `--template`. An unlocked, focusable macOS session is required:
 
 ```sh
-GOCACHE=/private/tmp/sshdesk-go-build mise exec -- python3 -B -u scripts/mcp-integration-ui.py \
-  --fixture "$SSHDESK_TEST_DIR" \
+GOCACHE=/private/tmp/burrow-go-build mise exec -- python3 -B -u scripts/mcp-integration-ui.py \
+  --fixture "$BURROW_TEST_DIR" \
   --template /absolute/path/to/Burrow.app
 ```
 

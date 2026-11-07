@@ -10,9 +10,9 @@ import (
 
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
-	"sshdesk/internal/hostinfo"
-	"sshdesk/internal/store"
-	"sshdesk/internal/uikit"
+	"github.com/zeroy1024/Burrow/internal/hostinfo"
+	"github.com/zeroy1024/Burrow/internal/store"
+	"github.com/zeroy1024/Burrow/internal/uikit"
 )
 
 // This file is compiled only through the README gallery overlay.

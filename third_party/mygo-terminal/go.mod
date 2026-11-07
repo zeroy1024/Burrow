@@ -1,4 +1,4 @@
-module github.com/egoist/mygo/sshdesk-terminal
+module github.com/egoist/mygo/burrow-terminal
 
 go 1.27.3
 

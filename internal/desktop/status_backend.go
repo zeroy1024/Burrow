@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"sshdesk/internal/hostinfo"
-	"sshdesk/internal/locales"
-	"sshdesk/internal/sshclient"
+	"github.com/zeroy1024/Burrow/internal/hostinfo"
+	"github.com/zeroy1024/Burrow/internal/locales"
+	"github.com/zeroy1024/Burrow/internal/sshclient"
 
 	"github.com/egoist/mygo/ui"
 )

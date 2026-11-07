@@ -4,10 +4,11 @@ import (
 	"strings"
 	"testing"
 
-	"sshdesk/internal/fileclient"
+	"github.com/zeroy1024/Burrow/internal/fileclient"
 )
 
 func TestValidateTransferNodePrivateDirectory(t *testing.T) {
+	// Retain the old prefix to cover journals saved before the rename.
 	stage := "/target/.sshdesk-" + strings.Repeat("a", 32) + ".part"
 	for _, tt := range []struct {
 		name               string

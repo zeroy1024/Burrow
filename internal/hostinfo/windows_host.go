@@ -9,7 +9,7 @@ import (
 	"unicode/utf16"
 	"unicode/utf8"
 
-	"sshdesk/internal/locales"
+	"github.com/zeroy1024/Burrow/internal/locales"
 )
 
 const windowsFactsMarker = "__BURROW_WINDOWS_FACTS_V2__"

@@ -8,8 +8,8 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/egoist/mygo/burrow-terminal/internal/vt"
 	"github.com/egoist/mygo/internal/l10n"
-	"github.com/egoist/mygo/sshdesk-terminal/internal/vt"
 	"github.com/egoist/mygo/transfer"
 	"github.com/egoist/mygo/ui"
 )

@@ -6,9 +6,9 @@ import (
 	"slices"
 	"strings"
 
-	"sshdesk/internal/locales"
-	"sshdesk/internal/store"
-	"sshdesk/internal/wggateway"
+	"github.com/zeroy1024/Burrow/internal/locales"
+	"github.com/zeroy1024/Burrow/internal/store"
+	"github.com/zeroy1024/Burrow/internal/wggateway"
 )
 
 const directGateway = "direct"

@@ -1,7 +1,7 @@
 package uikit
 
 import (
-	"sshdesk/internal/theme"
+	"github.com/zeroy1024/Burrow/internal/theme"
 
 	"github.com/egoist/mygo/ui"
 )

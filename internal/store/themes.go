@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 
-	"sshdesk/internal/locales"
+	"github.com/zeroy1024/Burrow/internal/locales"
 )
 
 type Theme struct {

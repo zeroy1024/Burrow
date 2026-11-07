@@ -19,8 +19,8 @@ import (
 	"testing"
 	"time"
 
-	"sshdesk/internal/sshclient"
-	"sshdesk/internal/store"
+	"github.com/zeroy1024/Burrow/internal/sshclient"
+	"github.com/zeroy1024/Burrow/internal/store"
 
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
@@ -34,9 +34,9 @@ type integrationFixture struct {
 
 func sshFixture(t *testing.T) integrationFixture {
 	t.Helper()
-	address, directory := os.Getenv("SSHDESK_TEST_ADDRESS"), os.Getenv("SSHDESK_TEST_DIR")
+	address, directory := os.Getenv("BURROW_TEST_ADDRESS"), os.Getenv("BURROW_TEST_DIR")
 	if address == "" || directory == "" {
-		t.Skip("SSHDESK_TEST_ADDRESS and SSHDESK_TEST_DIR are required for the Docker SSH fixture")
+		t.Skip("BURROW_TEST_ADDRESS and BURROW_TEST_DIR are required for the Docker SSH fixture")
 	}
 	host, portText, err := net.SplitHostPort(address)
 	if err != nil {
@@ -55,7 +55,7 @@ func sshFixture(t *testing.T) integrationFixture {
 	return integrationFixture{
 		address: address, directory: directory,
 		config: sshclient.Config{
-			Host: host, Port: port, User: "sshdesk", Auth: "key",
+			Host: host, Port: port, User: "burrow", Auth: "key",
 			KeyPath: filepath.Join(directory, "key_plain"),
 			HostKey: sshclient.KnownHosts(t.Context(), integrationTrustStore(t, filepath.Join(t.TempDir(), "burrow.db")), func(string, string, string) bool { return true }),
 		},

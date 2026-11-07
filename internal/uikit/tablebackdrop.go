@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/egoist/mygo/ui"
-	"sshdesk/internal/theme"
+	"github.com/zeroy1024/Burrow/internal/theme"
 )
 
 // TableBackdropRow supplies real display data for rows just outside the list's

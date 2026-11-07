@@ -12,8 +12,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"sshdesk/internal/locales"
-	"sshdesk/internal/store"
+	"github.com/zeroy1024/Burrow/internal/locales"
+	"github.com/zeroy1024/Burrow/internal/store"
 )
 
 const maxAuditResponse = 32 << 20

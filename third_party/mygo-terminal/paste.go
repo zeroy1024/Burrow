@@ -10,7 +10,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/egoist/mygo/sshdesk-terminal/internal/vt"
+	"github.com/egoist/mygo/burrow-terminal/internal/vt"
 	"github.com/egoist/mygo/transfer"
 )
 

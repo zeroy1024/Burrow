@@ -3,7 +3,7 @@ package main
 import (
 	"log"
 
-	"sshdesk/internal/desktop"
+	"github.com/zeroy1024/Burrow/internal/desktop"
 )
 
 func main() {

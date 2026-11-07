@@ -5,8 +5,8 @@ import (
 	"math"
 
 	"github.com/egoist/mygo/ui"
-	"sshdesk/internal/termtheme"
-	"sshdesk/internal/theme"
+	"github.com/zeroy1024/Burrow/internal/termtheme"
+	"github.com/zeroy1024/Burrow/internal/theme"
 )
 
 type TerminalColors struct{ Background, Foreground, Selection, SelectionForeground color.NRGBA }

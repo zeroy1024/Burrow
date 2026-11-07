@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 
-	"sshdesk/internal/store"
+	"github.com/zeroy1024/Burrow/internal/store"
 )
 
 type endpointEncoder struct{ values map[string]store.Endpoint }

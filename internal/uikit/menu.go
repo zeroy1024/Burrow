@@ -2,8 +2,8 @@ package uikit
 
 import (
 	"github.com/egoist/mygo/ui"
-	"sshdesk/internal/locales"
-	"sshdesk/internal/theme"
+	"github.com/zeroy1024/Burrow/internal/locales"
+	"github.com/zeroy1024/Burrow/internal/theme"
 )
 
 // MenuEntry is one item of an in-window menu. Callbacks are menu commands;

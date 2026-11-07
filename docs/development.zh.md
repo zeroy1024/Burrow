@@ -15,7 +15,7 @@ mise exec -- go run .
 
 普通 `go run` 使用 Burrow Dev 数据目录与独立凭据命名空间，正式打包使用 Burrow。数据模型、备份及旧格式边界见[数据与凭据](storage.zh.md)。SQLite 驱动固定为 `modernc.org/sqlite v1.61.1`，不要求系统 SQLite 或 CGo。
 
-首次运行或构建需要下载固定终端插件的原生 Ghostty VT 库，后续使用缓存。Go 模块名仍为 `sshdesk`，不影响产品名称 Burrow。
+首次运行或构建需要下载固定终端插件的原生 Ghostty VT 库，后续使用缓存。主模块为 `github.com/zeroy1024/Burrow`，普通 `go run .` 生成的可执行文件名为 `Burrow`，应用仍使用独立的 Burrow Dev 数据命名空间。本地终端分支为 `github.com/egoist/mygo/burrow-terminal`，保留 MyGo 前缀以满足 SDK 内部包导入约束。
 
 ## 界面图标
 
@@ -98,7 +98,7 @@ mise exec -- go -C third_party/mygo-terminal build ./...
 若受限环境无法写入默认 Go 构建缓存，可为相应命令指定任务缓存目录，例如：
 
 ```sh
-GOCACHE=/private/tmp/sshdesk-go-build mise exec -- go test ./...
+GOCACHE=/private/tmp/burrow-go-build mise exec -- go test ./...
 ```
 
 检查通过只说明本次实际运行的范围。协议、原生窗口和视觉验证的区别见[验证范围](limitations.zh.md#验证如何解读)。
@@ -171,7 +171,7 @@ GOOS=windows GOARCH=amd64 mise exec -- go vet ./...
 
 [dev/ssh-integration](../dev/ssh-integration/) 和 [dev/ftp-integration](../dev/ftp-integration/) 提供 Docker 夹具，启动入口为 [scripts/ssh-integration-server.py](../scripts/ssh-integration-server.py)。它们使用本机随机端口和临时凭据，不应连接现有私有站点。
 
-配置夹具输出的 `SSHDESK_TEST_ADDRESS`、`SSHDESK_TEST_DIR` 和需要的 `SSHDESK_FTP_ADDRESS` 后，协议测试入口为：
+配置夹具输出的 `BURROW_TEST_ADDRESS`、`BURROW_TEST_DIR` 和需要的 `BURROW_FTP_ADDRESS` 后，协议测试入口为：
 
 ```sh
 mise exec -- go test -race -tags=integration ./... -count=1 -timeout=180s

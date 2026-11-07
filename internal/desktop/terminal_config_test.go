@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"sshdesk/internal/locales"
-	"sshdesk/internal/termtheme"
+	"github.com/zeroy1024/Burrow/internal/locales"
+	"github.com/zeroy1024/Burrow/internal/termtheme"
 )
 
 func terminalAppForTest(t *testing.T, path string) *app {

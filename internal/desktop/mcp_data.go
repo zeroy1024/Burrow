@@ -15,10 +15,10 @@ import (
 	"time"
 
 	"github.com/egoist/mygo/ui"
-	"sshdesk/internal/locales"
-	"sshdesk/internal/mcpserver"
-	"sshdesk/internal/store"
-	"sshdesk/internal/uikit"
+	"github.com/zeroy1024/Burrow/internal/locales"
+	"github.com/zeroy1024/Burrow/internal/mcpserver"
+	"github.com/zeroy1024/Burrow/internal/store"
+	"github.com/zeroy1024/Burrow/internal/uikit"
 )
 
 type mcpData struct {

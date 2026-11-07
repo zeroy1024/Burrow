@@ -63,7 +63,7 @@ def seed_files(repo, task_dir, config_root):
             if host != "127.0.0.1":
                 raise RuntimeError("MCP integration server is not on loopback")
             profile, revision = str(uuid.uuid4()), str(uuid.uuid4())
-            value = dict(id=profile, auth="password", protocol="ftp", name=name, user="sshdesk", host=host,
+            value = dict(id=profile, auth="password", protocol="ftp", name=name, user="burrow", host=host,
                          port=int(port), os=0, system="Linux", createdAt=now, updatedAt=now,
                          passwordSaved=True, passwordRevision=revision,
                          files=dict(encoding="UTF-8", ftpMode="passive", ftpTls=tls_mode))
@@ -75,7 +75,7 @@ def seed_files(repo, task_dir, config_root):
         for profile, value in rows:
             value = json.loads(value)
             if value["protocol"] == "ssh":
-                value["ssh"]["initCommand"] = "touch /home/sshdesk/mcp-init-command-must-not-run"
+                value["ssh"]["initCommand"] = "touch /home/burrow/mcp-init-command-must-not-run"
                 db.execute("UPDATE profiles SET value=? WHERE id=?", (json.dumps(value), profile))
     write_private(config_root / "integration-secrets.json", credentials)
 
@@ -122,7 +122,7 @@ def prepare(repo, task_dir, native):
 def build(repo, task_dir, overlay, template):
     run_dir = Path(tempfile.mkdtemp(prefix="mcp-native-run-", dir=task_dir))
     binary = run_dir / "burrow-mcp-integration"
-    env = dict(os.environ, GOCACHE="/private/tmp/sshdesk-go-build")
+    env = dict(os.environ, GOCACHE="/private/tmp/burrow-go-build")
     subprocess.run(["go", "build", "-race", "-modfile", str(overlay.parent / "integration.mod"),
                     "-overlay", str(overlay), "-o", str(binary), "."], cwd=repo, env=env, check=True)
     bundle = run_dir / "Burrow MCP Integration.app"
@@ -220,7 +220,7 @@ class Suite:
         print("PASS MCP E2E: " + name, flush=True)
 
     def remote(self, container, command):
-        if not container.startswith(("sshdesk-integration-", "sshdesk-ftp-integration-", "sshdesk-ftps-")):
+        if not container.startswith(("burrow-integration-", "burrow-ftp-integration-", "burrow-ftps-")):
             raise RuntimeError("refusing non-fixture container")
         return subprocess.check_output(["docker", "exec", container, "sh", "-c", command], text=True).strip()
 
@@ -263,7 +263,7 @@ class Suite:
         if value["exit_code"] != 7 or value["stdout"] != "seven":
             raise RuntimeError("SSH nonzero exit lost output/status")
         self.case("SSH nonzero exit preserves stdout and exact exit code")
-        value = self.full.call("ssh_exec", dict(connection_id=ssh["id"], command="test ! -t 0 && test ! -e /home/sshdesk/mcp-init-command-must-not-run && printf isolated"))
+        value = self.full.call("ssh_exec", dict(connection_id=ssh["id"], command="test ! -t 0 && test ! -e /home/burrow/mcp-init-command-must-not-run && printf isolated"))
         if value["stdout"] != "isolated":
             raise RuntimeError("MCP inherited PTY or terminal init command")
         self.case("SSH no PTY and no terminal initialization command")
@@ -299,7 +299,7 @@ class Suite:
         ssh = self.connection("Docker Plain Key", "ssh")
         server = json.loads((self.task_dir / "server.json").read_text())
         policy_id = "integration-" + uuid.uuid4().hex
-        marker = "/home/sshdesk/mcp-command-policy-" + uuid.uuid4().hex
+        marker = "/home/burrow/mcp-command-policy-" + uuid.uuid4().hex
         command = "touch " + marker
         policy = dict(ID=policy_id, Version=1, Name="MCP command integration", Category="ssh", Enabled=True,
                       AllKeys=True, ConnectionIDs=[ssh["id"]], CommandRules=[dict(Mode="exact", Pattern=command)])
@@ -318,12 +318,12 @@ class Suite:
         # nested bash -c string. The whole command must be refused before its
         # first segment runs, while lookalike words and quoted data still run.
         policy_id = "integration-" + uuid.uuid4().hex
-        folder = "/home/sshdesk/mcp-command-match-" + uuid.uuid4().hex
-        self.remote(server["container"], "install -d -o sshdesk -g sshdesk " + folder)
+        folder = "/home/burrow/mcp-command-match-" + uuid.uuid4().hex
+        self.remote(server["container"], "install -d -o burrow -g burrow " + folder)
         policy = dict(ID=policy_id, Version=1, Name="MCP command match integration", Category="ssh", Enabled=True,
                       AllKeys=True, ConnectionIDs=[ssh["id"]], CommandRules=[dict(Mode="command", Pattern="rm -rf")])
         self.action("policy", policy=policy)
-        command = "cd /home/sshdesk && touch " + folder + "/started && timeout 30 bash -lc '\\rm -fr " + folder + "'"
+        command = "cd /home/burrow && touch " + folder + "/started && timeout 30 bash -lc '\\rm -fr " + folder + "'"
         denied = self.full.call("ssh_exec", dict(connection_id=ssh["id"], command=command), expect_error=True)
         if denied["error"]["code"] != "intercepted":
             raise RuntimeError("command-mode rule did not intercept rm behind timeout and bash -c")
@@ -339,8 +339,8 @@ class Suite:
         self.case("command-mode rule blocks rm via timeout/bash -c before any segment runs and reports the path; lookalikes still run")
 
         sftp = self.connection("Docker Plain Key", "sftp")
-        folder = "/home/sshdesk/mcp-protected-" + uuid.uuid4().hex
-        self.remote(server["container"], "install -d -o sshdesk -g sshdesk " + folder)
+        folder = "/home/burrow/mcp-protected-" + uuid.uuid4().hex
+        self.remote(server["container"], "install -d -o burrow -g burrow " + folder)
         policy_id = "integration-" + uuid.uuid4().hex
         policy = dict(ID=policy_id, Version=1, Name="MCP file integration", Category="files", Enabled=True,
                       AllKeys=True, ConnectionIDs=[sftp["id"]], FileRules=[dict(Side="remote", Kind="dir", Path=folder,
@@ -353,7 +353,7 @@ class Suite:
             raise RuntimeError("file write protection did not intercept actual replace")
         if self.full.call("files_read", dict(connection_id=sftp["id"], path=target))["text"] != "original":
             raise RuntimeError("file policy rejection changed the target")
-        alias = "/home/sshdesk/mcp-alias-" + uuid.uuid4().hex
+        alias = "/home/burrow/mcp-alias-" + uuid.uuid4().hex
         self.remote(server["container"], "ln -s " + folder + " " + alias)
         alias_result = self.full.call("files_write", dict(connection_id=sftp["id"], path=alias + "/new.txt", text="alias overwrite", mode="replace"), expect_error=True)
         if alias_result["error"]["code"] != "intercepted":
@@ -365,14 +365,14 @@ class Suite:
         readonly.call("files_write", dict(connection_id=sftp["id"], path=target, text="denied", mode="replace"), expect_error=True)
         outside = self.task_dir / "outside-authorized-root.txt"
         outside.write_text("outside")
-        self.full.call("files_upload", dict(connection_id=sftp["id"], path="/home/sshdesk", local_path=str(outside), conflict="error"), expect_error=True)
+        self.full.call("files_upload", dict(connection_id=sftp["id"], path="/home/burrow", local_path=str(outside), conflict="error"), expect_error=True)
         self.case("read-only key and local upload-root authorization reject real protocol mutations")
 
     def policy_during_read(self):
         connection = self.connection("MCP FTP")
         server = json.loads((self.task_dir / "ftp-server.json").read_text())
         filename = "mcp-slow-read-" + uuid.uuid4().hex + ".txt"
-        self.remote(server["container"], "dd if=/dev/zero of=/home/sshdesk/" + filename + " bs=1048576 count=1 status=none; chown sshdesk:sshdesk /home/sshdesk/" + filename)
+        self.remote(server["container"], "dd if=/dev/zero of=/home/burrow/" + filename + " bs=1048576 count=1 status=none; chown burrow:burrow /home/burrow/" + filename)
         future = self.executor.submit(self.full.call, "files_read", dict(connection_id=connection["id"], path="/" + filename, length=1048576), True)
         database = self.config_root / "Burrow/burrow.db"
         def reading():
@@ -416,7 +416,7 @@ class Suite:
 
     def files(self):
         ssh_server = json.loads((self.task_dir / "server.json").read_text())
-        protocols = [(self.connection("Docker Plain Key", "sftp"), ssh_server, "/home/sshdesk")]
+        protocols = [(self.connection("Docker Plain Key", "sftp"), ssh_server, "/home/burrow")]
         for name, filename in [("MCP FTP", "ftp-server.json"), ("MCP FTPS Explicit", "ftps-server.json"), ("MCP FTPS Implicit", "ftps-implicit-server.json")]:
             protocols.append((self.connection(name), json.loads((self.task_dir / filename).read_text()), "/"))
         for connection, server, remote_root in protocols:
@@ -435,7 +435,7 @@ class Suite:
             if self.full.call("files_read", dict(connection_id=connection["id"], path=filename))["text"] != content:
                 raise RuntimeError(label + " create overwrote an existing target")
             self.full.call("files_write", dict(connection_id=connection["id"], path=filename, text="replaced", mode="replace"))
-            physical = filename if remote_root != "/" else "/home/sshdesk" + filename
+            physical = filename if remote_root != "/" else "/home/burrow" + filename
             digest = self.remote(server["container"], "sha256sum " + physical).split()[0]
             if digest != hashlib.sha256(b"replaced").hexdigest():
                 raise RuntimeError(label + " independent server hash mismatch")
@@ -445,7 +445,7 @@ class Suite:
         self.case("FTPS native adapter rejects untrusted certificate")
 
     def transfers(self):
-        for name, protocol, root in [("Docker Plain Key", "sftp", "/home/sshdesk"), ("MCP FTP", None, "/"), ("MCP FTPS Explicit", None, "/"), ("MCP FTPS Implicit", None, "/")]:
+        for name, protocol, root in [("Docker Plain Key", "sftp", "/home/burrow"), ("MCP FTP", None, "/"), ("MCP FTPS Explicit", None, "/"), ("MCP FTPS Implicit", None, "/")]:
             connection = self.connection(name, protocol)
             directory = self.task_dir / "mcp-local" / ("upload-" + uuid.uuid4().hex)
             directory.mkdir()
@@ -505,7 +505,7 @@ class Suite:
 
     def verify_uploaded(self, source):
         server = json.loads((self.task_dir / "ftp-server.json").read_text())
-        remote_hash = self.remote(server["container"], "sha256sum /home/sshdesk/" + source.name).split()[0]
+        remote_hash = self.remote(server["container"], "sha256sum /home/burrow/" + source.name).split()[0]
         if remote_hash != hashlib.sha256(source.read_bytes()).hexdigest():
             raise RuntimeError("resumed FTP transfer hash mismatch")
 
@@ -538,7 +538,7 @@ class Suite:
         self.wait_task(running, "cancelled")
         self.wait_native_drained(running)
         server = json.loads((self.task_dir / "ftp-server.json").read_text())
-        if self.remote(server["container"], "test ! -e /home/sshdesk/" + queued_source.name + " && printf absent") != "absent":
+        if self.remote(server["container"], "test ! -e /home/burrow/" + queued_source.name + " && printf absent") != "absent":
             raise RuntimeError("cancelled queued task created a remote file")
         self.case("queued/running cancellation through MCP and actual queue convergence")
 
@@ -583,7 +583,7 @@ class Suite:
         self.wait_progress(restricted,"scope")
         sftp = self.connection("Docker Plain Key","sftp")
         unrelated_source = self.large_source("scope-unrelated",1024*1024)
-        unrelated = MCP(self.state,"scope").call("files_upload",dict(connection_id=sftp["id"],path="/home/sshdesk",local_path=str(unrelated_source),conflict="error"))["task_id"]
+        unrelated = MCP(self.state,"scope").call("files_upload",dict(connection_id=sftp["id"],path="/home/burrow",local_path=str(unrelated_source),conflict="error"))["task_id"]
         self.action("shrink",role="scope",connection_id=self.connection("MCP FTP")["id"])
         self.driver.wait("only narrowed grant task cancelled",lambda:self.database_task(restricted)["state"]=="cancelled",timeout=30)
         self.wait_task(unrelated,role="scope")
@@ -605,9 +605,9 @@ class Suite:
     def recovery_prepare(self):
         source = self.large_source("application-restart", 12 * 1024 * 1024)
         server = json.loads((self.task_dir / "ftp-server.json").read_text())
-        destination = "/home/sshdesk/" + source.name
+        destination = "/home/burrow/" + source.name
         self.remote(server["container"], "printf 'previous contents' > " + destination +
-                    " && chown sshdesk:sshdesk " + destination + " && chmod 600 " + destination)
+                    " && chown burrow:burrow " + destination + " && chmod 600 " + destination)
         task_id = self.full.call("files_upload", dict(connection_id=self.connection("MCP FTP")["id"],
                                 path="/", local_path=str(source), conflict="overwrite"))["task_id"]
         self.wait_progress(task_id)
@@ -628,7 +628,7 @@ class Suite:
             db.execute("CREATE TRIGGER mcp_e2e_audit_failure BEFORE INSERT ON mcp_operations BEGIN SELECT RAISE(FAIL,'integration audit storage failure'); END")
         try:
             ssh = self.connection("Docker Plain Key", "ssh")
-            marker = "/home/sshdesk/audit-must-not-execute-" + uuid.uuid4().hex
+            marker = "/home/burrow/audit-must-not-execute-" + uuid.uuid4().hex
             # The audited /mcp entry persists the operation before the SDK runs the
             # tool, so a failed beginning record is rejected there with HTTP 503.
             failure = self.full.request("tools/call",dict(name="ssh_exec",arguments=dict(connection_id=ssh["id"],command="touch " + marker)))
@@ -693,17 +693,17 @@ def main():
     parser.add_argument("--prepare-only", action="store_true")
     parser.add_argument("--reuse-run", type=Path, help="reuse a prior isolated native build/configuration while refining scenarios")
     parser.add_argument("--scenario", choices=("all", "lifecycle", "recovery"), default="all")
-    parser.add_argument("--fixture", default=os.environ.get("SSHDESK_TEST_DIR"))
+    parser.add_argument("--fixture", default=os.environ.get("BURROW_TEST_DIR"))
     parser.add_argument("--template", type=Path, help="existing Burrow.app resource template; defaults to the repository build")
     args = parser.parse_args()
     if not args.fixture:
-        parser.error("--fixture or SSHDESK_TEST_DIR is required")
+        parser.error("--fixture or BURROW_TEST_DIR is required")
     repo = Path(__file__).resolve().parents[1]
     task_dir = Path(args.fixture).resolve()
     native = load_native(repo)
     native.ensure_unlocked()
     address = json.loads((task_dir / "server.json").read_text())["address"]
-    os.environ.update(SSHDESK_TEST_DIR=str(task_dir), SSHDESK_TEST_ADDRESS=address)
+    os.environ.update(BURROW_TEST_DIR=str(task_dir), BURROW_TEST_ADDRESS=address)
     if args.reuse_run:
         previous = json.loads((args.reuse_run / "report.json").read_text())
         config_root, bundle = Path(previous["configuration"]), Path(previous["bundle"])
@@ -719,7 +719,7 @@ def main():
     print("MCP native integration artifacts: " + str(run_dir), flush=True)
     try:
         with native.isolated_agent(task_dir) as agent:
-            env = dict(os.environ, SSHDESK_INTEGRATION_CONFIG=str(config_root), SSH_AUTH_SOCK=agent,
+            env = dict(os.environ, BURROW_INTEGRATION_CONFIG=str(config_root), SSH_AUTH_SOCK=agent,
                        MYGO_AUTOMATION=str(run_dir / "native.sock"))
             with native.native_window(repo, bundle, env, config_root, run_dir, 1, "主导航", "tabList") as driver:
                 suite = Suite(driver, task_dir, config_root, report)

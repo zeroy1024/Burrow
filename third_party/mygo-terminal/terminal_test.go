@@ -17,7 +17,7 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/egoist/mygo/sshdesk-terminal/internal/vt"
+	"github.com/egoist/mygo/burrow-terminal/internal/vt"
 	"github.com/egoist/mygo/transfer"
 	"github.com/egoist/mygo/ui"
 	"golang.org/x/image/font/gofont/gomono"

@@ -4,10 +4,10 @@ import (
 	"errors"
 
 	"github.com/egoist/mygo/ui"
-	"sshdesk/internal/locales"
-	"sshdesk/internal/termtheme"
-	"sshdesk/internal/theme"
-	"sshdesk/internal/uikit"
+	"github.com/zeroy1024/Burrow/internal/locales"
+	"github.com/zeroy1024/Burrow/internal/termtheme"
+	"github.com/zeroy1024/Burrow/internal/theme"
+	"github.com/zeroy1024/Burrow/internal/uikit"
 )
 
 func (a *app) importedThemeUse(name string) string {

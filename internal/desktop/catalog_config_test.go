@@ -7,7 +7,7 @@ import (
 	"slices"
 	"testing"
 
-	"sshdesk/internal/store"
+	"github.com/zeroy1024/Burrow/internal/store"
 )
 
 func catalogAppForTest(t *testing.T, path string) *app {

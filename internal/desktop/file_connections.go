@@ -11,12 +11,12 @@ import (
 	"strings"
 	"time"
 
-	"sshdesk/internal/fileclient"
-	"sshdesk/internal/locales"
-	"sshdesk/internal/mcpserver"
-	"sshdesk/internal/sshclient"
-	"sshdesk/internal/uikit"
-	"sshdesk/internal/vault"
+	"github.com/zeroy1024/Burrow/internal/fileclient"
+	"github.com/zeroy1024/Burrow/internal/locales"
+	"github.com/zeroy1024/Burrow/internal/mcpserver"
+	"github.com/zeroy1024/Burrow/internal/sshclient"
+	"github.com/zeroy1024/Burrow/internal/uikit"
+	"github.com/zeroy1024/Burrow/internal/vault"
 )
 
 type fileNavigation struct {

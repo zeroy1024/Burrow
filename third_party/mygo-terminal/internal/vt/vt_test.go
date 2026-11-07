@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/egoist/mygo/sshdesk-terminal/internal/library"
+	"github.com/egoist/mygo/burrow-terminal/internal/library"
 )
 
 // loadLib loads the libghostty-vt of the terminal plugin, which it

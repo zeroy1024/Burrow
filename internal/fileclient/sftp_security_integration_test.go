@@ -35,7 +35,7 @@ func TestSFTPPrivateStageAtomicCreation(t *testing.T) {
 			t.Error(err)
 		}
 	})
-	name := path.Join("/home/sshdesk", ".sshdesk-private-"+rand.Text()+".part")
+	name := path.Join("/home/burrow", ".burrow-private-"+rand.Text()+".part")
 	defer removeSFTPTestFile(t, client, name)
 	private := client.(PrivateStageWriter)
 	output, created, err := private.OpenPrivateWrite(t.Context(), name, 0, false, true)
@@ -88,7 +88,7 @@ func TestSFTPPrivateStageResume(t *testing.T) {
 					t.Error(err)
 				}
 			})
-			name := path.Join("/home/sshdesk", ".sshdesk-resume-"+rand.Text()+".part")
+			name := path.Join("/home/burrow", ".burrow-resume-"+rand.Text()+".part")
 			defer removeSFTPTestFile(t, client, name)
 			output, err := client.OpenWrite(t.Context(), name, 0, true)
 			if err != nil {

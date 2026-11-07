@@ -4,8 +4,8 @@ import (
 	"strconv"
 
 	"github.com/egoist/mygo/ui"
-	"sshdesk/internal/locales"
-	"sshdesk/internal/theme"
+	"github.com/zeroy1024/Burrow/internal/locales"
+	"github.com/zeroy1024/Burrow/internal/theme"
 )
 
 type BadgeProps struct {

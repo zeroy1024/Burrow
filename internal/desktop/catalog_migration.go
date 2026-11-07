@@ -2,8 +2,8 @@ package desktop
 
 import (
 	"github.com/egoist/mygo/ui"
-	"sshdesk/internal/locales"
-	"sshdesk/internal/uikit"
+	"github.com/zeroy1024/Burrow/internal/locales"
+	"github.com/zeroy1024/Burrow/internal/uikit"
 )
 
 func (a *app) showCatalogError(c *ui.Context) {

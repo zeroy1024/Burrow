@@ -5,9 +5,9 @@ import (
 	"strconv"
 	"time"
 
-	"sshdesk/internal/locales"
-	"sshdesk/internal/mcpserver"
-	"sshdesk/internal/store"
+	"github.com/zeroy1024/Burrow/internal/locales"
+	"github.com/zeroy1024/Burrow/internal/mcpserver"
+	"github.com/zeroy1024/Burrow/internal/store"
 )
 
 type mcpPromptObserverKey struct{}

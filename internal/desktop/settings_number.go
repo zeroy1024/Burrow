@@ -2,7 +2,7 @@ package desktop
 
 import (
 	"github.com/egoist/mygo/ui"
-	"sshdesk/internal/uikit"
+	"github.com/zeroy1024/Burrow/internal/uikit"
 )
 
 func settingsNumberInput(c *ui.Context, label string, value *float64, lo, hi, step float64, width float32, grouped bool) bool {

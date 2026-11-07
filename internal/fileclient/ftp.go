@@ -17,7 +17,7 @@ import (
 	"sync"
 	"time"
 
-	"sshdesk/internal/locales"
+	"github.com/zeroy1024/Burrow/internal/locales"
 )
 
 const ftpOperationTimeout = 20 * time.Second
@@ -674,7 +674,7 @@ func (c *ftpClient) Rename(ctx context.Context, oldName, newName string, options
 			return err
 		}
 		if caseOnly {
-			temporary := path.Join(path.Dir(oldWire), ".sshdesk-rename-"+rand.Text())
+			temporary := path.Join(path.Dir(oldWire), ".burrow-rename-"+rand.Text())
 			decoded, err := c.codec.decode(temporary)
 			if err != nil {
 				return err

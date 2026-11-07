@@ -4,9 +4,9 @@ import (
 	"image/color"
 
 	"github.com/egoist/mygo/ui"
-	"sshdesk/internal/locales"
-	"sshdesk/internal/theme"
-	"sshdesk/internal/uikit"
+	"github.com/zeroy1024/Burrow/internal/locales"
+	"github.com/zeroy1024/Burrow/internal/theme"
+	"github.com/zeroy1024/Burrow/internal/uikit"
 )
 
 type scrollbarState = uikit.ScrollbarState

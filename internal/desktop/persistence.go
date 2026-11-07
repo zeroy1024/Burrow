@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"github.com/egoist/mygo"
-	"sshdesk/internal/locales"
-	"sshdesk/internal/store"
-	"sshdesk/internal/uikit"
+	"github.com/zeroy1024/Burrow/internal/locales"
+	"github.com/zeroy1024/Burrow/internal/store"
+	"github.com/zeroy1024/Burrow/internal/uikit"
 )
 
 type persistenceRequest struct {

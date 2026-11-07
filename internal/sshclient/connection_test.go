@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"sshdesk/internal/sshclient"
+	"github.com/zeroy1024/Burrow/internal/sshclient"
 
 	"golang.org/x/crypto/ssh"
 )

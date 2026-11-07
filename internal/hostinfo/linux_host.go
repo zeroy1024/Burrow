@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"sshdesk/internal/locales"
+	"github.com/zeroy1024/Burrow/internal/locales"
 )
 
 // Linux reads /proc through POSIX shell builtins, so it needs no procps.

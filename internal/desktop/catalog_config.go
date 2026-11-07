@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"sshdesk/internal/store"
+	"github.com/zeroy1024/Burrow/internal/store"
 )
 
 type catalogConfigState struct{ loadErr error }

@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"sshdesk/internal/fileclient"
+	"github.com/zeroy1024/Burrow/internal/fileclient"
 )
 
 func TestLocalRootAnchorsDownloadsAndCleanup(t *testing.T) {

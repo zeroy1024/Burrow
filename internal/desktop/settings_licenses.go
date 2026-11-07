@@ -6,11 +6,11 @@ import (
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/transfer"
 	"github.com/egoist/mygo/ui"
-	"sshdesk/assets"
-	"sshdesk/internal/locales"
-	"sshdesk/internal/termtheme"
-	"sshdesk/internal/theme"
-	"sshdesk/internal/uikit"
+	"github.com/zeroy1024/Burrow/assets"
+	"github.com/zeroy1024/Burrow/internal/locales"
+	"github.com/zeroy1024/Burrow/internal/termtheme"
+	"github.com/zeroy1024/Burrow/internal/theme"
+	"github.com/zeroy1024/Burrow/internal/uikit"
 )
 
 // License texts retain the upstream copyright notices for bundled dependencies and assets.

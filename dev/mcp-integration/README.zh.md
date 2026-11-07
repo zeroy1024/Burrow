@@ -6,7 +6,7 @@
 
 ## 启动夹具
 
-先按 [本机协议联调说明](../ssh-integration/README.zh.md) 运行 SSH 启动器，将最后一行 JSON 的目录写入 `SSHDESK_TEST_DIR`，并设置 `SSHDESK_TEST_ADDRESS`。所有临时凭据与证书保持在 `0700` 夹具目录，不能提交到仓库。
+先按 [本机协议联调说明](../ssh-integration/README.zh.md) 运行 SSH 启动器，将最后一行 JSON 的目录写入 `BURROW_TEST_DIR`，并设置 `BURROW_TEST_ADDRESS`。所有临时凭据与证书保持在 `0700` 夹具目录，不能提交到仓库。
 
 ```sh
 python3 -B scripts/ssh-integration-server.py
@@ -22,8 +22,8 @@ FTPS 始终校验临时 CA 和主机名，不安装系统证书，不使用 `Ins
 先构建当前平台的 `Burrow.app` 资源模板，或用 `--template` 指定已有应用包。需已解锁、可获得键盘焦点的 macOS 会话：
 
 ```sh
-GOCACHE=/private/tmp/sshdesk-go-build mise exec -- python3 -B -u scripts/mcp-integration-ui.py \
-  --fixture "$SSHDESK_TEST_DIR" \
+GOCACHE=/private/tmp/burrow-go-build mise exec -- python3 -B -u scripts/mcp-integration-ui.py \
+  --fixture "$BURROW_TEST_DIR" \
   --template /absolute/path/to/Burrow.app
 ```
 

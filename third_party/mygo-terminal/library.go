@@ -6,8 +6,8 @@ import (
 	"runtime"
 	"sync"
 
-	"github.com/egoist/mygo/sshdesk-terminal/internal/library"
-	"github.com/egoist/mygo/sshdesk-terminal/internal/vt"
+	"github.com/egoist/mygo/burrow-terminal/internal/library"
+	"github.com/egoist/mygo/burrow-terminal/internal/vt"
 )
 
 //go:generate go run ./internal/libbuild

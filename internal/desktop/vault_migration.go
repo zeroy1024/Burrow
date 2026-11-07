@@ -9,10 +9,10 @@ import (
 	"path/filepath"
 
 	"github.com/egoist/mygo"
+	"github.com/zeroy1024/Burrow/internal/locales"
+	"github.com/zeroy1024/Burrow/internal/localfs"
+	"github.com/zeroy1024/Burrow/internal/vault"
 	"golang.org/x/crypto/ssh"
-	"sshdesk/internal/locales"
-	"sshdesk/internal/localfs"
-	"sshdesk/internal/vault"
 )
 
 type migrationPassphraseError struct{ ID, Name string }

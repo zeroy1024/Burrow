@@ -15,7 +15,7 @@ mise exec -- go run .
 
 Ordinary `go run` uses Burrow Dev data and a separate credential namespace; release packages use Burrow. See [data and credentials](storage.md) for data models, backups, and legacy-format boundaries. SQLite uses pinned `modernc.org/sqlite v1.61.1`, without system SQLite or CGo.
 
-The first run/build downloads the pinned terminal plugin's native Ghostty VT libraries; later runs use caches. The Go module remains `sshdesk`, independent of the Burrow product name.
+The first run/build downloads the pinned terminal plugin's native Ghostty VT libraries; later runs use caches. The main module is `github.com/zeroy1024/Burrow`, so plain `go run .` generates an executable named `Burrow`. The app still uses the separate Burrow Dev data namespace. The local terminal fork is `github.com/egoist/mygo/burrow-terminal`; its MyGo prefix permits the existing internal SDK imports.
 
 ## UI icons
 
@@ -98,7 +98,7 @@ Use `gofmt -l` for a read-only check of changed Go files. Do not format unrelate
 If a restricted environment cannot write the default Go build cache, use a task-specific directory, for example:
 
 ```sh
-GOCACHE=/private/tmp/sshdesk-go-build mise exec -- go test ./...
+GOCACHE=/private/tmp/burrow-go-build mise exec -- go test ./...
 ```
 
 Passing checks establish only the scope actually run. See [interpreting validation](limitations.md#interpreting-validation) for protocol, native window, and visual distinctions.
@@ -171,7 +171,7 @@ Cross-compilation cannot run native Windows tests. Run existing checks and the [
 
 [dev/ssh-integration](../dev/ssh-integration/) and [dev/ftp-integration](../dev/ftp-integration/) provide Docker fixtures through [scripts/ssh-integration-server.py](../scripts/ssh-integration-server.py). They use random local ports and temporary credentials rather than existing private sites.
 
-After setting fixture-provided `SSHDESK_TEST_ADDRESS`, `SSHDESK_TEST_DIR`, and, when needed, `SSHDESK_FTP_ADDRESS`, run:
+After setting fixture-provided `BURROW_TEST_ADDRESS`, `BURROW_TEST_DIR`, and, when needed, `BURROW_FTP_ADDRESS`, run:
 
 ```sh
 mise exec -- go test -race -tags=integration ./... -count=1 -timeout=180s

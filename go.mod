@@ -1,4 +1,4 @@
-module sshdesk
+module github.com/zeroy1024/Burrow
 
 go 1.27.3
 
@@ -7,7 +7,7 @@ tool github.com/egoist/mygo/cmd/mygo
 require (
 	github.com/Microsoft/go-winio v0.6.4
 	github.com/egoist/mygo v0.7.3
-	github.com/egoist/mygo/sshdesk-terminal v0.0.0
+	github.com/egoist/mygo/burrow-terminal v0.0.0
 	github.com/modelcontextprotocol/go-sdk v1.8.0
 	github.com/pkg/sftp v1.13.12
 	golang.org/x/crypto v0.58.0
@@ -44,6 +44,6 @@ require (
 	modernc.org/memory v1.12.1 // indirect
 )
 
-replace github.com/egoist/mygo/sshdesk-terminal => ./third_party/mygo-terminal
+replace github.com/egoist/mygo/burrow-terminal => ./third_party/mygo-terminal
 
 replace github.com/pkg/sftp => ./third_party/pkg-sftp

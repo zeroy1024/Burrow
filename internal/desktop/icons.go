@@ -4,7 +4,7 @@ import (
 	"image/color"
 
 	"github.com/egoist/mygo/ui"
-	"sshdesk/internal/uikit"
+	"github.com/zeroy1024/Burrow/internal/uikit"
 )
 
 var (

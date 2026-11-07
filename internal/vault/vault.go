@@ -17,11 +17,11 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/zeroy1024/Burrow/internal/locales"
+	"github.com/zeroy1024/Burrow/internal/localfs"
+	"github.com/zeroy1024/Burrow/internal/store"
 	"golang.org/x/crypto/argon2"
 	"golang.org/x/crypto/chacha20poly1305"
-	"sshdesk/internal/locales"
-	"sshdesk/internal/localfs"
-	"sshdesk/internal/store"
 )
 
 var (

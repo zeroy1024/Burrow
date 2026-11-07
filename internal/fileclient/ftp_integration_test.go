@@ -25,14 +25,14 @@ import (
 	"testing"
 	"time"
 
-	"sshdesk/internal/fileclient"
+	"github.com/zeroy1024/Burrow/internal/fileclient"
 )
 
 func ftpDockerConfig(t *testing.T) fileclient.FTPConfig {
 	t.Helper()
-	address, directory := os.Getenv("SSHDESK_FTP_ADDRESS"), os.Getenv("SSHDESK_TEST_DIR")
+	address, directory := os.Getenv("BURROW_FTP_ADDRESS"), os.Getenv("BURROW_TEST_DIR")
 	if address == "" || directory == "" {
-		t.Skip("SSHDESK_FTP_ADDRESS and SSHDESK_TEST_DIR are required for the Docker FTP fixture")
+		t.Skip("BURROW_FTP_ADDRESS and BURROW_TEST_DIR are required for the Docker FTP fixture")
 	}
 	host, portText, err := net.SplitHostPort(address)
 	if err != nil {
@@ -50,7 +50,7 @@ func ftpDockerConfig(t *testing.T) fileclient.FTPConfig {
 		t.Fatal(err)
 	}
 	defer clear(password)
-	return fileclient.FTPConfig{Host: host, Port: port, User: "sshdesk", Password: strings.TrimSpace(string(password))}
+	return fileclient.FTPConfig{Host: host, Port: port, User: "burrow", Password: strings.TrimSpace(string(password))}
 }
 
 func openFTPFixture(t *testing.T, cfg fileclient.FTPConfig) fileclient.Client {
@@ -288,9 +288,9 @@ func TestFTPIntegrationStatBurst(t *testing.T) {
 }
 
 func TestFTPIntegrationReportedPrefix(t *testing.T) {
-	name := os.Getenv("SSHDESK_FTP_RESUME_PART")
+	name := os.Getenv("BURROW_FTP_RESUME_PART")
 	if name == "" {
-		t.Skip("SSHDESK_FTP_RESUME_PART selects a read-only reported fixture part")
+		t.Skip("BURROW_FTP_RESUME_PART selects a read-only reported fixture part")
 	}
 	client := openFTPFixture(t, ftpDockerConfig(t))
 	entry, err := client.Stat(t.Context(), name)
@@ -315,9 +315,9 @@ func TestFTPIntegrationReportedPrefix(t *testing.T) {
 
 func ftpsDockerConfig(t *testing.T, metadata string) fileclient.FTPConfig {
 	t.Helper()
-	directory := os.Getenv("SSHDESK_TEST_DIR")
+	directory := os.Getenv("BURROW_TEST_DIR")
 	if directory == "" {
-		t.Skip("SSHDESK_TEST_DIR is required for the Docker FTPS fixture")
+		t.Skip("BURROW_TEST_DIR is required for the Docker FTPS fixture")
 	}
 	data, err := os.ReadFile(filepath.Join(directory, metadata))
 	if errors.Is(err, os.ErrNotExist) {
@@ -358,7 +358,7 @@ func ftpsDockerConfig(t *testing.T, metadata string) fileclient.FTPConfig {
 		t.Fatal(err)
 	}
 	defer clear(password)
-	return fileclient.FTPConfig{Host: host, Port: port, User: "sshdesk", Password: strings.TrimSpace(string(password)),
+	return fileclient.FTPConfig{Host: host, Port: port, User: "burrow", Password: strings.TrimSpace(string(password)),
 		TLSMode: fixture.TLSMode, TLSConfig: &tls.Config{RootCAs: roots}}
 }
 

@@ -1,7 +1,7 @@
 package terminal
 
 import (
-	"github.com/egoist/mygo/sshdesk-terminal/internal/vt"
+	"github.com/egoist/mygo/burrow-terminal/internal/vt"
 	"github.com/egoist/mygo/ui"
 )
 

@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"sync"
 
-	"sshdesk/internal/locales"
-	"sshdesk/internal/store"
-	"sshdesk/internal/wggateway"
+	"github.com/zeroy1024/Burrow/internal/locales"
+	"github.com/zeroy1024/Burrow/internal/store"
+	"github.com/zeroy1024/Burrow/internal/wggateway"
 )
 
 type wgGatewayTransport struct {

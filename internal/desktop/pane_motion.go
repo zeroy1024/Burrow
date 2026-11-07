@@ -4,12 +4,12 @@ import (
 	"math"
 	"time"
 
-	"sshdesk/internal/locales"
-	"sshdesk/internal/theme"
+	"github.com/zeroy1024/Burrow/internal/locales"
+	"github.com/zeroy1024/Burrow/internal/theme"
 
 	"github.com/egoist/mygo/plugins/glass"
 	"github.com/egoist/mygo/ui"
-	"sshdesk/internal/uikit"
+	"github.com/zeroy1024/Burrow/internal/uikit"
 )
 
 func canSplit(r ui.Rect, zone dropZone) bool {

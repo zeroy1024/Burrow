@@ -1,6 +1,6 @@
 package mcpserver
 
-import "sshdesk/internal/store"
+import "github.com/zeroy1024/Burrow/internal/store"
 
 func (c Connection) DisplayID() string {
 	if c.CanonicalID != "" {

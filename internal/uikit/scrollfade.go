@@ -3,7 +3,7 @@ package uikit
 import (
 	"github.com/egoist/mygo/plugins/glass"
 	"github.com/egoist/mygo/ui"
-	"sshdesk/internal/theme"
+	"github.com/zeroy1024/Burrow/internal/theme"
 )
 
 type ScrollFadeProps struct {

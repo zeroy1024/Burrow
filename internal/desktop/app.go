@@ -9,16 +9,16 @@ import (
 	"sync"
 	"time"
 
-	"sshdesk/internal/locales"
-	"sshdesk/internal/localfs"
-	"sshdesk/internal/store"
-	"sshdesk/internal/termtheme"
-	"sshdesk/internal/theme"
-	"sshdesk/internal/uikit"
-	"sshdesk/internal/vault"
+	"github.com/zeroy1024/Burrow/internal/locales"
+	"github.com/zeroy1024/Burrow/internal/localfs"
+	"github.com/zeroy1024/Burrow/internal/store"
+	"github.com/zeroy1024/Burrow/internal/termtheme"
+	"github.com/zeroy1024/Burrow/internal/theme"
+	"github.com/zeroy1024/Burrow/internal/uikit"
+	"github.com/zeroy1024/Burrow/internal/vault"
 
 	"github.com/egoist/mygo"
-	nativeterm "github.com/egoist/mygo/sshdesk-terminal"
+	nativeterm "github.com/egoist/mygo/burrow-terminal"
 	"github.com/egoist/mygo/ui"
 )
 

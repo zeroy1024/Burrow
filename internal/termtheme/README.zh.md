@@ -18,7 +18,7 @@
 | `LICENSES.md` | 配色的 MIT 许可证全文 |
 | `licenses.go` | 内嵌许可证，供设置页展示 |
 
-本包只依赖 Go 标准库，通过 `sshdesk/internal/termtheme` 接入应用。`schemes/` 必须与 `state.go` 相邻，供 `//go:embed` 读取。用户操作见[终端与配色](../../docs/terminal-themes.zh.md)，检查命令见[开发与构建](../../docs/development.zh.md)。
+本包只依赖 Go 标准库，通过 `github.com/zeroy1024/Burrow/internal/termtheme` 接入应用。`schemes/` 必须与 `state.go` 相邻，供 `//go:embed` 读取。用户操作见[终端与配色](../../docs/terminal-themes.zh.md)，检查命令见[开发与构建](../../docs/development.zh.md)。
 
 ## 内置配色
 

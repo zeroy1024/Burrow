@@ -17,13 +17,13 @@ import (
 	"time"
 
 	"github.com/egoist/mygo"
+	"github.com/zeroy1024/Burrow/internal/locales"
+	"github.com/zeroy1024/Burrow/internal/sshclient"
+	"github.com/zeroy1024/Burrow/internal/store"
+	"github.com/zeroy1024/Burrow/internal/uikit"
+	"github.com/zeroy1024/Burrow/internal/vault"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
-	"sshdesk/internal/locales"
-	"sshdesk/internal/sshclient"
-	"sshdesk/internal/store"
-	"sshdesk/internal/uikit"
-	"sshdesk/internal/vault"
 )
 
 type credentialState struct {

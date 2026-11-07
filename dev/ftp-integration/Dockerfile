@@ -2,7 +2,7 @@ FROM ubuntu:24.04
 
 RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends vsftpd \
-    && useradd --create-home --shell /bin/bash sshdesk \
+    && useradd --create-home --shell /bin/bash burrow \
     && install -d -m 0755 /var/run/vsftpd/empty
 
 COPY vsftpd.conf /etc/vsftpd.conf

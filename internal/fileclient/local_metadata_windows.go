@@ -5,7 +5,7 @@ import (
 	"io/fs"
 	"os"
 
-	"sshdesk/internal/localfs"
+	"github.com/zeroy1024/Burrow/internal/localfs"
 )
 
 func setLocalMetadata(entry *Entry, _ fs.FileInfo) {

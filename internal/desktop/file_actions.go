@@ -7,9 +7,9 @@ import (
 	"strings"
 
 	"github.com/egoist/mygo/ui"
-	"sshdesk/internal/fileclient"
-	"sshdesk/internal/locales"
-	"sshdesk/internal/uikit"
+	"github.com/zeroy1024/Burrow/internal/fileclient"
+	"github.com/zeroy1024/Burrow/internal/locales"
+	"github.com/zeroy1024/Burrow/internal/uikit"
 )
 
 func (a *app) applyFileAction(c *ui.Context, dialog *fileActionDialog) bool {

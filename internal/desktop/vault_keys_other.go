@@ -2,6 +2,6 @@
 
 package desktop
 
-import "sshdesk/internal/vault"
+import "github.com/zeroy1024/Burrow/internal/vault"
 
 func platformUnlockKeys() vault.KeyStore { return nil }

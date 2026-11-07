@@ -14,8 +14,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/zeroy1024/Burrow/internal/localfs"
 	_ "modernc.org/sqlite"
-	"sshdesk/internal/localfs"
 )
 
 //go:embed schema.sql

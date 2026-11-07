@@ -5,12 +5,12 @@ import (
 	"strings"
 	"time"
 
-	"sshdesk/internal/locales"
-	"sshdesk/internal/termtheme"
-	"sshdesk/internal/theme"
+	"github.com/zeroy1024/Burrow/internal/locales"
+	"github.com/zeroy1024/Burrow/internal/termtheme"
+	"github.com/zeroy1024/Burrow/internal/theme"
 
 	"github.com/egoist/mygo/ui"
-	"sshdesk/internal/uikit"
+	"github.com/zeroy1024/Burrow/internal/uikit"
 )
 
 // reconnectHint ends the output of a pane that has no shell, as a shell ends

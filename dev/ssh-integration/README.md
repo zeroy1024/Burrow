@@ -12,7 +12,7 @@ From the repository root:
 python3 scripts/ssh-integration-server.py
 ```
 
-The script builds Ubuntu 24.04 / OpenSSH and starts a separate container labeled `dev.sshdesk.integration=true`. SSH maps to a random `127.0.0.1` port only. No host directories or Docker volumes are mounted. The container includes full `vim`, `htop`, and `top`, uses `C.UTF-8`, and logs in as `sshdesk`.
+The script builds Ubuntu 24.04 / OpenSSH and starts a separate container labeled `dev.burrow.integration=true`. SSH maps to a random `127.0.0.1` port only. No host directories or Docker volumes are mounted. The container includes full `vim`, `htop`, and `top`, uses `C.UTF-8`, and logs in as `burrow`.
 
 SSH enables `internal-sftp`. Fixtures include `hello.txt`, `你好.txt`, `nested/inside.txt`, and unreadable `denied/` for directory/permission checks.
 
@@ -21,20 +21,22 @@ The final JSON line provides `container`, `address`, and `directory`. Passwords,
 Use those values in the task environment:
 
 ```sh
-export SSHDESK_TEST_ADDRESS='127.0.0.1:<mapped-port>'
-export SSHDESK_TEST_DIR='/private/tmp/sshdesk-integration-<temporary-directory>'
+export BURROW_TEST_ADDRESS='127.0.0.1:<mapped-port>'
+export BURROW_TEST_DIR='/private/tmp/burrow-integration-<temporary-directory>'
 ```
 
 Start an independent FTP server using the same temporary password:
 
 ```sh
 python3 -B scripts/ssh-integration-server.py --ftp
-export SSHDESK_FTP_ADDRESS='127.0.0.1:<ftp-mapped-port>'
+export BURROW_FTP_ADDRESS='127.0.0.1:<ftp-mapped-port>'
 ```
 
 FTP uses a separate vsftpd container with init. Its control port and 64 passive data ports map locally only. Authenticated reads/writes are enabled at 1 MiB/s per connection to make pause/cancel/recovery observable. SSH metadata is `server.json`; FTP metadata is `ftp-server.json` in the same fixture directory. Credentials are shared, but connections/sessions are independent.
 
 Use `python3 -B scripts/ssh-integration-server.py --ftps` for explicit FTPS and append `--implicit` for implicit FTPS. Temporary CA, server certificate with loopback SANs, and metadata stay in the fixture directory. TLS verification and data-channel session reuse remain enabled. See [MCP integration](../mcp-integration/README.md) for real HTTP, native controls, and recovery.
+
+Current launchers and tests use `BURROW_*` variables and `dev.burrow.integration` fixtures. Start fresh fixtures after updating from an older checkout; historical validation records keep their original paths.
 
 ## Transport validation
 
@@ -48,7 +50,7 @@ It also covers independent Shell/SFTP channels sharing one connection, final-ref
 
 File security checks cover local source/destination directories replaced by out-of-tree links during read/write/cleanup, final-file replacement, and actual SFTP OPEN requests carrying exclusive creation and `0600` atomically. Old parts with `0644`, `0400`, or `0000` are restricted before resume writes while retaining confirmed contents. Local file tests do not need Docker; SFTP security tests use the real fixture.
 
-Docker tests use the `integration` build tag. Ordinary `go test ./...` does not connect to them; untagged SDK lifecycle tests use local in-process SSH services only. Docker targets must be local. If the build cache is unwritable, set `GOCACHE=/private/tmp/sshdesk-go-cache`.
+Docker tests use the `integration` build tag. Ordinary `go test ./...` does not connect to them; untagged SDK lifecycle tests use local in-process SSH services only. Docker targets must be local. If the build cache is unwritable, set `GOCACHE=/private/tmp/burrow-go-cache`.
 
 ## Native window validation
 
@@ -80,7 +82,7 @@ Default mode also checks independent add/edit/delete in both catalogs, SQLite sc
 - Pausing the controlled FTP container so refresh replies arrive while a file row is held; sources remain until release and cancelled drops create no transfer. The container is unpaused whether assertions pass or fail.
 - Normal shutdown and restart of the same isolated app/config, offline task ownership restoration, unchanged confirmed offsets, explicit resume, actual content, and partial cleanup.
 
-Core/file modes require `SSHDESK_FTP_ADDRESS`. Each core run uses independent directories in both containers. The launcher checks every native process's exit record, race log, and released SSH/FTP connections, writing `native-run-*/result.json`. Partial failure cannot be recorded as success.
+Core/file modes require `BURROW_FTP_ADDRESS`. Each core run uses independent directories in both containers. The launcher checks every native process's exit record, race log, and released SSH/FTP connections, writing `native-run-*/result.json`. Partial failure cannot be recorded as success.
 
 Do not run SDK Docker tests concurrently: connection/authentication counters would interfere. Acceptance requires the actual app's exit state and race logs, not only LaunchServices `open` returning success.
 
@@ -93,7 +95,7 @@ Source compatibility checked on 2026-11-07: the complete SSH and MCP overlays we
 Servers remain running for manual checks after the script exits. Inspect fixture containers and stop only the exact names from the launch result:
 
 ```sh
-docker ps --filter label=dev.sshdesk.integration=true
+docker ps --filter label=dev.burrow.integration=true
 docker stop <container-name>
 ```
 

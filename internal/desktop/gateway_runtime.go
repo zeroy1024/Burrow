@@ -10,10 +10,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/zeroy1024/Burrow/internal/locales"
+	"github.com/zeroy1024/Burrow/internal/sshclient"
+	"github.com/zeroy1024/Burrow/internal/store"
 	"golang.org/x/net/proxy"
-	"sshdesk/internal/locales"
-	"sshdesk/internal/sshclient"
-	"sshdesk/internal/store"
 )
 
 type gatewayDialFunc func(context.Context, string, string) (net.Conn, error)

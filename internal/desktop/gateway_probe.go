@@ -10,7 +10,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"sshdesk/internal/locales"
+	"github.com/zeroy1024/Burrow/internal/locales"
 
 	"golang.org/x/net/proxy"
 )

@@ -12,10 +12,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/zeroy1024/Burrow/internal/locales"
 	"golang.zx2c4.com/wireguard/conn"
 	"golang.zx2c4.com/wireguard/device"
 	"golang.zx2c4.com/wireguard/tun/netstack"
-	"sshdesk/internal/locales"
 )
 
 type Tunnel struct {

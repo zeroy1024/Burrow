@@ -10,11 +10,11 @@ import (
 
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
-	"sshdesk/internal/locales"
-	"sshdesk/internal/theme"
-	"sshdesk/internal/uikit"
-	"sshdesk/internal/vault"
-	"sshdesk/internal/wggateway"
+	"github.com/zeroy1024/Burrow/internal/locales"
+	"github.com/zeroy1024/Burrow/internal/theme"
+	"github.com/zeroy1024/Burrow/internal/uikit"
+	"github.com/zeroy1024/Burrow/internal/vault"
+	"github.com/zeroy1024/Burrow/internal/wggateway"
 )
 
 type wireguardDraft struct {

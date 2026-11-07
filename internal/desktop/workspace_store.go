@@ -6,9 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"github.com/egoist/mygo/ui"
+	"github.com/zeroy1024/Burrow/internal/locales"
+	"github.com/zeroy1024/Burrow/internal/store"
 	"slices"
-	"sshdesk/internal/locales"
-	"sshdesk/internal/store"
 	"strings"
 	"time"
 )

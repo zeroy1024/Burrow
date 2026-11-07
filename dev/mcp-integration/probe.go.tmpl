@@ -14,8 +14,8 @@ import (
     "time"
 
     "github.com/egoist/mygo"
-    "sshdesk/internal/mcpserver"
-    "sshdesk/internal/store"
+    "github.com/zeroy1024/Burrow/internal/mcpserver"
+    "github.com/zeroy1024/Burrow/internal/store"
 )
 
 type mcpIntegrationRequest struct {
@@ -38,8 +38,8 @@ type mcpIntegrationState struct {
 }
 
 func mcpIntegrationPath(name string) string {
-    if name=="mcp-state.json" { return filepath.Join(os.Getenv("SSHDESK_INTEGRATION_CONFIG"),name) }
-    return filepath.Join(os.Getenv("SSHDESK_TEST_DIR"),name)
+    if name=="mcp-state.json" { return filepath.Join(os.Getenv("BURROW_INTEGRATION_CONFIG"),name) }
+    return filepath.Join(os.Getenv("BURROW_TEST_DIR"),name)
 }
 
 // The driver polls these files, so publish them by rename to avoid empty reads.

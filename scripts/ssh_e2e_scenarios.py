@@ -176,11 +176,11 @@ def _transfer(driver, name, source_remote):
 def _fixture(driver, protocol):
     filename = "server.json" if protocol == "sftp" else "ftp-server.json"
     fixture = json.loads((driver.task_dir / filename).read_text())
-    prefix = "sshdesk-integration-" if protocol == "sftp" else "sshdesk-ftp-integration-"
+    prefix = "burrow-integration-" if protocol == "sftp" else "burrow-ftp-integration-"
     _check(fixture["container"].startswith(prefix), "unexpected Docker fixture identity")
     _check(fixture["address"].rsplit(":", 1)[0] in ("127.0.0.1", "localhost", "[::1]"),
            "core scenarios require a loopback fixture")
-    fixture["root"] = "/home/sshdesk/e2e-" + driver.config_root.name
+    fixture["root"] = "/home/burrow/e2e-" + driver.config_root.name
     return fixture
 
 
@@ -209,7 +209,7 @@ def _prepare_data(driver, local):
     expected = {}
     for protocol in ("sftp", "ftp"):
         fixture = _fixture(driver, protocol)
-        _docker(fixture, "install", "-d", "-o", "sshdesk", "-g", "sshdesk", "-m", "0755",
+        _docker(fixture, "install", "-d", "-o", "burrow", "-g", "burrow", "-m", "0755",
                 fixture["root"])
         upload = "core-" + protocol + "-upload.txt"
         download = "core-" + protocol + "-download.txt"
@@ -233,7 +233,7 @@ def _prepare_data(driver, local):
         expected[name] = _hash(large)
     for protocol in ("sftp", "ftp"):
         fixture = _fixture(driver, protocol)
-        _docker(fixture, "chown", "-R", "sshdesk:sshdesk", fixture["root"])
+        _docker(fixture, "chown", "-R", "burrow:burrow", fixture["root"])
     return expected
 
 
@@ -252,7 +252,7 @@ def _create_site(driver, name, protocol, local, remote_directory=None):
     fixture = _fixture(driver, protocol)
     host, port = fixture["address"].rsplit(":", 1)
     for label, value in (("名称", name), ("主机", host.strip("[]")),
-                         ("用户名", "sshdesk"), ("端口", port)):
+                         ("用户名", "burrow"), ("端口", port)):
         _fill(driver, label, value)
     if not _nodes(driver, "远程目录", ("textField",)):
         _press(driver, "高级", ("disclosure",))
@@ -406,7 +406,7 @@ def run_core(driver):
     cancel = _paused(driver, "core-cancel.bin")
     _transfer_control(driver, cancel, "取消传输")
     driver.wait("canceled task removed", lambda: all(task["ID"] != cancel["ID"] for task in _tasks(driver)))
-    driver.wait("owned parts cleaned", lambda: not list(local.glob(".sshdesk-*.part")))
+    driver.wait("owned parts cleaned", lambda: not list(local.glob(".burrow-*.part")))
     _check(not (local / "core-cancel.bin").exists(), "canceled download published a final file")
     print("PASS core: actual pause/resume bytes and canceled staging-file cleanup", flush=True)
 
@@ -459,7 +459,7 @@ def run_core_recovered(driver, checkpoint):
     local = Path(checkpoint["local"])
     _check(_hash(local / "core-restart.bin") == checkpoint["expected"]["core-restart.bin"],
            "restarted transfer bytes differ")
-    _check(not list(local.glob(".sshdesk-*.part")), "completed restored transfer retained staging files")
+    _check(not list(local.glob(".burrow-*.part")), "completed restored transfer retained staging files")
     print("PASS core: normal quit/restart, offline task binding, explicit resume and SHA-256", flush=True)
     driver.quit()
 
@@ -550,7 +550,7 @@ def run_file_browsing(driver):
     driver.output("\nBROWSE_SSH_READY\n")
     ssh = driver.focused()
 
-    sftp = _create_site(driver, "Browse SFTP", "sftp", local, remote_directory="/home/sshdesk")
+    sftp = _create_site(driver, "Browse SFTP", "sftp", local, remote_directory="/home/burrow")
     _check(not sftp["Temporary"] and sftp["Connection"] != ssh["Connection"],
            "saved SFTP site did not open its own session")
     _check(any(profile["Name"] == "Browse SFTP" for profile in driver.snapshot()["FileProfiles"]),

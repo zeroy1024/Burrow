@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"sshdesk/internal/sshclient"
+	"github.com/zeroy1024/Burrow/internal/sshclient"
 
 	"github.com/egoist/mygo/ui"
 )

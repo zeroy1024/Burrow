@@ -8,10 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"sshdesk/internal/hostinfo"
-	"sshdesk/internal/locales"
-	"sshdesk/internal/theme"
-	"sshdesk/internal/uikit"
+	"github.com/zeroy1024/Burrow/internal/hostinfo"
+	"github.com/zeroy1024/Burrow/internal/locales"
+	"github.com/zeroy1024/Burrow/internal/theme"
+	"github.com/zeroy1024/Burrow/internal/uikit"
 
 	"github.com/egoist/mygo/ui"
 )

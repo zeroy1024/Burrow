@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"image/color"
 
-	"sshdesk/internal/uikit"
+	"github.com/zeroy1024/Burrow/internal/uikit"
 
 	"github.com/egoist/mygo/ui"
 )

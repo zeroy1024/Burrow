@@ -2,7 +2,7 @@ package desktop
 
 import (
 	"github.com/egoist/mygo"
-	"sshdesk/internal/vault"
+	"github.com/zeroy1024/Burrow/internal/vault"
 )
 
 func platformUnlockKeys() vault.KeyStore {

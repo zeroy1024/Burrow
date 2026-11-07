@@ -39,8 +39,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/egoist/mygo/sshdesk-terminal/internal/pty"
-	"github.com/egoist/mygo/sshdesk-terminal/internal/vt"
+	"github.com/egoist/mygo/burrow-terminal/internal/pty"
+	"github.com/egoist/mygo/burrow-terminal/internal/vt"
 	"github.com/egoist/mygo/transfer"
 	"github.com/egoist/mygo/ui"
 )

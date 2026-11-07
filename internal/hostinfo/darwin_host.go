@@ -3,7 +3,7 @@ package hostinfo
 import (
 	"context"
 
-	"sshdesk/internal/locales"
+	"github.com/zeroy1024/Burrow/internal/locales"
 
 	"strings"
 	"time"

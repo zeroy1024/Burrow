@@ -10,11 +10,11 @@ import (
 	"math"
 	"sync"
 
-	"sshdesk/internal/locales"
-	"sshdesk/internal/theme"
-	"sshdesk/internal/uikit"
+	"github.com/zeroy1024/Burrow/internal/locales"
+	"github.com/zeroy1024/Burrow/internal/theme"
+	"github.com/zeroy1024/Burrow/internal/uikit"
 
-	nativeterm "github.com/egoist/mygo/sshdesk-terminal"
+	nativeterm "github.com/egoist/mygo/burrow-terminal"
 	"github.com/egoist/mygo/ui"
 )
 

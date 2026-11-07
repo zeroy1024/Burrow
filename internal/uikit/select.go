@@ -3,8 +3,8 @@ package uikit
 import (
 	"fmt"
 
-	"sshdesk/internal/locales"
-	"sshdesk/internal/theme"
+	"github.com/zeroy1024/Burrow/internal/locales"
+	"github.com/zeroy1024/Burrow/internal/theme"
 
 	"github.com/egoist/mygo/ui"
 )

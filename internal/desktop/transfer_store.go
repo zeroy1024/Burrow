@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"sshdesk/internal/fileclient"
-	"sshdesk/internal/locales"
+	"github.com/zeroy1024/Burrow/internal/fileclient"
+	"github.com/zeroy1024/Burrow/internal/locales"
 )
 
 type storedTransferQueue struct {
@@ -592,10 +592,15 @@ func validTransferTemporary(remote bool, name, destination string) bool {
 		return false
 	}
 	base := transferBase(remote, name)
-	if !strings.HasPrefix(base, ".sshdesk-") || !strings.HasSuffix(base, ".part") {
+	prefix := ".burrow-"
+	// Existing saved tasks still own parts created before the rename.
+	if strings.HasPrefix(base, ".sshdesk-") {
+		prefix = ".sshdesk-"
+	}
+	if !strings.HasPrefix(base, prefix) || !strings.HasSuffix(base, ".part") {
 		return false
 	}
-	encoded := strings.TrimSuffix(strings.TrimPrefix(base, ".sshdesk-"), ".part")
+	encoded := strings.TrimSuffix(strings.TrimPrefix(base, prefix), ".part")
 	value, err := hex.DecodeString(encoded)
 	return err == nil && len(value) == 16 && hex.EncodeToString(value) == encoded
 }

@@ -9,10 +9,10 @@ import (
 	"slices"
 	"time"
 
-	"sshdesk/internal/hostinfo"
-	"sshdesk/internal/locales"
-	"sshdesk/internal/store"
-	"sshdesk/internal/vault"
+	"github.com/zeroy1024/Burrow/internal/hostinfo"
+	"github.com/zeroy1024/Burrow/internal/locales"
+	"github.com/zeroy1024/Burrow/internal/store"
+	"github.com/zeroy1024/Burrow/internal/vault"
 )
 
 type sessionConfig struct {

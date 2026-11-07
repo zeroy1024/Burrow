@@ -6,7 +6,7 @@ import (
 	"strings"
 	"unicode/utf16"
 
-	"sshdesk/internal/locales"
+	"github.com/zeroy1024/Burrow/internal/locales"
 )
 
 // launcher describes a command that runs another command given in its

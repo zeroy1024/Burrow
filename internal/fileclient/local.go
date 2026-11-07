@@ -315,7 +315,7 @@ func localRenameTemporary() (string, error) {
 	if _, err := rand.Read(random[:]); err != nil {
 		return "", err
 	}
-	return ".sshdesk-rename-" + hex.EncodeToString(random[:]), nil
+	return ".burrow-rename-" + hex.EncodeToString(random[:]), nil
 }
 
 func (c *localClient) ResolveDirectory(ctx context.Context, name string) (string, error) {

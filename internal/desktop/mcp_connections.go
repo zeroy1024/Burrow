@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"strings"
 
-	"sshdesk/internal/locales"
-	"sshdesk/internal/mcpserver"
-	"sshdesk/internal/store"
+	"github.com/zeroy1024/Burrow/internal/locales"
+	"github.com/zeroy1024/Burrow/internal/mcpserver"
+	"github.com/zeroy1024/Burrow/internal/store"
 )
 
 // Only display and discovery are grouped. Every member retains its runtime,

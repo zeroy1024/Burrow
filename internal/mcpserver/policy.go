@@ -17,10 +17,10 @@ import (
 	"golang.org/x/text/cases"
 	"golang.org/x/text/unicode/norm"
 
-	"sshdesk/internal/fileclient"
-	"sshdesk/internal/locales"
-	"sshdesk/internal/shellcmd"
-	"sshdesk/internal/store"
+	"github.com/zeroy1024/Burrow/internal/fileclient"
+	"github.com/zeroy1024/Burrow/internal/locales"
+	"github.com/zeroy1024/Burrow/internal/shellcmd"
+	"github.com/zeroy1024/Burrow/internal/store"
 )
 
 func ValidatePolicy(p store.MCPPolicy) error {

@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"time"
 
-	"sshdesk/internal/locales"
-	"sshdesk/internal/sshclient"
+	"github.com/zeroy1024/Burrow/internal/locales"
+	"github.com/zeroy1024/Burrow/internal/sshclient"
 )
 
 var errSSHConnectCanceled = locales.NewError(locales.MessageSshConnectionCancelled)

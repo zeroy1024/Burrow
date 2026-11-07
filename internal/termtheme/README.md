@@ -19,7 +19,7 @@ Terminal colors and app UI tokens are separate:
 | `LICENSES.md` | Original full MIT licenses for schemes |
 | `licenses.go` | Embedded licenses for Settings |
 
-This package depends only on the Go standard library and is imported as `sshdesk/internal/termtheme`. `schemes/` must be beside `state.go` for `//go:embed`. See [terminal usage](../../docs/terminal-themes.md) and [development checks](../../docs/development.md).
+This package depends only on the Go standard library and is imported as `github.com/zeroy1024/Burrow/internal/termtheme`. `schemes/` must be beside `state.go` for `//go:embed`. See [terminal usage](../../docs/terminal-themes.md) and [development checks](../../docs/development.md).
 
 ## Built-in schemes
 

@@ -15,8 +15,8 @@ import (
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"sshdesk/internal/locales"
-	"sshdesk/internal/store"
+	"github.com/zeroy1024/Burrow/internal/locales"
+	"github.com/zeroy1024/Burrow/internal/store"
 )
 
 func (s *Service) Configure(ctx context.Context, cfg Config) error {

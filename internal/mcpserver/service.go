@@ -22,10 +22,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"sshdesk/internal/fileclient"
-	"sshdesk/internal/locales"
-	"sshdesk/internal/sshclient"
-	"sshdesk/internal/store"
+	"github.com/zeroy1024/Burrow/internal/fileclient"
+	"github.com/zeroy1024/Burrow/internal/locales"
+	"github.com/zeroy1024/Burrow/internal/sshclient"
+	"github.com/zeroy1024/Burrow/internal/store"
 )
 
 const MaxText = 1024 * 1024

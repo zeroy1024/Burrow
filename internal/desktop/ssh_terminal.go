@@ -7,14 +7,14 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"sshdesk/internal/locales"
-	"sshdesk/internal/sshclient"
-	"sshdesk/internal/termtheme"
-	"sshdesk/internal/theme"
-	"sshdesk/internal/uikit"
+	"github.com/zeroy1024/Burrow/internal/locales"
+	"github.com/zeroy1024/Burrow/internal/sshclient"
+	"github.com/zeroy1024/Burrow/internal/termtheme"
+	"github.com/zeroy1024/Burrow/internal/theme"
+	"github.com/zeroy1024/Burrow/internal/uikit"
 
 	"github.com/egoist/mygo"
-	nativeterm "github.com/egoist/mygo/sshdesk-terminal"
+	nativeterm "github.com/egoist/mygo/burrow-terminal"
 	"github.com/egoist/mygo/ui"
 )
 

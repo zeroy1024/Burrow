@@ -29,7 +29,7 @@ content += "\nfunc galleryUserConfigDir() (string, error) { return " + json.dump
 paths.write_text(content)
 modfile = (repo / "go.mod").read_text()
 for module_name, directory in [
-    ("github.com/egoist/mygo/sshdesk-terminal", "third_party/mygo-terminal"),
+    ("github.com/egoist/mygo/burrow-terminal", "third_party/mygo-terminal"),
     ("github.com/pkg/sftp", "third_party/pkg-sftp"),
 ]:
     modfile = modfile.replace(
@@ -57,7 +57,7 @@ overlay.write_text(json.dumps({"Replace": {
 subprocess.run(["gofmt", "-w", str(scene), str(replacement), str(paths)], check=True)
 binary = work / "Burrow"
 environment = os.environ.copy()
-environment.setdefault("GOCACHE", "/private/tmp/sshdesk-go-build")
+environment.setdefault("GOCACHE", "/private/tmp/burrow-go-build")
 subprocess.run([
     "go", "build", "-modfile", str(work / "gallery.mod"), "-overlay", str(overlay),
     "-o", str(binary), ".",

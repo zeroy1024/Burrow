@@ -7,7 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"sshdesk/internal/localfs"
+	"github.com/zeroy1024/Burrow/internal/localfs"
 )
 
 func openLocalLeaf(parent *os.Root, name string, flags int, mode fs.FileMode) (*os.File, error) {

@@ -17,15 +17,15 @@ import (
 	"testing"
 	"time"
 
-	"sshdesk/internal/sshclient"
-	"sshdesk/internal/store"
+	"github.com/zeroy1024/Burrow/internal/sshclient"
+	"github.com/zeroy1024/Burrow/internal/store"
 )
 
 func sftpFixtureConnection(t *testing.T) *sshclient.Connection {
 	t.Helper()
-	address, directory := os.Getenv("SSHDESK_TEST_ADDRESS"), os.Getenv("SSHDESK_TEST_DIR")
+	address, directory := os.Getenv("BURROW_TEST_ADDRESS"), os.Getenv("BURROW_TEST_DIR")
 	if address == "" || directory == "" {
-		t.Skip("SSHDESK_TEST_ADDRESS and SSHDESK_TEST_DIR are required")
+		t.Skip("BURROW_TEST_ADDRESS and BURROW_TEST_DIR are required")
 	}
 	host, portText, err := net.SplitHostPort(address)
 	if err != nil {
@@ -47,7 +47,7 @@ func sftpFixtureConnection(t *testing.T) *sshclient.Connection {
 	}
 	t.Cleanup(func() { db.Close() })
 	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
-	connection, err := sshclient.Dial(ctx, sshclient.Config{Host: host, Port: port, User: "sshdesk", Auth: "key",
+	connection, err := sshclient.Dial(ctx, sshclient.Config{Host: host, Port: port, User: "burrow", Auth: "key",
 		KeyPath: filepath.Join(directory, "key_plain"),
 		HostKey: sshclient.KnownHosts(t.Context(), db, func(string, string, string) bool { return true })})
 	if err != nil {
@@ -144,7 +144,7 @@ func TestSFTPIntegrationDirectory(t *testing.T) {
 	}
 	t.Cleanup(func() { client.Close() })
 	home, err := client.InitialPath(t.Context())
-	if err != nil || home != "/home/sshdesk" {
+	if err != nil || home != "/home/burrow" {
 		t.Fatalf("initial path = %q, error = %v", home, err)
 	}
 	entries, err := client.ReadDir(t.Context(), home)
@@ -201,7 +201,7 @@ func TestSFTPIntegrationSharedLifetime(t *testing.T) {
 			t.Cleanup(func() { client.Close() })
 			if action == "close_shell" {
 				shell.Close()
-				if _, err := client.ReadDir(t.Context(), "/home/sshdesk/nested"); err != nil {
+				if _, err := client.ReadDir(t.Context(), "/home/burrow/nested"); err != nil {
 					t.Fatalf("closing Shell disconnected SFTP: %v", err)
 				}
 			} else {

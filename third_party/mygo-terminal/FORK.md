@@ -7,7 +7,7 @@ are retained. No new permanent test suite is added here.
 
 Only the terminal plugin is a local module. The rest of MyGo remains the pinned
 `v0.7.3` dependency. The local module name is
-`github.com/egoist/mygo/sshdesk-terminal`; its private plugin imports are renamed
+`github.com/egoist/mygo/burrow-terminal`; its private plugin imports are renamed
 from `github.com/egoist/mygo/plugins/terminal/internal/...`. Keeping the MyGo
 module prefix lets the unchanged plugin legally use MyGo's internal localization
 and resource download packages, without reflection or external private access.

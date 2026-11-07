@@ -23,10 +23,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"sshdesk/internal/fileclient"
-	"sshdesk/internal/locales"
-	"sshdesk/internal/localfs"
-	"sshdesk/internal/mcpserver"
+	"github.com/zeroy1024/Burrow/internal/fileclient"
+	"github.com/zeroy1024/Burrow/internal/locales"
+	"github.com/zeroy1024/Burrow/internal/localfs"
+	"github.com/zeroy1024/Burrow/internal/mcpserver"
 
 	"golang.org/x/text/cases"
 	"golang.org/x/text/unicode/norm"
@@ -721,7 +721,7 @@ func (a *app) copyTransferNode(ctx context.Context, task *transferTask, run *tra
 		if _, err := rand.Read(suffix[:]); err != nil {
 			return err
 		}
-		name := ".sshdesk-" + hex.EncodeToString(suffix[:]) + ".part"
+		name := ".burrow-" + hex.EncodeToString(suffix[:]) + ".part"
 		temporary := transferJoin(!job.sourceRemote, transferDir(!job.sourceRemote, node.destination), name)
 		if temporary == node.destination {
 			return locales.NewError(locales.MessageTheTemporaryFilenameIsTheSameAsTheDestination)

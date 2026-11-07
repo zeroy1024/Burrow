@@ -8,10 +8,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"sshdesk/internal/locales"
-	"sshdesk/internal/store"
-	"sshdesk/internal/termtheme"
-	"sshdesk/internal/theme"
+	"github.com/zeroy1024/Burrow/internal/locales"
+	"github.com/zeroy1024/Burrow/internal/store"
+	"github.com/zeroy1024/Burrow/internal/termtheme"
+	"github.com/zeroy1024/Burrow/internal/theme"
 
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"

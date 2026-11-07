@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 
 	"github.com/egoist/mygo"
-	"sshdesk/internal/locales"
-	"sshdesk/internal/localfs"
+	"github.com/zeroy1024/Burrow/internal/locales"
+	"github.com/zeroy1024/Burrow/internal/localfs"
 )
 
 func (a *app) exportManagedKey(key managedKey) {

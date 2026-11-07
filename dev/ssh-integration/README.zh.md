@@ -12,7 +12,7 @@
 python3 scripts/ssh-integration-server.py
 ```
 
-脚本构建 Ubuntu 24.04 / OpenSSH 镜像，启动带 `dev.sshdesk.integration=true` 标签的独立容器，只将 SSH 端口随机映射到 `127.0.0.1`。不挂载主机目录或 Docker 卷。容器含完整 `vim`、`htop` 和 `top`，SSH 登录环境使用 `C.UTF-8`，用户名为 `sshdesk`。
+脚本构建 Ubuntu 24.04 / OpenSSH 镜像，启动带 `dev.burrow.integration=true` 标签的独立容器，只将 SSH 端口随机映射到 `127.0.0.1`。不挂载主机目录或 Docker 卷。容器含完整 `vim`、`htop` 和 `top`，SSH 登录环境使用 `C.UTF-8`，用户名为 `burrow`。
 
 SSH 已开启 `internal-sftp`；用户目录包含 `hello.txt`、`你好.txt`、`nested/inside.txt` 和不可读的 `denied/`，用于目录与权限验证。
 
@@ -21,20 +21,22 @@ SSH 已开启 `internal-sftp`；用户目录包含 `hello.txt`、`你好.txt`、
 将 JSON 中的值用于两个任务环境变量：
 
 ```sh
-export SSHDESK_TEST_ADDRESS='127.0.0.1:映射端口'
-export SSHDESK_TEST_DIR='/private/tmp/sshdesk-integration-临时目录'
+export BURROW_TEST_ADDRESS='127.0.0.1:映射端口'
+export BURROW_TEST_DIR='/private/tmp/burrow-integration-临时目录'
 ```
 
 使用同一临时密码另起 FTP 服务器：
 
 ```sh
 python3 -B scripts/ssh-integration-server.py --ftp
-export SSHDESK_FTP_ADDRESS='127.0.0.1:FTP映射端口'
+export BURROW_FTP_ADDRESS='127.0.0.1:FTP映射端口'
 ```
 
 FTP 使用独立的 vsftpd 容器和 init 进程托管，控制端口及 64 个被动数据端口都只映射到本机。夹具允许已认证用户读写，每条连接限速 1 MiB/s，为暂停、取消和恢复提供可观测的传输窗口。SSH 元数据保存在临时目录的 `server.json`，FTP 元数据保存在 `ftp-server.json`；两容器共享测试密码，连接与会话独立。
 
 显式和隐式 FTPS 分别运行 `python3 -B scripts/ssh-integration-server.py --ftps` 与 `python3 -B scripts/ssh-integration-server.py --ftps --implicit`。临时 CA、带回环地址 SAN 的服务器证书及连接元数据保存在同一夹具目录；TLS 校验和数据通道会话复用保持启用。MCP 的真实 HTTP、原生控制和任务恢复联调见 [MCP 联调说明](../mcp-integration/README.zh.md)。
+
+当前启动器和测试使用 `BURROW_*` 变量与 `dev.burrow.integration` 夹具。从旧版本更新后需重新创建夹具；历史验证记录保留原始路径。
 
 ## 传输层验证
 
@@ -48,7 +50,7 @@ mise exec -- go test -race -tags=integration ./... -count=1 -timeout=180s
 
 文件安全回归还覆盖本地源和目标目录被替换为树外链接后的读写与清理、最终文件替换，以及真实 SFTP OPEN 请求原子携带排他创建和 `0600`。旧 part 的 `0644`、`0400`、`0000` 权限在续传写入前收紧，且保留已确认内容。本地文件回归不需要 Docker；SFTP 安全用例使用同一真实服务。
 
-这些测试使用 `integration` build tag，普通 `go test ./...` 不会连接 Docker 服务器；不带标签的 SDK 生命周期测试仅使用进程内创建的本地 SSH 服务。Docker 目标必须是本机地址。Go 构建缓存不可写时，可为命令设置 `GOCACHE=/private/tmp/sshdesk-go-cache`。
+这些测试使用 `integration` build tag，普通 `go test ./...` 不会连接 Docker 服务器；不带标签的 SDK 生命周期测试仅使用进程内创建的本地 SSH 服务。Docker 目标必须是本机地址。Go 构建缓存不可写时，可为命令设置 `GOCACHE=/private/tmp/burrow-go-cache`。
 
 ## 原生窗口验证
 
@@ -80,7 +82,7 @@ python3 -B -u scripts/ssh-integration-ui.py --core-e2e
 - 暂停受控 FTP 容器，使刷新应答在按住文件行时到达；释放前保留源，取消的 Drop 不产生传输。无论断言是否通过，都会解除本用例的容器暂停。
 - 正常退出后启动同一个测试应用、复用同一隔离配置，检查任务按原标签离线恢复、确认偏移不变、显式继续后的实际内容和部分文件清理。
 
-核心模式和文件模式均需要 `SSHDESK_FTP_ADDRESS`。每轮核心模式在两个容器内使用独立目录，可以重跑而不复用上轮目标文件。启动器分别检查每次原生进程的退出记录、race 日志以及 SSH / FTP 连接释放，并在该次运行的 `native-run-*/result.json` 写入结果；中途失败不能记为通过。
+核心模式和文件模式均需要 `BURROW_FTP_ADDRESS`。每轮核心模式在两个容器内使用独立目录，可以重跑而不复用上轮目标文件。启动器分别检查每次原生进程的退出记录、race 日志以及 SSH / FTP 连接释放，并在该次运行的 `native-run-*/result.json` 写入结果；中途失败不能记为通过。
 
 原生驱动会比较服务器连接数与认证次数，运行时不要并行执行 SDK Docker 测试，以免其他测试连接干扰统计。确认驱动成功需要真实应用的退出状态及竞态日志检查，不能只依据 LaunchServices `open` 的退出码。
 
@@ -93,7 +95,7 @@ python3 -B -u scripts/ssh-integration-ui.py --core-e2e
 服务器在脚本结束后继续运行，便于手动复验。可用下面命令查看夹具容器；需要停止时，使用启动结果中的确切容器名：
 
 ```sh
-docker ps --filter label=dev.sshdesk.integration=true
+docker ps --filter label=dev.burrow.integration=true
 docker stop 容器名
 ```
 

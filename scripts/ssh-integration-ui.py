@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Drive the real native UI against the disposable Docker SSH fixture.
 
-Requires SSHDESK_TEST_DIR and SSHDESK_TEST_ADDRESS. It uses Go overlays for
+Requires BURROW_TEST_DIR and BURROW_TEST_ADDRESS. It uses Go overlays for
 automation and configuration isolation; release sources and user data stay intact.
 """
 
@@ -76,7 +76,7 @@ func dockerIntegrationProfiles(a *app, scope section) []dockerProfileInfo {
 }
 
 func dockerIntegrationConfigDir() (string, error) {
-    path := os.Getenv("SSHDESK_INTEGRATION_CONFIG")
+    path := os.Getenv("BURROW_INTEGRATION_CONFIG")
     if !filepath.IsAbs(path) { return "", errors.New("isolated integration configuration is required") }
     return path, nil
 }
@@ -245,7 +245,7 @@ func dockerIntegrationSnapshot() {
     }
     data, err := json.Marshal(out)
     if err != nil { panic(err) }
-    if err := os.WriteFile(filepath.Join(os.Getenv("SSHDESK_TEST_DIR"), "native-observation.json"), data, 0600); err != nil { panic(err) }
+    if err := os.WriteFile(filepath.Join(os.Getenv("BURROW_TEST_DIR"), "native-observation.json"), data, 0600); err != nil { panic(err) }
 }
 
 // These existing model actions exercise controller integration only. Snapshot
@@ -359,7 +359,7 @@ def prepare(repo, task_dir, address):
                 profile_id = str(uuid.uuid4())
                 key_id = key_ids.get(key)
                 value = dict(id=profile_id, auth=auth, protocol="ssh" if scope == "ssh" else "sftp",
-                             name=name, user="sshdesk", host=host.strip("[]"), port=int(port),
+                             name=name, user="burrow", host=host.strip("[]"), port=int(port),
                              os=0, system="Linux", createdAt=now, updatedAt=now)
                 if key_id:
                     value["keyId"] = key_id
@@ -408,7 +408,7 @@ func legacyCredentialStore() mygo.SecretsModule {return mygo.Secrets.Service("de
     content = replace_once(content, 'a.security.status = "migration"\n\t\treturn', '''a.security.status = "migration"
         catalog,err:=a.store.ReadCatalog(a.ctx)
         if err!=nil {a.security.errorText=locales.ErrorText(err);return}
-        phrase,err:=os.ReadFile(filepath.Join(os.Getenv("SSHDESK_TEST_DIR"),"key_passphrase"))
+        phrase,err:=os.ReadFile(filepath.Join(os.Getenv("BURROW_TEST_DIR"),"key_passphrase"))
         if err!=nil {a.security.errorText=locales.ErrorText(err);return}
         a.security.migrationPhrases=map[string]string{}
         for _,key:=range catalog.Keys {
@@ -443,7 +443,7 @@ func legacyCredentialStore() mygo.SecretsModule {return mygo.Secrets.Service("de
     mygo_dir = Path(tempfile.mkdtemp(prefix="mygo-sdk-", dir=overlay_dir))
     shutil.copytree(Path(module["Dir"]), mygo_dir, dirs_exist_ok=True)
     modfile = (repo / "go.mod").read_text()
-    for module_name, relative in (("github.com/egoist/mygo/sshdesk-terminal", "third_party/mygo-terminal"),
+    for module_name, relative in (("github.com/egoist/mygo/burrow-terminal", "third_party/mygo-terminal"),
                                   ("github.com/pkg/sftp", "third_party/pkg-sftp")):
         modfile = replace_once(modfile, "replace " + module_name + " => ./" + relative,
                                "replace " + module_name + " => " + json.dumps(str(repo / relative)))
@@ -469,7 +469,7 @@ func legacyCredentialStore() mygo.SecretsModule {return mygo.Secrets.Service("de
     content = content.replace("os.UserConfigDir()", "dockerIntegrationUserConfigDir()")
     content += '''
 func dockerIntegrationUserConfigDir() (string, error) {
-    root := os.Getenv("SSHDESK_INTEGRATION_CONFIG")
+    root := os.Getenv("BURROW_INTEGRATION_CONFIG")
     if !filepath.IsAbs(root) { return "", fmt.Errorf("isolated integration configuration is required") }
     return root, nil
 }
@@ -502,7 +502,7 @@ type secrets struct{}
 var integrationSecretsMu sync.Mutex
 
 func integrationSecrets() (string, map[string][]byte, error) {
-    root := os.Getenv("SSHDESK_INTEGRATION_CONFIG")
+    root := os.Getenv("BURROW_INTEGRATION_CONFIG")
     if !filepath.IsAbs(root) { return "", nil, fmt.Errorf("isolated integration credential directory is required") }
     name := filepath.Join(root, "integration-secrets.json")
     values := map[string][]byte{}
@@ -565,7 +565,7 @@ func (secrets) DeleteSecret(service, account string) error {
     content = replace_once(content, "if err := desktop.Run(); err != nil {", '''err := desktop.Run()
     status := "ok"
     if err != nil { status = "error" }
-    if writeErr := os.WriteFile(filepath.Join(os.Getenv("SSHDESK_INTEGRATION_CONFIG"), "app-exit-status"), []byte(status), 0600); writeErr != nil { log.Fatal(writeErr) }
+    if writeErr := os.WriteFile(filepath.Join(os.Getenv("BURROW_INTEGRATION_CONFIG"), "app-exit-status"), []byte(status), 0600); writeErr != nil { log.Fatal(writeErr) }
     if err != nil {''')
     replacement.write_text(content)
     mapping[str(original)] = str(replacement)
@@ -609,7 +609,7 @@ class Driver:
         self.config_root = config_root
         self.counter = 0
         fixture = json.loads((task_dir / "server.json").read_text())
-        if fixture["address"] != os.environ["SSHDESK_TEST_ADDRESS"] or not fixture["container"].startswith("sshdesk-integration-"):
+        if fixture["address"] != os.environ["BURROW_TEST_ADDRESS"] or not fixture["container"].startswith("burrow-integration-"):
             raise RuntimeError("native fixture metadata does not match the requested local server")
         self.container = fixture["container"]
 
@@ -723,7 +723,7 @@ class Driver:
     def server_connections(self):
         # These observations are confined to the named disposable local fixture.
         logs = subprocess.check_output(["docker", "logs", self.container], stderr=subprocess.STDOUT, text=True)
-        accepted = sum("Accepted " in line and " for sshdesk " in line for line in logs.splitlines())
+        accepted = sum("Accepted " in line and " for burrow " in line for line in logs.splitlines())
         established = self.established_connections(self.container, 22)
         return accepted, established
 
@@ -820,7 +820,7 @@ class Driver:
         self.menu("Create catalog record")
         self.select_protocol(protocol)
         host, port = address.rsplit(":", 1)
-        for label, value in (("名称", name), ("主机", host.strip("[]")), ("用户名", "sshdesk"), ("端口", port)):
+        for label, value in (("名称", name), ("主机", host.strip("[]")), ("用户名", "burrow"), ("端口", port)):
             self.fill(label, value)
         self.click("仅保存")
         self.wait("saved file site", lambda: any(p["Name"] == name and p["Protocol"] == protocol.lower() for p in self.profiles(1)))
@@ -915,8 +915,8 @@ class Driver:
 
     def add_catalog_record(self, name):
         self.menu("Create catalog record")
-        host, port = os.environ["SSHDESK_TEST_ADDRESS"].rsplit(":", 1)
-        for label, value in (("名称", name), ("主机", host.strip("[]")), ("用户名", "sshdesk"), ("端口", port)):
+        host, port = os.environ["BURROW_TEST_ADDRESS"].rsplit(":", 1)
+        for label, value in (("名称", name), ("主机", host.strip("[]")), ("用户名", "burrow"), ("端口", port)):
             self.fill(label, value)
         self.click("仅保存")
 
@@ -1064,8 +1064,8 @@ class Driver:
         self.click("信任并连接")
         self.state(1)
         self.focus_terminal()
-        self.command("printf '\\n%s\\n' SSHDESK_NATIVE_OK")
-        self.output("\nSSHDESK_NATIVE_OK\n")
+        self.command("printf '\\n%s\\n' BURROW_NATIVE_OK")
+        self.output("\nBURROW_NATIVE_OK\n")
         self.check_grid()
         print("PASS native UI: password, trust, keyboard, remote PTY size")
 
@@ -1078,19 +1078,19 @@ class Driver:
         self.text(":q!")
         self.key("Enter")
         self.shell_ready()
-        self.command("printf '\\n%s\\n' SSHDESK_VIM_DONE")
-        self.output("\nSSHDESK_VIM_DONE\n")
+        self.command("printf '\\n%s\\n' BURROW_VIM_DONE")
+        self.output("\nBURROW_VIM_DONE\n")
         self.command("top -d 1")
         self.wait("top alternate screen", lambda: "Tasks:" in (self.focused() or {}).get("Text", "") and "PID" in (self.focused() or {}).get("Text", ""))
         self.text("q")
         self.shell_ready()
-        self.command("printf '\\n%s\\n' SSHDESK_TOP_DONE")
-        self.output("\nSSHDESK_TOP_DONE\n")
+        self.command("printf '\\n%s\\n' BURROW_TOP_DONE")
+        self.output("\nBURROW_TOP_DONE\n")
         print("PASS native UI: vim Unicode input and top interactive exit")
 
         original_grid = self.check_grid()
-        self.command("SSHDESK_UI_VARIABLE=alpha; printf '\\n%s\\n' SSHDESK_VARIABLE_SET")
-        self.output("\nSSHDESK_VARIABLE_SET\n")
+        self.command("BURROW_UI_VARIABLE=alpha; printf '\\n%s\\n' BURROW_VARIABLE_SET")
+        self.output("\nBURROW_VARIABLE_SET\n")
         connections_before_split = self.server_connections()
         if connections_before_split[1] != 1:
             raise RuntimeError("native fixture did not have exactly one SSH transport before splitting")
@@ -1101,7 +1101,7 @@ class Driver:
         if self.server_connections() != connections_before_split:
             raise RuntimeError("splitting created another TCP connection or repeated authentication")
         print("PASS native UI: split reuses one TCP connection and authentication")
-        default_marker = "SSHDESK_DEFAULT_SPLIT_" + str(self.counter)
+        default_marker = "BURROW_DEFAULT_SPLIT_" + str(self.counter)
         self.command("printf '\\n%s\\n' " + default_marker)
         def default_target():
             sessions = self.sessions()
@@ -1115,10 +1115,10 @@ class Driver:
         print("PASS native UI: new split owns default keyboard focus")
         self.focus_terminal(session_id=new_id)
         self.call("idle", dict(timeout=5000))
-        self.command("printf '\\n__NEW_VAR__%s__END__\\n' \"${SSHDESK_UI_VARIABLE-unset}\"")
+        self.command("printf '\\n__NEW_VAR__%s__END__\\n' \"${BURROW_UI_VARIABLE-unset}\"")
         self.output("\n__NEW_VAR__unset__END__\n")
         self.focus_terminal(session_id=min(s["ID"] for s in split_sessions))
-        self.command("printf '\\n__OLD_VAR__%s__END__\\n' \"${SSHDESK_UI_VARIABLE-unset}\"")
+        self.command("printf '\\n__OLD_VAR__%s__END__\\n' \"${BURROW_UI_VARIABLE-unset}\"")
         self.output("\n__OLD_VAR__alpha__END__\n")
         self.focus_terminal(session_id=new_id)
         split_grid = self.check_grid()
@@ -1138,8 +1138,8 @@ class Driver:
             raise RuntimeError("closing one pane changed the surviving shared transport")
         self.focus_terminal()
         self.check_grid()
-        self.command("printf '\\n%s\\n' SSHDESK_BEFORE_RECONNECT")
-        self.output("\nSSHDESK_BEFORE_RECONNECT\n")
+        self.command("printf '\\n%s\\n' BURROW_BEFORE_RECONNECT")
+        self.output("\nBURROW_BEFORE_RECONNECT\n")
         print("PASS native UI: Cmd+D, independent shell, resize and close pane")
 
         self.menu("Disconnect")
@@ -1148,9 +1148,9 @@ class Driver:
         self.secret("输入 SSH 密码", password)
         self.state(1)
         self.focus_terminal()
-        self.output("SSHDESK_BEFORE_RECONNECT")
-        self.command("printf '\\n%s\\n' SSHDESK_RECONNECT_OK")
-        self.output("\nSSHDESK_RECONNECT_OK\n")
+        self.output("BURROW_BEFORE_RECONNECT")
+        self.command("printf '\\n%s\\n' BURROW_RECONNECT_OK")
+        self.output("\nBURROW_RECONNECT_OK\n")
         self.close_tab()
         print("PASS native UI: disconnect, reconnect, preserved history, close tab")
 
@@ -1168,16 +1168,16 @@ class Driver:
                 self.secret("输入私钥口令", value)
             self.state(1)
             self.focus_terminal(host)
-            self.command("printf '\\n%s\\n' SSHDESK_KEY_OK")
-            self.output("\nSSHDESK_KEY_OK\n")
+            self.command("printf '\\n%s\\n' BURROW_KEY_OK")
+            self.output("\nBURROW_KEY_OK\n")
             self.close_tab(host)
         print("PASS native UI: plain and encrypted private keys")
 
         self.open_host("Docker Agent")
         self.state(1)
         self.focus_terminal("Docker Agent")
-        self.command("printf '\\n%s\\n' SSHDESK_AGENT_OK")
-        self.output("\nSSHDESK_AGENT_OK\n")
+        self.command("printf '\\n%s\\n' BURROW_AGENT_OK")
+        self.output("\nBURROW_AGENT_OK\n")
         print("PASS native UI: isolated SSH agent")
         self.menu("Quit")
 
@@ -1188,7 +1188,7 @@ def native_window(repo, bundle, env, config_root, run_dir, phase, ready_label="D
     status_path = config_root / "app-exit-status"
     status_path.write_text("pending")
     launch = ["/usr/bin/open", "-n", "-W", "-a", str(bundle), "--stdout", str(log_path), "--stderr", str(log_path)]
-    for key in ("SSHDESK_INTEGRATION_CONFIG", "MYGO_AUTOMATION", "SSHDESK_TEST_DIR", "SSH_AUTH_SOCK"):
+    for key in ("BURROW_INTEGRATION_CONFIG", "MYGO_AUTOMATION", "BURROW_TEST_DIR", "SSH_AUTH_SOCK"):
         launch += ["--env", key + "=" + env[key]]
     with log_path.open("w") as log:
         app = subprocess.Popen(launch, cwd=repo, env=env, stdout=log, stderr=log)
@@ -1210,7 +1210,7 @@ def native_window(repo, bundle, env, config_root, run_dir, phase, ready_label="D
             if connection is None:
                 raise RuntimeError("native automation socket did not start; log: " + str(log_path))
             with connection:
-                driver = Driver(connection, Path(env["SSHDESK_TEST_DIR"]), config_root)
+                driver = Driver(connection, Path(env["BURROW_TEST_DIR"]), config_root)
                 try:
                     driver.wait("native window", lambda: driver.call("windows").get("windows"))
                     driver.wait("native view", lambda: driver.node(ready_label, ready_role))
@@ -1264,17 +1264,17 @@ def main():
     modes.add_argument("--core-e2e", action="store_true", help="run real UI transfers, drag lifecycle and restart recovery")
     args = parser.parse_args()
     repo = Path(__file__).resolve().parents[1]
-    task_dir = Path(os.environ["SSHDESK_TEST_DIR"]).resolve()
+    task_dir = Path(os.environ["BURROW_TEST_DIR"]).resolve()
     if not args.prepare_only:
         ensure_unlocked()
-    overlay, config_root = prepare(repo, task_dir, os.environ["SSHDESK_TEST_ADDRESS"])
+    overlay, config_root = prepare(repo, task_dir, os.environ["BURROW_TEST_ADDRESS"])
     if args.prepare_only:
         print(overlay)
         return
     run_dir = Path(tempfile.mkdtemp(prefix="native-run-", dir=task_dir))
-    binary = run_dir / "sshdesk-native-integration"
-    env = dict(os.environ, SSHDESK_INTEGRATION_CONFIG=str(config_root), MYGO_AUTOMATION=str(run_dir / "native.sock"))
-    env.setdefault("GOCACHE", "/private/tmp/sshdesk-go-cache")
+    binary = run_dir / "burrow-native-integration"
+    env = dict(os.environ, BURROW_INTEGRATION_CONFIG=str(config_root), MYGO_AUTOMATION=str(run_dir / "native.sock"))
+    env.setdefault("GOCACHE", "/private/tmp/burrow-go-cache")
     subprocess.run(["go", "build", "-race", "-modfile", str(overlay.parent / "integration.mod"),
                     "-overlay", str(overlay), "-o", str(binary), "."], cwd=repo, env=env, check=True)
     # AppKit needs a proper bundle to register/focus a native window reliably.
