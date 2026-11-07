@@ -39,11 +39,17 @@ type mcpData struct {
 func (a *app) initMCPBackend() error {
 	b := &mcpDesktop{a: a, sessions: make(map[string]*fileSession)}
 	a.mcpBackend = b
-	service, err := mcpserver.New(a.ctx, a.store, b, func() {
-		if a.window != nil {
-			a.window.Update(func() { a.refreshMCPBackend() })
-		}
-	})
+	service, err := mcpserver.New(
+		a.ctx,
+		a.store,
+		b,
+		appVersion(),
+		func() {
+			if a.window != nil {
+				a.window.Update(func() { a.refreshMCPBackend() })
+			}
+		},
+	)
 	if err != nil {
 		return err
 	}
@@ -724,7 +730,8 @@ func mcpAuditView(op store.MCPOperation, files []store.MCPFileEvent, task store.
 		return mcpAuditItem{}, err
 	}
 	view := mcpAuditItem{Action: op.Action, ID: op.ID, KeyID: op.KeyID, KeyName: op.KeyName, ConnectionID: op.ConnectionID,
-		Time: op.StartedAt.Local().Format("15:04:05"), Day: op.StartedAt.Local().Format("01-02"),
+		Time:     localizedDate(op.StartedAt.Local(), i18n.NoStyle, i18n.MediumStyle),
+		Day:      localizedDateOptions(op.StartedAt.Local(), i18n.DateOptions{Skeleton: "MMMd"}),
 		ConnName: target.Name, ConnHost: target.Host, ConnPort: strconv.Itoa(target.Port), ConnUser: target.User,
 		ConnProtocol: strings.ToUpper(target.Protocol), ActionType: mcpActionName(op.Action), Status: mcpUIStatus(op.Status),
 		StartTime: localizedDate(op.StartedAt.Local(), i18n.MediumStyle, i18n.MediumStyle), EndTime: locales.MessageInProgress(), IsCommand: op.Action == "ssh_exec",
@@ -764,7 +771,11 @@ func mcpAuditView(op store.MCPOperation, files []store.MCPFileEvent, task store.
 		)
 	}
 	for _, event := range op.Timeline {
-		view.Timeline = append(view.Timeline, uikit.TimelineItem{Stage: mcpStageName(event.Stage), Detail: event.Detail, Time: event.At.Local().Format("15:04:05"), Tone: uikit.ToneSecondary})
+		view.Timeline = append(view.Timeline, uikit.TimelineItem{
+			Stage: mcpStageName(event.Stage), Detail: event.Detail,
+			Time: localizedDate(event.At.Local(), i18n.NoStyle, i18n.MediumStyle),
+			Tone: uikit.ToneSecondary,
+		})
 	}
 	for i, h := range op.Hits {
 		category := locales.MessageFilePolicy()

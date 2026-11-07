@@ -39,9 +39,9 @@ func Toast(c *ui.Context, props ToastProps) string {
 	})
 }
 
-// Notify retains message-based deduplication for simple notices.
-func Notify(c *ui.Context, message string) {
-	Toast(c, ToastProps{ID: message, Title: locales.Raw(message)})
+// Notify retains a stable identity and formats its message when displayed.
+func Notify(c *ui.Context, id string, message func() string) {
+	Toast(c, ToastProps{ID: id, Title: locales.Deferred(message)})
 }
 
 var (

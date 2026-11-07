@@ -10,6 +10,7 @@ import (
 	"sshdesk/internal/theme"
 	"sshdesk/internal/uikit"
 
+	"github.com/egoist/mygo/i18n"
 	"github.com/egoist/mygo/ui"
 )
 
@@ -453,7 +454,7 @@ func (a *app) transferRow(c *ui.Context, task *transferTask) {
 	}
 	if task.state == transferDone {
 		view.Elapsed = fmt.Sprintf(locales.MessageCompletedInS(), task.completed.Sub(task.started).Seconds())
-		view.Completed = task.completed.Format("15:04:05") + locales.MessageCompleted2()
+		view.Completed = localizedDate(task.completed, i18n.NoStyle, i18n.MediumStyle) + locales.MessageCompleted2()
 	}
 	result := uikit.TransferRow(c, &view)
 	menu := []uikit.MenuEntry{}

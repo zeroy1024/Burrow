@@ -241,7 +241,7 @@ func (s *Service) Handler(cfg Config) http.Handler {
 }
 
 func (s *Service) protocolServer(key store.MCPKey, requestContext context.Context) *mcp.Server {
-	server := mcp.NewServer(&mcp.Implementation{Name: "Burrow", Version: "0.1.1"}, nil)
+	server := mcp.NewServer(&mcp.Implementation{Name: "Burrow", Version: s.version}, nil)
 	read, write, exec := false, false, false
 	for _, g := range key.Grants {
 		read, write, exec = read || g.Read, write || g.Write, exec || g.Exec

@@ -234,7 +234,7 @@ func (a *app) catalogHostMenu(c *ui.Context, id hostID) []uikit.MenuEntry {
 		{ID: "before-delete", Separator: true},
 		{ID: "delete", Label: deleteLabel, Icon: uikit.IconTrash, Danger: true, OnChoose: func() {
 			if a.fileSiteBusy(id) {
-				uikit.Notify(c, locales.MessageCancelOrRemoveThisSessionSTransfersFirst())
+				uikit.Notify(c, "site-transfer-busy", locales.MessageCancelOrRemoveThisSessionSTransfersFirst)
 				return
 			}
 			a.page().draft = hostDraft{id: id, name: h.name, deleting: true}

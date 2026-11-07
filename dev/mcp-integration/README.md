@@ -37,6 +37,8 @@ Each run writes `mcp-native-run-*/report.json` under the fixture directory. Fail
 
 Run separately from protocol Docker tests to avoid counter/port interference. Stop only exact container names from this run's metadata, never unrelated containers or user sites.
 
+Source compatibility checked on 2026-11-07: the shared SSH probe and startup/terminal overlays were adapted to current localized message types, and both complete overlays built with `-race`. These were compilation checks with temporary fixtures, not a new native/remote E2E run. The results below remain historical records.
+
 ## Validation completed on 2026-11-03
 
 The default `all` scenario passed **30/30** on macOS arm64 with fresh isolated SQLite/credential directories. Real MCP HTTP used cancellation semantics for `2026-07-28` and `2025-06-18`. Servers were local OpenSSH/internal-sftp and vsftpd. Explicit/implicit FTPS retained certificate, hostname, and data-channel session reuse checks.

@@ -10,7 +10,7 @@ SSH and File Transfer maintain their own entries, groups, order, and collapsed s
 
 **Save Only** updates the catalog; **Save and Connect** also opens a new session. A single sidebar click focuses an entry, and a double-click opens an independent session. Editing an address or authentication settings does not redirect an active connection. Background transfers keep the endpoint and credential version captured when queued.
 
-Deleting a catalog entry does not necessarily close its open sessions. Actual references prevent deletion of dependencies such as SSH hosts used by gateways or managed keys still in use.
+Deleting a saved host or site closes the saved sessions associated with that entry and removes its entries from closed-tab recovery. Cancel or remove associated transfer tasks and wait for them to leave the queue before deleting the entry. References still prevent deletion of dependencies such as SSH hosts used by gateways or managed keys in use. Other saved entries with the same name or address remain independent.
 
 ## Connection gateways
 

@@ -218,6 +218,14 @@ func (a *app) clearWorkspaceGestures() {
 	a.files.drag = nil
 }
 
+func appVersion() string {
+	if version := mygo.App.Version(); version != "" {
+		return version
+	}
+	// Plain go run has no package version metadata.
+	return "dev"
+}
+
 // Run starts the native desktop application and its main window.
 func Run() (runErr error) {
 	directory, err := configureDataDirectory()

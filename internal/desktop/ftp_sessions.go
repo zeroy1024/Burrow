@@ -392,7 +392,7 @@ func (a *app) deleteSiteDialogContents(c *ui.Context, parts uikit.ModalParts) bo
 
 func (a *app) confirmDeleteSite(c *ui.Context, id hostID) {
 	if a.fileSiteBusy(id) {
-		uikit.Notify(c, locales.MessageCancelOrRemoveThisSessionSTransfersFirst())
+		uikit.Notify(c, "site-transfer-busy", locales.MessageCancelOrRemoveThisSessionSTransfersFirst)
 		return
 	}
 	page := a.page()

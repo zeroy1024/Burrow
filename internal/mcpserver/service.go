@@ -107,6 +107,7 @@ type Service struct {
 	Store      *store.Store
 	Backend    Backend
 	ctx        context.Context
+	version    string
 	notify     func()
 	mu         sync.Mutex
 	lifecycle  sync.Mutex
@@ -165,8 +166,14 @@ func errorCode(err error) string {
 	}
 }
 
-func New(ctx context.Context, db *store.Store, backend Backend, changed func()) (*Service, error) {
-	s := &Service{Store: db, Backend: backend, ctx: ctx, notify: changed,
+func New(
+	ctx context.Context,
+	db *store.Store,
+	backend Backend,
+	version string,
+	changed func(),
+) (*Service, error) {
+	s := &Service{Store: db, Backend: backend, ctx: ctx, version: version, notify: changed,
 		config: Config{Host: "127.0.0.1", Port: 7801, RetentionDays: 30},
 		active: make(map[string]activeOperation), slots: make(chan struct{}, 8)}
 	var data []byte

@@ -66,7 +66,7 @@ mise exec -- go tool mygo build -skip-dmg
 
 `mygo.json` installs root `LICENSE` and complete `THIRD_PARTY_NOTICES.md` into app resources: `.app/Contents/Resources/` on macOS, beside the executable on Windows/Linux. After dependency license changes, run `python3 scripts/licenses.py` before building. GitHub CI checks the notice summary and packaged resources.
 
-DMGs use the light [assets/dmg/background.tiff](../assets/dmg/background.tiff) and Applications shortcut for drag-to-install. ZIPs retain bundle structure and resources. Before releasing, check versions in both `mygo.json` and [settings_licenses.go](../internal/desktop/settings_licenses.go).
+DMGs use the light [assets/dmg/background.tiff](../assets/dmg/background.tiff) and Applications shortcut for drag-to-install. ZIPs retain bundle structure and resources. `mygo.json` is the packaged version source. The Settings footer, About/copy action, and MCP server identity read the same runtime package version. Plain `go run` has no package metadata and displays `dev`.
 
 ## Existing checks
 
@@ -124,7 +124,7 @@ Actions are pinned to commit SHAs and use `mise.toml`. Hosted Ubuntu uses `sudo`
 
 ### Before publication and release
 
-- Update versions in `mygo.json` and About, and check notices with `python3 scripts/licenses.py --check`.
+- Update the version in `mygo.json`, and check notices with `python3 scripts/licenses.py --check`.
 - Use Gitleaks 8.30.1 or a compatible version to scan intended public history/files locally. Inspect all local refs for stashes, internal snapshots, or unprepared branches. Keep fully redacted results outside the repository.
 
   ```sh

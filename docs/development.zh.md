@@ -66,7 +66,7 @@ mise exec -- go tool mygo build -skip-dmg
 
 `mygo.json` 的资源列表将根目录 `LICENSE` 与完整 `THIRD_PARTY_NOTICES.md` 一并安装到应用资源目录：macOS 为 `.app/Contents/Resources/`，Windows/Linux 为可执行文件所在目录。新增或更新依赖许可后先运行 `python3 scripts/licenses.py`，再构建；GitHub CI 会校验汇总内容以及打包资源。
 
-DMG 使用 [assets/dmg/background.tiff](../assets/dmg/background.tiff) 的浅色背景和 Applications 快捷方式，支持拖拽安装；ZIP 保留应用包结构及资源信息。发布版本时需同时核对 `mygo.json` 与 [settings_licenses.go](../internal/desktop/settings_licenses.go) 的版本显示。
+DMG 使用 [assets/dmg/background.tiff](../assets/dmg/background.tiff) 的浅色背景和 Applications 快捷方式，支持拖拽安装；ZIP 保留应用包结构及资源信息。`mygo.json` 是打包版本的来源。设置页脚、关于页及其复制内容、MCP 服务身份统一读取运行时应用包版本；直接 `go run` 没有包版本元数据，显示为 `dev`。
 
 ## 已有检查
 
@@ -124,7 +124,7 @@ Actions 均固定到提交 SHA，工具链沿用 `mise.toml`；APT 使用托管 
 
 ### 公开与发布前检查
 
-- 更新 `mygo.json` 和关于页的版本号，生成并检查第三方声明：`python3 scripts/licenses.py --check`。
+- 更新 `mygo.json` 的版本号，生成并检查第三方声明：`python3 scripts/licenses.py --check`。
 - 使用 Gitleaks 8.30.1 或兼容版本在本地扫描计划公开的提交历史和工作文件；额外检查所有本地 refs，确认不会带出 stash、内部快照或未准备公开的分支。扫描结果留在仓库外并开启完整脱敏。
 
   ```sh

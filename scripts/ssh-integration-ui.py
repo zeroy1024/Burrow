@@ -104,7 +104,7 @@ type dockerFilePane struct {
 }
 
 func dockerIntegrationPane(p *filePaneState) dockerFilePane {
-    result := dockerFilePane{Path:p.path, Error:p.errorText, Loading:p.loading, Remote:p.remote,
+    result := dockerFilePane{Path:p.path, Error:p.errorText.String(), Loading:p.loading, Remote:p.remote,
         HistoryIndex:p.historyIndex, History:append([]string{}, p.history...),
         Selection:[]string{}, Entries:[]dockerFileEntry{}}
     for selected := range p.table.Selection.All() { result.Selection = append(result.Selection, selected) }
@@ -208,19 +208,19 @@ func dockerIntegrationSnapshot() {
         local, remote := dockerIntegrationPane(s.local), dockerIntegrationPane(s.remote)
         item := fileSessionInfo{ID:s.id, Host:int(s.host), State:int(s.state), Selected:i==a.activeFile,
             Temporary:s.temporary, Loading:s.remote.loading, Name:s.endpoint.name, Protocol:s.endpoint.protocol,
-            Path:s.remote.path, Error:s.remote.errorText, RestoreID:s.restoreID,
+            Path:s.remote.path, Error:s.remote.errorText.String(), RestoreID:s.restoreID,
             Local:local, Remote:remote, LocalPath:local.Path, LocalLoading:local.Loading, LocalError:local.Error,
             LocalEntries:local.Entries, Entries:remote.Entries,
             RemoteSelection:remote.Selection, LocalSelection:local.Selection,
             RemoteBounds:remote.Bounds, LocalBounds:local.Bounds}
-        if s.errorText != "" { item.Error = s.errorText }
+        if !s.errorText.Empty() { item.Error = s.errorText.String() }
         if s.connection != nil { item.Connection, item.Generation = s.connection.id, s.connection.generation }
         out.FileSessions = append(out.FileSessions, item)
     }
     for _, task := range a.transfers.tasks {
         item := transferInfo{ID:task.id, SessionID:task.session.id, RestoreID:task.session.restoreID,
             Name:task.entry.name, State:int(task.state), SourcePath:task.sourcePath,
-            TargetPath:task.targetPath, Error:task.errorText, ErrorText:task.errorText, SourceRemote:task.sourceRemote,
+            TargetPath:task.targetPath, Error:task.errorText.String(), ErrorText:task.errorText.String(), SourceRemote:task.sourceRemote,
             RunPresent:task.run != nil, CleanupPending:task.cleanupPending, RemoveRequested:task.removeRequested,
             Transferred:task.transferred, Total:task.total, Speed:task.speed, TemporaryCount:-1}
         if task.view != nil { item.ViewID, item.ViewRestoreID = task.view.id, task.view.restoreID }
@@ -407,9 +407,9 @@ func legacyCredentialStore() mygo.SecretsModule {return mygo.Secrets.Service("de
     content = replace_once(content, "import (", 'import (\n "os"\n "path/filepath"')
     content = replace_once(content, 'a.security.status = "migration"\n\t\treturn', '''a.security.status = "migration"
         catalog,err:=a.store.ReadCatalog(a.ctx)
-        if err!=nil {a.security.errorText=err.Error();return}
+        if err!=nil {a.security.errorText=locales.ErrorText(err);return}
         phrase,err:=os.ReadFile(filepath.Join(os.Getenv("SSHDESK_TEST_DIR"),"key_passphrase"))
-        if err!=nil {a.security.errorText=err.Error();return}
+        if err!=nil {a.security.errorText=locales.ErrorText(err);return}
         a.security.migrationPhrases=map[string]string{}
         for _,key:=range catalog.Keys {
             if key.Name=="key_encrypted" {a.security.migrationPhrases[key.ID]=strings.TrimSpace(string(phrase))}
@@ -423,8 +423,8 @@ func legacyCredentialStore() mygo.SecretsModule {return mygo.Secrets.Service("de
     original = repo / "internal/desktop/ssh_terminal.go"
     replacement = overlay_dir / "ssh_terminal.go"
     replacement.write_text(replace_once(original.read_text(),
-        'Label(session.endpoint.name + " SSH 终端")',
-        'Label(fmt.Sprintf("%s SSH 终端 #%d", session.endpoint.name, session.id))'))
+        'Label(session.endpoint.name + locales.MessageSshTerminal())',
+        'Label(fmt.Sprintf("%s%s #%d", session.endpoint.name, locales.MessageSshTerminal(), session.id))'))
     mapping[str(original)] = str(replacement)
     original = repo / "internal/desktop/app_actions.go"
     content = replace_once(original.read_text(), "menu := mygo.NewMenu([]*mygo.MenuItem{",

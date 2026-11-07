@@ -40,7 +40,7 @@
 - **Transfer queue**: upload and download files or directories with concurrency, pause, resume, cancellation, and retry. Tasks are isolated by file tab and can be restored offline after quitting.
 - **Server status**: inspect Linux CPU, memory, network, processes, and host information. Root disk capacity is available when the server provides the required SFTP capabilities.
 - **Local MCP service**: expose authorized SSH and file operations to trusted clients over Streamable HTTP, with access keys, connection and capability grants, interception policies, and operation auditing.
-- **English and Chinese UI**: choose English, Simplified Chinese, or the system language. Menus, dialogs, notifications, and accessibility labels follow language changes; dates use the app language and system regional formats.
+- **English and Chinese UI**: choose English, Simplified Chinese, or the system language. App-owned menus, dialogs, queued notifications, and accessibility labels follow language changes; dates and times use the app language and system regional formats. User content and remote output retain their original text.
 - **Personal settings**: light and dark appearance, terminal colors, fonts, cursor, and shortcuts. Vault encrypts passwords, managed private keys, and saved key passphrases.
 
 Built in Go with [MyGo](https://github.com/egoist/mygo), with a terminal powered by [Ghostty VT](https://github.com/ghostty-org/ghostty).
@@ -93,6 +93,7 @@ GitHub Actions checks branches and PRs for sensitive data, licenses, language re
 ## Data and connections
 
 - Passwords, managed private keys, and saved passphrases are encrypted in SQLite. The macOS release build keeps its automatic unlock key in the system Keychain; other builds use a local key file. Optional app password unlock is available. Connection addresses, paths, audit records, and other database metadata are not encrypted as a whole.
+- Deleting a saved host or site closes its associated saved sessions. Remote file operations are performed separately on the file page.
 - Workspace and transfer restoration stays offline. It does not log in or resume transfers automatically. Forced termination or power loss may lose the latest progress.
 - MCP can execute remote commands and read or write files within its grants. Give keys only to trusted clients. Commands and output may contain sensitive data; redact diagnostic material before sharing it.
 

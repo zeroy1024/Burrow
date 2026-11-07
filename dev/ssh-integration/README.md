@@ -84,7 +84,9 @@ Core/file modes require `SSHDESK_FTP_ADDRESS`. Each core run uses independent di
 
 Do not run SDK Docker tests concurrently: connection/authentication counters would interfere. Acceptance requires the actual app's exit state and race logs, not only LaunchServices `open` returning success.
 
-The current arm64 bundle is a native-library/icon template for a separate race-enabled overlay app. `--prepare-only` builds without opening a window. Native integration requires an unlocked, focusable macOS graphical session and fails quickly when locked. Each run gets isolated configuration; native logs and observations remain in temporary directories without authentication input.
+The current arm64 bundle is a native-library/icon template for a separate race-enabled overlay app. `--prepare-only` generates the overlay and isolated configuration without compiling or opening a window. Native integration requires an unlocked, focusable macOS graphical session and fails quickly when locked. Each run gets isolated configuration; native logs and observations remain in temporary directories without authentication input.
+
+Source compatibility checked on 2026-11-07: the complete SSH and MCP overlays were generated with isolated temporary compilation fixtures and built with `-race`. This checked current source seams and types without opening native windows or contacting SSH/FTP services. Native interaction and remote protocol scenarios were not rerun.
 
 ## Running resources
 

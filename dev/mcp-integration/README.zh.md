@@ -37,6 +37,8 @@ GOCACHE=/private/tmp/sshdesk-go-build mise exec -- python3 -B -u scripts/mcp-int
 
 与原协议 Docker 测试分别运行，避免干扰连接计数与端口容量。停止服务时仅使用本轮 metadata 中的准确容器名，不操作其他容器或用户站点。
 
+2026-11-07 已核对源码适配：共享 SSH probe 及启动、终端 overlay 已适配当前本地化消息类型，两个完整 overlay 均通过 `-race` 编译。本次使用临时夹具进行编译检查，未重跑原生及远端 E2E；下述结果仍为历史记录。
+
 ## 2026-11-03 已完成验证
 
 本轮在 macOS arm64、全新隔离 SQLite 和凭据目录下，运行默认 `all` 场景：**30/30 通过**。真实 MCP HTTP 使用 `2026-07-28` 与 `2025-06-18` 取消语义；服务器为本机 OpenSSH/internal-sftp 与 vsftpd，显式/隐式 FTPS 保持证书、主机名和数据通道会话复用检查。
