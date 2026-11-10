@@ -16611,3 +16611,25 @@ func MessageHideDockIconHelp() string { return In(i18n.Locale()).MessageHideDock
 func (msgs Messages) MessageHideDockIconHelp() string {
 	return Catalog.Format(msgs.locale, "messageHideDockIconHelp", nil)
 }
+
+// TrayActiveSessions says "活动会话"
+// in the language the app shows.
+func TrayActiveSessions() string { return In(i18n.Locale()).TrayActiveSessions() }
+
+// TrayActiveSessions says "活动会话"
+// in the language of msgs.
+func (msgs Messages) TrayActiveSessions() string {
+	return Catalog.Format(msgs.locale, "trayActiveSessions", nil)
+}
+
+// TrayTransfersInProgress says "传输中 {count} 项"
+// in the language the app shows.
+func TrayTransfersInProgress(count int) string {
+	return In(i18n.Locale()).TrayTransfersInProgress(count)
+}
+
+// TrayTransfersInProgress says "传输中 {count} 项"
+// in the language of msgs.
+func (msgs Messages) TrayTransfersInProgress(count int) string {
+	return Catalog.Format(msgs.locale, "trayTransfersInProgress", map[string]any{"count": count})
+}

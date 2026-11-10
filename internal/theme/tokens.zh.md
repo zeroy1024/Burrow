@@ -9,8 +9,8 @@
 | 层 | 数量 | 说明 |
 |---|---|---|
 | palette（primitives） | 282 | 原始色值与刻度，其中 50 个为推导值（derived） |
-| semantic（每个主题一份） | 499 | Light = 当前设计；Dark 覆盖其中 111 个（全部 derived） |
-| component | 1113 | 只引用 semantic；换主题时自动跟随 |
+| semantic（每个主题一份） | 500 | Light = 当前设计；Dark 覆盖其中 111 个（全部 derived） |
+| component | 1114 | 只引用 semantic；换主题时自动跟随 |
 
 ## 1. 三层结构与引用规则
 
@@ -751,6 +751,7 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `size.paneMinLocal` | 320px | ＝ |  |
 | `size.paneMinRemote` | 420px | ＝ |  |
 | `size.popover` | 384px | ＝ |  |
+| `size.trayPanel` | 300px | ＝ | **derived** 菜单栏面板宽度 |
 | `size.capsuleBarWidth` | 32px | ＝ |  |
 | `size.capsuleBarHeight` | 3px | ＝ |  |
 | `size.dockHeader` | 42px | ＝ |  |
@@ -2351,6 +2352,11 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `popover.padding` | `{space.12}` | 12px |  |
 | `popover.bg` | `{color.surface.raised}` | #ffffff | 浮起层：拖动卡片、ghost、分段控件选中 |
 | `popover.shadow` | `{shadow.lift}` | 0px 0px 0px 0.5px rgba(0,0,0,0.1), 0px 10px 28px 0px rgba(0,0,0,0.16), 0px 2px 6px 0px rgba(0,0,0,0.08) | 拖动中卡片 |
+
+### trayPanel
+| token | 引用 | Light 值 | 说明 |
+|---|---|---|---|
+| `trayPanel.width` | `{size.trayPanel}` | 300px | 菜单栏面板宽度 |
 
 ### latency
 | token | 引用 | Light 值 | 说明 |

@@ -2018,5 +2018,14 @@
   "messageCommandQBackground": "⌘Q 仅关闭窗口",
   "messageCommandQBackgroundHelp": "Burrow 留在菜单栏，MCP、连接和传输继续运行；要退出请从菜单栏选择“退出”",
   "messageHideDockIcon": "隐藏程序坞图标",
-  "messageHideDockIconHelp": "主窗口转入后台后，程序坞不再显示 Burrow；重新打开窗口时恢复"
+  "messageHideDockIconHelp": "主窗口转入后台后，程序坞不再显示 Burrow；重新打开窗口时恢复",
+  "trayActiveSessions": "活动会话",
+  "trayTransfersInProgress": "传输中 {count} 项",
+  "@trayTransfersInProgress": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
 }

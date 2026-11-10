@@ -357,16 +357,21 @@ func (a *app) openSettingsFromMenu() {
 	if !a.businessReady() || a.security.dialog != nil {
 		return
 	}
-	// Native menu callbacks do not pass through the UI modal scope.
-	if a.page().addHostOpen || a.page().groupDialogOpen || a.files.dialog != nil ||
-		a.files.conflict != nil || a.credentials.draft != nil || a.closeRequest != nil ||
-		a.closeFileRequest != nil || a.closePaneRequest != nil {
+	if a.windowDialogOpen() {
 		return
 	}
 	if !a.deferWorkspaceDragAction(a.openSettings) {
 		a.openSettings()
 	}
 	a.window.Invalidate()
+}
+
+// windowDialogOpen guards actions from outside the window, as native menus
+// and the tray panel, which do not pass through the UI modal scope.
+func (a *app) windowDialogOpen() bool {
+	return a.page().addHostOpen || a.page().groupDialogOpen || a.files.dialog != nil ||
+		a.files.conflict != nil || a.credentials.draft != nil || a.closeRequest != nil ||
+		a.closeFileRequest != nil || a.closePaneRequest != nil
 }
 
 func (a *app) requestCloseTab(index int) {

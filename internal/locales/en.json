@@ -1543,5 +1543,7 @@
   "messageCommandQBackground": "⌘Q only closes the window",
   "messageCommandQBackgroundHelp": "Burrow stays in the menu bar while MCP, connections, and transfers keep running. Choose Quit from the menu bar to exit.",
   "messageHideDockIcon": "Hide Dock icon",
-  "messageHideDockIconHelp": "Hide Burrow from the Dock when the main window runs in the background; restore it when the window reopens."
+  "messageHideDockIconHelp": "Hide Burrow from the Dock when the main window runs in the background; restore it when the window reopens.",
+  "trayActiveSessions": "Active sessions",
+  "trayTransfersInProgress": "{count, plural, one {# transfer in progress} other {# transfers in progress}}"
 }

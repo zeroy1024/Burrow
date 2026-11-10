@@ -9,8 +9,8 @@ Design sources: `ssh-v6.html`, `common.css`, `parts/split_style.css`, `focus.py`
 | Layer | Count | Purpose |
 |---|---|---|
 | palette (primitives) | 282 | Literal colors/scales, including 50 derived values |
-| semantic (per theme) | 499 | Light follows the design; Dark has 111 derived overrides |
-| component | 1113 | Semantic references only; follows the current theme |
+| semantic (per theme) | 500 | Light follows the design; Dark has 111 derived overrides |
+| component | 1114 | Semantic references only; follows the current theme |
 
 ## 1. Layers and reference rules
 
@@ -751,6 +751,7 @@ siderItem.nameColor             <- component, references semantics only
 | `size.paneMinLocal` | 320px | ＝ |  |
 | `size.paneMinRemote` | 420px | ＝ |  |
 | `size.popover` | 384px | ＝ |  |
+| `size.trayPanel` | 300px | ＝ | **derived** Menu bar panel width |
 | `size.capsuleBarWidth` | 32px | ＝ |  |
 | `size.capsuleBarHeight` | 3px | ＝ |  |
 | `size.dockHeader` | 42px | ＝ |  |
@@ -2351,6 +2352,11 @@ References and resolved Light values; Dark follows the corresponding semantic va
 | `popover.padding` | `{space.12}` | 12px |  |
 | `popover.bg` | `{color.surface.raised}` | #ffffff | Raised surfaces: dragged cards, ghosts, selected segments |
 | `popover.shadow` | `{shadow.lift}` | 0px 0px 0px 0.5px rgba(0,0,0,0.1), 0px 10px 28px 0px rgba(0,0,0,0.16), 0px 2px 6px 0px rgba(0,0,0,0.08) | Dragged card |
+
+### trayPanel
+| token | Reference | Light value | Description |
+|---|---|---|---|
+| `trayPanel.width` | `{size.trayPanel}` | 300px | Menu bar panel width |
 
 ### latency
 | token | Reference | Light value | Description |

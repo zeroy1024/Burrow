@@ -13,7 +13,15 @@ type trayState struct {
 	icon                                 *mygo.Tray
 	open, status, toggle, settings, quit *mygo.MenuItem
 	err                                  error
+	// panel is the open flyout of a click on the icon, nil while closed;
+	// panelHeight is its last measured height, which it opens at again.
+	panel       *mygo.Window
+	panelHeight int
 }
+
+// trayPanelSupported reports whether the icon reports clicks, so a click can
+// open the panel. Linux's AppIndicator only shows menus.
+func trayPanelSupported() bool { return runtime.GOOS != "linux" }
 
 func (a *app) syncTray() error {
 	if !a.prefs.ShowTray {
@@ -45,18 +53,34 @@ func (a *app) syncTray() error {
 		options.Icon = assets.TrayTemplatePNG
 		options.IconIsTemplate = true
 	}
+	if trayPanelSupported() {
+		// Without a menu the click reaches OnClick; the native menu stays
+		// on the secondary click.
+		options.Menu = nil
+	}
 	icon, err := mygo.NewTray(options)
 	a.tray.err = err
 	if err != nil {
 		return err
 	}
 	a.tray.icon = icon
+	if trayPanelSupported() {
+		icon.OnClick(a.toggleTrayPanel)
+		icon.OnRightClick(func() {
+			a.closeTrayPanel()
+			// Set for this popup only, so that clicks keep toggling the panel.
+			icon.SetMenu(menu)
+			defer icon.SetMenu(nil)
+			icon.PopUpMenu()
+		})
+	}
 	a.syncQuitShortcut()
 	a.refreshTray()
 	return nil
 }
 
 func (a *app) destroyTray() {
+	a.closeTrayPanel()
 	if a.tray.icon != nil {
 		a.tray.icon.Destroy()
 	}
@@ -66,6 +90,9 @@ func (a *app) destroyTray() {
 func (a *app) refreshTray() {
 	if a.tray.icon == nil {
 		return
+	}
+	if a.tray.panel != nil {
+		a.tray.panel.Invalidate()
 	}
 	a.tray.open.SetLabel(locales.MessageOpenBurrow())
 	a.tray.settings.SetLabel(locales.MessageSettings())

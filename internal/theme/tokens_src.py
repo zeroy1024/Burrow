@@ -500,7 +500,8 @@ SEM['motion']['duration'].update({
 })
 SEM['size'].update({
  'paneMinLocal':D(P('size.320')), 'paneMinRemote':D(P('size.420')),
- 'popover':D(P('size.384')), 'capsuleBarWidth':D(P('size.32')),
+ 'popover':D(P('size.384')), 'trayPanel':D(P('size.300'),'菜单栏面板宽度',True),
+ 'capsuleBarWidth':D(P('size.32')),
  'capsuleBarHeight':D(P('size.3')), 'dockHeader':D(P('size.42')),
  'dockRow':D(P('size.50')), 'tabSpinner':D(P('size.10')),
  'fileToolbar':D(P('size.44')), 'fileCompactWidth':D(P('size.720')),
@@ -901,6 +902,7 @@ COMP['toast']={
  'paddingX':'space.14','paddingY':'space.10','gap':'space.8','timeout':'motion.duration.autoHide',
 }
 COMP['popover']={'radius':'radius.window','padding':'space.12','bg':'color.surface.raised','shadow':'shadow.lift'}
+COMP['trayPanel']={'width':'size.trayPanel'}
 COMP['latency']={'warnMs':'size.latencyWarn','badMs':'size.latencyBad','normal':'color.text.secondary','warn':'color.warning.text','bad':'color.danger.text'}
 COMP['listRow']={'height':'size.listRow','radius':'radius.controlSm','paddingX':'space.8','gap':'space.9','meta':'color.text.secondary'}
 COMP['breadcrumb']['iconSize']='size.iconXs'

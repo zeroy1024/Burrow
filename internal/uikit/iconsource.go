@@ -68,6 +68,7 @@ const (
 	IconHelp         IconName = "help"
 	IconRoute        IconName = "route"
 	IconGlobe        IconName = "globe"
+	IconPower        IconName = "power"
 )
 
 const LucideVersion = "1.67.0"
@@ -135,6 +136,7 @@ var iconFiles = map[IconName]string{
 	IconHelp:         "circle-question-mark",
 	IconRoute:        "route",
 	IconGlobe:        "globe",
+	IconPower:        "power",
 }
 
 // The cache holds immutable SVG geometry, keyed by the current token stroke.

@@ -33,10 +33,21 @@ func (a *app) updateSSHLatency(c *ui.Context) {
 	if tab == nil {
 		return
 	}
-	seen := map[*sshConnectionGroup]bool{}
+	var sessions []*remoteSession
 	for _, session := range tab.root.sessions() {
-		if session.closing || session.state != connected || session.ssh == nil || session.ssh.conn == nil ||
-			tab.maximized && session != tab.focused {
+		if !tab.maximized || session == tab.focused {
+			sessions = append(sessions, session)
+		}
+	}
+	a.sampleSSHLatency(c, sessions)
+}
+
+// sampleSSHLatency probes the connections of the shown sessions, once per
+// interval for each connection group, whichever window shows them.
+func (a *app) sampleSSHLatency(c *ui.Context, sessions []*remoteSession) {
+	seen := map[*sshConnectionGroup]bool{}
+	for _, session := range sessions {
+		if session.closing || session.state != connected || session.ssh == nil || session.ssh.conn == nil {
 			continue
 		}
 		group := session.connection
