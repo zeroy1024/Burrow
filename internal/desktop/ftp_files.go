@@ -269,7 +269,3 @@ func (a *app) revealTransferredFile(c *ui.Context, task *transferTask) {
 	a.queueFileDirectory(view, pane, fileNavigation{path: task.targetPath, historyIndex: -1})
 	pane.focus.Focus()
 }
-
-func (a *app) fileSiteBusy(id hostID) bool {
-	return slices.ContainsFunc(a.transfers.tasks, func(task *transferTask) bool { return task.session.host == id })
-}

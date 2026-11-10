@@ -76,6 +76,7 @@ type app struct {
 	dataDirectory          string
 	catalogSaving          bool
 	catalogReady           []func()
+	siteDeletion           *siteDeletion
 	workspaceSave          workspaceSaveState
 	quitReady, quitPending bool
 	terminalCapture        terminalCaptureState

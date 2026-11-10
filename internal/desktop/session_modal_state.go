@@ -25,6 +25,9 @@ type hostDraft struct {
 	env                                                   []string
 	envInput, newGroup                                    string
 	id                                                    hostID
+	deleteProfileID                                       string
+	deleteError                                           locales.Text
+	viewDeleteTransfers                                   bool
 	editing, deleting, files, portEdited                  bool
 	passwordChanged, passphraseChanged, passwordSaved     bool
 	advanced, closing, selectedName, creatingGroup        bool

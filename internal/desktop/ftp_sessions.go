@@ -258,21 +258,32 @@ func (a *app) catalogHostIcon(c *ui.Context, id hostID) {
 	uikit.OsLogo(c, style.name, uikit.SizeDefault)
 }
 
-func (a *app) deleteFileSite(id hostID, done func(error)) {
+func (a *app) fileSiteDeleteError(id hostID) error {
 	deleted := a.hosts[id]
 	for _, g := range a.gateways {
 		if g.SSHProfileID == deleted.session.ID {
-			done(locales.Errorf(locales.MessageThisHostIsReferencedByGatewayUpdateTheGatewayFirst, g.Name))
-			return
+			return locales.Errorf(locales.MessageThisHostIsReferencedByGatewayUpdateTheGatewayFirst, g.Name)
 		}
 	}
 	for _, group := range a.runtimeSSHGroups() {
 		for _, hop := range group.plan.route {
 			if hop.SSH != nil && hop.SSH.ID == deleted.session.ID {
-				done(locales.Errorf(locales.MessageThisHostIsUsedByAGatewayConnectionCloseRelatedSessionsAndTransfers))
-				return
+				return locales.Errorf(locales.MessageThisHostIsUsedByAGatewayConnectionCloseRelatedSessionsAndTransfers)
 			}
 		}
+	}
+	return nil
+}
+
+func (a *app) deleteFileSite(id hostID, done func(error)) {
+	deleted := a.hosts[id]
+	if err := a.fileSiteDeleteError(id); err != nil {
+		done(err)
+		return
+	}
+	if len(a.siteTransfers(deleted.session.ID)) != 0 {
+		done(locales.NewError(locales.MessageCancelOrRemoveThisSessionSTransfersFirst))
+		return
 	}
 	previousWorkspace := a.savedWorkspace
 	a.savedWorkspace = a.workspaceSnapshot()
@@ -305,6 +316,9 @@ func (a *app) deleteFileSite(id hostID, done func(error)) {
 				continue
 			}
 			if page.draft.id == id {
+				if page.draft.deleting && page.draft.saving {
+					continue
+				}
 				page.draft.cancelTest()
 				page.draft, page.addHostOpen = hostDraft{}, false
 			} else if page.draft.id > id {
@@ -323,6 +337,11 @@ func (a *app) deleteFileSite(id hostID, done func(error)) {
 		}
 		for _, task := range a.transfers.tasks {
 			remainingFiles[task.session] = true
+		}
+		if a.mcpBackend != nil {
+			for _, session := range a.mcpBackend.sessions {
+				remainingFiles[session] = true
+			}
 		}
 		for _, closed := range a.closedTabs {
 			if closed.section == sectionFiles {
@@ -377,28 +396,88 @@ func (a *app) deleteFileSite(id hostID, done func(error)) {
 
 func (a *app) deleteSiteDialogContents(c *ui.Context, parts uikit.ModalParts) bool {
 	t := theme.Current()
+	d := &a.page().draft
+	tasks := a.siteTransfers(d.deleteProfileID)
+	needsCancellation := slices.ContainsFunc(tasks, transferNeedsCancellation)
 	var confirm bool
 	uikit.Text(
 		c,
 		locales.MessageRemoveThisEntryFromTheCurrentCatalogAndCloseItsSessionsServerFiles(),
 		uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneSecondary},
 	)
+	if len(tasks) > 0 {
+		ui.Row(c).FillWidth().AlignItems(ui.Center).Gap(t.Space.N8).Children(func() {
+			uikit.Text(c, locales.SessionRelatedTransfers(len(tasks)), uikit.TextProps{Style: uikit.TextBodyStrong})
+			ui.Spacer(c)
+			uikit.Button(c, locales.SessionViewTransfers(), uikit.ButtonProps{Size: uikit.SizeSm, Disabled: d.saving}).OnClick(func() {
+				d.viewDeleteTransfers = true
+				parts.RequestDismiss()
+			})
+		})
+		list := ui.Scroll(c).FillWidth().MinHeight(0).MaxHeight(parts.Bounds.MaxHeight / 2).TrackScroll(&d.scroll).Children(func() {
+			for _, task := range tasks {
+				ui.Column(c).Key(task.id).FillWidth().Gap(t.Space.N4).Padding(t.Space.N8, 0).Children(func() {
+					ui.Row(c).FillWidth().Gap(t.Space.N8).AlignItems(ui.Center).Children(func() {
+						source := locales.SessionManualTransfer()
+						if task.mcp != nil {
+							source = "MCP"
+						}
+						uikit.Badge(c, source, uikit.BadgeProps{})
+						uikit.Text(c, task.entry.name, uikit.TextProps{}).Grow(1).MinWidth(0).SingleLine().Ellipsis("…")
+						state := [...]func() string{
+							transferQueued: locales.MessageQueued, transferRunning: locales.MessageRunning,
+							transferPaused: locales.MessagePaused, transferDone: locales.MessageCompleted,
+							transferFailed: locales.MessageTransferFailed2,
+						}[task.state]()
+						if task.removeRequested {
+							state = locales.MessageCancellationRequested()
+						} else if task.cleanupPending {
+							state = locales.SessionTransferCleanupPending()
+						}
+						uikit.Badge(c, state, uikit.BadgeProps{Tone: uikit.ToneMuted})
+					})
+					uikit.Text(c, task.sourcePath+" → "+task.targetPath, uikit.TextProps{Style: uikit.TextCaption, Tone: uikit.ToneSecondary}).SingleLine().Ellipsis("…")
+					if task.errorText.String() != "" {
+						uikit.Text(c, task.errorText.String(), uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneDanger})
+					}
+				})
+			}
+		})
+		uikit.Scrollbars(c, parts.Panel, list, &d.scroll, uikit.ScrollbarProps{Label: locales.MessageTransferListScrollbar()})
+	}
+	if d.deleteError.String() != "" {
+		uikit.Banner(c, d.deleteError.String(), uikit.BannerProps{Tone: uikit.ToneDanger, Icon: sessionAlertIcon})
+	} else if d.saving {
+		status := locales.SessionWaitingForTransfers()
+		if len(tasks) == 0 {
+			status = locales.SessionDeleting()
+		}
+		uikit.Text(c, status, uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneSecondary})
+	} else if needsCancellation {
+		uikit.Text(c, locales.SessionCancelTransfersNotice(), uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneSecondary})
+	}
 	ui.Row(c).Justify(ui.End).Gap(t.Space.N8).Children(func() {
-		uikit.Button(c, locales.CommonCancel(), uikit.ButtonProps{}).OnClick(parts.RequestDismiss)
-		confirm = uikit.Button(c, locales.CommonDelete(), uikit.ButtonProps{Variant: uikit.ButtonDanger}).Clicked()
+		uikit.Button(c, locales.CommonCancel(), uikit.ButtonProps{Disabled: d.saving}).OnClick(parts.RequestDismiss)
+		label := locales.CommonDelete()
+		if needsCancellation {
+			label = locales.SessionCancelTransfersAndDelete()
+		}
+		if d.saving {
+			label = locales.MessageProcessing2()
+		}
+		confirm = uikit.Button(c, label, uikit.ButtonProps{Variant: uikit.ButtonDanger, Disabled: d.saving}).Clicked()
 	})
 	return confirm
 }
 
-func (a *app) confirmDeleteSite(c *ui.Context, id hostID) {
-	if a.fileSiteBusy(id) {
-		uikit.Notify(c, "site-transfer-busy", locales.MessageCancelOrRemoveThisSessionSTransfersFirst)
-		return
-	}
+func (a *app) confirmDeleteSite() {
 	page := a.page()
-	a.deleteFileSite(id, func(err error) {
+	d := &page.draft
+	d.saving, d.deleteError = true, locales.Text{}
+	a.beginSiteDeletion(d.deleteProfileID, func(err error) {
+		d.saving = false
 		if err != nil {
-			a.persistenceNotice(locales.MessageUnableToDeleteSession, err)
+			d.deleteError = locales.ErrorText(err)
 			return
 		}
 		page.draft.modal.Close()

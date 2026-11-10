@@ -16633,3 +16633,107 @@ func TrayTransfersInProgress(count int) string {
 func (msgs Messages) TrayTransfersInProgress(count int) string {
 	return Catalog.Format(msgs.locale, "trayTransfersInProgress", map[string]any{"count": count})
 }
+
+// SessionRelatedTransfers says "关联传输任务（{count}）"
+// in the language the app shows.
+func SessionRelatedTransfers(count int) string {
+	return In(i18n.Locale()).SessionRelatedTransfers(count)
+}
+
+// SessionRelatedTransfers says "关联传输任务（{count}）"
+// in the language of msgs.
+func (msgs Messages) SessionRelatedTransfers(count int) string {
+	return Catalog.Format(msgs.locale, "sessionRelatedTransfers", map[string]any{"count": count})
+}
+
+// SessionViewTransfers says "查看任务"
+// in the language the app shows.
+func SessionViewTransfers() string { return In(i18n.Locale()).SessionViewTransfers() }
+
+// SessionViewTransfers says "查看任务"
+// in the language of msgs.
+func (msgs Messages) SessionViewTransfers() string {
+	return Catalog.Format(msgs.locale, "sessionViewTransfers", nil)
+}
+
+// SessionManualTransfer says "手动传输"
+// in the language the app shows.
+func SessionManualTransfer() string { return In(i18n.Locale()).SessionManualTransfer() }
+
+// SessionManualTransfer says "手动传输"
+// in the language of msgs.
+func (msgs Messages) SessionManualTransfer() string {
+	return Catalog.Format(msgs.locale, "sessionManualTransfer", nil)
+}
+
+// SessionTransferCleanupPending says "待清理"
+// in the language the app shows.
+func SessionTransferCleanupPending() string { return In(i18n.Locale()).SessionTransferCleanupPending() }
+
+// SessionTransferCleanupPending says "待清理"
+// in the language of msgs.
+func (msgs Messages) SessionTransferCleanupPending() string {
+	return Catalog.Format(msgs.locale, "sessionTransferCleanupPending", nil)
+}
+
+// SessionCancelTransfersAndDelete says "取消任务并删除"
+// in the language the app shows.
+func SessionCancelTransfersAndDelete() string {
+	return In(i18n.Locale()).SessionCancelTransfersAndDelete()
+}
+
+// SessionCancelTransfersAndDelete says "取消任务并删除"
+// in the language of msgs.
+func (msgs Messages) SessionCancelTransfersAndDelete() string {
+	return Catalog.Format(msgs.locale, "sessionCancelTransfersAndDelete", nil)
+}
+
+// SessionCancelTransfersNotice says "将取消这些任务，清理临时文件后删除会话。已传输完成的文件和 MCP 审计记录会保留。"
+// in the language the app shows.
+func SessionCancelTransfersNotice() string { return In(i18n.Locale()).SessionCancelTransfersNotice() }
+
+// SessionCancelTransfersNotice says "将取消这些任务，清理临时文件后删除会话。已传输完成的文件和 MCP 审计记录会保留。"
+// in the language of msgs.
+func (msgs Messages) SessionCancelTransfersNotice() string {
+	return Catalog.Format(msgs.locale, "sessionCancelTransfersNotice", nil)
+}
+
+// SessionWaitingForTransfers says "正在取消任务并清理临时文件，请稍候…"
+// in the language the app shows.
+func SessionWaitingForTransfers() string { return In(i18n.Locale()).SessionWaitingForTransfers() }
+
+// SessionWaitingForTransfers says "正在取消任务并清理临时文件，请稍候…"
+// in the language of msgs.
+func (msgs Messages) SessionWaitingForTransfers() string {
+	return Catalog.Format(msgs.locale, "sessionWaitingForTransfers", nil)
+}
+
+// SessionDeleting says "正在删除会话…"
+// in the language the app shows.
+func SessionDeleting() string { return In(i18n.Locale()).SessionDeleting() }
+
+// SessionDeleting says "正在删除会话…"
+// in the language of msgs.
+func (msgs Messages) SessionDeleting() string {
+	return Catalog.Format(msgs.locale, "sessionDeleting", nil)
+}
+
+// SessionTransferCleanupBlocked says "关联任务尚未完成清理，会话已保留。请查看任务错误后重试。"
+// in the language the app shows.
+func SessionTransferCleanupBlocked() string { return In(i18n.Locale()).SessionTransferCleanupBlocked() }
+
+// SessionTransferCleanupBlocked says "关联任务尚未完成清理，会话已保留。请查看任务错误后重试。"
+// in the language of msgs.
+func (msgs Messages) SessionTransferCleanupBlocked() string {
+	return Catalog.Format(msgs.locale, "sessionTransferCleanupBlocked", nil)
+}
+
+// SessionUnavailableForTransfer says "会话正在删除或已不存在，无法接受新传输。"
+// in the language the app shows.
+func SessionUnavailableForTransfer() string { return In(i18n.Locale()).SessionUnavailableForTransfer() }
+
+// SessionUnavailableForTransfer says "会话正在删除或已不存在，无法接受新传输。"
+// in the language of msgs.
+func (msgs Messages) SessionUnavailableForTransfer() string {
+	return Catalog.Format(msgs.locale, "sessionUnavailableForTransfer", nil)
+}

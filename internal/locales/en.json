@@ -1545,5 +1545,22 @@
   "messageHideDockIcon": "Hide Dock icon",
   "messageHideDockIconHelp": "Hide Burrow from the Dock when the main window runs in the background; restore it when the window reopens.",
   "trayActiveSessions": "Active sessions",
-  "trayTransfersInProgress": "{count, plural, one {# transfer in progress} other {# transfers in progress}}"
+  "trayTransfersInProgress": "{count, plural, one {# transfer in progress} other {# transfers in progress}}",
+  "sessionRelatedTransfers": "Related transfers ({count})",
+  "sessionViewTransfers": "View tasks",
+  "sessionManualTransfer": "Manual",
+  "sessionTransferCleanupPending": "Cleanup pending",
+  "sessionCancelTransfersAndDelete": "Cancel tasks and delete",
+  "sessionCancelTransfersNotice": "These tasks will be cancelled before the session is deleted. Temporary files must be cleaned up first. Completed files and MCP audit history will be kept.",
+  "sessionWaitingForTransfers": "Cancelling tasks and cleaning up temporary files…",
+  "sessionDeleting": "Deleting session…",
+  "sessionTransferCleanupBlocked": "Related tasks still need cleanup. The session has been kept. Review the task errors and retry.",
+  "sessionUnavailableForTransfer": "The session is being deleted or no longer exists and cannot accept new transfers.",
+  "@sessionRelatedTransfers": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
 }

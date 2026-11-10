@@ -412,6 +412,7 @@ func (a *app) finishTransfer(task *transferTask, run *transferRun, cleanup bool,
 		a.transfers.tasks = slices.DeleteFunc(a.transfers.tasks, func(t *transferTask) bool { return t == task })
 		a.persistTransfers()
 	}
+	a.advanceSiteDeletion()
 }
 
 func (a *app) pauseTransfer(task *transferTask) {
@@ -430,7 +431,7 @@ func (a *app) pauseTransfer(task *transferTask) {
 }
 
 func (a *app) resumeTransfer(task *transferTask) {
-	if a.transfers.quitting {
+	if a.transfers.quitting || a.siteDeletionPending(task.session.endpoint.session.ID) {
 		return
 	}
 	if task.state == transferRunning || task.state == transferDone {

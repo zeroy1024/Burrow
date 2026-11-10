@@ -136,6 +136,7 @@ func (a *app) persistTransfersDone(done func(error)) {
 		}
 	}
 	a.persist(func() error { return a.store.SaveTransfersWithMCP(a.ctx, q, owners) }, func(err error) {
+		defer a.advanceSiteDeletion()
 		if done != nil {
 			defer done(err)
 		}

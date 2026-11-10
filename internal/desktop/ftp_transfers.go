@@ -133,10 +133,10 @@ func (a *app) detachedTransferCount() int {
 	return count
 }
 
-func (a *app) recoverTransferTabs(c *ui.Context) {
+func (a *app) recoverTransferTabs(c *ui.Context, tasks []*transferTask) {
 	recovered := map[string]*fileSession{}
 	var first *fileSession
-	for _, task := range a.transfers.tasks {
+	for _, task := range tasks {
 		if slices.Contains(a.fileSessions, task.view) {
 			continue
 		}
@@ -163,7 +163,10 @@ func (a *app) recoverTransferTabs(c *ui.Context) {
 		}
 	}
 	if first == nil {
-		return
+		if len(tasks) == 0 {
+			return
+		}
+		first = tasks[0].view
 	}
 	a.closedTabs = slices.DeleteFunc(a.closedTabs, func(closed closedWorkspaceTab) bool {
 		return closed.section == sectionFiles && slices.Contains(a.fileSessions, closed.file)
@@ -182,6 +185,10 @@ func (a *app) enqueueFiles(
 	entries []fileEntry,
 	targetPath string,
 ) {
+	if a.siteDeletionPending(session.endpoint.session.ID) {
+		uikit.Notify(c, "site-deleting", locales.SessionDeleting)
+		return
+	}
 	var snapshot *fileSession
 	var batch *transferBatch
 	for _, entry := range entries {
@@ -383,7 +390,7 @@ func (a *app) transferHeader(c *ui.Context, session *fileSession, tasks []*trans
 				Variant: uikit.ButtonPlain, Size: uikit.SizeSm,
 			}).Key("recover-transfers").Shrink(0)
 			uikit.Tip(c, button, locales.MessageReopenTheTransferSTabWithoutConnectingOrResumingTheTransfer())
-			button.OnClick(func() { a.recoverTransferTabs(c) })
+			button.OnClick(func() { a.recoverTransferTabs(c, q.tasks) })
 		} else if !compact {
 			uikit.TransferHeaderSummary(
 				c,

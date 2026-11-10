@@ -160,6 +160,7 @@ func (b *mcpDesktop) captureConnections() ([]mcpserver.Connection, error) {
 			b.observeGroup(session.connection)
 			b.sessions[h.session.ID+":"+digest] = session
 		}
+		session.host = hostID(i)
 		if protocol == "ftp" && h.session.Files != nil && h.session.Files.FTPTLS != "" && h.session.Files.FTPTLS != "none" {
 			protocol = "ftps"
 		}
@@ -402,6 +403,9 @@ func (b *mcpDesktop) Enqueue(ctx context.Context, request mcpserver.TransferRequ
 	var saved store.MCPTask
 	_, err = mcpOnUI(acceptCtx, b, func() (bool, error) {
 		a := b.a
+		if a.siteDeletionPending(request.Connection.ID) || !slices.ContainsFunc(a.hosts, func(h host) bool { return h.session.ID == request.Connection.ID }) {
+			return false, locales.NewError(locales.SessionUnavailableForTransfer)
+		}
 		if !a.businessReady() || !b.service.Accepting() || a.quitPending || len(a.transfers.tasks) >= 1000 || a.transfers.quitting || a.transfers.storeErr != nil || a.transfers.writeErr != nil {
 			return false, locales.NewError(locales.MessageTheTransferQueueIsUnavailableOrAtCapacity)
 		}

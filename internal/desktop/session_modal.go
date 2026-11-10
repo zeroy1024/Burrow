@@ -28,14 +28,22 @@ func (a *app) hostDialog(c *ui.Context) {
 	if d.deleting {
 		requested := false
 		result := uikit.Modal(c.Key("delete-site-dialog"), &page.addHostOpen, uikit.ModalProps{
-			Controller: &d.modal,
-			Title:      locales.SessionDeleteTitle(d.name), Compact: true,
+			Controller:      &d.modal,
+			DismissDisabled: d.saving,
+			Title:           locales.SessionDeleteTitle(d.name), Compact: true,
 			Width: theme.Current().C.Dialog.HostWidth, Motion: uikit.MotionOverride(a.reduceMotion(c)),
 		}, func(parts uikit.ModalParts) {
 			requested = a.deleteSiteDialogContents(c, parts)
 		})
-		if requested || result.Submit {
-			a.confirmDeleteSite(c, d.id)
+		if !d.saving && !result.Closing && (requested || result.Submit) {
+			a.confirmDeleteSite()
+		}
+		if result.Dismissed {
+			profileID, viewTransfers := d.deleteProfileID, d.viewDeleteTransfers
+			page.draft = hostDraft{}
+			if viewTransfers {
+				a.recoverTransferTabs(c, a.siteTransfers(profileID))
+			}
 		}
 		return
 	}

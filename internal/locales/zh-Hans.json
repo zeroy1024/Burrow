@@ -2027,5 +2027,22 @@
         "type": "int"
       }
     }
+  },
+  "sessionRelatedTransfers": "关联传输任务（{count}）",
+  "sessionViewTransfers": "查看任务",
+  "sessionManualTransfer": "手动传输",
+  "sessionTransferCleanupPending": "待清理",
+  "sessionCancelTransfersAndDelete": "取消任务并删除",
+  "sessionCancelTransfersNotice": "将取消这些任务，清理临时文件后删除会话。已传输完成的文件和 MCP 审计记录会保留。",
+  "sessionWaitingForTransfers": "正在取消任务并清理临时文件，请稍候…",
+  "sessionDeleting": "正在删除会话…",
+  "sessionTransferCleanupBlocked": "关联任务尚未完成清理，会话已保留。请查看任务错误后重试。",
+  "sessionUnavailableForTransfer": "会话正在删除或已不存在，无法接受新传输。",
+  "@sessionRelatedTransfers": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
   }
 }
