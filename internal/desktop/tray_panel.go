@@ -15,7 +15,7 @@ import (
 )
 
 // trayPanelRefresh redraws the open panel for values that change without an
-// event of their own: uptime, transfer progress and latency samples.
+// event of their own: transfer progress and latency samples.
 const trayPanelRefresh = time.Second
 
 // trayPanelHeight is the height the panel first opens at, before it has
@@ -97,24 +97,22 @@ func (a *app) trayPanelMCP(c *ui.Context) {
 	t := theme.Current()
 	status, tone := locales.MessageMcpUnavailable(), uikit.ToneNeutral
 	available := a.mcpBackend != nil && a.mcpBackend.service != nil
-	running, address, uptime := false, "", ""
+	running, address := false, ""
 	if !a.security.ready {
 		status = locales.MessageWaitingForAppUnlock()
 	} else if available {
-		cfg, active, started, err := a.mcpBackend.service.Status()
+		cfg, active, _, err := a.mcpBackend.service.Status()
 		running = active
 		status = locales.MessageOff()
 		if running {
 			status, tone = locales.MessageRunning(), uikit.ToneSuccess
 			address = net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.Port))
-			seconds := time.Since(started).Seconds()
-			uptime = monitorUptime(&seconds, true)
 		}
 		if err != nil {
 			status, tone = locales.MessageMcpServiceError(), uikit.ToneDanger
 		}
 	}
-	ui.Column(c).FillWidth().Padding(t.Space.N12, t.Space.N14).Gap(t.Space.N8).Children(func() {
+	ui.Column(c).FillWidth().Padding(t.Space.N12, t.Space.N14).Gap(t.Space.N12).Children(func() {
 		ui.Row(c).FillWidth().AlignItems(ui.Center).Gap(t.Space.N10).Children(func() {
 			on := running
 			toggle := uikit.Switch(c.Key("tray-mcp"), &on, uikit.ToggleProps{
@@ -131,15 +129,19 @@ func (a *app) trayPanelMCP(c *ui.Context) {
 		if !running {
 			return
 		}
-		stat := func(label, value string, mono bool) {
-			ui.Row(c).Gap(t.Space.N4).AlignItems(ui.Center).MinWidth(0).Children(func() {
-				uikit.Text(c, label, uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneSecondary}).Shrink(0)
-				uikit.Text(c, value, uikit.TextProps{Style: uikit.TextFootnote, Mono: mono}).SingleLine().FontFeatures("tnum")
+		ui.Row(c).FillWidth().Gap(t.Space.N12).AlignItems(ui.End).Children(func() {
+			ui.Column(c).Grow(1).MinWidth(0).Gap(t.Space.N4).Children(func() {
+				addressCopy := uikit.CopyField(c, address, uikit.CopyFieldProps{
+					Key: "tray-mcp-address", Label: locales.MessageCopyListeningAddress(), Plain: true,
+				})
+				addressCopy.Root.AlignSelf(ui.Start).MinWidth(0)
+				if addressCopy.Copied {
+					mygo.Clipboard.WriteText("http://" + address + "/mcp")
+				}
 			})
-		}
-		ui.Row(c).FillWidth().Gap(t.Space.N14).Children(func() {
-			stat(locales.MessageListeningAddress(), address, true)
-			stat(locales.MessageUptime(), uptime, false)
+			calls := locales.MessageCallsToday() + " " + strconv.Itoa(a.mcp.todayCalls)
+			uikit.Badge(c, calls, uikit.BadgeProps{Tone: uikit.ToneMuted}).
+				Radius(t.Radius.ControlSm).FontFeatures("tnum").Margin(0, 0, t.Space.N2, 0)
 		})
 	})
 }

@@ -16,6 +16,7 @@ type CopyFieldProps struct {
 	Label       string
 	ButtonLabel string
 	Fill        bool
+	Plain       bool
 }
 
 type CopyFieldResult struct {
@@ -23,17 +24,22 @@ type CopyFieldResult struct {
 	Copied bool
 }
 
-// CopyField renders a monospace value chip with an integrated copy trigger and
-// transient "已复制" feedback.
+// CopyField renders a monospace value with a copy trigger and transient
+// "已复制" feedback. Plain shows an inline action without the field chrome.
 func CopyField(c *ui.Context, value string, props CopyFieldProps) CopyFieldResult {
 	t := theme.Current()
 	label := props.Label
 	if label == "" {
 		label = locales.MessageCopy() + value
 	}
-	root := ui.ButtonBase(c).Height(t.Size.ControlSm).Padding(0, t.Space.N8).Gap(t.Space.N6).
-		Radius(t.Radius.ControlSm).Border(t.Size.Hairline, Color(t.Color.Border.Control)).
-		Background(Color(t.Color.Surface.Sunken)).AlignItems(ui.Center).FocusRing(false).Label(label)
+	root := ui.ButtonBase(c).Height(t.Size.ControlSm).Gap(t.Space.N6).
+		Radius(t.Radius.ControlSm).AlignItems(ui.Center).FocusRing(false).Label(label)
+	if props.Plain {
+		root.Padding(0, t.Space.N6).Background(ui.Transparent).Justify(ui.Start)
+	} else {
+		root.Padding(0, t.Space.N8).Border(t.Size.Hairline, Color(t.Color.Border.Control)).
+			Background(Color(t.Color.Surface.Sunken))
+	}
 	if props.Key != nil {
 		root.Key(props.Key)
 	}
@@ -61,7 +67,13 @@ func CopyField(c *ui.Context, value string, props CopyFieldProps) CopyFieldResul
 		text := ui.Text(c, value).Font(strings.Join(t.Font.Family.Mono, ", ")).FontSize(t.Font.Size.Footnote).
 			TextColor(Color(t.Color.Text.Primary)).SingleLine().Ellipsis("…").PassThrough()
 		if props.Fill {
-			text.Grow(1).MinWidth(0)
+			text.MinWidth(0)
+			if !props.Plain {
+				text.Grow(1)
+			}
+		}
+		if props.Plain {
+			text.MinWidth(0).FontWeight(t.Font.Weight.Medium)
 		}
 		icon := IconCopy
 		ink := t.Color.Icon.Subtle
