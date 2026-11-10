@@ -40,8 +40,12 @@ SSH and file catalogs are independent. Matching names or addresses do not synchr
 
 ## Close and restore
 
-Closing the main window quits the app: it saves the workspace and preferences, stops MCP, pauses and saves transfers, and closes all session connections. macOS, Windows, and Linux use the same behavior. The last-tab action is configured separately in Settings.
+By default, closing the main window quits the app: it saves the workspace and preferences, stops MCP, pauses and saves transfers, and closes all session connections. macOS, Windows, and Linux use the same behavior. The last-tab action is configured separately in Settings.
 
-The Quit menu follows the same shutdown and save process. With **Restore sessions on startup** enabled, the next launch restores the workspace and associated tasks offline. Connect or resume transfers manually.
+In **Settings → General → Background running**, choose whether closing the main window quits or runs in the background. Background running hides the window while keeping enabled MCP, connections, transfers, and the currently unlocked credentials active. The menu bar / tray icon is shown by default and can be hidden when closing the window is set to quit; background running requires the icon. Click it to open Burrow, check or start/stop MCP, open Settings, or quit. Launching Burrow again brings the existing window forward. Authentication requests show the window when user input is needed. On Linux, tray support requires `libayatana-appindicator3` and a desktop panel that displays AppIndicator icons; tray creation failures are reported and the window stays accessible.
+
+macOS has two independent options, both off by default. **Hide Dock icon** hides Burrow from the Dock when the main window runs in the background and restores it when the window reopens. **⌘Q only closes the window** makes Cmd+Q hide the main window while Burrow stays in the menu bar and enabled MCP, connections, and transfers keep running. The latter option requires the menu bar icon regardless of the window-close setting; the app menu shows **Run in background** with the Cmd+Q shortcut. Neither option appears on Windows or Linux.
+
+Quit in the app and tray menus always exits completely through the same shutdown and save process, including while the window is hidden; Cmd+Q follows that process by default. With **Restore sessions on startup** enabled, the next launch restores the workspace and associated tasks offline. Connect or resume transfers manually.
 
 For connection, resume, or monitoring failures, inspect the actual error and [known limitations](limitations.md).

@@ -274,20 +274,7 @@ func (a *app) cycleTab(direction int) {
 func (a *app) installAppMenu() func() {
 	settings := &mygo.MenuItem{
 		Label: locales.MessageSettings(),
-		Click: func(*mygo.MenuItem, *mygo.Window) {
-			if !a.businessReady() || a.security.dialog != nil {
-				return
-			}
-			// Native menu callbacks do not pass through the UI modal scope.
-			if a.page().addHostOpen || a.page().groupDialogOpen || a.files.dialog != nil ||
-				a.files.conflict != nil || a.credentials.draft != nil || a.closeRequest != nil || a.closeFileRequest != nil || a.closePaneRequest != nil {
-				return
-			}
-			if !a.deferWorkspaceDragAction(a.openSettings) {
-				a.openSettings()
-			}
-			a.window.Invalidate()
-		},
+		Click: func(*mygo.MenuItem, *mygo.Window) { a.openSettingsFromMenu() },
 	}
 	cycle := func(direction int) func(*mygo.MenuItem, *mygo.Window) {
 		return func(*mygo.MenuItem, *mygo.Window) {
@@ -321,23 +308,65 @@ func (a *app) installAppMenu() func() {
 	tabs := &mygo.MenuItem{
 		Label: locales.MessageTabs(), Submenu: []*mygo.MenuItem{previous, next},
 	}
+	a.backgroundMenu = &mygo.MenuItem{
+		Label: locales.MessageRunInBackground(), Hidden: true,
+		Click: func(*mygo.MenuItem, *mygo.Window) { a.hideMainWindow() },
+	}
+	a.quitMenu = &mygo.MenuItem{Role: mygo.RoleQuit}
 	menu := mygo.NewMenu([]*mygo.MenuItem{
 		{Label: "Burrow", Submenu: []*mygo.MenuItem{
 			settings,
-			{Type: mygo.MenuItemSeparator}, {Role: mygo.RoleQuit},
+			{Type: mygo.MenuItemSeparator}, a.backgroundMenu, a.quitMenu,
 		}},
 		{Role: mygo.RoleEditMenu},
 		tabs,
 		{Role: mygo.RoleWindowMenu},
 	})
 	mygo.App.SetMenu(menu)
+	a.syncQuitShortcut()
 	return mygo.App.OnLocaleChanged(func(string) {
 		settings.SetLabel(locales.MessageSettings())
 		tabs.SetLabel(locales.MessageTabs())
 		previous.SetLabel(locales.MessagePreviousTab())
 		next.SetLabel(locales.MessageNextTab())
+		a.backgroundMenu.SetLabel(locales.MessageRunInBackground())
 		a.refreshLocalizedViews()
+		a.refreshTray()
 	})
+}
+
+func (a *app) syncQuitShortcut() {
+	if runtime.GOOS != "darwin" {
+		return
+	}
+	quitShortcut, backgroundShortcut := "Cmd+Q", ""
+	if a.prefs.CmdQBackground {
+		quitShortcut, backgroundShortcut = "", "Cmd+Q"
+	}
+	// Keep explicit quit actions intact; only the app menu owns Command+Q.
+	a.quitMenu.SetAccelerator(quitShortcut)
+	a.backgroundMenu.SetAccelerator(backgroundShortcut)
+	a.backgroundMenu.SetVisible(a.prefs.CmdQBackground)
+	if a.tray.quit != nil {
+		a.tray.quit.SetAccelerator("")
+	}
+}
+
+func (a *app) openSettingsFromMenu() {
+	a.showMainWindow()
+	if !a.businessReady() || a.security.dialog != nil {
+		return
+	}
+	// Native menu callbacks do not pass through the UI modal scope.
+	if a.page().addHostOpen || a.page().groupDialogOpen || a.files.dialog != nil ||
+		a.files.conflict != nil || a.credentials.draft != nil || a.closeRequest != nil ||
+		a.closeFileRequest != nil || a.closePaneRequest != nil {
+		return
+	}
+	if !a.deferWorkspaceDragAction(a.openSettings) {
+		a.openSettings()
+	}
+	a.window.Invalidate()
 }
 
 func (a *app) requestCloseTab(index int) {

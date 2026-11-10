@@ -39,6 +39,9 @@ func (a *app) askSSH(ctx context.Context, prompt *sshPrompt) sshAnswer {
 	a.window.Update(func() {
 		if ctx.Err() == nil {
 			a.sshPrompts = append(a.sshPrompts, prompt)
+			if !a.window.IsVisible() {
+				a.showMainWindow()
+			}
 		}
 	})
 	select {

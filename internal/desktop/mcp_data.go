@@ -46,7 +46,10 @@ func (a *app) initMCPBackend() error {
 		appVersion(),
 		func() {
 			if a.window != nil {
-				a.window.Update(func() { a.refreshMCPBackend() })
+				a.window.Update(func() {
+					a.refreshTray()
+					a.refreshMCPBackend()
+				})
 			}
 		},
 	)
@@ -83,6 +86,7 @@ func (a *app) startMCPBackend() {
 					a.persistenceNotice(locales.MessageUnableToStartTheMcpService, err)
 				}
 				a.refreshMCPBackend()
+				a.refreshTray()
 			})
 		})
 	}
@@ -436,10 +440,12 @@ func (a *app) mcpWork(work func() error, done func(error)) {
 		return
 	}
 	b.busy = true
+	a.refreshTray()
 	a.sshWorkers.Go(func() {
 		err := work()
 		a.window.Update(func() {
 			b.busy = false
+			a.refreshTray()
 			if err != nil {
 				a.persistenceNotice(locales.MessageMcpOperationFailed, err)
 			}

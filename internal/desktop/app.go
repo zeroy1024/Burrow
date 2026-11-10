@@ -112,6 +112,9 @@ type app struct {
 	tabPress           ui.Point
 	statusVisible      bool
 	window             *mygo.Window
+	tray               trayState
+	quitMenu           *mygo.MenuItem
+	backgroundMenu     *mygo.MenuItem
 	windowMaterial     mygo.Vibrancy
 	minimumWindow      [2]int
 	workArea           ui.Handle
@@ -232,6 +235,9 @@ func Run() (runErr error) {
 	if err != nil {
 		return err
 	}
+	if !mygo.App.RequestSingleInstanceLock() {
+		return nil
+	}
 	if err := localfs.MkdirAll(directory, 0700); err != nil {
 		return locales.Errorf(locales.MessageProtectAppDataDirectory, err)
 	}
@@ -322,28 +328,36 @@ func Run() (runErr error) {
 				return
 			}
 			e.PreventDefault()
+			if a.prefs.WindowClose == "background" {
+				a.hideMainWindow()
+				return
+			}
 			mygo.App.Quit()
 		})
 		if stopMenuLocale != nil {
 			stopMenuLocale()
 		}
 		stopMenuLocale = a.installAppMenu()
+		if err := a.syncTray(); err != nil {
+			a.reportTrayError(err)
+		}
 		// Windows can build the first frame synchronously when shown. Finish
 		// assigning and setting up a.window before that frame starts UI work.
-		a.window.Show()
+		a.showMainWindow()
 		a.beginStartup()
 	}
 	mygo.App.WhenReady(openWindow)
+	stopSecondInstance := mygo.App.OnSecondInstance(func([]string, string) { a.showMainWindow() })
+	defer stopSecondInstance()
 	stopActivate := mygo.App.OnActivate(func(visible bool) {
 		if !visible && a.ctx.Err() == nil {
-			if a.window != nil {
-				a.window.Show()
-			}
+			a.showMainWindow()
 		}
 	})
 	defer stopActivate()
 	stopQuit := mygo.App.OnBeforeQuit(func(e *mygo.QuitEvent) {
 		if !a.security.initialized {
+			a.quitReady = true
 			a.cancel()
 			return
 		}
@@ -362,7 +376,7 @@ func Run() (runErr error) {
 				locales.MessageAFileOrCredentialOperationIsInProgressWaitForItToFinish,
 			)}
 			if a.window != nil {
-				a.window.Show()
+				a.showMainWindow()
 				a.window.Invalidate()
 			}
 			return
@@ -370,24 +384,26 @@ func Run() (runErr error) {
 		if !a.quitReady {
 			e.PreventDefault()
 			a.quitPending = true
+			a.refreshTray()
 			a.persistBeforeClose(func(err error) {
 				if err != nil {
 					a.quitPending = false
 					a.persistenceNotice(locales.MessageUnableToSaveBeforeQuitting, err)
-					a.window.Show()
+					a.showMainWindow()
 					return
 				}
 				a.stopMCPForQuit(func(err error) {
 					if err != nil {
 						a.quitPending = false
 						a.persistenceNotice(locales.MessageUnableToStopTheMcpService, err)
+						a.showMainWindow()
 						return
 					}
 					a.prepareTransferQuit(func(err error) {
 						a.quitPending = false
 						if err != nil {
 							a.persistenceNotice(locales.MessageUnableToSaveTransferHistory, err)
-							a.window.Show()
+							a.showMainWindow()
 							return
 						}
 						a.quitReady = true
@@ -403,7 +419,12 @@ func Run() (runErr error) {
 		}
 	})
 	defer stopQuit()
-	stopShutdown := mygo.App.OnWillQuit(func(*mygo.QuitEvent) { a.clearTerminalPreviews(); a.monitor.stop(); a.closeConnections() })
+	stopShutdown := mygo.App.OnWillQuit(func(*mygo.QuitEvent) {
+		a.destroyTray()
+		a.clearTerminalPreviews()
+		a.monitor.stop()
+		a.closeConnections()
+	})
 	defer stopShutdown()
 	return mygo.App.Run()
 }
@@ -676,4 +697,5 @@ func (a *app) sidebarResizeHandle(c *ui.Context, shown float32) {
 
 func (a *app) resetQuitAttempt() {
 	a.quitReady, a.quitPending, a.transfers.quitting = false, false, false
+	a.refreshTray()
 }

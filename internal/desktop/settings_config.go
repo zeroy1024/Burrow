@@ -18,28 +18,32 @@ import (
 )
 
 type appPreferences struct {
-	Version            int               `json:"version"`
-	Locale             string            `json:"locale"`
-	RestoreSessions    bool              `json:"restoreSessions"`
-	LastTabClose       string            `json:"lastTabClose"`
-	ConfirmCloseActive bool              `json:"confirmCloseActive"`
-	AppTheme           string            `json:"appTheme"`
-	Accent             string            `json:"accent"`
-	ReduceMotion       string            `json:"reduceMotion"`
-	Translucency       bool              `json:"translucency"`
-	TermMode           string            `json:"termMode"`
-	TermFollowLight    string            `json:"termFollowLight"`
-	TermFollowDark     string            `json:"termFollowDark"`
-	TermBackground     string            `json:"termBackground"`
-	Term               termtheme.Prefs   `json:"term"`
-	LineHeightEdited   bool              `json:"lineHeightEdited"`
-	ScrollbackLines    int               `json:"scrollbackLines"`
-	DefaultLocalDir    string            `json:"defaultLocalDir"`
-	TransferParallel   int               `json:"transferParallel"`
-	ConflictPolicy     string            `json:"conflictPolicy"`
-	Keymap             map[string]string `json:"keymap"`
-	LastSettingsTab    string            `json:"lastSettingsTab"`
-	ModalAdvancedOpen  map[string]bool   `json:"modalAdvancedOpen"`
+	Version              int               `json:"version"`
+	Locale               string            `json:"locale"`
+	RestoreSessions      bool              `json:"restoreSessions"`
+	LastTabClose         string            `json:"lastTabClose"`
+	WindowClose          string            `json:"windowClose"`
+	CmdQBackground       bool              `json:"cmdQBackground"`
+	HideDockInBackground bool              `json:"hideDockInBackground"`
+	ShowTray             bool              `json:"showTray"`
+	ConfirmCloseActive   bool              `json:"confirmCloseActive"`
+	AppTheme             string            `json:"appTheme"`
+	Accent               string            `json:"accent"`
+	ReduceMotion         string            `json:"reduceMotion"`
+	Translucency         bool              `json:"translucency"`
+	TermMode             string            `json:"termMode"`
+	TermFollowLight      string            `json:"termFollowLight"`
+	TermFollowDark       string            `json:"termFollowDark"`
+	TermBackground       string            `json:"termBackground"`
+	Term                 termtheme.Prefs   `json:"term"`
+	LineHeightEdited     bool              `json:"lineHeightEdited"`
+	ScrollbackLines      int               `json:"scrollbackLines"`
+	DefaultLocalDir      string            `json:"defaultLocalDir"`
+	TransferParallel     int               `json:"transferParallel"`
+	ConflictPolicy       string            `json:"conflictPolicy"`
+	Keymap               map[string]string `json:"keymap"`
+	LastSettingsTab      string            `json:"lastSettingsTab"`
+	ModalAdvancedOpen    map[string]bool   `json:"modalAdvancedOpen"`
 }
 
 type preferenceSaveState struct {
@@ -79,6 +83,7 @@ func (a *app) loadAppPreferences() error {
 	a.appearance = 2
 	a.prefs = appPreferences{
 		Version: 1, RestoreSessions: true, LastTabClose: "keep", ConfirmCloseActive: true,
+		WindowClose: "quit", ShowTray: true,
 		AppTheme: "system", Accent: "#0a84ff", ReduceMotion: "system", Translucency: true,
 		TermMode: a.terminal.mode.String(), TermFollowLight: a.terminal.followLight,
 		TermFollowDark: a.terminal.followDark, TermBackground: a.terminal.prefs.Background.String(),
@@ -140,6 +145,12 @@ func (a *app) validateAppPreferences() error {
 	}
 	if !slices.Contains([]string{"keep", "closeWindow", "quit"}, p.LastTabClose) {
 		return locales.NewError(locales.MessageInvalidTabCloseSetting)
+	}
+	if !slices.Contains([]string{"quit", "background"}, p.WindowClose) {
+		return locales.NewError(locales.MessageInvalidWindowCloseSetting)
+	}
+	if a.backgroundEnabled() && !p.ShowTray {
+		return locales.NewError(locales.MessageBackgroundRunningRequiresTrayIcon)
 	}
 	if !slices.Contains([]string{"ask", "overwrite", "skip", "rename"}, p.ConflictPolicy) {
 		return locales.NewError(locales.MessageInvalidFileConflictSetting)

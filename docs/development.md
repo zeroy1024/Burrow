@@ -21,6 +21,8 @@ The first run/build downloads the pinned terminal plugin's native Ghostty VT lib
 
 Shared icons use pinned Lucide SVGs. See [Lucide assets](../internal/uikit/icons/lucide/README.md) for sources and licenses. Use `uikit.IconName`, `IconSVG`, `Icon`, and `IconButton` with theme dimensions, colors, and stroke settings instead of defining general SVG paths in pages. App, OS, and MCP brand marks remain separate.
 
+The macOS menu bar uses [tray-template.svg](../assets/tray-template.svg), a monochrome Burrow mark with transparent terminal details. AppKit tints its black-and-transparent template for the menu bar appearance and selection. The embedded PNG is 72×72 pixels, displayed at 18×18 points; Windows and Linux use the app icon. After editing the SVG, regenerate the PNG with `mise exec -- uv run --script scripts/render-tray-icon.py`; uv supplies the pinned resvg renderer for this development command.
+
 ## Packaging
 
 ```sh

@@ -93,6 +93,7 @@ func (a *app) initializeBusiness() error {
 		a.activateTab(a.activeTab)
 	}
 	a.startMCPBackend()
+	a.refreshTray()
 	return nil
 }
 
@@ -468,6 +469,7 @@ func (a *app) changeApplicationProtection(d *protectionDraft) {
 	}
 	protected := d.kind != "disable"
 	a.security.changing = true
+	a.refreshTray()
 	d.errorText = locales.Text{}
 	current, next := d.current, d.password
 	a.persist(func() error {
@@ -483,6 +485,7 @@ func (a *app) changeApplicationProtection(d *protectionDraft) {
 		return err
 	}, func(err error) {
 		a.security.changing = false
+		defer a.refreshTray()
 		var cleanup *protectionCleanupError
 		if err != nil && !errors.As(err, &cleanup) {
 			if errors.Is(err, vault.ErrUnlock) {

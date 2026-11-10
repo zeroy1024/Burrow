@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"image/color"
 	"math"
+	"runtime"
 	"slices"
 	"strings"
 	"unicode"
@@ -190,7 +191,7 @@ func (a *app) settingMatches(label, description string) bool {
 
 func (a *app) settingsCategoryHasMatch(index int) bool {
 	texts := []string{
-		"语言 跟随系统 简体中文 English 启动时恢复会话 关闭最后一个选项卡时 关闭活动连接前确认",
+		"语言 跟随系统 简体中文 English 启动时恢复会话 关闭最后一个选项卡时 关闭活动连接前确认 后台运行 关闭主窗口 菜单栏 托盘 程序坞 隐藏 Dock Command Q ⌘Q",
 		"应用主题 浅色 深色 跟随系统 强调色 预览 减少动态效果 窗口半透明 全局背景 毛玻璃 标题栏 玻璃栏 macOS",
 		"配色方案 跟随应用明暗 固定一种 浅色外观时 深色外观时 配色 终端背景 字体 字号 行高 光标 样式 闪烁 回滚行数",
 		"默认本地目录 同时传输数 同名冲突",
@@ -198,7 +199,7 @@ func (a *app) settingsCategoryHasMatch(index int) bool {
 		"私钥 导入 生成 ssh-agent 已保存的密码 添加到 agent 密钥与凭据",
 		"关于 版本 开源许可 MyGo Catppuccin JetBrains Mono",
 	}
-	english := []string{"language system startup restore sessions close last tab active connection confirmation", "app theme light dark system accent preview reduce motion window translucency global background blur macOS", "color scheme follow app fixed light dark terminal background font size line height cursor style blink scrollback", "default local directory concurrent transfers name conflict", "keyboard shortcuts new close reopen select tabs previous next sidebar terminal file mode split search current page settings", "private key import generate ssh-agent saved passwords add to agent credentials", "about version open source license MyGo Catppuccin JetBrains Mono"}
+	english := []string{"language system startup restore sessions close last tab active connection confirmation background main window menu bar tray hide dock icon command q cmd q", "app theme light dark system accent preview reduce motion window translucency global background blur macOS", "color scheme follow app fixed light dark terminal background font size line height cursor style blink scrollback", "default local directory concurrent transfers name conflict", "keyboard shortcuts new close reopen select tabs previous next sidebar terminal file mode split search current page settings", "private key import generate ssh-agent saved passwords add to agent credentials", "about version open source license MyGo Catppuccin JetBrains Mono"}
 	return (index == 5 && a.securitySettingsMatch()) || a.settingMatches(settingsCategories()[index].label, texts[index]+english[index])
 }
 
@@ -307,6 +308,49 @@ func (a *app) generalSettings(c *ui.Context) {
 			a.preferenceSwitch(c, locales.MessageConfirmBeforeClosingAnActiveConnection(), &a.prefs.ConfirmCloseActive)
 		}},
 	})
+	backgroundFields := []settingField{
+		{"MessageWhenTheMainWindowCloses", locales.MessageWhenTheMainWindowCloses(), "",
+			locales.MessageBackgroundRunningKeepsServicesAndConnections(), func() {
+				values := []string{"quit", "background"}
+				settingsSegment(
+					c,
+					"window-close",
+					locales.MessageWhenTheMainWindowCloses(),
+					[]string{locales.MessageQuitApp(), locales.MessageRunInBackground()},
+					slices.Index(values, a.prefs.WindowClose),
+					func(index int) { a.setBackgroundPreferences(values[index], a.prefs.ShowTray, a.prefs.CmdQBackground) },
+				)
+			}},
+		{"MessageShowTrayIcon", locales.MessageShowTrayIcon(), "", locales.MessageBackgroundRunningRequiresTrayIcon(), func() {
+			shown := a.prefs.ShowTray
+			if uikit.Switch(c, &shown, uikit.ToggleProps{
+				Label: locales.MessageShowTrayIcon(), Disabled: a.backgroundEnabled(),
+				Motion: uikit.MotionOverride(a.reduceMotion(c)),
+			}).Changed() {
+				a.setBackgroundPreferences(a.prefs.WindowClose, shown, a.prefs.CmdQBackground)
+			}
+		}},
+	}
+	if runtime.GOOS == "darwin" {
+		backgroundFields = slices.Insert(backgroundFields, 2, settingField{
+			id: "MessageHideDockIcon", label: locales.MessageHideDockIcon(),
+			help: locales.MessageHideDockIconHelp(), control: func() {
+				a.preferenceSwitch(c, locales.MessageHideDockIcon(), &a.prefs.HideDockInBackground)
+			},
+		}, settingField{
+			id: "MessageCommandQBackground", label: locales.MessageCommandQBackground(),
+			help: locales.MessageCommandQBackgroundHelp(), control: func() {
+				enabled := a.prefs.CmdQBackground
+				if uikit.Switch(c, &enabled, uikit.ToggleProps{
+					Label:  locales.MessageCommandQBackground(),
+					Motion: uikit.MotionOverride(a.reduceMotion(c)),
+				}).Changed() {
+					a.setBackgroundPreferences(a.prefs.WindowClose, a.prefs.ShowTray, enabled)
+				}
+			},
+		})
+	}
+	a.settingsGroup(c, "MessageBackgroundRunning", locales.MessageBackgroundRunning(), "", backgroundFields)
 }
 
 func (a *app) appearanceSettings(c *ui.Context) {

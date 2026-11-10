@@ -735,7 +735,7 @@ func (a *app) mcpAuditDrawer(c *ui.Context) {
 							Action: locales.MessageAcknowledgedAndHidden(),
 						})
 						if res.Action {
-							a.window.Show()
+							a.showMainWindow()
 						}
 					}
 				})

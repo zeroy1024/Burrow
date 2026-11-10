@@ -21,6 +21,8 @@ mise exec -- go run .
 
 通用界面图标使用固定版本的 Lucide SVG，素材、来源与许可见 [Lucide 素材说明](../internal/uikit/icons/lucide/README.zh.md)。统一通过 `uikit.IconName`、`IconSVG`、`Icon`、`IconButton` 使用，沿用主题的尺寸、颜色和描边设置；业务页面不再单独定义通用 SVG 路径。应用、操作系统与 MCP 品牌标识独立保留。
 
+macOS 菜单栏使用 [tray-template.svg](../assets/tray-template.svg) 中的 Burrow 单色标识，终端细节为透明镂空。AppKit 根据菜单栏外观及选中状态为黑色透明模板着色。内嵌 PNG 为 72×72 像素，显示为 18×18 点；Windows 和 Linux 使用应用图标。修改 SVG 后，通过 `mise exec -- uv run --script scripts/render-tray-icon.py` 重新生成 PNG；uv 会为这条开发命令准备固定版本的 resvg 渲染器。
+
 ## 打包
 
 ```sh

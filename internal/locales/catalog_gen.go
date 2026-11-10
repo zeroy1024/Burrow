@@ -16411,3 +16411,203 @@ func WgPSKHelp() string { return In(i18n.Locale()).WgPSKHelp() }
 func (msgs Messages) WgPSKHelp() string {
 	return Catalog.Format(msgs.locale, "wgPSKHelp", nil)
 }
+
+// MessageBackgroundRunning says "后台运行"
+// in the language the app shows.
+func MessageBackgroundRunning() string { return In(i18n.Locale()).MessageBackgroundRunning() }
+
+// MessageBackgroundRunning says "后台运行"
+// in the language of msgs.
+func (msgs Messages) MessageBackgroundRunning() string {
+	return Catalog.Format(msgs.locale, "messageBackgroundRunning", nil)
+}
+
+// MessageWhenTheMainWindowCloses says "关闭主窗口时"
+// in the language the app shows.
+func MessageWhenTheMainWindowCloses() string {
+	return In(i18n.Locale()).MessageWhenTheMainWindowCloses()
+}
+
+// MessageWhenTheMainWindowCloses says "关闭主窗口时"
+// in the language of msgs.
+func (msgs Messages) MessageWhenTheMainWindowCloses() string {
+	return Catalog.Format(msgs.locale, "messageWhenTheMainWindowCloses", nil)
+}
+
+// MessageBackgroundRunningKeepsServicesAndConnections says "后台运行会保留 MCP、连接和传输，当前凭据保持解锁；“退出应用”仍会完全退出"
+// in the language the app shows.
+func MessageBackgroundRunningKeepsServicesAndConnections() string {
+	return In(i18n.Locale()).MessageBackgroundRunningKeepsServicesAndConnections()
+}
+
+// MessageBackgroundRunningKeepsServicesAndConnections says "后台运行会保留 MCP、连接和传输，当前凭据保持解锁；“退出应用”仍会完全退出"
+// in the language of msgs.
+func (msgs Messages) MessageBackgroundRunningKeepsServicesAndConnections() string {
+	return Catalog.Format(msgs.locale, "messageBackgroundRunningKeepsServicesAndConnections", nil)
+}
+
+// MessageRunInBackground says "后台运行"
+// in the language the app shows.
+func MessageRunInBackground() string { return In(i18n.Locale()).MessageRunInBackground() }
+
+// MessageRunInBackground says "后台运行"
+// in the language of msgs.
+func (msgs Messages) MessageRunInBackground() string {
+	return Catalog.Format(msgs.locale, "messageRunInBackground", nil)
+}
+
+// MessageShowTrayIcon says "显示菜单栏／托盘图标"
+// in the language the app shows.
+func MessageShowTrayIcon() string { return In(i18n.Locale()).MessageShowTrayIcon() }
+
+// MessageShowTrayIcon says "显示菜单栏／托盘图标"
+// in the language of msgs.
+func (msgs Messages) MessageShowTrayIcon() string {
+	return Catalog.Format(msgs.locale, "messageShowTrayIcon", nil)
+}
+
+// MessageBackgroundRunningRequiresTrayIcon says "任一后台运行选项开启时始终显示图标，方便重新打开或退出应用"
+// in the language the app shows.
+func MessageBackgroundRunningRequiresTrayIcon() string {
+	return In(i18n.Locale()).MessageBackgroundRunningRequiresTrayIcon()
+}
+
+// MessageBackgroundRunningRequiresTrayIcon says "任一后台运行选项开启时始终显示图标，方便重新打开或退出应用"
+// in the language of msgs.
+func (msgs Messages) MessageBackgroundRunningRequiresTrayIcon() string {
+	return Catalog.Format(msgs.locale, "messageBackgroundRunningRequiresTrayIcon", nil)
+}
+
+// MessageInvalidWindowCloseSetting says "无效的主窗口关闭设置"
+// in the language the app shows.
+func MessageInvalidWindowCloseSetting() string {
+	return In(i18n.Locale()).MessageInvalidWindowCloseSetting()
+}
+
+// MessageInvalidWindowCloseSetting says "无效的主窗口关闭设置"
+// in the language of msgs.
+func (msgs Messages) MessageInvalidWindowCloseSetting() string {
+	return Catalog.Format(msgs.locale, "messageInvalidWindowCloseSetting", nil)
+}
+
+// MessageOpenBurrow says "打开 Burrow"
+// in the language the app shows.
+func MessageOpenBurrow() string { return In(i18n.Locale()).MessageOpenBurrow() }
+
+// MessageOpenBurrow says "打开 Burrow"
+// in the language of msgs.
+func (msgs Messages) MessageOpenBurrow() string {
+	return Catalog.Format(msgs.locale, "messageOpenBurrow", nil)
+}
+
+// MessageWaitingForAppUnlock says "等待解锁"
+// in the language the app shows.
+func MessageWaitingForAppUnlock() string { return In(i18n.Locale()).MessageWaitingForAppUnlock() }
+
+// MessageWaitingForAppUnlock says "等待解锁"
+// in the language of msgs.
+func (msgs Messages) MessageWaitingForAppUnlock() string {
+	return Catalog.Format(msgs.locale, "messageWaitingForAppUnlock", nil)
+}
+
+// MessageMcpServiceError says "服务异常"
+// in the language the app shows.
+func MessageMcpServiceError() string { return In(i18n.Locale()).MessageMcpServiceError() }
+
+// MessageMcpServiceError says "服务异常"
+// in the language of msgs.
+func (msgs Messages) MessageMcpServiceError() string {
+	return Catalog.Format(msgs.locale, "messageMcpServiceError", nil)
+}
+
+// MessageTrayMcpStatus says "MCP：%s"
+// in the language the app shows.
+func MessageTrayMcpStatus() string { return In(i18n.Locale()).MessageTrayMcpStatus() }
+
+// MessageTrayMcpStatus says "MCP：%s"
+// in the language of msgs.
+func (msgs Messages) MessageTrayMcpStatus() string {
+	return Catalog.Format(msgs.locale, "messageTrayMcpStatus", nil)
+}
+
+// MessageStartMcpService says "启动 MCP 服务"
+// in the language the app shows.
+func MessageStartMcpService() string { return In(i18n.Locale()).MessageStartMcpService() }
+
+// MessageStartMcpService says "启动 MCP 服务"
+// in the language of msgs.
+func (msgs Messages) MessageStartMcpService() string {
+	return Catalog.Format(msgs.locale, "messageStartMcpService", nil)
+}
+
+// MessageStopMcpService says "停止 MCP 服务"
+// in the language the app shows.
+func MessageStopMcpService() string { return In(i18n.Locale()).MessageStopMcpService() }
+
+// MessageStopMcpService says "停止 MCP 服务"
+// in the language of msgs.
+func (msgs Messages) MessageStopMcpService() string {
+	return Catalog.Format(msgs.locale, "messageStopMcpService", nil)
+}
+
+// MessageUnableToCreateTrayIcon says "创建菜单栏／托盘图标失败"
+// in the language the app shows.
+func MessageUnableToCreateTrayIcon() string { return In(i18n.Locale()).MessageUnableToCreateTrayIcon() }
+
+// MessageUnableToCreateTrayIcon says "创建菜单栏／托盘图标失败"
+// in the language of msgs.
+func (msgs Messages) MessageUnableToCreateTrayIcon() string {
+	return Catalog.Format(msgs.locale, "messageUnableToCreateTrayIcon", nil)
+}
+
+// MessageUnableToSaveBeforeHiding says "隐藏窗口前保存失败"
+// in the language the app shows.
+func MessageUnableToSaveBeforeHiding() string {
+	return In(i18n.Locale()).MessageUnableToSaveBeforeHiding()
+}
+
+// MessageUnableToSaveBeforeHiding says "隐藏窗口前保存失败"
+// in the language of msgs.
+func (msgs Messages) MessageUnableToSaveBeforeHiding() string {
+	return Catalog.Format(msgs.locale, "messageUnableToSaveBeforeHiding", nil)
+}
+
+// MessageCommandQBackground says "⌘Q 仅关闭窗口"
+// in the language the app shows.
+func MessageCommandQBackground() string { return In(i18n.Locale()).MessageCommandQBackground() }
+
+// MessageCommandQBackground says "⌘Q 仅关闭窗口"
+// in the language of msgs.
+func (msgs Messages) MessageCommandQBackground() string {
+	return Catalog.Format(msgs.locale, "messageCommandQBackground", nil)
+}
+
+// MessageCommandQBackgroundHelp says "Burrow 留在菜单栏，MCP、连接和传输继续运行；要退出请从菜单栏选择“退出”"
+// in the language the app shows.
+func MessageCommandQBackgroundHelp() string { return In(i18n.Locale()).MessageCommandQBackgroundHelp() }
+
+// MessageCommandQBackgroundHelp says "Burrow 留在菜单栏，MCP、连接和传输继续运行；要退出请从菜单栏选择“退出”"
+// in the language of msgs.
+func (msgs Messages) MessageCommandQBackgroundHelp() string {
+	return Catalog.Format(msgs.locale, "messageCommandQBackgroundHelp", nil)
+}
+
+// MessageHideDockIcon says "隐藏程序坞图标"
+// in the language the app shows.
+func MessageHideDockIcon() string { return In(i18n.Locale()).MessageHideDockIcon() }
+
+// MessageHideDockIcon says "隐藏程序坞图标"
+// in the language of msgs.
+func (msgs Messages) MessageHideDockIcon() string {
+	return Catalog.Format(msgs.locale, "messageHideDockIcon", nil)
+}
+
+// MessageHideDockIconHelp says "主窗口转入后台后，程序坞不再显示 Burrow；重新打开窗口时恢复"
+// in the language the app shows.
+func MessageHideDockIconHelp() string { return In(i18n.Locale()).MessageHideDockIconHelp() }
+
+// MessageHideDockIconHelp says "主窗口转入后台后，程序坞不再显示 Burrow；重新打开窗口时恢复"
+// in the language of msgs.
+func (msgs Messages) MessageHideDockIconHelp() string {
+	return Catalog.Format(msgs.locale, "messageHideDockIconHelp", nil)
+}
