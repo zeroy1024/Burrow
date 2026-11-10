@@ -272,7 +272,7 @@ func Run() (runErr error) {
 	if err := a.loadAppPreferences(); err != nil {
 		a.security.errorText = locales.ErrorText(err)
 	}
-	a.vault, err = vault.OpenWithKeyStore(ctx, db, directory, platformUnlockKeys())
+	a.vault, err = vault.OpenWithKeyStore(ctx, db, directory, legacyUnlockKeys())
 	if err != nil {
 		a.security.errorText = locales.ErrorText(err)
 		a.security.status = "blocked"

@@ -4,4 +4,4 @@ package desktop
 
 import "github.com/zeroy1024/Burrow/internal/vault"
 
-func platformUnlockKeys() vault.KeyStore { return nil }
+func legacyUnlockKeys() vault.KeyStore { return nil }

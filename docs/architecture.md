@@ -40,7 +40,7 @@ The process takes an exclusive lock, opens the database, and loads the unlock vi
 
 While locked, only startup UI is built; business ticks do not run. Menus, connections, MCP HTTP admission, and task admission are gated by app state. Exiting before initialization releases resources without overwriting saved catalogs, preferences, or workspaces with empty defaults.
 
-The automatic unlock source, file or Keychain, is recorded in authenticated vault metadata. A missing Keychain item does not fall back to an old file. Portable backups use the in-memory data key to create an independent file wrapper.
+Automatic unlock uses private local files. Old Keychain-backed vaults first read the original key, rotate into a file-backed generation, and verify the committed result; missing keys never trigger a fallback or replacement. Legacy Keychain items remain for old backups. Portable backups use the in-memory data key to create an independent file wrapper.
 
 Protection changes and password changes use the existing persistence worker. They rotate the data key, re-encrypt all records, and commit atomically. New business admissions are refused during transition, while authenticated connections, running tasks, and checkpoints continue. An uncertain commit or failed business initialization prevents further use, avoiding restoration or saving of duplicate workspaces from partial state.
 
@@ -58,7 +58,7 @@ Transfers use independent contexts and protocol clients/subsystems. Tasks are gr
 - Destination conflicts use real metadata. The app coordinates identical/overlapping targets; local targets conservatively account for case and Unicode normalization equivalence.
 - Local upload sources, download destinations, and cleanup resolve beneath retained directory handles. Recursion does not follow symbolic links. SFTP private staging permissions are specified in the creation request, before content is sent.
 - Structured data lives in SQLite. Catalog/workspace changes use transactions; settings/layout saves are debounced. Transfer workers commit manifests, digests, and rename intent at safe points. Read failures block overwrite rather than rebuilding the database.
-- Vault encrypts passwords, managed private keys, and saved passphrases into the database. Ciphertext and configuration commit together; endpoint snapshots retain business credential versions. Legacy system credentials are migration sources only. The macOS release automatic unlock key has a separate Keychain service; other platforms and development builds use files. See [data and credentials](storage.md) for formats and locations.
+- Vault encrypts passwords, managed private keys, and saved passphrases into the database. Ciphertext and configuration commit together; endpoint snapshots retain business credential versions. System credential services are one-time migration sources only. All platforms use private local files for automatic unlock. See [data and credentials](storage.md) for formats and locations.
 
 Platform files isolate Unix metadata/mode bits and Windows ACLs. The Windows local client implements `PermissionPreserver` to copy and verify destination ACLs at commit. Private creation and native access live in `localfs`; queue logic does not embed Win32 calls. SSH agent uses separate Unix socket and local Windows named pipe entry points while sharing authentication lifecycle.
 

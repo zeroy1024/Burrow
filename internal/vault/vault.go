@@ -35,26 +35,19 @@ type PlainItem struct {
 	Data               []byte
 }
 
-// KeyStore holds only automatic-unlock wrapping keys. Credential ciphertext and
-// application-password derivation remain independent of the platform store.
+// KeyStore reads automatic-unlock keys from legacy platform storage during
+// migration. New automatic-unlock keys always use private local files.
 type KeyStore interface {
 	Get(string) ([]byte, error)
-	Set(string, []byte) error
-	Delete(string) error
 }
 
 type KeyCleanup struct {
-	File    string
-	store   KeyStore
-	account string
+	File string
 }
 
 func (k KeyCleanup) Run(recycle func(string) error) error {
 	if k.File != "" {
 		return recycle(k.File)
-	}
-	if k.store != nil {
-		return k.store.Delete(k.account)
 	}
 	return nil
 }
@@ -66,7 +59,6 @@ type Manager struct {
 	snapshot  store.VaultSnapshot
 	key       []byte
 	blocked   bool
-	keyStore  KeyStore
 }
 
 func Open(ctx context.Context, db *store.Store, directory string) (*Manager, error) {
@@ -78,7 +70,7 @@ func OpenWithKeyStore(ctx context.Context, db *store.Store, directory string, ke
 	if err != nil {
 		return nil, err
 	}
-	m := &Manager{db: db, directory: directory, snapshot: snapshot, keyStore: keys}
+	m := &Manager{db: db, directory: directory, snapshot: snapshot}
 	switch snapshot.State {
 	case "pending_init", "pending_migration":
 		if !reflect.DeepEqual(snapshot.Header, store.VaultHeader{}) || len(snapshot.Items) != 0 {
@@ -94,7 +86,7 @@ func OpenWithKeyStore(ctx context.Context, db *store.Store, directory string, ke
 			}
 		}
 		if snapshot.Header.Mode == "local" {
-			kek, err := m.readLocalKey(snapshot.Header)
+			kek, err := m.readLocalKey(snapshot.Header, keys)
 			if err != nil {
 				return nil, err
 			}
@@ -109,9 +101,9 @@ func OpenWithKeyStore(ctx context.Context, db *store.Store, directory string, ke
 	}
 	// Retain the header only. Secret ciphertext is read when requested.
 	m.snapshot.Items = nil
-	if keys != nil && snapshot.State == "ready" && snapshot.Header.Mode == "local" && snapshot.Header.KeyStorage != "keychain" {
-		// This is an explicit file-to-Keychain upgrade, never a read-error fallback.
-		// Rotate the DEK and retain the old file as a migration/backup source.
+	if snapshot.State == "ready" && snapshot.Header.Mode == "local" && snapshot.Header.KeyStorage == "keychain" {
+		// Unlock with the original Keychain item before rotating into a file-backed
+		// generation. Keep that item available for old backups and failed upgrades.
 		if _, err := m.ChangeProtection(ctx, "", "", false); err != nil {
 			m.Close()
 			return nil, err
@@ -299,10 +291,7 @@ func (m *Manager) ChangeProtection(ctx context.Context, current, nextPassword st
 	if err := m.commit(ctx, next, key, nil); err != nil {
 		return KeyCleanup{}, err
 	}
-	if old.Mode == "local" {
-		if old.KeyStorage == "keychain" {
-			return KeyCleanup{store: m.keyStore, account: keychainAccount(old)}, nil
-		}
+	if old.Mode == "local" && old.KeyStorage != "keychain" {
 		return KeyCleanup{File: m.localPath(old.LocalKeyID)}, nil
 	}
 	return KeyCleanup{}, nil
@@ -325,9 +314,6 @@ func (m *Manager) prepareHeader(password string, protected bool) (store.VaultSna
 	} else {
 		h.LocalKeyID = randomID()
 		h.KeyStorage = "file"
-		if m.keyStore != nil {
-			h.KeyStorage = "keychain"
-		}
 		kek = randomBytes(32)
 		if err := m.writeLocalKey(h, kek); err != nil {
 			clear(kek)
@@ -526,24 +512,6 @@ func (m *Manager) writeLocalKey(h store.VaultHeader, kek []byte) error {
 		return err
 	}
 	defer clear(data)
-	if h.KeyStorage == "keychain" {
-		if m.keyStore == nil {
-			return locales.NewError(locales.MessageThisCredentialVaultRequiresMacosKeychainToUnlockRestoreItUsingItsMatching)
-		}
-		account := keychainAccount(h)
-		if err := m.keyStore.Set(account, data); err != nil {
-			return locales.Errorf(locales.MessageSaveKeychainUnlockKey, err)
-		}
-		verified, err := m.keyStore.Get(account)
-		defer clear(verified)
-		if err != nil {
-			return locales.Errorf(locales.MessageVerifyKeychainUnlockKey, err)
-		}
-		if !bytes.Equal(data, verified) {
-			return locales.NewError(locales.MessageTheSavedKeychainUnlockKeyDoesNotMatch)
-		}
-		return nil
-	}
 	directory := filepath.Join(m.directory, "vault-keys")
 	if err := localfs.MkdirAll(directory, 0700); err != nil {
 		return err
@@ -556,22 +524,33 @@ func (m *Manager) writeLocalKey(h store.VaultHeader, kek []byte) error {
 	if err := errors.Join(writeErr, f.Sync(), f.Close()); err != nil {
 		return err
 	}
-	return errors.Join(syncDirectory(directory), syncDirectory(m.directory))
+	if err := errors.Join(syncDirectory(directory), syncDirectory(m.directory)); err != nil {
+		return err
+	}
+	verified, err := m.readLocalKey(h, nil)
+	defer clear(verified)
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(kek, verified) {
+		return locales.NewError(locales.MessageTheLocalUnlockKeyDoesNotMatchTheCredentialVault)
+	}
+	return nil
 }
 func keychainAccount(h store.VaultHeader) string {
 	return "vault/" + h.ID + "/unlock/" + h.LocalKeyID
 }
 
-func (m *Manager) readLocalKey(h store.VaultHeader) ([]byte, error) {
+func (m *Manager) readLocalKey(h store.VaultHeader, keys KeyStore) ([]byte, error) {
 	var data []byte
 	var err error
 	if h.KeyStorage == "keychain" {
-		if m.keyStore == nil {
+		if keys == nil {
 			return nil, locales.NewError(
 				locales.MessageThisCredentialVaultRequiresMacosKeychainToUnlockRestoreItUsingItsMatching,
 			)
 		}
-		data, err = m.keyStore.Get(keychainAccount(h))
+		data, err = keys.Get(keychainAccount(h))
 	} else {
 		path := m.localPath(h.LocalKeyID)
 		info, statErr := os.Lstat(path)

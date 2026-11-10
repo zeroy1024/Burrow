@@ -2,7 +2,7 @@
 
 [English](macos-signing.md) | [简体中文](macos-signing.zh.md)
 
-Burrow macOS release packages use a fixed self-signed identity. Business passwords, managed private keys, and passphrases remain encrypted in SQLite. The system Keychain stores only a random automatic unlock key. App password unlock remains independent.
+Burrow macOS release packages use a fixed self-signed identity. Business passwords, managed private keys, and passphrases remain encrypted in SQLite. Automatic unlock uses a private local key file on every platform; Keychain is only a one-time migration source for older vaults. App password unlock remains independent. The build machine’s signing private key is separate from runtime unlock material.
 
 The current identity is created and pinned, with its private key in the local user's default Keychain. Isolated validation on 2026-11-05 passed: two signed builds with different code hashes retained the same designated requirement; the second read the first's fixture without allowing another authorization dialog. Touch ID hardware was available, but creating a protected item with the self-signed probe returned -34018. Fingerprint unlock is not integrated.
 
@@ -12,7 +12,7 @@ The current identity is created and pinned, with its private key in the local us
 - [assets/signing/burrow-local.pem](../assets/signing/burrow-local.pem) contains only the public certificate and may be committed.
 - Private keys never enter the project, package, commit, configuration, or logs. Setup generates the unencrypted key only in memory; temporary PKCS#12 files use a random password held only in the process.
 - Self-signing is not Developer ID, provides no Apple notarization, and does not remove Gatekeeper checks.
-- A fixed identity preserves access identity in the traditional login Keychain; it does not grant restricted data-protection Keychain entitlements.
+- A fixed identity preserves access identity when reading legacy login Keychain items; it does not grant restricted data-protection Keychain entitlements. Normal file-based unlock does not depend on it.
 
 Initial setup:
 
@@ -29,13 +29,13 @@ Use Keychain Access to export and securely back up the certificate/private key a
 
 ## Release and development builds
 
-[platformUnlockKeys](../internal/desktop/vault_keys_darwin.go) enables `dev.burrow.app.vault-unlock` only for packaged release apps named Burrow. Development/integration builds retain file keys and isolated data, so changing signatures do not affect release items.
+[legacyUnlockKeys](../internal/desktop/vault_keys_darwin.go) supplies a read-only migration provider for `dev.burrow.app.vault-unlock` in packaged release apps named Burrow. The provider reads Keychain only when an old vault header explicitly names it. Existing file-backed and password vaults never read it. All new automatic unlock keys use private files, including release, development, and integration builds; their data namespaces remain separate.
 
 Normal release commands and direct MyGo builds use the fixed identity. Full macOS packaging checks it first and fails explicitly if missing. Temporary isolated integration packages retain their existing temporary signing and test namespaces.
 
-Vault metadata v2 authenticates the file/keychain source. Existing file-mode vaults first unlock with the original file, then rotate data keys and migrate to Keychain. Old files remain as migration copies. Missing/unreadable new Keychain items do not fall back to them or generate replacement keys.
+Vault metadata v2 authenticates the file/keychain source. An old Keychain-backed vault first unlocks with its original key, then rotates data keys and records into a file-backed generation. New files use Unix `0600` permissions (`0700` directories) or private Windows ACLs, are synced and read back before database references change, and the committed generation is verified. Existing v1/v2 file-backed vaults stay unchanged. Missing or unreadable keys block startup rather than trying another source or generating replacements. Migration may still need one final system authorization; later startup and upgrades do not access Keychain.
 
-Enabling/changing an app password still re-encrypts credentials and rotates the data key. Previous automatic unlock Keychain items are removed only after committing and reading back the new generation. Cleanup failure is reported separately without rolling back a successful password setting.
+Enabling/changing an app password still re-encrypts credentials and rotates the data key; disabling it creates a private file key. Inactive local files can be recycled after commit/readback through the existing settings flow. Old Keychain items are retained for old backups and are not deleted by migration.
 
 ## Terminal libraries and library validation
 
@@ -51,9 +51,11 @@ The exception solves terminal-library loading for the current self-signed packag
 
 Automatic-mode `Vault.Backup` uses the current in-memory data key to create an independent file unlock key for a consistent database snapshot and rewrap its metadata. Record versions/generations remain unchanged. Another machine need not access the original Mac's Keychain.
 
-Copying only the macOS data directory is therefore not a complete cross-machine backup. Use the paired backup directory, or retain the database/password after enabling app password unlock. There is no new backup UI at present.
+After file migration, quit normally and copy the entire data directory, including `vault-keys/`, or use a paired Vault backup. Password-mode backups require their corresponding password. An unmigrated Keychain-backed database still needs its original key or a portable backup. There is no new backup UI at present.
 
 ## Cross-version validation
+
+This diagnostic covers the legacy Keychain signing path; it is not required for normal file-backed unlock. The earlier isolated result below does not establish that every existing user Keychain ACL will accept an update without authorization.
 
 ~~~sh
 python3 scripts/verify-macos-keychain.py

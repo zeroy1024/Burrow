@@ -5,9 +5,9 @@ import (
 	"github.com/zeroy1024/Burrow/internal/vault"
 )
 
-func platformUnlockKeys() vault.KeyStore {
-	// Development and integration bundles have changing signatures and isolated
-	// data roots. Only stable-signed release bundles use the login Keychain.
+func legacyUnlockKeys() vault.KeyStore {
+	// Only old release vaults need this reader. File-backed and password vaults
+	// never call it, and migrated Keychain items remain available to old backups.
 	if !mygo.App.IsPackaged() || mygo.App.Name() != "Burrow" {
 		return nil
 	}

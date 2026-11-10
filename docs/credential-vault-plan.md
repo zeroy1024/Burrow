@@ -8,7 +8,7 @@ This page records the vault's schema v4 design and acceptance constraints. See [
 
 Date: 2026-11-05. Status: integrated. Existing race tests and isolated encryption/migration checks passed; native UI and migration of real system credentials still await acceptance.
 
-Burrow encrypts passwords, managed private keys, and optionally saved passphrases in its existing SQLite database. Business credentials stay there; the macOS release stores only an automatic unlock key in a separate Keychain service. Users choose one setting: **Require unlocking when opening the app**. It is off by default for automatic unlock. When on, each launch requires an app password. The same page offers **Change Password**.
+Burrow encrypts passwords, managed private keys, and optionally saved passphrases in its existing SQLite database. Automatic unlock keys use private local files on every platform; system credential services are legacy migration sources only. Users choose **Require unlocking when opening the app**, off by default for automatic unlock. When on, each launch requires an app password. The same page offers **Change Password**.
 
 Sections 1–3 define product behavior. Later sections define supporting storage, startup, transition, and recovery constraints. Internal key mechanisms must not become extra user options.
 
@@ -154,7 +154,7 @@ flowchart TD
     V -->|Read ciphertext| S[Store database interface]
     APP -->|Commit config and prepared ciphertext together| S
     S --> DB[(burrow.db)]
-    V --> L[macOS release Keychain or private file keys]
+    V --> L[Private local unlock key files]
     APP -->|Password or signer for this authentication| CLIENT[SSH and file protocol clients]
 ~~~
 
@@ -232,7 +232,7 @@ app-data-directory/
     <local-key-id>.key
 ~~~
 
-The macOS release uses fixed signing for `dev.burrow.app.vault-unlock`. Other platforms and development/integration builds use files. Format v2 authenticates file/keychain source; v1 authenticated data remains unchanged. File-to-Keychain migration first reads the original key successfully, then rotates data keys/records. It does not try another source after failure. Old files remain migration copies.
+All platforms use private local unlock key files. The macOS release reads `dev.burrow.app.vault-unlock` only for old Keychain-backed vaults: unlock successfully, durably write and read back a new file key, rotate the DEK and records, then commit and verify the file-backed generation. Keep old Keychain items for old backups; failed or denied reads do not create replacement keys or fall back to stale files. Existing v1/v2 file-backed vaults remain unchanged. Format v2 authenticates the source; v1 authenticated data remains unchanged.
 
 Items/files contain format version, vault_id, local_key_id, and random unlock key. Filenames use app-generated IDs, not arbitrary paths from the DB.
 
@@ -250,7 +250,7 @@ Each vault has an independent random 32-byte data encryption key (DEK) for all c
 
 The key encryption key (KEK) only wraps/unwraps the DEK:
 
-- local: `crypto/rand` generates 32 bytes, stored in the macOS release's dedicated Keychain item or a private local file elsewhere.
+- local: `crypto/rand` generates 32 bytes, stored in a private local key file on every platform.
 - In `password` mode, Argon2id derives 32 bytes from input and a random database salt; the result is not persisted.
 
 Both databases store only a wrapped DEK and share the same record-read flow.
@@ -293,7 +293,7 @@ Local mode protects a database-only leak, but DB plus local key file permits dec
 
 Password mode adds password/KDF cost to data-directory decryption, but depends on password strength and cannot prevent process control, keylogging, or unlocked-memory reads.
 
-Credential encryption and password mode do not use Apple signing as a decryption secret. The macOS release automatic key's Keychain access still depends on its fixed signing identity. Business credentials no longer come from old system credential stores. Gatekeeper, notarization, and other OS permissions are unchanged.
+Credential encryption, password mode, and file automatic unlock do not use Apple signing as a decryption secret. Only one-time legacy Keychain reads depend on OS authorization. Gatekeeper, notarization, and release signing are unchanged.
 
 ## 7 Credential operations and database consistency
 
@@ -315,7 +315,7 @@ PasswordRevision constraints remain effective. Old workspace/transfer snapshots 
 
 Enabling, disabling, and changing passwords share one flow: verify identity, prepare the unlock mode, generate a new DEK, re-encrypt current credentials, atomically commit metadata/all ciphertext, then update memory.
 
-Rewrapping the same DEK could change a password, but old metadata/unlock material could still recover that DEK and current records. Credential data is limited in size, so explicit security changes and file-to-Keychain transitions rotate DEKs to sever that relationship.
+Rewrapping the same DEK could change a password, but old metadata/unlock material could still recover that DEK and current records. Credential data is limited in size, so explicit security changes and Keychain-to-file transitions rotate DEKs to sever that relationship.
 
 This cuts old keys off from the new epoch only. Passwords/private keys already in old backups remain readable with old unlock material. Leaked remote passwords/SSH keys still require replacement; changing the app password does not revoke them.
 
@@ -325,7 +325,7 @@ This cuts old keys off from the new epoch only. Passwords/private keys already i
 2. Enter ChangingProtection, stop new credential reads/writes and new business admission, and wait for admitted short credential operations.
 3. Establish a write boundary through existing serial commits and capture complete ciphertext/current crypto_epoch. Authenticated SSH sessions/transfers and checkpoint saves may continue; new authentication waits.
 4. Generate a new DEK and KEK or password parameters. Decrypt/re-encrypt records one at a time without retaining all plaintext together.
-5. For local mode, save/read back a Keychain item under a new local_key_id or fully write/durably store a new file. Password mode writes no local unlock key.
+5. For local mode, fully write, sync, and read back a private file under a new local_key_id. Password mode writes no local unlock key.
 6. In one SQLite transaction, check the old epoch and replace all ciphertext/metadata, retaining credential IDs/business revisions.
 7. After confirmed commit, publish the new DEK/settings/UI, release old key references, and resume admission.
 8. Retire old automatic file references. Report cleanup separately without rolling back a committed epoch. Old files are not fallback unlock paths.
