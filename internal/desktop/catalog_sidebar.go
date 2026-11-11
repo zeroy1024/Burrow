@@ -244,7 +244,10 @@ func (a *app) catalogHostMenu(c *ui.Context, id hostID) []uikit.MenuEntry {
 		}
 		menu = slices.Insert(menu, 3, uikit.MenuEntry{
 			ID: "add-other-protocol", Label: label, Icon: uikit.IconPlus,
-			OnChoose: func() { a.startOtherProtocolDraft(id) },
+			OnChoose: func() {
+				// Finish building the source catalog before switching its page state.
+				a.window.Update(func() { a.startOtherProtocolDraft(id) })
+			},
 		})
 	}
 	return menu
