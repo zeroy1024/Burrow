@@ -118,16 +118,13 @@ type HeaderProps struct {
 	Title, Subtitle string
 	Leading, Center func()
 	Actions         []HeaderAction
-	Close           bool
-	CloseLabel      string
 	Surface         *theme.Theme
 }
 
 type HeaderResult struct {
-	Root, CloseButton ui.Element
-	Buttons           []ui.Element
-	Action            int
-	Close             bool
+	Root    ui.Element
+	Buttons []ui.Element
+	Action  int
 }
 
 func PaneHeader(c *ui.Context, props HeaderProps) HeaderResult {
@@ -170,7 +167,7 @@ func PaneHeader(c *ui.Context, props HeaderProps) HeaderResult {
 		if props.Center != nil {
 			props.Center()
 		}
-		if props.Title == "" && props.Subtitle == "" && props.Center == nil && (len(props.Actions) != 0 || props.Close) {
+		if props.Title == "" && props.Subtitle == "" && props.Center == nil && len(props.Actions) != 0 {
 			ui.Spacer(c).PassThrough()
 		}
 		for index, action := range props.Actions {
@@ -186,14 +183,6 @@ func PaneHeader(c *ui.Context, props HeaderProps) HeaderResult {
 			if button.Clicked() || button.Changed() {
 				result.Action = index
 			}
-		}
-		if props.Close {
-			label := props.CloseLabel
-			if label == "" {
-				label = locales.MessageClosePane3()
-			}
-			result.CloseButton = IconButton(c, IconClose, IconButtonProps{Label: label, Size: SizeSm, Surface: t})
-			result.Close = result.CloseButton.Clicked()
 		}
 	})
 	return result

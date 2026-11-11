@@ -28,8 +28,8 @@ type statusLive struct {
 
 func (a *app) serverStatus(c *ui.Context) {
 	t := theme.Current()
-	result := uikit.SidePanel(c, uikit.SidePanelProps{
-		Title: locales.MessageServerStatus(), CloseLabel: locales.MessageCloseServerStatus(), Scroll: &a.statusScroll,
+	uikit.SidePanel(c, uikit.SidePanelProps{
+		Title: locales.MessageServerStatus(), Scroll: &a.statusScroll,
 		ContentPaddingX: t.Space.N16,
 		Scrollbar:       &a.statusScrollbar,
 	}, func() {
@@ -44,7 +44,7 @@ func (a *app) serverStatus(c *ui.Context) {
 		}
 		session := tab.focused
 		facts, factsMessage := a.statusHostFacts(session)
-		m := &a.monitor
+		m := a.sessionMonitor(session)
 		ui.Column(c).Gap(t.C.Stats.SectionGap).Children(func() {
 			switch {
 			case session.state != connected:
@@ -52,7 +52,7 @@ func (a *app) serverStatus(c *ui.Context) {
 				a.statusHost(c, session, facts, live)
 				uikit.EmptyState(c, empty)
 				a.statusFacts(c, &a.statusFactsOpen, facts, factsMessage, nil)
-			case m.session == session && m.unsupported:
+			case m != nil && m.unsupported:
 				a.statusHost(c, session, facts, statusLive{label: locales.MessageNotMonitored(), ink: t.Color.Text.Quaternary})
 				uikit.EmptyState(c, uikit.EmptyProps{IconName: uikit.IconActivity, Title: m.platform.DisplayName() + locales.MessageDoesNotSupportMonitoringYet(),
 					Detail: locales.MessageMonitoringMetricsAreCurrentlyAvailableOnlyForLinuxBasicInformationIsStillAvailable()})
@@ -69,7 +69,7 @@ func (a *app) serverStatus(c *ui.Context) {
 				// still once collection fails or the server cannot provide it.
 				motion := !a.reduceMotion(c)
 				shimmer, diskShimmer := func(string) bool { return motion }, motion
-				if m.session == session {
+				if m != nil {
 					if m.metrics != nil {
 						metrics, history = *m.metrics, m.history
 						live = statusLive{label: locales.MessageLive(), ink: t.Color.Success.Default, halo: t.Color.Success.Halo}
@@ -93,7 +93,7 @@ func (a *app) serverStatus(c *ui.Context) {
 				if notice != "" {
 					uikit.Text(c, notice, uikit.TextProps{Style: uikit.TextCaption, Tone: uikit.ToneSecondary})
 				}
-				statusCPU(c, metrics, history.cpu, m.session == session && m.metrics != nil, shimmer("CPU"))
+				statusCPU(c, metrics, history.cpu, m != nil && m.metrics != nil, shimmer("CPU"))
 				statusResources(c, metrics, disk, diskUsed, diskTotal, shimmer(locales.MessageMemory()), diskShimmer)
 				statusNetwork(c, metrics, history, shimmer(locales.MessageNetwork()))
 				statusProcesses(c, metrics, shimmer(locales.MessageTopProcesses()))
@@ -102,10 +102,47 @@ func (a *app) serverStatus(c *ui.Context) {
 			ui.Box(c).Height(t.Space.N8)
 		})
 	})
-	if result.Close {
-		a.statusVisible = false
-		a.monitor.stop()
+}
+
+// paneReadings shows a connected terminal's latency and latest samples in the
+// pane footer. They appear together, with a dash until each has a value; a
+// narrowing pane drops the wider network rates first, then the other samples.
+func (a *app) paneReadings(c *ui.Context, session *remoteSession, surface *theme.Theme) {
+	if session.state != connected {
+		return
 	}
+	p := surface.C.PaneFooter
+	ui.Row(c).Shrink(0).Gap(p.MetricGap).AlignItems(ui.Center).Children(func() {
+		uikit.Latency(c, sshLatencyMS(session, c.Now()), uikit.LatencyProps{Surface: surface, Label: locales.MessageLatency()})
+		m := a.sessionMonitor(session)
+		if m != nil && m.unsupported || session.layoutRect.W < p.MetricsMinWidth {
+			return
+		}
+		metrics := hostinfo.Metrics{}
+		if m != nil && m.metrics != nil {
+			metrics = *m.metrics
+		}
+		percent := func(value *float64) string {
+			if value == nil {
+				return "—"
+			}
+			return fmt.Sprintf("%.0f%%", *value)
+		}
+		rate := func(value *float64) string {
+			if value == nil {
+				return "—"
+			}
+			number, unit := monitorRate(*value)
+			return number + " " + unit
+		}
+		uikit.PaneMetric(c.Key("cpu"), uikit.IconCPU, percent(metrics.CPU), "CPU", surface)
+		uikit.PaneMetric(c.Key("memory"), uikit.IconMemory, percent(metrics.Memory), locales.MessageMemory(), surface)
+		if session.layoutRect.W < p.MetricsNetMinWidth {
+			return
+		}
+		uikit.PaneMetric(c.Key("down"), uikit.IconArrowDown, rate(metrics.Down), locales.MessageDownload3(), surface)
+		uikit.PaneMetric(c.Key("up"), uikit.IconArrowUp, rate(metrics.Up), locales.MessageUpload3(), surface)
+	})
 }
 
 // statusOffline describes a session that has no live connection.

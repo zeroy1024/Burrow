@@ -81,7 +81,7 @@ type app struct {
 	quitReady, quitPending bool
 	terminalCapture        terminalCaptureState
 	terminalPreviews       map[*remoteSession]*terminalPreview
-	monitor                monitorState
+	monitors               map[*sshConnectionGroup]*monitorState
 	hostFacts              hostFactsState
 	ctx                    context.Context
 	cancel                 context.CancelFunc
@@ -421,7 +421,7 @@ func Run() (runErr error) {
 	stopShutdown := mygo.App.OnWillQuit(func(*mygo.QuitEvent) {
 		a.destroyTray()
 		a.clearTerminalPreviews()
-		a.monitor.stop()
+		a.stopMonitors()
 		a.closeConnections()
 	})
 	defer stopShutdown()

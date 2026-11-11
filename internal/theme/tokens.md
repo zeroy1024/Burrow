@@ -9,8 +9,8 @@ Design sources: `ssh-v6.html`, `common.css`, `parts/split_style.css`, `focus.py`
 | Layer | Count | Purpose |
 |---|---|---|
 | palette (primitives) | 282 | Literal colors/scales, including 50 derived values |
-| semantic (per theme) | 500 | Light follows the design; Dark has 111 derived overrides |
-| component | 1114 | Semantic references only; follows the current theme |
+| semantic (per theme) | 502 | Light follows the design; Dark has 111 derived overrides |
+| component | 1118 | Semantic references only; follows the current theme |
 
 ## 1. Layers and reference rules
 
@@ -742,6 +742,8 @@ siderItem.nameColor             <- component, references semantics only
 | `size.statsChartHeight` | 44px | ＝ | CPU trend chart |
 | `size.statsChartStroke` | 1.3px | ＝ |  |
 | `size.statsSectionGap` | 18px | ＝ |  |
+| `size.paneMetricsMinWidth` | 380px | ＝ | Minimum pane width for CPU and memory in the pane footer |
+| `size.paneMetricsNetMinWidth` | 560px | ＝ | Minimum pane width for network rates in the pane footer |
 | `size.statsNetChartHeight` | 20px | ＝ | Upload/download mini trends |
 | `size.statsValueLarge` | 28px | ＝ | Main CPU value |
 | `size.statsSkeletonLine` | 10px | ＝ | Top-process skeleton bars |
@@ -2394,6 +2396,10 @@ References and resolved Light values; Dark follows the corresponding semantic va
 | `paneFooter.height` | `{size.paneStatusBar}` | 32px |  |
 | `paneFooter.paddingX` | `{space.14}` | 14px |  |
 | `paneFooter.gap` | `{space.10}` | 10px |  |
+| `paneFooter.metricGap` | `{space.12}` | 12px |  |
+| `paneFooter.metricIconGap` | `{space.4}` | 4px |  |
+| `paneFooter.metricsMinWidth` | `{size.paneMetricsMinWidth}` | 380px | Minimum pane width for CPU and memory in the pane footer |
+| `paneFooter.metricsNetMinWidth` | `{size.paneMetricsNetMinWidth}` | 560px | Minimum pane width for network rates in the pane footer |
 | `paneFooter.text` | `{color.text.secondary}` | #8e8e93 | Secondary text, host subtitles, status bars |
 | `paneFooter.font` | `{font.size.footnote}` | 11.5px | Group headers, subtitles, status bars |
 | `paneFooter.divider` | `{color.border.divider}` | #f2f2f4 | Header and table-header bottom lines |

@@ -346,6 +346,7 @@ SEM['size'].update({
  'terminalContentBottom':D(50), 'emptyPaneTitleSize':D(15),
  'statsHeaderHeight':D(44), 'statsChartHeight':D(44,'CPU 趋势图'),
  'statsChartStroke':D(1.3), 'statsSectionGap':D(18),
+ 'paneMetricsMinWidth':D(380,'窗格页脚显示 CPU 与内存的最小窗格宽度'), 'paneMetricsNetMinWidth':D(560,'窗格页脚显示网络速率的最小窗格宽度'),
  'statsNetChartHeight':D(20,'网络上下行迷你趋势'), 'statsValueLarge':D(28,'CPU 主数字'),
  'statsSkeletonLine':D(10,'进程 Top 骨架条'),
 })
@@ -912,7 +913,7 @@ COMP['paneHeader']={
  'heightCompact':'size.paneHeader','heightToolbar':'size.fileHeader','heightTitle':'size.panelHeader',
  'titleFont':'font.size.bodyLg','titleWeight':'font.weight.semibold','paddingLeft':'space.14','paddingRight':'space.8','gap':'space.7',
 }
-COMP['paneFooter']={'height':'size.paneStatusBar','paddingX':'space.14','gap':'space.10','text':'color.text.secondary','font':'font.size.footnote','divider':'color.border.divider'}
+COMP['paneFooter']={'height':'size.paneStatusBar','paddingX':'space.14','gap':'space.10','metricGap':'space.12','metricIconGap':'space.4','metricsMinWidth':'size.paneMetricsMinWidth','metricsNetMinWidth':'size.paneMetricsNetMinWidth','text':'color.text.secondary','font':'font.size.footnote','divider':'color.border.divider'}
 COMP['filePaneFocus'].update({'borderFocused':'color.accent.default','borderWidthFocused':'size.focusRing'})
 SEM['motion']['drag'].update({'standardScale':N(1.02),'standardRotation':N(-.6)})
 COMP['dragLift'].update({'standardScale':'motion.drag.standardScale','standardRotation':'motion.drag.standardRotation'})

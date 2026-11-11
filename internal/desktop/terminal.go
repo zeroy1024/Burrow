@@ -324,11 +324,7 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 			uikit.PaneFooter(c, uikit.FooterProps{Key: "status", Surface: surface}).Absolute().Bottom(0).Left(0).Right(0).
 				Opacity(appearance.FooterOpacity).PassThrough().Children(func() {
 				uikit.ConnectionBadge(c, connectionIndicatorState(session.state), surface)
-				uikit.Latency(
-					c,
-					sshLatencyMS(session, c.Now()),
-					uikit.LatencyProps{Surface: surface, Prefix: locales.MessageLatency()},
-				)
+				a.paneReadings(c, session, surface)
 				ui.Spacer(c)
 				ui.Text(c, a.paneSizeLabel(session)).FontSize(status.FontSize).SingleLine()
 			})

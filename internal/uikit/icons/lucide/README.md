@@ -13,6 +13,6 @@ SVGs remain unchanged. [iconsource.go](../../iconsource.go) maps logical names t
 
 For a new icon, obtain its SVG from the pinned commit and add `IconName`/`iconFiles` mappings. Pages use `IconSVG`, `Icon`, or `IconButton` rather than writing general SVG paths. Version updates must synchronize assets, mappings, `LucideVersion`, this document, and licenses.
 
-Refresh uses `refresh-cw`; retry uses `rotate-ccw`. Sidebar controls use `panel-left` and `panel-left-close`. Splitting/maximizing/restoring use `columns-2`, `maximize-2`, and `minimize-2`. Settings help uses `circle-question-mark`.
+Refresh uses `refresh-cw`; retry uses `rotate-ccw`. Sidebar controls use `panel-left` and `panel-left-close`. Splitting/maximizing/restoring use `columns-2`, `maximize-2`, and `minimize-2`. Settings help uses `circle-question-mark`. Pane footer readings use `zap`, `cpu`, `memory-stick`, `arrow-down`, and `arrow-up`.
 
 Lucide excludes brand marks. Burrow, OS, and MCP marks remain separate and render through `BrandIcon` or dedicated asset entry points.

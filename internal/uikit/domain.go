@@ -319,7 +319,9 @@ func ProtocolBadge(c *ui.Context, protocol string) ui.Element {
 
 type LatencyProps struct {
 	Surface *theme.Theme
-	Prefix  string
+	// Label makes this a pane-footer reading: an icon before the value, named
+	// by Label for assistive technology. Empty shows the value alone.
+	Label string
 }
 
 func Latency(c *ui.Context, ms int, props LatencyProps) ui.Element {
@@ -329,18 +331,35 @@ func Latency(c *ui.Context, ms int, props LatencyProps) ui.Element {
 		surface = t
 	}
 	p := surface.C.Latency
-	label := "—"
+	value := "—"
 	ink := p.Normal
 	if ms >= 0 {
-		label = fmt.Sprintf("%d ms", ms)
+		value = fmt.Sprintf("%d ms", ms)
 		if float32(ms) >= p.BadMs {
 			ink = p.Bad
 		} else if float32(ms) >= p.WarnMs {
 			ink = p.Warn
 		}
 	}
-	if props.Prefix != "" {
-		label = props.Prefix + " " + label
+	if props.Label != "" {
+		return paneReading(c, IconZap, value, props.Label, Color(ink), surface)
 	}
-	return ui.Text(c, label).FontSize(surface.C.StatusBar.FontSize).SingleLine().TextColor(Color(ink)).FontFeatures("tnum")
+	return ui.Text(c, value).FontSize(surface.C.StatusBar.FontSize).SingleLine().TextColor(Color(ink)).FontFeatures("tnum")
+}
+
+// PaneMetric is a pane-footer reading whose icon stands in for a caption;
+// label names it for assistive technology.
+func PaneMetric(c *ui.Context, icon IconName, value, label string, surface *theme.Theme) ui.Element {
+	if surface == nil {
+		surface = theme.Current()
+	}
+	return paneReading(c, icon, value, label, Color(surface.C.PaneFooter.Text), surface)
+}
+
+func paneReading(c *ui.Context, icon IconName, value, label string, ink ui.Color, surface *theme.Theme) ui.Element {
+	p, size := surface.C.PaneFooter, surface.C.IconButton.IconSizeXs
+	return ui.Row(c).Shrink(0).Gap(p.MetricIconGap).AlignItems(ui.Center).Label(label + " " + value).Children(func() {
+		ui.Icon(c, IconSVG(icon)).Size(size, size).TextColor(ink)
+		ui.Text(c, value).FontSize(surface.C.StatusBar.FontSize).SingleLine().TextColor(ink).FontFeatures("tnum")
+	})
 }

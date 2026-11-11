@@ -67,6 +67,11 @@ const (
 	IconRoute        IconName = "route"
 	IconGlobe        IconName = "globe"
 	IconPower        IconName = "power"
+	IconCPU          IconName = "cpu"
+	IconMemory       IconName = "memory"
+	IconArrowDown    IconName = "arrow-down"
+	IconArrowUp      IconName = "arrow-up"
+	IconZap          IconName = "zap"
 )
 
 const LucideVersion = "1.67.0"
@@ -133,6 +138,11 @@ var iconFiles = map[IconName]string{
 	IconRoute:        "route",
 	IconGlobe:        "globe",
 	IconPower:        "power",
+	IconCPU:          "cpu",
+	IconMemory:       "memory-stick",
+	IconArrowDown:    "arrow-down",
+	IconArrowUp:      "arrow-up",
+	IconZap:          "zap",
 }
 
 // The cache holds immutable SVG geometry, keyed by the current token stroke.

@@ -2,7 +2,7 @@
 
 [English](monitoring.md) | [简体中文](monitoring.zh.md)
 
-The panel collects server information over the current SSH connection. Opening it starts sampling. Closing it, switching pages, or hiding the window stops new samples and cancels the panel's own requests without closing Shells or transfers.
+Burrow collects server information over each SSH connection that has a connected terminal. Sampling starts once the terminal is connected and continues whether or not the panel is open, so opening the panel shows the trend already collected. Samples are discarded when that connection ends; monitoring requests never close Shells or transfers.
 
 ## Remote platforms
 
@@ -59,9 +59,9 @@ Root capacity requires SFTP statvfs and confirmation that SFTP and Shell see the
 
 ## Latency and sampling intervals
 
-Shell status-bar latency is independent of monitoring. Visible terminals share an SSH application-level round-trip measurement per connection group every five seconds. Results above three seconds, or no valid sample for ten seconds, display as unknown. This is not ICMP ping.
+Shell status-bar latency is sampled independently of monitoring. Visible terminals share an SSH application-level round-trip measurement per connection group every five seconds. Results above three seconds, or no valid sample for ten seconds, display as unknown. This is not ICMP ping.
 
-Main metrics sample roughly every two seconds with a five-second Exec timeout and at most one request in flight; actual intervals include collection time. Root capacity samples roughly every ten seconds with an independent three-second timeout. Hidden windows and non-SSH pages do not start new latency samples.
+Main metrics sample roughly every two seconds with a five-second Exec timeout and at most one request in flight; actual intervals include collection time. Root capacity samples roughly every ten seconds with an independent three-second timeout. Hidden windows and non-SSH pages do not start new latency samples. Monitoring keeps sampling on other pages; sampling pauses whenever the app builds no frames, and a trend resumed after more than its two-minute window starts over.
 
 ## Panel presentation
 
@@ -73,7 +73,9 @@ The panel follows the focused terminal. Its top card shows session name, OS icon
 - Top-process row backgrounds reflect one-core utilization; rows rounding to 0.0% use secondary text.
 - Host facts can collapse while the heading retains uptime.
 
-CPU/network trends retain the latest 60 valid samples per connection, roughly two minutes. Switching to another terminal on the same connection preserves them; collection failure or switching connections clears them.
+CPU/network trends retain the latest 60 valid samples per connection, roughly two minutes, which is the whole chart. Hiding the panel, switching terminals, or switching pages preserves them; collection failure or the end of the connection clears them.
+
+A connected terminal's pane footer shows latency, then the latest CPU and memory percentages and download/upload rates, each as an icon followed by its value. They appear together as soon as the terminal connects, with `—` until a value is available, and are hidden while it is not connected; hosts without monitoring support show latency only. Panes narrower than 560 px omit the network rates, and panes narrower than 380 px omit all four metrics.
 
 ## Development notes
 

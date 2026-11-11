@@ -10676,16 +10676,6 @@ func (msgs Messages) MessageServerStatus() string {
 	return Catalog.Format(msgs.locale, "messageServerStatus", nil)
 }
 
-// MessageCloseServerStatus says "关闭服务器状态"
-// in the language the app shows.
-func MessageCloseServerStatus() string { return In(i18n.Locale()).MessageCloseServerStatus() }
-
-// MessageCloseServerStatus says "关闭服务器状态"
-// in the language of msgs.
-func (msgs Messages) MessageCloseServerStatus() string {
-	return Catalog.Format(msgs.locale, "messageCloseServerStatus", nil)
-}
-
 // MessageSelectATerminalToViewItsStatus says "选择一个终端查看状态"
 // in the language the app shows.
 func MessageSelectATerminalToViewItsStatus() string {
@@ -14680,16 +14670,6 @@ func MessageRemove() string { return In(i18n.Locale()).MessageRemove() }
 // in the language of msgs.
 func (msgs Messages) MessageRemove() string {
 	return Catalog.Format(msgs.locale, "messageRemove", nil)
-}
-
-// MessageClosePane3 says "关闭面板"
-// in the language the app shows.
-func MessageClosePane3() string { return In(i18n.Locale()).MessageClosePane3() }
-
-// MessageClosePane3 says "关闭面板"
-// in the language of msgs.
-func (msgs Messages) MessageClosePane3() string {
-	return Catalog.Format(msgs.locale, "messageClosePane3", nil)
 }
 
 // MessageCurrentDirectory says "当前目录 "

@@ -9,8 +9,8 @@
 | 层 | 数量 | 说明 |
 |---|---|---|
 | palette（primitives） | 282 | 原始色值与刻度，其中 50 个为推导值（derived） |
-| semantic（每个主题一份） | 500 | Light = 当前设计；Dark 覆盖其中 111 个（全部 derived） |
-| component | 1114 | 只引用 semantic；换主题时自动跟随 |
+| semantic（每个主题一份） | 502 | Light = 当前设计；Dark 覆盖其中 111 个（全部 derived） |
+| component | 1118 | 只引用 semantic；换主题时自动跟随 |
 
 ## 1. 三层结构与引用规则
 
@@ -742,6 +742,8 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `size.statsChartHeight` | 44px | ＝ | CPU 趋势图 |
 | `size.statsChartStroke` | 1.3px | ＝ |  |
 | `size.statsSectionGap` | 18px | ＝ |  |
+| `size.paneMetricsMinWidth` | 380px | ＝ | 窗格页脚显示 CPU 与内存的最小窗格宽度 |
+| `size.paneMetricsNetMinWidth` | 560px | ＝ | 窗格页脚显示网络速率的最小窗格宽度 |
 | `size.statsNetChartHeight` | 20px | ＝ | 网络上下行迷你趋势 |
 | `size.statsValueLarge` | 28px | ＝ | CPU 主数字 |
 | `size.statsSkeletonLine` | 10px | ＝ | 进程 Top 骨架条 |
@@ -2394,6 +2396,10 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `paneFooter.height` | `{size.paneStatusBar}` | 32px |  |
 | `paneFooter.paddingX` | `{space.14}` | 14px |  |
 | `paneFooter.gap` | `{space.10}` | 10px |  |
+| `paneFooter.metricGap` | `{space.12}` | 12px |  |
+| `paneFooter.metricIconGap` | `{space.4}` | 4px |  |
+| `paneFooter.metricsMinWidth` | `{size.paneMetricsMinWidth}` | 380px | 窗格页脚显示 CPU 与内存的最小窗格宽度 |
+| `paneFooter.metricsNetMinWidth` | `{size.paneMetricsNetMinWidth}` | 560px | 窗格页脚显示网络速率的最小窗格宽度 |
 | `paneFooter.text` | `{color.text.secondary}` | #8e8e93 | 次要文字、主机副标题、状态栏 |
 | `paneFooter.font` | `{font.size.footnote}` | 11.5px | 分组头、副标题、状态栏 |
 | `paneFooter.divider` | `{color.border.divider}` | #f2f2f4 | 头部底线、表头底线 |

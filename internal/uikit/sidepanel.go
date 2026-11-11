@@ -15,16 +15,17 @@ func SidePanelViewport(c *ui.Context) ui.Element {
 }
 
 type SidePanelProps struct {
-	Title, Subtitle, CloseLabel string
-	Width                       float32
-	Open                        *bool
-	Scroll                      *ui.ScrollState
-	Scrollbar                   *ScrollbarState
-	ScrollInput                 func(ui.InputEvent) bool
-	ContentPaddingX             float32
-	ScrollOverlay               func(ui.Element, *ui.ScrollState)
-	Header                      func() bool
-	Footer                      func()
+	Title, Subtitle string
+	Width           float32
+	Open            *bool
+	Scroll          *ui.ScrollState
+	Scrollbar       *ScrollbarState
+	ScrollInput     func(ui.InputEvent) bool
+	ContentPaddingX float32
+	ScrollOverlay   func(ui.Element, *ui.ScrollState)
+	// Header replaces the title row and reports a close request.
+	Header func() bool
+	Footer func()
 }
 
 type SidePanelResult struct {
@@ -62,12 +63,8 @@ func SidePanel(c *ui.Context, props SidePanelProps, body func()) SidePanelResult
 		if props.Header != nil {
 			result.Close = props.Header()
 		} else {
-			header := PaneHeader(c, HeaderProps{
-				Density: DensityTitle, Title: props.Title, Subtitle: props.Subtitle,
-				Close: true, CloseLabel: props.CloseLabel,
-			})
+			header := PaneHeader(c, HeaderProps{Density: DensityTitle, Title: props.Title, Subtitle: props.Subtitle})
 			header.Root.FillWidth().Height(p.HeaderHeight).Padding(0, padding)
-			result.Close = header.Close
 		}
 		if result.Close && props.Open != nil {
 			*props.Open = false

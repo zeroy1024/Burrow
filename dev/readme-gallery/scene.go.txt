@@ -179,8 +179,8 @@ func (a *app) galleryTerminals() {
 	}
 	a.nextTab, a.nextSession = 2, 9
 	cpu, memory, uptime, down, up, processes := 23.0, 41.0, 1225920.0, 4200000.0, 840000.0, 146
-	a.monitor = monitorState{
-		session: left,
+	monitor := &monitorState{
+		cancel: func() {},
 		metrics: &hostinfo.Metrics{
 			CPU: &cpu, Memory: &memory, Uptime: &uptime, Down: &down, Up: &up, Cores: 8,
 			Load: "0.82 / 0.64 / 0.51", MemoryUsed: 6600000000, MemoryTotal: 16000000000,
@@ -193,10 +193,11 @@ func (a *app) galleryTerminals() {
 		diskIdentity: "/", diskStats: &hostinfo.Usage{Total: 120000000000, Free: 68400000000},
 	}
 	for i := range 60 {
-		a.monitor.history.cpu = append(a.monitor.history.cpu, 22+7*math.Sin(float64(i)/4)+3*math.Sin(float64(i)/1.7))
-		a.monitor.history.down = append(a.monitor.history.down, 3800000+1800000*math.Sin(float64(i)/6))
-		a.monitor.history.up = append(a.monitor.history.up, 600000+300000*math.Sin(float64(i)/5))
+		monitor.history.cpu = append(monitor.history.cpu, 22+7*math.Sin(float64(i)/4)+3*math.Sin(float64(i)/1.7))
+		monitor.history.down = append(monitor.history.down, 3800000+1800000*math.Sin(float64(i)/6))
+		monitor.history.up = append(monitor.history.up, 600000+300000*math.Sin(float64(i)/5))
 	}
+	a.monitors = map[*sshConnectionGroup]*monitorState{left.connection: monitor}
 	a.hostFacts.values = map[string]hostinfo.Facts{
 		hostFactsKey(left.connection.plan): {
 			Platform: hostinfo.Linux, Hostname: "prod-web-01", OSID: "ubuntu", OSVersion: "24.04",

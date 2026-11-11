@@ -845,6 +845,8 @@ type Sizes struct {
 	StatsChartHeight         float32 // CPU 趋势图
 	StatsChartStroke         float32
 	StatsSectionGap          float32
+	PaneMetricsMinWidth      float32 // 窗格页脚显示 CPU 与内存的最小窗格宽度
+	PaneMetricsNetMinWidth   float32 // 窗格页脚显示网络速率的最小窗格宽度
 	StatsNetChartHeight      float32 // 网络上下行迷你趋势
 	StatsValueLarge          float32 // CPU 主数字
 	StatsSkeletonLine        float32 // 进程 Top 骨架条
@@ -2563,12 +2565,16 @@ type PaneHeaderTokens struct {
 
 // PaneFooterTokens groups tokens.
 type PaneFooterTokens struct {
-	Height   float32     // ← size.paneStatusBar
-	PaddingX float32     // ← space.14
-	Gap      float32     // ← space.10
-	Text     color.NRGBA // ← color.text.secondary
-	Font     float32     // ← font.size.footnote
-	Divider  color.NRGBA // ← color.border.divider
+	Height             float32     // ← size.paneStatusBar
+	PaddingX           float32     // ← space.14
+	Gap                float32     // ← space.10
+	MetricGap          float32     // ← space.12
+	MetricIconGap      float32     // ← space.4
+	MetricsMinWidth    float32     // ← size.paneMetricsMinWidth
+	MetricsNetMinWidth float32     // ← size.paneMetricsNetMinWidth
+	Text               color.NRGBA // ← color.text.secondary
+	Font               float32     // ← font.size.footnote
+	Divider            color.NRGBA // ← color.border.divider
 }
 
 // McpTokens groups tokens.
@@ -3349,6 +3355,8 @@ func lightSemantic() Semantic {
 			StatsChartHeight:         44,
 			StatsChartStroke:         1.3,
 			StatsSectionGap:          18,
+			PaneMetricsMinWidth:      380,
+			PaneMetricsNetMinWidth:   560,
 			StatsNetChartHeight:      20,
 			StatsValueLarge:          28,
 			StatsSkeletonLine:        10,
@@ -4978,12 +4986,16 @@ func buildComponents(s *Semantic) Components {
 			Gap:           s.Space.N7,
 		},
 		PaneFooter: PaneFooterTokens{
-			Height:   s.Size.PaneStatusBar,
-			PaddingX: s.Space.N14,
-			Gap:      s.Space.N10,
-			Text:     s.Color.Text.Secondary,
-			Font:     s.Font.Size.Footnote,
-			Divider:  s.Color.Border.Divider,
+			Height:             s.Size.PaneStatusBar,
+			PaddingX:           s.Space.N14,
+			Gap:                s.Space.N10,
+			MetricGap:          s.Space.N12,
+			MetricIconGap:      s.Space.N4,
+			MetricsMinWidth:    s.Size.PaneMetricsMinWidth,
+			MetricsNetMinWidth: s.Size.PaneMetricsNetMinWidth,
+			Text:               s.Color.Text.Secondary,
+			Font:               s.Font.Size.Footnote,
+			Divider:            s.Color.Border.Divider,
 		},
 		Mcp: McpTokens{
 			TableMinWidth:     s.Size.McpTableMinWidth,
