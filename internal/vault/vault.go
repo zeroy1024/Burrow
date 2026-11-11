@@ -61,10 +61,6 @@ type Manager struct {
 	blocked   bool
 }
 
-func Open(ctx context.Context, db *store.Store, directory string) (*Manager, error) {
-	return OpenWithKeyStore(ctx, db, directory, nil)
-}
-
 func OpenWithKeyStore(ctx context.Context, db *store.Store, directory string, keys KeyStore) (*Manager, error) {
 	snapshot, err := db.ReadVault(ctx)
 	if err != nil {

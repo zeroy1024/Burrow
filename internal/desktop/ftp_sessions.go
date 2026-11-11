@@ -20,7 +20,6 @@ type fileSession struct {
 	gatewayScope   string
 	runtime        *fileRuntime
 	localRuntime   *fileRuntime
-	sshPeer        *remoteSession
 	ftpSecret      string
 	config         sessionConfig
 	id             int
@@ -346,13 +345,6 @@ func (a *app) deleteFileSite(id hostID, done func(error)) {
 		for _, closed := range a.closedTabs {
 			if closed.section == sectionFiles {
 				remainingFiles[closed.file] = true
-			}
-		}
-		for _, tab := range a.tabs {
-			for _, session := range tab.root.sessions() {
-				if session.filePeer != nil {
-					remainingFiles[session.filePeer] = true
-				}
 			}
 		}
 		a.closedTabs = slices.DeleteFunc(a.closedTabs, func(candidate closedWorkspaceTab) bool {

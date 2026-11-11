@@ -764,7 +764,7 @@ class Driver:
         except RuntimeError:
             state = self.snapshot()
             selected = self.file()
-            labels = {"远程文件", "打开 SSH 会话", "打开文件会话", selected["Name"] if selected else ""}
+            labels = {"远程文件", selected["Name"] if selected else ""}
             print("Remote ready state: " + repr(dict(section=state["Section"], file=selected,
                   nodes=[(n.get("role"), n.get("label"), n.get("states"), n.get("bounds"))
                          for n in self.nodes() if n.get("label") in labels],

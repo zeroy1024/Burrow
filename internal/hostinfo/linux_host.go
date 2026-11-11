@@ -284,7 +284,7 @@ func parseMonitorSections(sections map[string]string) linuxSample {
 		{"CPU", sample.hasCPU}, {locales.MessageMemory(), metrics.memory != nil},
 		{locales.MessageNetwork(), sample.hasNetwork && metrics.uptime != nil}, {locales.MessageLoad2(), metrics.load != ""},
 		{locales.MessageUptime2(), metrics.uptime != nil},
-		{locales.MessageProcessCount(), metrics.hasProcesses}, {locales.MessageTopProcesses(), sample.processes != nil && len(sample.processes) > 0 && sample.hasCPU && metrics.cores > 0},
+		{locales.MessageProcessCount(), metrics.hasProcesses}, {locales.MessageTopProcesses(), len(sample.processes) > 0 && sample.hasCPU && metrics.cores > 0},
 		{locales.MessageMountInformation(), metrics.root.identity != ""},
 	} {
 		if !item.ok {

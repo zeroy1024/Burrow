@@ -1,18 +1,10 @@
 package desktop
 
 import (
-	"fmt"
-	"image/color"
-
 	"github.com/zeroy1024/Burrow/internal/uikit"
 
 	"github.com/egoist/mygo/ui"
 )
-
-// Window colors use the native API's string format rather than a UI element.
-func windowColor(c color.NRGBA) string {
-	return fmt.Sprintf("#%02x%02x%02x%02x", c.R, c.G, c.B, c.A)
-}
 
 // Shortcut policy and stable page handles stay with the application.
 func (a *app) sidebarSearch(c *ui.Context, value *string, focus *ui.Handle, label, placeholder string) {

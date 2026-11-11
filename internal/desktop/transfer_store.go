@@ -228,9 +228,7 @@ func (a *app) transferSnapshot() *storedTransferQueue {
 			SourceRemote: job.sourceRemote, SourcePath: manifest.SourcePath, TargetPath: manifest.TargetPath,
 			Name: job.name, Policy: int(job.batch.policy.Load()), Total: manifest.Total, DoneBytes: manifest.Done,
 			Root: manifest.Root}
-		for _, name := range manifest.Temporary {
-			stored.Temporary = append(stored.Temporary, name)
-		}
+		stored.Temporary = append(stored.Temporary, manifest.Temporary...)
 		slices.Sort(stored.Temporary)
 		result.Tasks = append(result.Tasks, stored)
 	}

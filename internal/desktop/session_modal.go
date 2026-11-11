@@ -17,7 +17,6 @@ import (
 
 var (
 	sessionKeyIcon   = uikit.IconSVG(uikit.IconKey)
-	sessionEyeIcon   = uikit.IconSVG(uikit.IconEye)
 	sessionAlertIcon = uikit.IconSVG(uikit.IconAlertCircle)
 	sessionCheckIcon = uikit.IconSVG(uikit.IconCheckCircle)
 )

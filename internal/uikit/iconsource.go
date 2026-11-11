@@ -46,7 +46,6 @@ const (
 	IconPause        IconName = "pause"
 	IconPlay         IconName = "play"
 	IconRetry        IconName = "retry"
-	IconPin          IconName = "pin"
 	IconCopy         IconName = "copy"
 	IconEdit         IconName = "edit"
 	IconImage        IconName = "image"
@@ -57,7 +56,6 @@ const (
 	IconBan          IconName = "ban"
 	IconSplit        IconName = "split"
 	IconRestore      IconName = "restore"
-	IconAppearance   IconName = "appearance"
 	IconPalette      IconName = "palette"
 	IconTextCursor   IconName = "text-cursor"
 	IconLaptop       IconName = "laptop"
@@ -115,7 +113,6 @@ var iconFiles = map[IconName]string{
 	IconPause:        "pause",
 	IconPlay:         "play",
 	IconRetry:        "rotate-ccw",
-	IconPin:          "pin",
 	IconCopy:         "copy",
 	IconEdit:         "pencil",
 	IconImage:        "image",
@@ -125,7 +122,6 @@ var iconFiles = map[IconName]string{
 	IconBan:          "ban",
 	IconSplit:        "columns-2",
 	IconRestore:      "minimize-2",
-	IconAppearance:   "contrast",
 	IconPalette:      "palette",
 	IconTextCursor:   "text-cursor",
 	IconLaptop:       "laptop",

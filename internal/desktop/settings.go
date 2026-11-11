@@ -175,10 +175,9 @@ func (a *app) settingMatches(label, description string) bool {
 	if query == "" {
 		return true
 	}
-	haystack := []rune(strings.ToLower(label + " " + description))
 	needle := []rune(query)
 	at := 0
-	for _, r := range haystack {
+	for _, r := range strings.ToLower(label + " " + description) {
 		if r == needle[at] {
 			at++
 			if at == len(needle) {
@@ -254,12 +253,6 @@ func (a *app) settingsGroup(c *ui.Context, id, title, help string, fields []sett
 				},
 			})
 		}
-	})
-}
-
-func settingsRow(c *ui.Context, label string, content func()) {
-	uikit.SettingsRow(c, uikit.SettingsRowProps{
-		Gap: theme.Current().Space.N16, Inline: true, Title: label, Control: content,
 	})
 }
 
@@ -721,15 +714,6 @@ func (a *app) terminalTextSettings(c *ui.Context) {
 			a.preferencesChanged()
 		}
 	}}})
-}
-
-func (a *app) terminalNumberSetting(c *ui.Context, label string, destination *float32, lo, hi float64) {
-	settingsRow(c, label, func() {
-		value := float64(*destination)
-		if settingsNumberInput(c, label, &value, lo, hi, 0.5, theme.Current().C.Settings.NumberWidth, false) {
-			a.changeTerminalSettings(func() { *destination = float32(value) })
-		}
-	})
 }
 
 func (a *app) fileSettings(c *ui.Context) {

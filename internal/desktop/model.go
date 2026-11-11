@@ -68,18 +68,14 @@ type remoteSession struct {
 	ssh                         *sshRuntime
 	terminal                    *sshTerminal
 	focusPending                bool
-	filePeer                    *fileSession
 	config                      sessionConfig
 	id                          int
 	host                        hostID
 	state                       connectionState
-	connectionStarted           time.Time
-	connectionStep              int
 	scroll                      terminalScrollState
 	focus                       ui.Handle
 	transcript                  []terminalLine
 	output                      []terminalLine
-	textState                   terminalTextState
 	hasNewOutput                bool
 	hasBell                     bool
 	cursorStarted               time.Time
@@ -125,14 +121,6 @@ func (a *app) currentTab() *workspaceTab {
 		return nil
 	}
 	return a.tabs[a.activeTab]
-}
-
-func (a *app) focusedHost() (hostID, bool) {
-	tab := a.currentTab()
-	if tab == nil {
-		return 0, false
-	}
-	return tab.focused.host, true
 }
 
 func (a *app) newSession(id hostID) *remoteSession {
@@ -214,22 +202,6 @@ func (a *app) selectTab(index int) {
 	a.closeSettings()
 	a.activeTab = index
 	a.tabs[index].focused.markViewed()
-}
-
-// The prototype receives complete output lines; BEL is an activity event, not printable text.
-func (a *app) receiveSessionOutput(session *remoteSession, text string) {
-	background := a.currentTab().focused != session
-	lines, bell := session.textState.parse(text)
-	if background && bell {
-		session.hasBell = true
-	}
-	if len(lines) == 0 {
-		return
-	}
-	appendSessionLines(session, lines...)
-	if background {
-		session.hasNewOutput = true
-	}
 }
 
 func (a *app) openHost(id hostID) {

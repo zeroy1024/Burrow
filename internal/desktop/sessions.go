@@ -180,11 +180,3 @@ func (a *app) deleteGroupDialog(c *ui.Context) {
 		page.groupDelete = nil
 	}
 }
-
-func draftField(c *ui.Context, label string, value *string) {
-	t := theme.Current()
-	ui.Column(c).Gap(t.Space.N6).Children(func() {
-		uikit.Text(c, label, uikit.TextProps{Style: uikit.TextSmall})
-		uikit.Input(c, value, uikit.InputProps{}).Label(label).FillWidth()
-	})
-}

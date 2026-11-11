@@ -21,7 +21,6 @@ import signal
 import socket
 import sqlite3
 import subprocess
-import sys
 import tempfile
 import time
 import urllib.error

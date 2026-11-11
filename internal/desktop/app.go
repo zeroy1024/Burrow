@@ -89,8 +89,6 @@ type app struct {
 	nextConnection         int
 	nextCatalogGroupID     int
 	sshPrompts             []*sshPrompt
-	fileSSHLink            *fileSession
-	fileSSHLinkAfterClose  func()
 	gateways               []gatewayConfig
 	defaultGateway         string
 	gatewayUI              gatewayUIState
@@ -557,7 +555,6 @@ func (a *app) view(c *ui.Context) {
 	}
 	a.gatewayDialog(c)
 	a.sshDialogs(c)
-	a.fileSSHLinkDialog(c)
 	a.credentialDialogs(c)
 	a.applicationSecurityDialog(c)
 	a.closeTabDialog(c)

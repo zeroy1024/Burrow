@@ -340,12 +340,8 @@ func (a *app) disconnectFileSession(session *fileSession) {
 	session.state, session.errorText, session.remote.loading = disconnected, locales.Text{}, false
 }
 
-func (a *app) refreshRemoteFiles(session *fileSession) { a.refreshFilePane(session, session.remote) }
 func (a *app) refreshFilePane(session *fileSession, pane *filePaneState) {
 	a.queueFileDirectory(session, pane, fileNavigation{path: pane.path, historyIndex: pane.historyIndex})
-}
-func (a *app) queueRemoteDirectory(session *fileSession, navigation fileNavigation) {
-	a.queueFileDirectory(session, session.remote, navigation)
 }
 
 func (a *app) queueFileDirectory(session *fileSession, pane *filePaneState, navigation fileNavigation) {

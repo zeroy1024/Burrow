@@ -2,7 +2,6 @@ package fileclient
 
 import (
 	"context"
-	"errors"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -54,20 +53,4 @@ func (c *localClient) PreservePermissions(ctx context.Context, source, destinati
 		return err
 	}
 	return localfs.CopyPermissions(from, to)
-}
-
-func renameLocalNoReplace(from, to string) error {
-	fromRoot, err := os.OpenRoot(filepath.Dir(from))
-	if err != nil {
-		return err
-	}
-	defer fromRoot.Close()
-	toRoot, err := os.OpenRoot(filepath.Dir(to))
-	if err != nil {
-		return err
-	}
-	return errors.Join(
-		renameLocalAt(fromRoot, filepath.Base(from), toRoot, filepath.Base(to), true),
-		toRoot.Close(),
-	)
 }

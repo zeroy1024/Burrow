@@ -3944,16 +3944,6 @@ func (msgs Messages) MessageRemoveThisEntryFromTheCurrentCatalogAndCloseItsSessi
 	return Catalog.Format(msgs.locale, "messageRemoveThisEntryFromTheCurrentCatalogAndCloseItsSessionsServerFiles", nil)
 }
 
-// MessageUnableToDeleteSession says "删除会话失败"
-// in the language the app shows.
-func MessageUnableToDeleteSession() string { return In(i18n.Locale()).MessageUnableToDeleteSession() }
-
-// MessageUnableToDeleteSession says "删除会话失败"
-// in the language of msgs.
-func (msgs Messages) MessageUnableToDeleteSession() string {
-	return Catalog.Format(msgs.locale, "messageUnableToDeleteSession", nil)
-}
-
 // MessageTheFilenameCannotBeSafelyUsedInTheDestinationPath says "文件名不能安全地用于目标路径"
 // in the language the app shows.
 func MessageTheFilenameCannotBeSafelyUsedInTheDestinationPath() string {
@@ -5650,28 +5640,6 @@ func MessageAfterSavingSelectThisGatewayForHostsFileSitesOrTheAppDefault() strin
 // in the language of msgs.
 func (msgs Messages) MessageAfterSavingSelectThisGatewayForHostsFileSitesOrTheAppDefault() string {
 	return Catalog.Format(msgs.locale, "messageAfterSavingSelectThisGatewayForHostsFileSitesOrTheAppDefault", nil)
-}
-
-// MessageUseASavedSshHost says "复用已保存的 SSH 主机"
-// in the language the app shows.
-func MessageUseASavedSshHost() string { return In(i18n.Locale()).MessageUseASavedSshHost() }
-
-// MessageUseASavedSshHost says "复用已保存的 SSH 主机"
-// in the language of msgs.
-func (msgs Messages) MessageUseASavedSshHost() string {
-	return Catalog.Format(msgs.locale, "messageUseASavedSshHost", nil)
-}
-
-// MessageRouteConnectionsThroughAProxyServer says "经代理服务器转发连接"
-// in the language the app shows.
-func MessageRouteConnectionsThroughAProxyServer() string {
-	return In(i18n.Locale()).MessageRouteConnectionsThroughAProxyServer()
-}
-
-// MessageRouteConnectionsThroughAProxyServer says "经代理服务器转发连接"
-// in the language of msgs.
-func (msgs Messages) MessageRouteConnectionsThroughAProxyServer() string {
-	return Catalog.Format(msgs.locale, "messageRouteConnectionsThroughAProxyServer", nil)
 }
 
 // MessageGatewayType says "网关类型"
@@ -9300,42 +9268,6 @@ func MessageTransferStorageIsUnavailable() string {
 // in the language of msgs.
 func (msgs Messages) MessageTransferStorageIsUnavailable() string {
 	return Catalog.Format(msgs.locale, "messageTransferStorageIsUnavailable", nil)
-}
-
-// MessageChooseSshShortcutTarget says "选择 SSH 快捷目标"
-// in the language the app shows.
-func MessageChooseSshShortcutTarget() string {
-	return In(i18n.Locale()).MessageChooseSshShortcutTarget()
-}
-
-// MessageChooseSshShortcutTarget says "选择 SSH 快捷目标"
-// in the language of msgs.
-func (msgs Messages) MessageChooseSshShortcutTarget() string {
-	return Catalog.Format(msgs.locale, "messageChooseSshShortcutTarget", nil)
-}
-
-// MessageFtpUsesASeparateLoginSelectASavedSshHostToSwitchBetween says "FTP 使用独立登录。选择已有 SSH 主机后，本次会话可双向跳转。"
-// in the language the app shows.
-func MessageFtpUsesASeparateLoginSelectASavedSshHostToSwitchBetween() string {
-	return In(i18n.Locale()).MessageFtpUsesASeparateLoginSelectASavedSshHostToSwitchBetween()
-}
-
-// MessageFtpUsesASeparateLoginSelectASavedSshHostToSwitchBetween says "FTP 使用独立登录。选择已有 SSH 主机后，本次会话可双向跳转。"
-// in the language of msgs.
-func (msgs Messages) MessageFtpUsesASeparateLoginSelectASavedSshHostToSwitchBetween() string {
-	return Catalog.Format(msgs.locale, "messageFtpUsesASeparateLoginSelectASavedSshHostToSwitchBetween", nil)
-}
-
-// MessageSshShortcutTargetScrollbar says "SSH 快捷目标滚动条"
-// in the language the app shows.
-func MessageSshShortcutTargetScrollbar() string {
-	return In(i18n.Locale()).MessageSshShortcutTargetScrollbar()
-}
-
-// MessageSshShortcutTargetScrollbar says "SSH 快捷目标滚动条"
-// in the language of msgs.
-func (msgs Messages) MessageSshShortcutTargetScrollbar() string {
-	return Catalog.Format(msgs.locale, "messageSshShortcutTargetScrollbar", nil)
 }
 
 // MessageCloseSessionSettings says "关闭会话设置"
@@ -15040,40 +14972,6 @@ func MessageThisCredentialVaultRequiresMacosKeychainToUnlockRestoreItUsingItsMat
 // in the language of msgs.
 func (msgs Messages) MessageThisCredentialVaultRequiresMacosKeychainToUnlockRestoreItUsingItsMatching() string {
 	return Catalog.Format(msgs.locale, "messageThisCredentialVaultRequiresMacosKeychainToUnlockRestoreItUsingItsMatching", nil)
-}
-
-// MessageSaveKeychainUnlockKey says "保存钥匙串解锁密钥：%w"
-// in the language the app shows.
-func MessageSaveKeychainUnlockKey() string { return In(i18n.Locale()).MessageSaveKeychainUnlockKey() }
-
-// MessageSaveKeychainUnlockKey says "保存钥匙串解锁密钥：%w"
-// in the language of msgs.
-func (msgs Messages) MessageSaveKeychainUnlockKey() string {
-	return Catalog.Format(msgs.locale, "messageSaveKeychainUnlockKey", nil)
-}
-
-// MessageVerifyKeychainUnlockKey says "核对钥匙串解锁密钥：%w"
-// in the language the app shows.
-func MessageVerifyKeychainUnlockKey() string {
-	return In(i18n.Locale()).MessageVerifyKeychainUnlockKey()
-}
-
-// MessageVerifyKeychainUnlockKey says "核对钥匙串解锁密钥：%w"
-// in the language of msgs.
-func (msgs Messages) MessageVerifyKeychainUnlockKey() string {
-	return Catalog.Format(msgs.locale, "messageVerifyKeychainUnlockKey", nil)
-}
-
-// MessageTheSavedKeychainUnlockKeyDoesNotMatch says "钥匙串解锁密钥保存后不匹配"
-// in the language the app shows.
-func MessageTheSavedKeychainUnlockKeyDoesNotMatch() string {
-	return In(i18n.Locale()).MessageTheSavedKeychainUnlockKeyDoesNotMatch()
-}
-
-// MessageTheSavedKeychainUnlockKeyDoesNotMatch says "钥匙串解锁密钥保存后不匹配"
-// in the language of msgs.
-func (msgs Messages) MessageTheSavedKeychainUnlockKeyDoesNotMatch() string {
-	return Catalog.Format(msgs.locale, "messageTheSavedKeychainUnlockKeyDoesNotMatch", nil)
 }
 
 // MessageReadLocalUnlockKey says "读取本机解锁密钥：%w"

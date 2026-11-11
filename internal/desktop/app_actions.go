@@ -288,7 +288,7 @@ func (a *app) installAppMenu() func() {
 				return
 			case a.page().addHostOpen, a.page().groupDialogOpen:
 				return
-			case a.files.dialog != nil, a.files.conflict != nil, a.fileSSHLink != nil:
+			case a.files.dialog != nil, a.files.conflict != nil:
 				return
 			case a.credentials.draft != nil, len(a.sshPrompts) > 0:
 				return

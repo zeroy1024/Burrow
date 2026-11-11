@@ -14,7 +14,6 @@ import (
 	"github.com/zeroy1024/Burrow/internal/theme"
 
 	"github.com/egoist/mygo"
-	"github.com/egoist/mygo/ui"
 )
 
 type terminalSettingsState struct {
@@ -23,7 +22,6 @@ type terminalSettingsState struct {
 	followLight string
 	followDark  string
 	loadErr     error
-	scroll      ui.ScrollState
 	importing   bool
 	imported    map[string]string
 }
