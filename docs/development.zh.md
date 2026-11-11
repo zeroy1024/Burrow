@@ -107,7 +107,7 @@ GOCACHE=/private/tmp/burrow-go-build mise exec -- go test ./...
 
 ## GitHub CI
 
-[提交检查](../.github/workflows/check.yml)在分支 push、PR 和手动触发时运行，使用托管 `ubuntu-24.04`。检查范围沿用 Gitea：Go 格式、Python 语法、根模块与终端扩展的已有 race 测试和 vet、Linux 编译、Windows 双架构交叉编译；另检查第三方许可汇总、中英文语言资源及生成文件一致性，并使用固定版本、校验 SHA-256 的 Gitleaks 扫描工作文件和检出仓库的全部历史引用。检出保留完整历史且不持久化凭据；工作流仅授予 `contents: read`，使用普通 `pull_request`，无需提供自定义仓库 Secret。
+[提交检查](../.github/workflows/check.yml)在分支 push、PR 和手动触发时运行，使用托管 `ubuntu-24.04`。检查范围包括 Go 格式、Python 语法、根模块与终端扩展的已有 race 测试和 vet、Linux 编译、Windows 双架构交叉编译；另检查第三方许可汇总、中英文语言资源及生成文件一致性，并使用固定版本、校验 SHA-256 的 Gitleaks 扫描工作文件和检出仓库的全部历史引用。检出保留完整历史且不持久化凭据；工作流仅授予 `contents: read`，使用普通 `pull_request`，无需提供自定义仓库 Secret。
 
 [编译打包](../.github/workflows/package.yml)由 `v*` 标签推送触发，也可在 Actions 中手动运行并填写已存在的版本标签。两种入口都检出指定标签的源码，并要求标签与 `mygo.json` 一致，例如版本 `0.1.6` 对应 `v0.1.6`。手动入口可在修复工作流后重建原版本，无需移动标签。Windows 使用托管 `ubuntu-24.04` 交叉构建 amd64/arm64 的 UPX NSIS 安装程序，并通过 `7zip` 包提供的 `7z` 解包校验；macOS 使用托管 Apple Silicon `macos-15` 构建 ARM64 DMG。安装程序校验包括 EXE、DLL 和两个许可文件，macOS 校验 APP 内许可资源及 DMG。各附件附有 `SHA256SUMS`，保留 14 天；工作流不创建或更新 GitHub Release。
 
@@ -122,7 +122,7 @@ GitHub 不需要注册自托管 runner。macOS 打包需要在仓库的 **Settin
 
 标签任务将签名身份导入 `$RUNNER_TEMP` 下的临时钥匙串，使用随机的临时钥匙串口令，并运行 `scripts/setup-macos-signing.py --check` 核对证书与 `mygo.json` 中的固定身份。Secret 缺失或身份不匹配会明确失败，不生成替代身份或回退临时签名。托管虚拟机在任务结束后销毁，签名材料不上传为附件。应在 GitHub 限制 `v*` 标签创建权限。临时钥匙串方式参考 [GitHub 官方说明](https://docs.github.com/en/actions/how-tos/deploy/deploy-to-third-party-platforms/sign-xcode-applications)。
 
-Actions 均固定到提交 SHA，工具链沿用 `mise.toml`；APT 使用托管 Ubuntu runner 的 `sudo`，不复用 Gitea 的 rootless 容器设置。原生窗口、协议 Docker 联调、Windows 安装/升级/卸载、签名和公证状态需要单独验收，不能从工作流成功推断。
+Actions 均固定到提交 SHA，工具链沿用 `mise.toml`。原生窗口、协议 Docker 联调、Windows 安装/升级/卸载、签名和公证状态需要单独验收，不能从工作流成功推断。
 
 ### 公开与发布前检查
 
@@ -141,16 +141,7 @@ GitHub Release 说明统一先放完整英文内容，再放对应的简体中�
 - 在 GitHub 启用私密漏洞报告、Secret scanning / Push protection，并为主分支配置所需检查；这些是仓库设置，不由本地文件自动启用。
 - 首次只推选定分支及必要标签，避免 `--mirror` 把内部 refs 一并公开。确认 GitHub 检查及产物校验通过后，再人工整理 Release 附件和版本说明，注明实际平台验收及签名状态。
 
-## Gitea CI
-
-检查和 Windows 打包使用现有的 `ubuntu-latest` runner，在任务容器内准备工具。macOS DMG 使用 `macos-arm64` 的原生 host runner；需要另行注册带有 `macos-arm64:host` 标签的 Apple Silicon macOS runner，主机需有 Xcode Command Line Tools 和运行 JavaScript actions 所需的 Node。该 runner 尚待配置，在其上线前 macOS 作业会等待匹配的 runner。mise 读取仓库的 `mise.toml`，使用固定的 Go、uv 版本；action 固定到 commit，mise 本体固定为 2026.10.25。
-
-当前 rootless runner 限制容器内的 UID/GID 切换；APT 使用 `APT::Sandbox::User=root`，并将下载缓存放在当前任务的 `RUNNER_TEMP` 下，避免切换到 `_apt` 或访问镜像中 `_apt` 专属目录失败，不增加容器能力或修改宿主机权限。
-
-| Workflow | 触发条件 | 内容 |
-|---|---|---|
-| [提交检查](../.gitea/workflows/check.yml) | 分支 push、PR 和手动触发；标签 push 不触发 | 应用及终端扩展的 Go 格式、Python 语法、语言资源与生成文件一致性、现有 race 测试、vet、Linux 编译和 Windows 双架构交叉检查 |
-| [编译打包](../.gitea/workflows/package.yml) | 仅 `v*` 标签 push | Windows amd64/arm64 的 UPX NSIS 安装程序、macOS ARM64 DMG 和 SHA-256 摘要 |
+## CI 任务细节
 
 `pkg-sftp` 保留上游格式，不纳入格式门禁；其独立模块执行 vet 时关闭 `stdmethods`：上游的 `RawPacket.ReadFrom` 和 `RequestPacket.ReadFrom` 接收缓冲区与长度限制，并非 `io.ReaderFrom`，该分析项会误报。其余 vet 分析项保留，应用和终端扩展仍执行完整 vet。原生 UI、视觉验收及需要 Docker 服务的 SSH/FTP 集成测试不在这个基础提交检查中。
 
@@ -158,9 +149,9 @@ Windows 打包任务安装 NSIS、7-Zip，并下载固定 UPX 5.3.0 的官方 Li
 
 macOS 继续使用原有 APP 签名、LZMA DMG 和 ZIP 构建流程，不启用 UPX 或文件系统透明压缩。CI 只上传校验通过的 DMG 与摘要。
 
-产物按 `burrow-windows-amd64`、`burrow-windows-arm64`、`burrow-macos-arm64` 保存为 Actions 附件，分别包含安装程序或 DMG 以及摘要，保留 14 天；本地生成的便携 ZIP 不上传，workflow 不创建 Release 或发布到外部仓库。上传使用 Runner 5 的 action 兼容层，需保留默认的 `runner.patch_actions: true`。标签名不会自动修改 `mygo.json` 的版本，创建版本标签前先更新项目版本。
+产物按 `burrow-windows-amd64`、`burrow-windows-arm64`、`burrow-macos-arm64` 保存为 Actions 附件，分别包含安装程序或 DMG 以及摘要，保留 14 天；本地生成的便携 ZIP 不上传，workflow 不创建 Release 或发布到外部仓库。标签名不会自动修改 `mygo.json` 的版本，创建版本标签前先更新项目版本。
 
-UPX 内部完整性检查和安装程序内容校验不能替代 Windows 原生启动、DLL 加载、安装、升级、卸载及杀软误报检查。macOS host runner 的 DMG 构建与安装亦需在其上线后验证；MSI 尚未接入。
+UPX 内部完整性检查和安装程序内容校验不能替代 Windows 原生启动、DLL 加载、安装、升级、卸载及杀软误报检查。MSI 尚未接入。
 
 可在 macOS/Linux 上进行目标编译与静态检查，例如：
 

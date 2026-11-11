@@ -25,7 +25,7 @@ When the repository contains a public certificate, the script accepts only its e
 
 First use may show a system codesign authorization dialog. Enter the Keychain password personally in that dialog and choose Always Allow. Do not send the password through chat, command lines, or scripts. This authorizes the new signing key, not unrestricted access to business credentials.
 
-Use Keychain Access to export and securely back up the certificate/private key as encrypted PKCS#12. CI and other release machines must import the same identity. GitHub uses hosted `macos-15`, importing Base64 PKCS#12 and its export password from two repository Secrets into a temporary Keychain; see [GitHub CI](development.md#github-ci). Gitea host runners import the identity and authorize codesign beforehand. Ordinary users install signed packages without importing release private keys.
+Use Keychain Access to export and securely back up the certificate/private key as encrypted PKCS#12. CI and other release machines must import the same identity. GitHub uses hosted `macos-15`, importing Base64 PKCS#12 and its export password from two repository Secrets into a temporary Keychain; see [GitHub CI](development.md#github-ci). Ordinary users install signed packages without importing release private keys.
 
 ## Release and development builds
 

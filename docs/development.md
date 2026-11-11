@@ -107,7 +107,7 @@ Passing checks establish only the scope actually run. See [interpreting validati
 
 ## GitHub CI
 
-[Commit checks](../.github/workflows/check.yml) run on branch pushes, PRs, and manual dispatch using hosted `ubuntu-24.04`. They retain Gitea's Go formatting, Python syntax, existing root/terminal race tests and vet, Linux build, and Windows cross-builds for both architectures. They also check third-party notices, English/Chinese catalogs, and generated-file consistency. Pinned Gitleaks, verified by SHA-256, scans working files and all checked-out history references. Checkout retains full history without persisted credentials. The workflow grants only `contents: read`, uses ordinary `pull_request`, and needs no custom repository Secrets.
+[Commit checks](../.github/workflows/check.yml) run on branch pushes, PRs, and manual dispatch using hosted `ubuntu-24.04`. They cover Go formatting, Python syntax, existing root/terminal race tests and vet, Linux build, and Windows cross-builds for both architectures. They also check third-party notices, English/Chinese catalogs, and generated-file consistency. Pinned Gitleaks, verified by SHA-256, scans working files and all checked-out history references. Checkout retains full history without persisted credentials. The workflow grants only `contents: read`, uses ordinary `pull_request`, and needs no custom repository Secrets.
 
 [Packaging](../.github/workflows/package.yml) runs on `v*` tag pushes or manual dispatch naming an existing version tag. Both check out that tag and require it to match `mygo.json`, such as `0.1.6` / `v0.1.6`. Manual dispatch can rebuild an existing version after workflow fixes without moving its tag. Hosted `ubuntu-24.04` cross-builds UPX NSIS installers for Windows amd64/arm64 and extracts them with the `7zip` package's `7z` for verification. Apple Silicon `macos-15` builds the ARM64 DMG. Installer checks include EXE, DLL, and both license files; macOS checks bundle license resources and DMG. Artifacts include `SHA256SUMS`, remain for 14 days, and do not create/update GitHub Releases.
 
@@ -122,7 +122,7 @@ Export the original identity from the local Keychain instead of creating a certi
 
 Tag jobs import the identity into a temporary Keychain under `$RUNNER_TEMP` using a random Keychain password, then run `scripts/setup-macos-signing.py --check` against `mygo.json`. Missing Secrets or an incorrect identity fail explicitly without replacement identities or temporary-signing fallback. Hosted VMs are destroyed afterward and signing material is not uploaded. Restrict creation of `v*` tags in GitHub. The temporary Keychain approach follows [GitHub's guidance](https://docs.github.com/en/actions/how-tos/deploy/deploy-to-third-party-platforms/sign-xcode-applications).
 
-Actions are pinned to commit SHAs and use `mise.toml`. Hosted Ubuntu uses `sudo` for APT, not Gitea's rootless-container workaround. Native windows, Docker protocol integration, Windows installation/upgrade/uninstallation, signing, and notarization require separate acceptance; workflow success alone does not establish them.
+Actions are pinned to commit SHAs and use `mise.toml`. Native windows, Docker protocol integration, Windows installation/upgrade/uninstallation, signing, and notarization require separate acceptance; workflow success alone does not establish them.
 
 ### Before publication and release
 
@@ -141,16 +141,7 @@ GitHub Release notes must include a complete English section first, followed by 
 - Enable private vulnerability reporting, Secret scanning / Push protection, and required main-branch checks in GitHub. Local files do not configure these repository settings automatically.
 - Initially push only selected branches and required tags; avoid `--mirror` exposing internal refs. After checking GitHub results/artifacts, manually prepare Release attachments and notes with actual platform acceptance and signing status.
 
-## Gitea CI
-
-Checks and Windows packaging use the existing `ubuntu-latest` runner and prepare tools in job containers. macOS DMG uses a native `macos-arm64` host runner, requiring registration of an Apple Silicon machine labeled `macos-arm64:host`, with Xcode Command Line Tools and Node for JavaScript actions. This runner remains unconfigured; macOS jobs wait for a match until it is online. mise reads pinned Go/uv from `mise.toml`. Actions use commit pins; mise itself is pinned to 2026.10.25.
-
-The rootless runner restricts UID/GID switching. APT uses `APT::Sandbox::User=root` and job-local `RUNNER_TEMP` caches, avoiding `_apt` switching or image-owned `_apt` directories without extra container capabilities or host permission changes.
-
-| Workflow | Trigger | Contents |
-|---|---|---|
-| [Commit checks](../.gitea/workflows/check.yml) | Branch pushes, PRs, manual dispatch; not tag pushes | App/terminal Go formatting, Python syntax, language resources/generated-file consistency, existing race tests, vet, Linux build, and Windows checks for both architectures |
-| [Packaging](../.gitea/workflows/package.yml) | `v*` tag pushes only | UPX NSIS installers for Windows amd64/arm64, macOS ARM64 DMG, and SHA-256 sums |
+## CI job details
 
 `pkg-sftp` retains upstream formatting and is excluded from formatting gates. Its nested module disables only vet's `stdmethods`: upstream `RawPacket.ReadFrom` and `RequestPacket.ReadFrom` take buffers/length limits and are not `io.ReaderFrom`, producing false positives. Other analyzers remain enabled; app/terminal vet stays complete. Native UI, visual acceptance, and Docker-dependent SSH/FTP integration are outside basic commit checks.
 
@@ -158,9 +149,9 @@ Windows jobs install NSIS and 7-Zip, download official pinned UPX 5.3.0 Linux to
 
 macOS retains APP signing, LZMA DMG, and ZIP generation, without UPX or transparent filesystem compression. CI uploads only verified DMGs and sums.
 
-Artifacts are named `burrow-windows-amd64`, `burrow-windows-arm64`, and `burrow-macos-arm64`, containing installers/DMGs plus sums for 14 days. Local portable ZIPs are not uploaded. Workflows do not create Releases or publish to external repositories. Upload uses Runner 5's action compatibility layer; retain default `runner.patch_actions: true`. Tags do not change `mygo.json`; update the project version before tagging.
+Artifacts are named `burrow-windows-amd64`, `burrow-windows-arm64`, and `burrow-macos-arm64`, containing installers/DMGs plus sums for 14 days. Local portable ZIPs are not uploaded. Workflows do not create Releases or publish to external repositories. Tags do not change `mygo.json`; update the project version before tagging.
 
-UPX integrity/installer-content checks do not replace native Windows startup, DLL loading, installation, upgrades, uninstallation, or antivirus checks. macOS host-runner DMG build/install must be validated after it comes online. MSI is not integrated.
+UPX integrity/installer-content checks do not replace native Windows startup, DLL loading, installation, upgrades, uninstallation, or antivirus checks. MSI is not integrated.
 
 Cross-build/static checks from macOS/Linux include:
 
