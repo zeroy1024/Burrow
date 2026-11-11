@@ -13,7 +13,6 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-0A84FF" alt="MIT license"></a>
   <img src="https://img.shields.io/badge/status-developer_preview-64748B" alt="Developer preview">
   <img src="https://img.shields.io/badge/macOS-13%2B-64748B" alt="macOS 13 and later">
-  <a href="https://linux.do"><img src="https://img.shields.io/badge/community-LINUX%20DO-F0B90B" alt="LINUX DO community"></a>
 </p>
 
 <p align="center">
