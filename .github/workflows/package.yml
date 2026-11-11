@@ -38,6 +38,8 @@ jobs:
 
       - name: 安装打包依赖
         run: |
+          # The runner's default Ubuntu hosts fail DNS resolution.
+          printf '%s\n' 'https://mirrors.edge.kernel.org/ubuntu/' | sudo tee /etc/apt/apt-mirrors.txt > /dev/null
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends ca-certificates curl nsis 7zip xz-utils
 
