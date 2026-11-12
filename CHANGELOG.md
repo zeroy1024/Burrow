@@ -2,7 +2,7 @@
 
 Every released version has a `## <version> - <date>` section, English first, then Simplified Chinese. The release build reads the section of the version in `mygo.json` as the notes shown in the app's update window, and fails when it is missing.
 
-## Unreleased
+## 0.1.9 - 2026-11-13
 
 - Add in-app updates: Burrow checks GitHub Releases in the background, shows the release notes, and installs signed updates. **Settings → About → Software update** has a manual check, the automatic-check switch, the update channel (Stable or Preview), a system-proxy switch, and an optional GitHub mirror URL.
 - Windows executables are no longer compressed with UPX.

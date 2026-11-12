@@ -38,12 +38,12 @@ mise run build -- --platform windows/amd64,windows/arm64
 
 支持的构建目标为 `darwin`、`windows`、`linux` 的 `amd64` / `arm64`。macOS 完整打包必须在 macOS 上运行，沿用 [scripts/build-macos.py](../scripts/build-macos.py)：MyGo 生成应用，固定 `dmgbuild==1.6.7` 生成 DMG，系统 `ditto` 生成 ZIP。uv 在首次执行时准备兼容的 Python（3.10+）及脚本依赖。
 
-名称、slug、版本和输出目录来自 [mygo.json](../mygo.json)。以当前 0.1.8 的 Apple Silicon 构建为例：
+名称、slug、版本和输出目录来自 [mygo.json](../mygo.json)。以当前 0.1.9 的 Apple Silicon 构建为例：
 
 ```text
 build/darwin-arm64/Burrow.app
-build/darwin-arm64/burrow-0.1.8-arm64.zip
-build/darwin-arm64/burrow-0.1.8-arm64.dmg
+build/darwin-arm64/burrow-0.1.9-arm64.zip
+build/darwin-arm64/burrow-0.1.9-arm64.dmg
 ```
 
 Windows 可执行文件不压缩。启用应用内更新后，MyGo 还会在各平台输出目录写入签名的更新归档（`.tar.gz`）、增量包（`.delta`）和清单（`update-<平台>.json`）；未提供更新签名私钥时只构建应用，不生成这些文件。见[应用内更新](#应用内更新)。
@@ -53,10 +53,10 @@ Windows 可执行文件不压缩。启用应用内更新后，MyGo 还会在各�
 ```text
 build/windows-amd64/Burrow.exe
 build/windows-amd64/ghostty-vt.dll
-build/windows-amd64/burrow-0.1.8-windows-amd64.zip
+build/windows-amd64/burrow-0.1.9-windows-amd64.zip
 ```
 
-Windows 本机构建时，MyGo 会准备所需 NSIS；从 macOS/Linux 交叉打包安装程序需要主机提供 `makensis`。缺少 NSIS 时仍生成 EXE 与便携 ZIP，并明确报告未生成安装程序，不将它算作安装包验证通过。安装程序名称为 `burrow-setup-0.1.8-amd64.exe`，ARM64 对应目录及文件名使用 `arm64`。
+Windows 本机构建时，MyGo 会准备所需 NSIS；从 macOS/Linux 交叉打包安装程序需要主机提供 `makensis`。缺少 NSIS 时仍生成 EXE 与便携 ZIP，并明确报告未生成安装程序，不将它算作安装包验证通过。安装程序名称为 `burrow-setup-0.1.9-amd64.exe`，ARM64 对应目录及文件名使用 `arm64`。
 
 macOS 正式包使用 [mygo.json](../mygo.json) 中固定的自签名身份，公有证书位于 [assets/signing/burrow-local.pem](../assets/signing/burrow-local.pem)，私钥由用户默认钥匙串管理。首次使用新私钥时，macOS 可能要求本人授权系统 codesign。完整打包会先执行身份检查；缺少原私钥时明确失败，不自动生成另一张证书或退回临时签名。其他构建机需导入同一签名身份。操作步骤见[macOS 签名与解锁](macos-signing.zh.md)。
 
@@ -109,7 +109,7 @@ GOCACHE=/private/tmp/burrow-go-build mise exec -- go test ./...
 
 [提交检查](../.github/workflows/check.yml)在分支 push、PR 和手动触发时运行，使用托管 `ubuntu-24.04`。检查范围包括 Go 格式、Python 语法、根模块与终端扩展的已有 race 测试和 vet、Linux 编译、Windows 双架构交叉编译；另检查第三方许可汇总、中英文语言资源及生成文件一致性，并使用固定版本、校验 SHA-256 的 Gitleaks 扫描工作文件和检出仓库的全部历史引用。检出保留完整历史且不持久化凭据；工作流仅授予 `contents: read`，使用普通 `pull_request`，无需提供自定义仓库 Secret。
 
-[编译打包](../.github/workflows/package.yml)由 `v*` 标签推送触发，也可在 Actions 中手动运行并填写已存在的版本标签。两种入口都检出指定标签的源码，并要求标签与 `mygo.json` 一致，例如版本 `0.1.8` 对应 `v0.1.8`。手动入口可在修复工作流后重建原版本，无需移动标签。Windows 使用托管 `ubuntu-24.04` 交叉构建 amd64/arm64 的 NSIS 安装程序，并通过 `7zip` 包提供的 `7z` 解包校验；macOS 使用托管 Apple Silicon `macos-15` 构建 ARM64 DMG。安装程序校验包括 EXE、DLL 和两个许可文件，macOS 校验 APP 内许可资源及 DMG。两个构建任务只有 `contents: read`，产物作为 Actions 附件保留 14 天；随后由单独的汇总任务核对清单与文件、生成 `SHA256SUMS`，并上传到该标签的 Release 草稿。只有汇总任务持有 `contents: write`。
+[编译打包](../.github/workflows/package.yml)由 `v*` 标签推送触发，也可在 Actions 中手动运行并填写已存在的版本标签。两种入口都检出指定标签的源码，并要求标签与 `mygo.json` 一致，例如版本 `0.1.9` 对应 `v0.1.9`。手动入口可在修复工作流后重建原版本，无需移动标签。Windows 使用托管 `ubuntu-24.04` 交叉构建 amd64/arm64 的 NSIS 安装程序，并通过 `7zip` 包提供的 `7z` 解包校验；macOS 使用托管 Apple Silicon `macos-15` 构建 ARM64 DMG。安装程序校验包括 EXE、DLL 和两个许可文件，macOS 校验 APP 内许可资源及 DMG。两个构建任务只有 `contents: read`，产物作为 Actions 附件保留 14 天；随后由单独的汇总任务核对清单与文件、生成 `SHA256SUMS`，并上传到该标签的 Release 草稿。只有汇总任务持有 `contents: write`。
 
 GitHub 不需要注册自托管 runner。打包需要在仓库的 **Settings → Secrets and variables → Actions** 配置三项 Secret：
 
