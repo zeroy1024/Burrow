@@ -145,7 +145,10 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 	contentGap := p.ContentSide
 	topPadding := contentGap
 	bottomPadding := status.HeightPane + contentGap
-	if multiple {
+	// An agent's record has the header band of a split pane for its label,
+	// so that the label never lies over the transcript.
+	headed := multiple || session.agent != nil
+	if headed {
 		topPadding += p.HeaderHeight
 	}
 	// Only the inner card clips. Its wrapper owns the focus border and overlay hairline.
@@ -192,7 +195,7 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 				backdropOptions := nativeterm.ViewportBackdropOptions{Radius: p.Radius}
 				if a.translucencyEnabled(c) {
 					backdropOptions.Bottom, backdropOptions.Gap = status.HeightPane, contentGap
-					if multiple {
+					if headed {
 						backdropOptions.Top = p.HeaderHeight
 					}
 				}
@@ -225,7 +228,13 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 						Uniforms: map[string]any{"Saturation": appearance.Saturation},
 					}))
 				}
-				output.Children(func() { a.terminalLines(c, session, focused) })
+				output.Children(func() {
+					if session.agent != nil {
+						a.agentCards(c, session, s, colors.Foreground)
+					} else {
+						a.terminalLines(c, session, focused)
+					}
+				})
 				// The scrollbar owns the node's input handler, so Enter rides on its hook.
 				terminalScrollbar(c, card, output, scroll, terminalBackground, func(ev ui.InputEvent) bool {
 					if ev.Kind != ui.InputKeyDown || ev.Key != ui.KeyEnter || ev.Mods != 0 || !session.awaitingConnect() {
@@ -235,7 +244,7 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 					return true
 				})
 			}
-			if multiple {
+			if headed {
 				a.terminalScrollEdge(c, p.HeaderHeight, false, background)
 			}
 			a.terminalScrollEdge(c, status.HeightPane, true, background)
@@ -271,6 +280,8 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 				actionsWidth = 3*p.ActionWidth + 2*p.ActionGap
 			}
 			actions := uikit.PaneActions(c, actionsWidth, surface)
+			// An agent's record cannot be split; its corner carries the AI chip instead.
+			actions.Hidden(session.agent != nil)
 			x, y, over := pane.PointerPosition()
 			inActionBand := x >= pane.Bounds().W-actionsWidth-p.ActionRevealPadding && y <= p.HeaderHeight+p.ActionRight
 			nearActions := over && inActionBand
@@ -323,13 +334,26 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 			}
 			uikit.PaneFooter(c, uikit.FooterProps{Key: "status", Surface: surface}).Absolute().Bottom(0).Left(0).Right(0).
 				Opacity(appearance.FooterOpacity).PassThrough().Children(func() {
-				uikit.ConnectionBadge(c, connectionIndicatorState(session.state), surface)
-				a.paneReadings(c, session, surface)
+				if agent := session.agent; agent != nil {
+					// The lock and the operator stand where a shell shows its connection.
+					uikit.PaneMetric(c, uikit.IconLock, fmt.Sprintf(locales.AgentSessionOperatedBy(), agent.keyName), locales.AgentSessionReadOnly(), surface)
+				} else {
+					uikit.ConnectionBadge(c, connectionIndicatorState(session.state), surface)
+					a.paneReadings(c, session, surface)
+				}
 				ui.Spacer(c)
-				ui.Text(c, a.paneSizeLabel(session)).FontSize(status.FontSize).SingleLine()
+				// A record of cards has no character grid to report.
+				if session.agent == nil {
+					ui.Text(c, a.paneSizeLabel(session)).FontSize(status.FontSize).SingleLine()
+				}
 			})
 		})
 		hairline = uikit.PaneHairline(c, surface)
+		if agent := session.agent; agent != nil {
+			// The outline turns only while the agent has an operation under way.
+			uikit.AgentRing(c, t.C.Pane.Radius, len(agent.running) > 0 && !a.reduceMotion(c)).Opacity(appearance.Opacity)
+			uikit.AgentChip(c, locales.AgentSessionLabel(), fmt.Sprintf("%s@%s:%d", h.user, h.address, h.port), p.HeaderHeight, surface)
+		}
 	})
 	paneReveal(c, card, session)
 	if a.lifted(session) {

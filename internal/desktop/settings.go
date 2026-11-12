@@ -190,7 +190,7 @@ func (a *app) settingMatches(label, description string) bool {
 
 func (a *app) settingsCategoryHasMatch(index int) bool {
 	texts := []string{
-		"语言 跟随系统 简体中文 English 启动时恢复会话 关闭最后一个选项卡时 关闭活动连接前确认 后台运行 关闭主窗口 菜单栏 托盘 程序坞 隐藏 Dock Command Q ⌘Q",
+		"语言 跟随系统 简体中文 English 启动时恢复会话 关闭最后一个选项卡时 关闭活动连接前确认 自动显示 AI 会话 agent MCP 后台运行 关闭主窗口 菜单栏 托盘 程序坞 隐藏 Dock Command Q ⌘Q",
 		"应用主题 浅色 深色 跟随系统 强调色 预览 减少动态效果 窗口半透明 全局背景 毛玻璃 标题栏 玻璃栏 macOS",
 		"配色方案 跟随应用明暗 固定一种 浅色外观时 深色外观时 配色 终端背景 字体 字号 行高 光标 样式 闪烁 回滚行数",
 		"默认本地目录 同时传输数 同名冲突",
@@ -299,6 +299,9 @@ func (a *app) generalSettings(c *ui.Context) {
 		}},
 		{"MessageConfirmBeforeClosingAnActiveConnection", locales.MessageConfirmBeforeClosingAnActiveConnection(), "", "", func() {
 			a.preferenceSwitch(c, locales.MessageConfirmBeforeClosingAnActiveConnection(), &a.prefs.ConfirmCloseActive)
+		}},
+		{"AgentSessionSetting", locales.AgentSessionSetting(), "", locales.AgentSessionSettingDetail(), func() {
+			a.preferenceSwitch(c, locales.AgentSessionSetting(), &a.prefs.ShowAgentSessions)
 		}},
 	})
 	backgroundFields := []settingField{

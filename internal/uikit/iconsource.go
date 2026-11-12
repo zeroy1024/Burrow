@@ -72,6 +72,7 @@ const (
 	IconArrowDown    IconName = "arrow-down"
 	IconArrowUp      IconName = "arrow-up"
 	IconZap          IconName = "zap"
+	IconBot          IconName = "bot"
 )
 
 const LucideVersion = "1.67.0"
@@ -143,6 +144,7 @@ var iconFiles = map[IconName]string{
 	IconArrowDown:    "arrow-down",
 	IconArrowUp:      "arrow-up",
 	IconZap:          "zap",
+	IconBot:          "bot",
 }
 
 // The cache holds immutable SVG geometry, keyed by the current token stroke.

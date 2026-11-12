@@ -27,6 +27,7 @@ type appPreferences struct {
 	HideDockInBackground bool              `json:"hideDockInBackground"`
 	ShowTray             bool              `json:"showTray"`
 	ConfirmCloseActive   bool              `json:"confirmCloseActive"`
+	ShowAgentSessions    bool              `json:"showAgentSessions"`
 	AppTheme             string            `json:"appTheme"`
 	Accent               string            `json:"accent"`
 	ReduceMotion         string            `json:"reduceMotion"`
@@ -83,7 +84,7 @@ func (a *app) loadAppPreferences() error {
 	a.appearance = 2
 	a.prefs = appPreferences{
 		Version: 1, RestoreSessions: true, LastTabClose: "keep", ConfirmCloseActive: true,
-		WindowClose: "quit", ShowTray: true,
+		WindowClose: "quit", ShowTray: true, ShowAgentSessions: true,
 		AppTheme: "system", Accent: "#0a84ff", ReduceMotion: "system", Translucency: true,
 		TermMode: a.terminal.mode.String(), TermFollowLight: a.terminal.followLight,
 		TermFollowDark: a.terminal.followDark, TermBackground: a.terminal.prefs.Background.String(),

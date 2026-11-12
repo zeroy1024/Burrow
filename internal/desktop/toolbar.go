@@ -89,8 +89,13 @@ func (a *app) tabButton(c *ui.Context, list ui.Element, index int, tab *workspac
 	case disconnected:
 		hint = locales.MessageDisconnectedReconnectFromTheMenu()
 	}
+	title := h.name
+	if agent := session.agent; agent != nil {
+		title = fmt.Sprintf(locales.AgentSessionTab(), h.name)
+		hint = fmt.Sprintf(locales.AgentSessionOperatedBy(), agent.keyName) + " · " + hint
+	}
 	props := uikit.SessionTabProps{
-		Key: tab.id, Title: h.name, Hint: hint, Selected: a.activeTab == index,
+		Key: tab.id, Title: title, Hint: hint, Selected: a.activeTab == index,
 		State: connectionIndicatorState(session.state), Handle: &tab.frame,
 		ReduceMotion: a.reduceMotion(c), PositionAnimation: a.positionAnimation(ui.Animation{Spring: uikit.Spring(t.C.ReorderMotion.TabDisplace)}),
 		Extra: tab.root.count() - 1, CloseLabel: locales.MessageCloseTab2() + h.name, DragLabel: locales.MessageDragTab() + h.name, CloseIcon: closeIcon,
@@ -112,7 +117,7 @@ func (a *app) tabButton(c *ui.Context, list ui.Element, index int, tab *workspac
 				pendingAction = func() { a.ungroupTab(tab) }
 			},
 		})
-	} else {
+	} else if session.agent == nil {
 		menu = append(menu, uikit.MenuEntry{
 			ID: "edit", Label: locales.MessageEditSession(), Icon: uikit.IconEdit,
 			Disabled: session.temporary || session.host < 0, OnChoose: func() { a.startEditHostDraft(session.host) },
@@ -133,7 +138,10 @@ func (a *app) tabButton(c *ui.Context, list ui.Element, index int, tab *workspac
 			})
 		}
 	}
-	menu = append(menu, uikit.MenuEntry{ID: "before-close", Separator: true}, uikit.MenuEntry{
+	if len(menu) > 0 {
+		menu = append(menu, uikit.MenuEntry{ID: "before-close", Separator: true})
+	}
+	menu = append(menu, uikit.MenuEntry{
 		ID: "close", Label: locales.MessageCloseTab(), Icon: uikit.IconClose, Danger: true,
 		OnChoose: func() { pendingAction = func() { a.requestCloseTab(slices.Index(a.tabs, tab)) } },
 	})

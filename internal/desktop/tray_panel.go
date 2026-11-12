@@ -67,6 +67,7 @@ func (a *app) trayPanelView(c *ui.Context) {
 	content := ui.Column(c).Width(t.C.TrayPanel.Width).Shrink(0).Radius(p.Radius).
 		Background(uikit.Color(p.Bg)).Label("Burrow").Children(func() {
 		a.trayPanelMCP(c)
+		a.trayPanelAgents(c)
 		if len(sessions) > 0 {
 			uikit.Divider(c)
 			a.trayPanelSessionList(c, sessions)
@@ -146,6 +147,63 @@ func (a *app) trayPanelMCP(c *ui.Context) {
 	})
 }
 
+// trayPanelAgents lists this run's AI session records, the latest active
+// first, whether or not their tabs are open.
+func (a *app) trayPanelAgents(c *ui.Context) {
+	var views []*agentView
+	for _, view := range a.agents {
+		if view.session != nil {
+			views = append(views, view)
+		}
+	}
+	if len(views) == 0 {
+		return
+	}
+	slices.SortFunc(views, func(left, right *agentView) int {
+		if order := right.last.Compare(left.last); order != 0 {
+			return order
+		}
+		return left.session.id - right.session.id
+	})
+	t := theme.Current()
+	uikit.Divider(c)
+	ui.Row(c).FillWidth().Padding(t.Space.N8, t.Space.N14, t.Space.N4, t.Space.N14).AlignItems(ui.Center).Children(func() {
+		uikit.Text(c, locales.TrayAgentSessions(), uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneSecondary}).Grow(1)
+		uikit.Count(c, len(views), uikit.CountProps{})
+	})
+	ui.Column(c).FillWidth().Padding(0, t.Space.N6, t.Space.N6, t.Space.N6).Children(func() {
+		for _, view := range views {
+			session, h := view.session, view.session.endpoint
+			row := uikit.ListRow(c, uikit.ListRowProps{
+				Key: session.id, Label: h.name, PaddingY: t.Space.N6,
+			}).AlignItems(ui.Center)
+			row.Children(func() {
+				uikit.IconTile(c, uikit.IconTileProps{}, func() { uikit.Icon(c, uikit.IconBot, uikit.IconProps{}) })
+				uikit.SiderRowLabel(c, h.name, view.keyName+" · "+h.user+"@"+h.address)
+				if len(view.running) > 0 {
+					uikit.Badge(c, locales.MessageRunning(), uikit.BadgeProps{Tone: uikit.ToneAccent, Dot: true})
+				}
+			})
+			if row.Clicked() {
+				a.openAgentFromTray(view)
+			}
+		}
+	})
+}
+
+func (a *app) openAgentFromTray(view *agentView) {
+	a.closeTrayPanel()
+	a.showMainWindow()
+	if !a.businessReady() || a.security.dialog != nil || a.windowDialogOpen() {
+		return
+	}
+	reveal := func() { a.revealAgentSession(view) }
+	if !a.deferWorkspaceDragAction(reveal) {
+		reveal()
+	}
+	a.window.Invalidate()
+}
+
 type trayPanelSession struct {
 	tab     *workspaceTab
 	session *remoteSession
@@ -158,7 +216,7 @@ func (a *app) trayPanelSessions() []trayPanelSession {
 	seen := map[any]bool{}
 	for _, tab := range a.tabs {
 		for _, session := range tab.root.sessions() {
-			if session.closing || session.state == disconnected {
+			if session.agent != nil || session.closing || session.state == disconnected {
 				continue
 			}
 			key := any(session)

@@ -9,8 +9,8 @@
 | 层 | 数量 | 说明 |
 |---|---|---|
 | palette（primitives） | 282 | 原始色值与刻度，其中 50 个为推导值（derived） |
-| semantic（每个主题一份） | 502 | Light = 当前设计；Dark 覆盖其中 111 个（全部 derived） |
-| component | 1118 | 只引用 semantic；换主题时自动跟随 |
+| semantic（每个主题一份） | 504 | Light = 当前设计；Dark 覆盖其中 111 个（全部 derived） |
+| component | 1125 | 只引用 semantic；换主题时自动跟随 |
 
 ## 1. 三层结构与引用规则
 
@@ -744,6 +744,7 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `size.statsSectionGap` | 18px | ＝ |  |
 | `size.paneMetricsMinWidth` | 380px | ＝ | 窗格页脚显示 CPU 与内存的最小窗格宽度 |
 | `size.paneMetricsNetMinWidth` | 560px | ＝ | 窗格页脚显示网络速率的最小窗格宽度 |
+| `size.agentRing` | 2px | ＝ | AI 会话窗格的渐变描边宽度 |
 | `size.statsNetChartHeight` | 20px | ＝ | 网络上下行迷你趋势 |
 | `size.statsValueLarge` | 28px | ＝ | CPU 主数字 |
 | `size.statsSkeletonLine` | 10px | ＝ | 进程 Top 骨架条 |
@@ -990,6 +991,7 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `motion.duration.flash` | 600ms | ＝ | 落位闪光 |
 | `motion.duration.shimmer` | 1400ms | ＝ | 骨架占位流光一周 |
 | `motion.duration.liveBeat` | 900ms | ＝ | 实时状态点每次采样的跳动 |
+| `motion.duration.agentRing` | 6000ms | ＝ | AI 会话描边渐变旋转一周 |
 | `motion.duration.frameInterval` | 16ms | ＝ |  |
 | `motion.duration.zoom` | 240ms | ＝ |  |
 | `motion.duration.paneEnter` | 220ms | ＝ |  |
@@ -2389,6 +2391,17 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `paneHeader.paddingLeft` | `{space.14}` | 14px |  |
 | `paneHeader.paddingRight` | `{space.8}` | 8px |  |
 | `paneHeader.gap` | `{space.7}` | 7px |  |
+
+### agentPane
+| token | 引用 | Light 值 | 说明 |
+|---|---|---|---|
+| `agentPane.ringWidth` | `{size.agentRing}` | 2px | AI 会话窗格的渐变描边宽度 |
+| `agentPane.ringPeriod` | `{motion.duration.agentRing}` | 6000ms | AI 会话描边渐变旋转一周 |
+| `agentPane.ringStart` | `{color.accentChoices.purple}` | #8e5cf7 |  |
+| `agentPane.ringMiddle` | `{color.accentChoices.pink}` | #ec4899 |  |
+| `agentPane.ringEnd` | `{color.accentChoices.blue}` | #0a84ff |  |
+| `agentPane.chipInset` | `{space.10}` | 10px |  |
+| `agentPane.chipGap` | `{space.6}` | 6px |  |
 
 ### paneFooter
 | token | 引用 | Light 值 | 说明 |

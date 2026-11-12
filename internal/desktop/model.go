@@ -62,6 +62,8 @@ func (tab *workspaceTab) canSeparateSessions() bool {
 }
 
 type remoteSession struct {
+	// agent marks the read-only record of an MCP agent; it has no shell of its own.
+	agent                       *agentView
 	endpoint                    host
 	temporary                   bool
 	connection                  *sshConnectionGroup
@@ -274,12 +276,16 @@ func (a *app) detachPaneToTab(source *workspaceTab, session *remoteSession, inde
 
 func (a *app) closeTab(index int) {
 	if tab := a.tabs[index]; tab.root != nil {
-		for _, session := range tab.root.sessions() {
-			releaseSSH(session)
+		// An agent's record outlives its tab; a shell's tab reopens as a new shell.
+		if session := tab.focused; session.agent != nil {
+			a.closeAgentSession(session.agent)
+		} else {
+			for _, session := range tab.root.sessions() {
+				releaseSSH(session)
+			}
+			a.closedTabs = append(a.closedTabs, closedWorkspaceTab{host: session.host, section: sectionSSH,
+				endpoint: cloneHostEndpoint(session.endpoint), temporary: session.temporary, connection: session.connection})
 		}
-		session := tab.focused
-		a.closedTabs = append(a.closedTabs, closedWorkspaceTab{host: session.host, section: sectionSSH,
-			endpoint: cloneHostEndpoint(session.endpoint), temporary: session.temporary, connection: session.connection})
 	}
 	closedActive := index == a.activeTab
 	a.tabs = append(a.tabs[:index], a.tabs[index+1:]...)
@@ -298,7 +304,7 @@ func (a *app) closeTab(index int) {
 
 func (a *app) splitSession(session *remoteSession, stacked bool) {
 	tab := a.currentTab()
-	if tab.root.count() >= maxTerminalPanes {
+	if session.agent != nil || tab.root.count() >= maxTerminalPanes {
 		return
 	}
 	zone := dropRight

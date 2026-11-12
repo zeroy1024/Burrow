@@ -201,7 +201,7 @@ func (b *mcpDesktop) OpenFiles(ctx context.Context, c mcpserver.Connection) (fil
 	}
 }
 
-func (b *mcpDesktop) Exec(ctx context.Context, c mcpserver.Connection, command string) (sshclient.ExecResult, error) {
+func (b *mcpDesktop) Exec(ctx context.Context, c mcpserver.Connection, command string, observe func(stderr bool, data []byte)) (sshclient.ExecResult, error) {
 	type result struct {
 		output sshclient.ExecResult
 		err    error
@@ -216,7 +216,7 @@ func (b *mcpDesktop) Exec(ctx context.Context, c mcpserver.Connection, command s
 		request.failed = func(err error) { ready <- result{err: err} }
 		request.ready = func(connection *sshclient.Connection) {
 			b.a.sshWorkers.Go(func() {
-				output, err := connection.ExecCommand(ctx, command)
+				output, err := connection.ExecObserved(ctx, command, observe)
 				ready <- result{output, err}
 				b.a.window.Update(func() { b.a.completeSSHRequest(request) })
 			})

@@ -145,6 +145,8 @@
   "终端卡片容器底色（仅容器，不含终端文字配色）": "Terminal card container background, excluding terminal text colors",
   "统一空输入与中文占位文字行高，避免字体回退造成基线偏移": "Align empty-input and Chinese-placeholder line heights across font fallback",
   "网络上下行迷你趋势": "Upload/download mini trends",
+  "AI 会话窗格的渐变描边宽度": "Gradient outline width of an AI session pane",
+  "AI 会话描边渐变旋转一周": "One turn of the AI session outline gradient",
   "窗格页脚显示 CPU 与内存的最小窗格宽度": "Minimum pane width for CPU and memory in the pane footer",
   "窗格页脚显示网络速率的最小窗格宽度": "Minimum pane width for network rates in the pane footer",
   "自动滚动区渐变": "Auto-scroll zone gradient",

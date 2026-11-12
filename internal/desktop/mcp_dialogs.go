@@ -444,6 +444,13 @@ func (a *app) mcpAuditDrawer(c *ui.Context) {
 				}
 				uikit.StatusPill(c, item.Status)
 				ui.Spacer(c)
+				if view := a.agentViewFor(item.KeyID, item.ConnectionID); view != nil {
+					if uikit.IconButton(c, uikit.IconBot, uikit.IconButtonProps{
+						Key: "view-agent-session", Label: locales.AgentSessionView(), Size: uikit.SizeSm,
+					}).Clicked() {
+						a.revealAgentSession(view)
+					}
+				}
 				if uikit.IconButton(
 					c,
 					closeIcon,

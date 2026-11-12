@@ -83,7 +83,8 @@ type Backend interface {
 	Available(context.Context) error
 	Connections(context.Context) ([]Connection, error)
 	OpenFiles(context.Context, Connection) (fileclient.Client, error)
-	Exec(context.Context, Connection, string) (sshclient.ExecResult, error)
+	// Exec reports output to observe as it arrives; see sshclient.ExecObserved.
+	Exec(ctx context.Context, c Connection, command string, observe func(stderr bool, data []byte)) (sshclient.ExecResult, error)
 	WriteText(context.Context, Connection, string, string, string, func(context.Context, fileclient.Client, string, bool) error) error
 	Enqueue(context.Context, TransferRequest) (store.MCPTask, error)
 	ControlTask(context.Context, int, string) error
@@ -103,9 +104,43 @@ type activeOperation struct {
 	cancel                                      context.CancelFunc
 }
 
+// ActivityPhase is the stage of a tool call that an Activity reports.
+type ActivityPhase int
+
+const (
+	ActivityStarted ActivityPhase = iota
+	ActivityOutput
+	ActivityFinished
+)
+
+// Activity describes an authorized tool call on a connection as it happens,
+// for a live view beside the audit. Calls rejected before their connection is
+// authorized are only audited. Request and error text have the caller's own
+// key redacted as in the audit; command output is passed as received.
+type Activity struct {
+	Phase          ActivityPhase
+	OperationID    string
+	KeyID, KeyName string
+	Connection     Connection
+	Tool           string
+	At             time.Time
+	// Started: the request.
+	Command, Path, LocalPath string
+	// Output: one chunk of an ssh_exec stream.
+	Stderr bool
+	Data   []byte
+	// Finished: the audit status, or "queued" for an accepted transfer.
+	Status   string
+	ExitCode *int
+	Error    string
+}
+
 type Service struct {
-	Store      *store.Store
-	Backend    Backend
+	Store   *store.Store
+	Backend Backend
+	// Observe receives every Activity on the calling goroutine; set it before
+	// the service starts. Nil observes nothing.
+	Observe    func(Activity)
 	ctx        context.Context
 	version    string
 	notify     func()

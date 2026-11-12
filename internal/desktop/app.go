@@ -82,6 +82,7 @@ type app struct {
 	terminalCapture        terminalCaptureState
 	terminalPreviews       map[*remoteSession]*terminalPreview
 	monitors               map[*sshConnectionGroup]*monitorState
+	agents                 map[string]*agentView
 	hostFacts              hostFactsState
 	ctx                    context.Context
 	cancel                 context.CancelFunc

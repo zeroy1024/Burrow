@@ -260,6 +260,9 @@ func (a *app) mcpTransferChanged(task *transferTask, result error) {
 	setMCPTransferOutcome(task, result)
 	snapshot := a.mcpTaskSnapshot(task, result)
 	cleanupOnly := task.mcp.CleanupOnly
+	if !cleanupOnly && slices.Contains([]string{"completed", "failed", "cancelled", "intercepted", "partial_intercepted"}, snapshot.State) {
+		a.agentTransferFinished(snapshot.OperationID, snapshot.State, snapshot.Error)
+	}
 	a.persist(func() error {
 		if cleanupOnly {
 			return a.store.MCPSaveTaskEvent(a.ctx, snapshot)

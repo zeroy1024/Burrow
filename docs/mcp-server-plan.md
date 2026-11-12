@@ -87,6 +87,18 @@ Before adding MCP, some routing treated every non-Settings page as an SSH/file w
 
 Switching MCP pages must not affect terminals, browsing, or transfers. Leaving MCP or hiding the window must not stop the service/tasks.
 
+### AI session view
+
+Burrow also shows what an agent does as it happens. When a key's first authorized operation reaches a connection, a read-only tab opens in the background of the SSH page, titled `AI · <connection>`, without taking focus. One tab covers one access key on one connection; equivalent SSH/SFTP profiles share it.
+
+- Each operation is one card. Its header gives the kind of operation, the time, and the result: running, the exit code, or that it was blocked by policy, timed out, or cancelled, with the duration. An **Input** panel holds the command or path. An **Output** panel shows stdout and stderr as they arrive, stderr in red, in the order their lines complete; long lines wrap inside the panel. An accepted upload or download shows as queued and gains a second result when the transfer ends. Error text appears under the input.
+- Output keeps its colors, but every other escape sequence and control character except tab and line feed is dropped. Request and error text hide the caller's own access key as the audit does; command output is shown as received.
+- The view is a record Burrow draws, not a remote shell or a terminal. Calls stay independent non-PTY commands, so remote programs do not color their output and interactive programs do not draw. Nothing can be typed, and the pane cannot be split, dragged into another tab, or reconnected; text can be selected and copied. A gradient outline, an `AI session` label with the login at the left of the pane's header band, and the operating key in the footer mark it. The outline turns while an operation is under way and rests otherwise or under reduced motion.
+- A card shows all the output it keeps, at most 2,000 lines; the record keeps the latest 200 cards. Earlier lines and cards are dropped, and a card says how many lines it omitted.
+- Closing the tab does not affect the agent, and the record keeps growing while closed. **Reopen closed tab**, the **View AI session** button in an audit operation's details, or its row under **AI sessions** in the tray panel brings it back with everything recorded; otherwise it stays closed while that agent keeps working and returns with the first operation after five quiet minutes. AI tabs do not count toward **When the last tab closes**: closing one never closes the window or quits, and closing your own last session still does. **Settings → General → Show AI sessions automatically** turns the tabs off.
+- The record lives in memory for this run and is not restored at startup. Command output still never enters the audit database; audit records remain the durable account.
+- Calls rejected before their connection is authorized, `connections_list`, and task tools have no connection view and appear only in the audit.
+
 ## 4. Transport and protocol
 
 ### Transport

@@ -85,7 +85,8 @@ func (a *app) paneDragHandle(c *ui.Context, source ui.Element, transfer paneTran
 		return
 	}
 	t := theme.Current()
-	if transfer.session.closing {
+	// An agent's record keeps to its own tab.
+	if transfer.session.closing || transfer.session.agent != nil {
 		return
 	}
 	if d := a.drag; d != nil && d.phase == dragActive && transfer.fromTab &&
@@ -491,7 +492,7 @@ func (a *app) paneDragPreview(c *ui.Context, session *remoteSession) {
 }
 
 func (a *app) paneDrop(c *ui.Context, pane ui.Element, target *remoteSession, catalog bool) {
-	if a.drag != nil && a.drag.afterCancel != nil {
+	if target.agent != nil || a.drag != nil && a.drag.afterCancel != nil {
 		return
 	}
 	t := theme.Current()

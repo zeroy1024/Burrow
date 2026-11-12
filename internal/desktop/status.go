@@ -47,6 +47,10 @@ func (a *app) serverStatus(c *ui.Context) {
 		m := a.sessionMonitor(session)
 		ui.Column(c).Gap(t.C.Stats.SectionGap).Children(func() {
 			switch {
+			case session.agent != nil:
+				a.statusHost(c, session, facts, statusLive{label: locales.MessageNotMonitored(), ink: t.Color.Text.Quaternary})
+				uikit.EmptyState(c, uikit.EmptyProps{IconName: uikit.IconBot, Title: locales.AgentSessionNoMonitoring(),
+					Detail: locales.AgentSessionNoMonitoringDetail()})
 			case session.state != connected:
 				live, empty := statusOffline(session)
 				a.statusHost(c, session, facts, live)

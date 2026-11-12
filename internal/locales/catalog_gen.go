@@ -34,6 +34,148 @@ type Messages struct{ locale string }
 // source language.
 func In(locale string) Messages { return Messages{locale} }
 
+// AgentSessionDropped says "已省略较早的 %d 行"
+// in the language the app shows.
+func AgentSessionDropped() string { return In(i18n.Locale()).AgentSessionDropped() }
+
+// AgentSessionDropped says "已省略较早的 %d 行"
+// in the language of msgs.
+func (msgs Messages) AgentSessionDropped() string {
+	return Catalog.Format(msgs.locale, "agentSessionDropped", nil)
+}
+
+// AgentSessionLabel says "AI 会话"
+// in the language the app shows.
+func AgentSessionLabel() string { return In(i18n.Locale()).AgentSessionLabel() }
+
+// AgentSessionLabel says "AI 会话"
+// in the language of msgs.
+func (msgs Messages) AgentSessionLabel() string {
+	return Catalog.Format(msgs.locale, "agentSessionLabel", nil)
+}
+
+// AgentSessionInput says "输入"
+// in the language the app shows.
+func AgentSessionInput() string { return In(i18n.Locale()).AgentSessionInput() }
+
+// AgentSessionInput says "输入"
+// in the language of msgs.
+func (msgs Messages) AgentSessionInput() string {
+	return Catalog.Format(msgs.locale, "agentSessionInput", nil)
+}
+
+// AgentSessionOutput says "输出"
+// in the language the app shows.
+func AgentSessionOutput() string { return In(i18n.Locale()).AgentSessionOutput() }
+
+// AgentSessionOutput says "输出"
+// in the language of msgs.
+func (msgs Messages) AgentSessionOutput() string {
+	return Catalog.Format(msgs.locale, "agentSessionOutput", nil)
+}
+
+// TrayAgentSessions says "AI 会话"
+// in the language the app shows.
+func TrayAgentSessions() string { return In(i18n.Locale()).TrayAgentSessions() }
+
+// TrayAgentSessions says "AI 会话"
+// in the language of msgs.
+func (msgs Messages) TrayAgentSessions() string {
+	return Catalog.Format(msgs.locale, "trayAgentSessions", nil)
+}
+
+// AgentSessionView says "查看 AI 会话"
+// in the language the app shows.
+func AgentSessionView() string { return In(i18n.Locale()).AgentSessionView() }
+
+// AgentSessionView says "查看 AI 会话"
+// in the language of msgs.
+func (msgs Messages) AgentSessionView() string {
+	return Catalog.Format(msgs.locale, "agentSessionView", nil)
+}
+
+// AgentSessionTab says "AI · %s"
+// in the language the app shows.
+func AgentSessionTab() string { return In(i18n.Locale()).AgentSessionTab() }
+
+// AgentSessionTab says "AI · %s"
+// in the language of msgs.
+func (msgs Messages) AgentSessionTab() string {
+	return Catalog.Format(msgs.locale, "agentSessionTab", nil)
+}
+
+// AgentSessionReadOnly says "AI 会话 · 只读"
+// in the language the app shows.
+func AgentSessionReadOnly() string { return In(i18n.Locale()).AgentSessionReadOnly() }
+
+// AgentSessionReadOnly says "AI 会话 · 只读"
+// in the language of msgs.
+func (msgs Messages) AgentSessionReadOnly() string {
+	return Catalog.Format(msgs.locale, "agentSessionReadOnly", nil)
+}
+
+// AgentSessionOperatedBy says "由 %s 操作"
+// in the language the app shows.
+func AgentSessionOperatedBy() string { return In(i18n.Locale()).AgentSessionOperatedBy() }
+
+// AgentSessionOperatedBy says "由 %s 操作"
+// in the language of msgs.
+func (msgs Messages) AgentSessionOperatedBy() string {
+	return Catalog.Format(msgs.locale, "agentSessionOperatedBy", nil)
+}
+
+// AgentSessionExit says "退出码 %d"
+// in the language the app shows.
+func AgentSessionExit() string { return In(i18n.Locale()).AgentSessionExit() }
+
+// AgentSessionExit says "退出码 %d"
+// in the language of msgs.
+func (msgs Messages) AgentSessionExit() string {
+	return Catalog.Format(msgs.locale, "agentSessionExit", nil)
+}
+
+// AgentSessionNoMonitoring says "AI 会话不采集监控"
+// in the language the app shows.
+func AgentSessionNoMonitoring() string { return In(i18n.Locale()).AgentSessionNoMonitoring() }
+
+// AgentSessionNoMonitoring says "AI 会话不采集监控"
+// in the language of msgs.
+func (msgs Messages) AgentSessionNoMonitoring() string {
+	return Catalog.Format(msgs.locale, "agentSessionNoMonitoring", nil)
+}
+
+// AgentSessionNoMonitoringDetail says "此视图只读展示 agent 通过 MCP 执行的操作。"
+// in the language the app shows.
+func AgentSessionNoMonitoringDetail() string {
+	return In(i18n.Locale()).AgentSessionNoMonitoringDetail()
+}
+
+// AgentSessionNoMonitoringDetail says "此视图只读展示 agent 通过 MCP 执行的操作。"
+// in the language of msgs.
+func (msgs Messages) AgentSessionNoMonitoringDetail() string {
+	return Catalog.Format(msgs.locale, "agentSessionNoMonitoringDetail", nil)
+}
+
+// AgentSessionSetting says "自动显示 AI 会话"
+// in the language the app shows.
+func AgentSessionSetting() string { return In(i18n.Locale()).AgentSessionSetting() }
+
+// AgentSessionSetting says "自动显示 AI 会话"
+// in the language of msgs.
+func (msgs Messages) AgentSessionSetting() string {
+	return Catalog.Format(msgs.locale, "agentSessionSetting", nil)
+}
+
+// AgentSessionSettingDetail says "agent 通过 MCP 操作连接时，在后台打开只读选项卡，实时显示命令与输出"
+// in the language the app shows.
+func AgentSessionSettingDetail() string { return In(i18n.Locale()).AgentSessionSettingDetail() }
+
+// AgentSessionSettingDetail says "agent 通过 MCP 操作连接时，在后台打开只读选项卡，实时显示命令与输出"
+// in the language of msgs.
+func (msgs Messages) AgentSessionSettingDetail() string {
+	return Catalog.Format(msgs.locale, "agentSessionSettingDetail", nil)
+}
+
 // MessageBits says "%s · %d 位"
 // in the language the app shows.
 func MessageBits() string { return In(i18n.Locale()).MessageBits() }

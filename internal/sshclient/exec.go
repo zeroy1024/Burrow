@@ -30,14 +30,22 @@ type commandOutput struct {
 	limit    int
 	abort    func()
 	exceeded bool
+	// observe sees the bytes kept in buffer as they arrive.
+	observe func([]byte)
 }
 
 func (b *commandOutput) Write(p []byte) (int, error) {
 	left := b.limit - b.buffer.Len()
 	if len(p) <= left {
+		if b.observe != nil {
+			b.observe(p)
+		}
 		return b.buffer.Write(p)
 	}
 	n, _ := b.buffer.Write(p[:left])
+	if b.observe != nil && n > 0 {
+		b.observe(p[:n])
+	}
 	b.exceeded = true
 	b.abort()
 	return n, errExecOutputLimit
@@ -64,6 +72,14 @@ func (c *Connection) Exec(ctx context.Context, command string) ([]byte, error) {
 // ExecCommand keeps diagnostics and the remote exit status separate. A nil
 // ExitCode means the remote result is unknown, including interrupted channels.
 func (c *Connection) ExecCommand(ctx context.Context, command string) (ExecResult, error) {
+	return c.ExecObserved(ctx, command, nil)
+}
+
+// ExecObserved is ExecCommand with a live view of the output: observe sees
+// each chunk within the limits as it arrives, before the result returns. The
+// two streams call it from separate goroutines, and it must not keep the
+// slice. Nil observes nothing.
+func (c *Connection) ExecObserved(ctx context.Context, command string, observe func(stderr bool, data []byte)) (ExecResult, error) {
 	if strings.TrimSpace(command) == "" {
 		return ExecResult{}, errors.New("SSH command must not be empty")
 	}
@@ -97,6 +113,10 @@ func (c *Connection) ExecCommand(ctx context.Context, command string) (ExecResul
 		}
 		stdout := &commandOutput{limit: maxExecOutput, abort: abort}
 		stderr := &commandOutput{limit: maxExecStderr, abort: abort}
+		if observe != nil {
+			stdout.observe = func(data []byte) { observe(false, data) }
+			stderr.observe = func(data []byte) { observe(true, data) }
+		}
 		session.Stdout, session.Stderr = stdout, stderr
 		err = session.Run(command)
 		output := ExecResult{Stdout: stdout.buffer.Bytes(), Stderr: stderr.buffer.Bytes()}

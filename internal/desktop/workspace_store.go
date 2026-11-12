@@ -61,7 +61,7 @@ type storedFileTab struct {
 func (a *app) workspaceSnapshot() *storedWorkspace {
 	result := &storedWorkspace{
 		Version: 2, Tabs: []storedWorkspaceTab{}, FileTabs: []storedFileTab{},
-		Section: a.section, ActiveSSH: a.activeTab, ActiveFile: a.activeFile,
+		Section: a.section, ActiveFile: a.activeFile,
 	}
 	groups := map[*sshConnectionGroup]int{}
 	connectionID := func(group *sshConnectionGroup) int {
@@ -77,7 +77,15 @@ func (a *app) workspaceSnapshot() *storedWorkspace {
 		result.Connections = append(result.Connections, storedWorkspaceConnection{ID: id, Endpoint: stored.Endpoint})
 		return id
 	}
-	for _, tab := range a.tabs {
+	for index, tab := range a.tabs {
+		// An agent's record belongs to this run; the saved active tab counts
+		// only the tabs kept, and falls back to the last of them.
+		if tab.focused.agent != nil {
+			continue
+		}
+		if index <= a.activeTab {
+			result.ActiveSSH = len(result.Tabs)
+		}
 		result.Tabs = append(result.Tabs, storedWorkspaceTab{
 			Root:    snapshotWorkspaceLayout(tab.root, connectionID),
 			Focused: slices.Index(tab.root.sessions(), tab.focused), Maximized: tab.maximized,

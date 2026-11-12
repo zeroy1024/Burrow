@@ -1,6 +1,7 @@
 package mcpserver
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"database/sql"
@@ -175,8 +176,27 @@ func (s *Service) Call(parent context.Context, keyID, name string, raw json.RawM
 		inbound.managed.Store(true)
 	}
 	background := false
+	// observed is set once the call's connection is authorized and announced.
+	var observed *Activity
+	var exitCode *int
+	// The view shows no more of the caller's own key than the audit keeps.
+	redact := func(text string) string {
+		if inbound == nil {
+			return text
+		}
+		return string(redactAuditKey([]byte(text), inbound.secret))
+	}
+	finished := func(status, detail string) {
+		if observed == nil {
+			return
+		}
+		done := *observed
+		done.Phase, done.At, done.Status, done.ExitCode, done.Error = ActivityFinished, time.Now(), status, exitCode, redact(detail)
+		s.Observe(done)
+	}
 	defer func() {
 		if background {
+			finished("queued", "")
 			s.Changed()
 			return
 		}
@@ -197,6 +217,7 @@ func (s *Service) Call(parent context.Context, keyID, name string, raw json.RawM
 			}
 		}
 		out["status"] = op.Status
+		finished(op.Status, op.Error)
 		finishCtx, finishCancel := context.WithTimeout(context.WithoutCancel(parent), 5*time.Second)
 		defer finishCancel()
 		saved, readErr := s.Store.MCPOperation(finishCtx, op.ID)
@@ -264,6 +285,13 @@ func (s *Service) Call(parent context.Context, keyID, name string, raw json.RawM
 		return out, err
 	}
 	op.ConnectionID = connection.ID
+	if s.Observe != nil {
+		observed = &Activity{OperationID: op.ID, KeyID: key.ID, KeyName: key.Name, Connection: connection, Tool: name}
+		started := *observed
+		started.Phase, started.At = ActivityStarted, op.StartedAt
+		started.Command, started.Path, started.LocalPath = redact(in.Command), redact(in.Path), redact(in.LocalPath)
+		s.Observe(started)
+	}
 	policies, err := s.Store.MCPPolicies(ctx)
 	if err != nil {
 		if ctx.Err() != nil {
@@ -313,7 +341,18 @@ func (s *Service) Call(parent context.Context, keyID, name string, raw json.RawM
 		}
 		execCtx, execCancel := context.WithTimeout(ctx, time.Duration(in.Timeout)*time.Second)
 		defer execCancel()
-		result, err := s.Backend.Exec(execCtx, connection, in.Command)
+		var observe func(bool, []byte)
+		if observed != nil {
+			chunk := *observed
+			chunk.Phase = ActivityOutput
+			observe = func(stderr bool, data []byte) {
+				event := chunk
+				event.Stderr, event.Data, event.At = stderr, bytes.Clone(data), time.Now()
+				s.Observe(event)
+			}
+		}
+		result, err := s.Backend.Exec(execCtx, connection, in.Command, observe)
+		exitCode = result.ExitCode
 		out["stdout"], out["stderr"], out["exit_code"], out["truncated"] = string(result.Stdout), string(result.Stderr), result.ExitCode, result.Truncated
 		out["stdout_lossy_utf8"], out["stderr_lossy_utf8"] = !utf8.Valid(result.Stdout), !utf8.Valid(result.Stderr)
 		out["timed_out"], out["cancelled"] = errors.Is(execCtx.Err(), context.DeadlineExceeded), errors.Is(ctx.Err(), context.Canceled)

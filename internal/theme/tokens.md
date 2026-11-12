@@ -9,8 +9,8 @@ Design sources: `ssh-v6.html`, `common.css`, `parts/split_style.css`, `focus.py`
 | Layer | Count | Purpose |
 |---|---|---|
 | palette (primitives) | 282 | Literal colors/scales, including 50 derived values |
-| semantic (per theme) | 502 | Light follows the design; Dark has 111 derived overrides |
-| component | 1118 | Semantic references only; follows the current theme |
+| semantic (per theme) | 504 | Light follows the design; Dark has 111 derived overrides |
+| component | 1125 | Semantic references only; follows the current theme |
 
 ## 1. Layers and reference rules
 
@@ -744,6 +744,7 @@ siderItem.nameColor             <- component, references semantics only
 | `size.statsSectionGap` | 18px | ＝ |  |
 | `size.paneMetricsMinWidth` | 380px | ＝ | Minimum pane width for CPU and memory in the pane footer |
 | `size.paneMetricsNetMinWidth` | 560px | ＝ | Minimum pane width for network rates in the pane footer |
+| `size.agentRing` | 2px | ＝ | Gradient outline width of an AI session pane |
 | `size.statsNetChartHeight` | 20px | ＝ | Upload/download mini trends |
 | `size.statsValueLarge` | 28px | ＝ | Main CPU value |
 | `size.statsSkeletonLine` | 10px | ＝ | Top-process skeleton bars |
@@ -990,6 +991,7 @@ siderItem.nameColor             <- component, references semantics only
 | `motion.duration.flash` | 600ms | ＝ | Drop flash |
 | `motion.duration.shimmer` | 1400ms | ＝ | One skeleton shimmer cycle |
 | `motion.duration.liveBeat` | 900ms | ＝ | Live status pulse per sample |
+| `motion.duration.agentRing` | 6000ms | ＝ | One turn of the AI session outline gradient |
 | `motion.duration.frameInterval` | 16ms | ＝ |  |
 | `motion.duration.zoom` | 240ms | ＝ |  |
 | `motion.duration.paneEnter` | 220ms | ＝ |  |
@@ -2389,6 +2391,17 @@ References and resolved Light values; Dark follows the corresponding semantic va
 | `paneHeader.paddingLeft` | `{space.14}` | 14px |  |
 | `paneHeader.paddingRight` | `{space.8}` | 8px |  |
 | `paneHeader.gap` | `{space.7}` | 7px |  |
+
+### agentPane
+| token | Reference | Light value | Description |
+|---|---|---|---|
+| `agentPane.ringWidth` | `{size.agentRing}` | 2px | Gradient outline width of an AI session pane |
+| `agentPane.ringPeriod` | `{motion.duration.agentRing}` | 6000ms | One turn of the AI session outline gradient |
+| `agentPane.ringStart` | `{color.accentChoices.purple}` | #8e5cf7 |  |
+| `agentPane.ringMiddle` | `{color.accentChoices.pink}` | #ec4899 |  |
+| `agentPane.ringEnd` | `{color.accentChoices.blue}` | #0a84ff |  |
+| `agentPane.chipInset` | `{space.10}` | 10px |  |
+| `agentPane.chipGap` | `{space.6}` | 6px |  |
 
 ### paneFooter
 | token | Reference | Light value | Description |

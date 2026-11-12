@@ -56,6 +56,12 @@ func (a *app) initMCPBackend() error {
 	if err != nil {
 		return err
 	}
+	// Activities keep their order through the window thread's queue.
+	service.Observe = func(event mcpserver.Activity) {
+		if a.window != nil {
+			a.window.Update(func() { a.agentActivity(event) })
+		}
+	}
 	b.service = service
 	b.connections, err = b.captureConnections()
 	if err != nil {

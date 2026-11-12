@@ -14,7 +14,9 @@ import (
 )
 
 type closedWorkspaceTab struct {
-	file       *fileSession
+	file *fileSession
+	// agent is a record whose tab was closed; reopening shows it again.
+	agent      *agentView
 	endpoint   host
 	temporary  bool
 	connection *sshConnectionGroup
@@ -211,6 +213,10 @@ func (a *app) appShortcuts(c *ui.Context) {
 		run(func() {
 			closed := a.closedTabs[len(a.closedTabs)-1]
 			a.closedTabs = a.closedTabs[:len(a.closedTabs)-1]
+			if closed.agent != nil {
+				a.revealAgentSession(closed.agent)
+				return
+			}
 			a.switchSection(closed.section)
 			if closed.section == sectionFiles {
 				// Reopening this tab restores its identity and task ownership;
@@ -379,12 +385,18 @@ func (a *app) requestCloseTab(index int) {
 	if a.deferWorkspaceDragAction(func() { a.requestCloseTab(slices.Index(a.tabs, tab)) }) {
 		return
 	}
-	if a.prefs.ConfirmCloseActive && slices.ContainsFunc(tab.root.sessions(), func(s *remoteSession) bool { return s.state == connected || s.state == connecting }) {
+	if a.prefs.ConfirmCloseActive && slices.ContainsFunc(tab.root.sessions(), func(s *remoteSession) bool {
+		return s.agent == nil && (s.state == connected || s.state == connecting)
+	}) {
 		a.closeRequest, a.closeFileRequest, a.closePaneRequest = tab, nil, nil
 		return
 	}
+	agent := tab.focused.agent != nil
 	a.closeTab(index)
-	a.afterLastTabClosed()
+	// Dismissing an agent's record is not the user closing their last session.
+	if !agent {
+		a.afterLastTabClosed()
+	}
 }
 
 func (a *app) requestClosePane(tab *workspaceTab, session *remoteSession) {
@@ -455,7 +467,13 @@ func (a *app) closeTabDialog(c *ui.Context) {
 }
 
 func (a *app) afterLastTabClosed() {
-	count := len(a.tabs) + len(a.fileSessions)
+	// Records of agents open by themselves and do not keep the window.
+	count := len(a.fileSessions)
+	for _, tab := range a.tabs {
+		if tab.focused.agent == nil {
+			count++
+		}
+	}
 	if count > 0 || a.window == nil {
 		return
 	}

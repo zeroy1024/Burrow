@@ -347,6 +347,7 @@ SEM['size'].update({
  'statsHeaderHeight':D(44), 'statsChartHeight':D(44,'CPU 趋势图'),
  'statsChartStroke':D(1.3), 'statsSectionGap':D(18),
  'paneMetricsMinWidth':D(380,'窗格页脚显示 CPU 与内存的最小窗格宽度'), 'paneMetricsNetMinWidth':D(560,'窗格页脚显示网络速率的最小窗格宽度'),
+ 'agentRing':D(2,'AI 会话窗格的渐变描边宽度'),
  'statsNetChartHeight':D(20,'网络上下行迷你趋势'), 'statsValueLarge':D(28,'CPU 主数字'),
  'statsSkeletonLine':D(10,'进程 Top 骨架条'),
 })
@@ -354,6 +355,7 @@ SEM['color']['fill']['shimmer']=C(P('gray.40'),'骨架占位流光高光')
 DARK['color.fill.shimmer']=P('graphite.600')
 SEM['motion']['duration']['shimmer']=MS(1400,'骨架占位流光一周')
 SEM['motion']['duration']['liveBeat']=MS(900,'实时状态点每次采样的跳动')
+SEM['motion']['duration']['agentRing']=MS(6000,'AI 会话描边渐变旋转一周')
 SEM['opacity']['liveBeatScale']=N(1.35,'实时状态点跳动起始缩放')
 SEM['opacity'].update({
  'dragRotation':N(-1), 'dragPreview':N(.9), 'previewHeader':N(.96),
@@ -913,6 +915,7 @@ COMP['paneHeader']={
  'heightCompact':'size.paneHeader','heightToolbar':'size.fileHeader','heightTitle':'size.panelHeader',
  'titleFont':'font.size.bodyLg','titleWeight':'font.weight.semibold','paddingLeft':'space.14','paddingRight':'space.8','gap':'space.7',
 }
+COMP['agentPane']={'ringWidth':'size.agentRing','ringPeriod':'motion.duration.agentRing','ringStart':'color.accentChoices.purple','ringMiddle':'color.accentChoices.pink','ringEnd':'color.accentChoices.blue','chipInset':'space.10','chipGap':'space.6'}
 COMP['paneFooter']={'height':'size.paneStatusBar','paddingX':'space.14','gap':'space.10','metricGap':'space.12','metricIconGap':'space.4','metricsMinWidth':'size.paneMetricsMinWidth','metricsNetMinWidth':'size.paneMetricsNetMinWidth','text':'color.text.secondary','font':'font.size.footnote','divider':'color.border.divider'}
 COMP['filePaneFocus'].update({'borderFocused':'color.accent.default','borderWidthFocused':'size.focusRing'})
 SEM['motion']['drag'].update({'standardScale':N(1.02),'standardRotation':N(-.6)})

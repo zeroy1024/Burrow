@@ -847,6 +847,7 @@ type Sizes struct {
 	StatsSectionGap          float32
 	PaneMetricsMinWidth      float32 // 窗格页脚显示 CPU 与内存的最小窗格宽度
 	PaneMetricsNetMinWidth   float32 // 窗格页脚显示网络速率的最小窗格宽度
+	AgentRing                float32 // AI 会话窗格的渐变描边宽度
 	StatsNetChartHeight      float32 // 网络上下行迷你趋势
 	StatsValueLarge          float32 // CPU 主数字
 	StatsSkeletonLine        float32 // 进程 Top 骨架条
@@ -1133,6 +1134,7 @@ type MotionDuration struct {
 	Flash             time.Duration // 落位闪光
 	Shimmer           time.Duration // 骨架占位流光一周
 	LiveBeat          time.Duration // 实时状态点每次采样的跳动
+	AgentRing         time.Duration // AI 会话描边渐变旋转一周
 	FrameInterval     time.Duration
 	Zoom              time.Duration
 	PaneEnter         time.Duration
@@ -2563,6 +2565,17 @@ type PaneHeaderTokens struct {
 	Gap           float32 // ← space.7
 }
 
+// AgentPaneTokens groups tokens.
+type AgentPaneTokens struct {
+	RingWidth  float32       // ← size.agentRing
+	RingPeriod time.Duration // ← motion.duration.agentRing
+	RingStart  color.NRGBA   // ← color.accentChoices.purple
+	RingMiddle color.NRGBA   // ← color.accentChoices.pink
+	RingEnd    color.NRGBA   // ← color.accentChoices.blue
+	ChipInset  float32       // ← space.10
+	ChipGap    float32       // ← space.6
+}
+
 // PaneFooterTokens groups tokens.
 type PaneFooterTokens struct {
 	Height             float32     // ← size.paneStatusBar
@@ -2709,6 +2722,7 @@ type Components struct {
 	Latency             LatencyTokens
 	ListRow             ListRowTokens
 	PaneHeader          PaneHeaderTokens
+	AgentPane           AgentPaneTokens
 	PaneFooter          PaneFooterTokens
 	Mcp                 McpTokens
 	Inset               InsetTokens
@@ -3357,6 +3371,7 @@ func lightSemantic() Semantic {
 			StatsSectionGap:          18,
 			PaneMetricsMinWidth:      380,
 			PaneMetricsNetMinWidth:   560,
+			AgentRing:                2,
 			StatsNetChartHeight:      20,
 			StatsValueLarge:          28,
 			StatsSkeletonLine:        10,
@@ -3610,6 +3625,7 @@ func lightSemantic() Semantic {
 				Flash:             Palette.Duration.N600,
 				Shimmer:           1400 * time.Millisecond,
 				LiveBeat:          900 * time.Millisecond,
+				AgentRing:         6000 * time.Millisecond,
 				FrameInterval:     16 * time.Millisecond,
 				Zoom:              240 * time.Millisecond,
 				PaneEnter:         220 * time.Millisecond,
@@ -4984,6 +5000,15 @@ func buildComponents(s *Semantic) Components {
 			PaddingLeft:   s.Space.N14,
 			PaddingRight:  s.Space.N8,
 			Gap:           s.Space.N7,
+		},
+		AgentPane: AgentPaneTokens{
+			RingWidth:  s.Size.AgentRing,
+			RingPeriod: s.Motion.Duration.AgentRing,
+			RingStart:  s.Color.AccentChoices.Purple,
+			RingMiddle: s.Color.AccentChoices.Pink,
+			RingEnd:    s.Color.AccentChoices.Blue,
+			ChipInset:  s.Space.N10,
+			ChipGap:    s.Space.N6,
 		},
 		PaneFooter: PaneFooterTokens{
 			Height:             s.Size.PaneStatusBar,
