@@ -110,6 +110,7 @@ func (a *app) settingsSchemeSelect(c *ui.Context, label string, value *string) b
 				Background(uikit.Color(scheme.Background)).Border(t.Size.Hairline, uikit.Color(t.C.Input.Border)).PassThrough()
 		}})
 	}
-	uikit.Select(c.Key(value), value, options, uikit.SelectProps{Label: label}).Width(t.C.Settings.SelectWidth)
+	// The value may be a per-frame copy; keep the control's identity stable.
+	uikit.Select(c.Key("settings-scheme"), value, options, uikit.SelectProps{Label: label}).Width(t.C.Settings.SelectWidth)
 	return *value != previous
 }
