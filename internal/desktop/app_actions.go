@@ -6,6 +6,7 @@ import (
 	"slices"
 
 	"github.com/egoist/mygo"
+	"github.com/egoist/mygo/plugins/updater"
 	"github.com/egoist/mygo/ui"
 	"github.com/zeroy1024/Burrow/internal/locales"
 	"github.com/zeroy1024/Burrow/internal/termtheme"
@@ -282,6 +283,10 @@ func (a *app) installAppMenu() func() {
 		Label: locales.MessageSettings(),
 		Click: func(*mygo.MenuItem, *mygo.Window) { a.openSettingsFromMenu() },
 	}
+	checkUpdates := &mygo.MenuItem{
+		Label: locales.UpdateCheckMenu(),
+		Click: func(*mygo.MenuItem, *mygo.Window) { updater.CheckForUpdates() },
+	}
 	cycle := func(direction int) func(*mygo.MenuItem, *mygo.Window) {
 		return func(*mygo.MenuItem, *mygo.Window) {
 			if !a.businessReady() || a.security.dialog != nil {
@@ -321,7 +326,7 @@ func (a *app) installAppMenu() func() {
 	a.quitMenu = &mygo.MenuItem{Role: mygo.RoleQuit}
 	menu := mygo.NewMenu([]*mygo.MenuItem{
 		{Label: "Burrow", Submenu: []*mygo.MenuItem{
-			settings,
+			settings, checkUpdates,
 			{Type: mygo.MenuItemSeparator}, a.backgroundMenu, a.quitMenu,
 		}},
 		{Role: mygo.RoleEditMenu},
@@ -332,6 +337,7 @@ func (a *app) installAppMenu() func() {
 	a.syncQuitShortcut()
 	return mygo.App.OnLocaleChanged(func(string) {
 		settings.SetLabel(locales.MessageSettings())
+		checkUpdates.SetLabel(locales.UpdateCheckMenu())
 		tabs.SetLabel(locales.MessageTabs())
 		previous.SetLabel(locales.MessagePreviousTab())
 		next.SetLabel(locales.MessageNextTab())

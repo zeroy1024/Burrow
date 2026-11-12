@@ -10,11 +10,11 @@ SSH, transfer queues, sessions, and persistence share implementations. Platform 
 |---|---|---|
 | macOS arm64 | APP, DMG, ZIP; macOS 13 baseline; tag CI uploads a DMG | Existing tests/race, static checks, and standard packaging; GitHub-hosted builds require signing Secrets and remote verification |
 | macOS amd64 | Retained by the same build entry point | Not run on an Intel machine in this validation |
-| Windows amd64 / arm64 | Tag CI generates UPX-compressed NSIS installers with matching `ghostty-vt.dll`; local builds retain portable ZIPs | No native Windows runtime results; minimum OS version, UPX compatibility, and antivirus behavior need native acceptance |
+| Windows amd64 / arm64 | Tag CI generates NSIS installers with matching `ghostty-vt.dll`; local builds retain portable ZIPs | No native Windows runtime results; minimum OS version, in-app updates, and antivirus behavior need native acceptance |
 | Linux amd64 | Target compilation checked; build entry point reuses MyGo | Distribution dependencies, X11/Wayland, system credentials, and desktop interactions unverified |
 | Linux arm64 | Selectable build target | Not validated in this run |
 
-See [development and builds](development.md) for commands and output paths. Windows packaging hosts require UPX 5.3.0 or later. Native Windows builds have MyGo prepare NSIS; cross-building installers requires `makensis` on the host. GitHub tag workflows use hosted `ubuntu-24.04` and Apple Silicon `macos-15`, importing the macOS signing identity from repository Secrets into a temporary Keychain. Workflow configuration is not evidence of successful tag execution, artifact upload, or native runtime acceptance; record remote results separately.
+See [development and builds](development.md) for commands and output paths. Native Windows builds have MyGo prepare NSIS; cross-building installers requires `makensis` on the host. GitHub tag workflows use hosted `ubuntu-24.04` and Apple Silicon `macos-15`, importing the macOS signing identity from repository Secrets into a temporary Keychain. Workflow configuration is not evidence of successful tag execution, artifact upload, or native runtime acceptance; record remote results separately.
 
 ## Integrated platform differences
 

@@ -16817,3 +16817,153 @@ func SessionUnavailableForTransfer() string { return In(i18n.Locale()).SessionUn
 func (msgs Messages) SessionUnavailableForTransfer() string {
 	return Catalog.Format(msgs.locale, "sessionUnavailableForTransfer", nil)
 }
+
+// UpdateTitle says "软件更新"
+// in the language the app shows.
+func UpdateTitle() string { return In(i18n.Locale()).UpdateTitle() }
+
+// UpdateTitle says "软件更新"
+// in the language of msgs.
+func (msgs Messages) UpdateTitle() string {
+	return Catalog.Format(msgs.locale, "updateTitle", nil)
+}
+
+// UpdateCheck says "检查更新"
+// in the language the app shows.
+func UpdateCheck() string { return In(i18n.Locale()).UpdateCheck() }
+
+// UpdateCheck says "检查更新"
+// in the language of msgs.
+func (msgs Messages) UpdateCheck() string {
+	return Catalog.Format(msgs.locale, "updateCheck", nil)
+}
+
+// UpdateCheckMenu says "检查更新…"
+// in the language the app shows.
+func UpdateCheckMenu() string { return In(i18n.Locale()).UpdateCheckMenu() }
+
+// UpdateCheckMenu says "检查更新…"
+// in the language of msgs.
+func (msgs Messages) UpdateCheckMenu() string {
+	return Catalog.Format(msgs.locale, "updateCheckMenu", nil)
+}
+
+// UpdateCurrentVersion says "当前版本 %s"
+// in the language the app shows.
+func UpdateCurrentVersion() string { return In(i18n.Locale()).UpdateCurrentVersion() }
+
+// UpdateCurrentVersion says "当前版本 %s"
+// in the language of msgs.
+func (msgs Messages) UpdateCurrentVersion() string {
+	return Catalog.Format(msgs.locale, "updateCurrentVersion", nil)
+}
+
+// UpdateAutomatic says "自动检查更新"
+// in the language the app shows.
+func UpdateAutomatic() string { return In(i18n.Locale()).UpdateAutomatic() }
+
+// UpdateAutomatic says "自动检查更新"
+// in the language of msgs.
+func (msgs Messages) UpdateAutomatic() string {
+	return Catalog.Format(msgs.locale, "updateAutomatic", nil)
+}
+
+// UpdateAutomaticDetail says "启动后及每天在后台检查一次，发现新版本时提示"
+// in the language the app shows.
+func UpdateAutomaticDetail() string { return In(i18n.Locale()).UpdateAutomaticDetail() }
+
+// UpdateAutomaticDetail says "启动后及每天在后台检查一次，发现新版本时提示"
+// in the language of msgs.
+func (msgs Messages) UpdateAutomaticDetail() string {
+	return Catalog.Format(msgs.locale, "updateAutomaticDetail", nil)
+}
+
+// UpdateChannel says "更新渠道"
+// in the language the app shows.
+func UpdateChannel() string { return In(i18n.Locale()).UpdateChannel() }
+
+// UpdateChannel says "更新渠道"
+// in the language of msgs.
+func (msgs Messages) UpdateChannel() string {
+	return Catalog.Format(msgs.locale, "updateChannel", nil)
+}
+
+// UpdateChannelDetail says "正式版只接收正式发布，预览版同时接收预览和正式发布"
+// in the language the app shows.
+func UpdateChannelDetail() string { return In(i18n.Locale()).UpdateChannelDetail() }
+
+// UpdateChannelDetail says "正式版只接收正式发布，预览版同时接收预览和正式发布"
+// in the language of msgs.
+func (msgs Messages) UpdateChannelDetail() string {
+	return Catalog.Format(msgs.locale, "updateChannelDetail", nil)
+}
+
+// UpdateChannelStable says "正式版"
+// in the language the app shows.
+func UpdateChannelStable() string { return In(i18n.Locale()).UpdateChannelStable() }
+
+// UpdateChannelStable says "正式版"
+// in the language of msgs.
+func (msgs Messages) UpdateChannelStable() string {
+	return Catalog.Format(msgs.locale, "updateChannelStable", nil)
+}
+
+// UpdateChannelPreview says "预览版"
+// in the language the app shows.
+func UpdateChannelPreview() string { return In(i18n.Locale()).UpdateChannelPreview() }
+
+// UpdateChannelPreview says "预览版"
+// in the language of msgs.
+func (msgs Messages) UpdateChannelPreview() string {
+	return Catalog.Format(msgs.locale, "updateChannelPreview", nil)
+}
+
+// UpdateSystemProxy says "使用系统代理"
+// in the language the app shows.
+func UpdateSystemProxy() string { return In(i18n.Locale()).UpdateSystemProxy() }
+
+// UpdateSystemProxy says "使用系统代理"
+// in the language of msgs.
+func (msgs Messages) UpdateSystemProxy() string {
+	return Catalog.Format(msgs.locale, "updateSystemProxy", nil)
+}
+
+// UpdateSystemProxyDetail says "检查和下载更新时使用系统代理设置，关闭后直接连接"
+// in the language the app shows.
+func UpdateSystemProxyDetail() string { return In(i18n.Locale()).UpdateSystemProxyDetail() }
+
+// UpdateSystemProxyDetail says "检查和下载更新时使用系统代理设置，关闭后直接连接"
+// in the language of msgs.
+func (msgs Messages) UpdateSystemProxyDetail() string {
+	return Catalog.Format(msgs.locale, "updateSystemProxyDetail", nil)
+}
+
+// UpdateMirror says "GitHub 镜像地址"
+// in the language the app shows.
+func UpdateMirror() string { return In(i18n.Locale()).UpdateMirror() }
+
+// UpdateMirror says "GitHub 镜像地址"
+// in the language of msgs.
+func (msgs Messages) UpdateMirror() string {
+	return Catalog.Format(msgs.locale, "updateMirror", nil)
+}
+
+// UpdateMirrorDetail says "作为前缀加在 GitHub 下载地址之前，留空则直接访问 GitHub；下载内容仍会校验签名"
+// in the language the app shows.
+func UpdateMirrorDetail() string { return In(i18n.Locale()).UpdateMirrorDetail() }
+
+// UpdateMirrorDetail says "作为前缀加在 GitHub 下载地址之前，留空则直接访问 GitHub；下载内容仍会校验签名"
+// in the language of msgs.
+func (msgs Messages) UpdateMirrorDetail() string {
+	return Catalog.Format(msgs.locale, "updateMirrorDetail", nil)
+}
+
+// MessageInvalidUpdateChannel says "更新渠道设置无效"
+// in the language the app shows.
+func MessageInvalidUpdateChannel() string { return In(i18n.Locale()).MessageInvalidUpdateChannel() }
+
+// MessageInvalidUpdateChannel says "更新渠道设置无效"
+// in the language of msgs.
+func (msgs Messages) MessageInvalidUpdateChannel() string {
+	return Catalog.Format(msgs.locale, "messageInvalidUpdateChannel", nil)
+}

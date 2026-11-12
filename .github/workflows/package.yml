@@ -1,4 +1,4 @@
-name: 编译打包
+name: 编译打包与发布草稿
 run-name: 打包 ${{ inputs.tag || github.ref_name }}
 
 on:
@@ -14,12 +14,16 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: package-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
 env:
   BURROW_RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
 
 jobs:
   windows:
-    name: Windows 双架构 UPX 安装程序
+    name: Windows 双架构安装程序
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     defaults:
@@ -39,27 +43,7 @@ jobs:
       - name: 安装打包依赖
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends ca-certificates curl nsis 7zip xz-utils
-
-      - name: 准备 UPX 5.3.0
-        run: |
-          case "$(uname -m)" in
-            x86_64)
-              burrow_upx_arch=amd64
-              burrow_upx_sha256=79cea8a50b6fa102d10c7b79a419cd77dead3cc2d78661de2dc5e5815dc505c1
-              ;;
-            aarch64)
-              burrow_upx_arch=arm64
-              burrow_upx_sha256=2a4afa860ac7aa6968f88df7841823746e5d00ba56affdf9342c2f5254fb776f
-              ;;
-            *) echo "Unsupported UPX host architecture: $(uname -m)" >&2; exit 1 ;;
-          esac
-          burrow_upx_name="upx-5.3.0-${burrow_upx_arch}_linux"
-          burrow_upx_archive="$RUNNER_TEMP/$burrow_upx_name.tar.xz"
-          curl --fail --location --output "$burrow_upx_archive" "https://github.com/upx/upx/releases/download/v5.3.0/$burrow_upx_name.tar.xz"
-          printf '%s  %s\n' "$burrow_upx_sha256" "$burrow_upx_archive" | sha256sum --check --strict
-          tar -xJf "$burrow_upx_archive" -C "$RUNNER_TEMP"
-          echo "$RUNNER_TEMP/$burrow_upx_name" >> "$GITHUB_PATH"
+          sudo apt-get install -y --no-install-recommends ca-certificates nsis 7zip
 
       - name: 核对版本标签与许可
         run: |
@@ -81,12 +65,15 @@ jobs:
           cache: false
 
       - name: 构建 Windows 产物
-        run: mise run build -- --platform windows/amd64,windows/arm64
+        env:
+          MYGO_UPDATER_PRIVATE_KEY: ${{ secrets.MYGO_UPDATER_PRIVATE_KEY }}
+        run: |
+          : "${MYGO_UPDATER_PRIVATE_KEY:?Configure the MYGO_UPDATER_PRIVATE_KEY repository secret}"
+          mise run build -- --platform windows/amd64,windows/arm64
 
-      - name: 校验安装程序内容与摘要
+      - name: 校验安装程序内容与更新文件
         run: |
           python3 - <<'PY'
-          import hashlib
           import json
           from pathlib import Path
           import subprocess
@@ -103,27 +90,21 @@ jobs:
                   for filename in (f"{config['name']}.exe", "ghostty-vt.dll", "LICENSE", "THIRD_PARTY_NOTICES.md"):
                       if (Path(directory) / filename).read_bytes() != (output / filename).read_bytes():
                           raise SystemExit(f"Installed runtime differs: {filename}")
-              digest = hashlib.sha256(installer.read_bytes()).hexdigest()
-              (output / "SHA256SUMS").write_text(f"{digest}  {installer.name}\n", encoding="utf-8")
+              manifest = json.loads((output / f"update-windows-{arch}.json").read_text(encoding="utf-8"))
+              archive = output / manifest["url"].rsplit("/", 1)[1]
+              if manifest["version"] != config["version"] or archive.stat().st_size != manifest["size"]:
+                  raise SystemExit(f"Update manifest differs from the build: windows-{arch}")
           PY
 
-      - name: 保存 Windows x64 产物
+      - name: 保存 Windows 产物
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: burrow-windows-amd64
+          name: burrow-windows
           path: |
-            build/windows-amd64/*-setup-*.exe
-            build/windows-amd64/SHA256SUMS
-          if-no-files-found: error
-          retention-days: 14
-
-      - name: 保存 Windows ARM64 产物
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: burrow-windows-arm64
-          path: |
-            build/windows-arm64/*-setup-*.exe
-            build/windows-arm64/SHA256SUMS
+            build/windows-*/*-setup-*.exe
+            build/windows-*/*.tar.gz
+            build/windows-*/*.delta
+            build/windows-*/update-*.json
           if-no-files-found: error
           retention-days: 14
 
@@ -188,12 +169,15 @@ jobs:
           cache: false
 
       - name: 构建 macOS DMG
-        run: mise run build -- --platform darwin/arm64
+        env:
+          MYGO_UPDATER_PRIVATE_KEY: ${{ secrets.MYGO_UPDATER_PRIVATE_KEY }}
+        run: |
+          : "${MYGO_UPDATER_PRIVATE_KEY:?Configure the MYGO_UPDATER_PRIVATE_KEY repository secret}"
+          mise run build -- --platform darwin/arm64
 
-      - name: 校验 DMG 与摘要
+      - name: 校验 DMG 与更新文件
         run: |
           python3 - <<'PY'
-          import hashlib
           import json
           from pathlib import Path
           import subprocess
@@ -208,16 +192,85 @@ jobs:
           if not dmg.is_file() or dmg.stat().st_size == 0:
               raise SystemExit(f"Missing or empty DMG: {dmg}")
           subprocess.run(["hdiutil", "verify", str(dmg)], check=True)
-          digest = hashlib.sha256(dmg.read_bytes()).hexdigest()
-          (output / "SHA256SUMS").write_text(f"{digest}  {dmg.name}\n", encoding="utf-8")
+          manifest = json.loads((output / "update-darwin-arm64.json").read_text(encoding="utf-8"))
+          archive = output / manifest["url"].rsplit("/", 1)[1]
+          if manifest["version"] != config["version"] or archive.stat().st_size != manifest["size"]:
+              raise SystemExit("Update manifest differs from the build: darwin-arm64")
           PY
 
-      - name: 保存 macOS DMG
+      - name: 保存 macOS 产物
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: burrow-macos-arm64
+          name: burrow-macos
           path: |
             build/darwin-arm64/*.dmg
-            build/darwin-arm64/SHA256SUMS
+            build/darwin-arm64/*.tar.gz
+            build/darwin-arm64/*.delta
+            build/darwin-arm64/update-*.json
           if-no-files-found: error
           retention-days: 14
+
+  release:
+    name: 汇总产物并上传 Release 草稿
+    needs: [windows, macos]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      actions: read
+    defaults:
+      run:
+        shell: bash
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: 下载本次运行的产物
+        run: |
+          gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --dir "$RUNNER_TEMP/artifacts"
+          mkdir "$RUNNER_TEMP/release"
+          find "$RUNNER_TEMP/artifacts" -type f -exec mv -t "$RUNNER_TEMP/release" {} +
+
+      - name: 核对产物并生成摘要
+        working-directory: ${{ runner.temp }}/release
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          version = os.environ["BURROW_RELEASE_TAG"].removeprefix("v")
+          expected = [f"burrow-{version}-arm64.dmg", f"burrow-setup-{version}-amd64.exe", f"burrow-setup-{version}-arm64.exe"]
+          for target in ("darwin-arm64", "windows-amd64", "windows-arm64"):
+              manifest = json.loads(Path(f"update-{target}.json").read_text(encoding="utf-8"))
+              if manifest["version"] != version:
+                  raise SystemExit(f"Update manifest version differs from the tag: {target}")
+              expected.append(manifest["url"].rsplit("/", 1)[1])
+              expected.extend(delta["url"].rsplit("/", 1)[1] for delta in manifest.get("deltas", []))
+          published = sorted(path.name for path in Path(".").iterdir() if not path.name.startswith("update-"))
+          if published != sorted(expected):
+              raise SystemExit(f"Release files differ from the manifests: {published}")
+          Path("SHA256SUMS").write_text(
+              "".join(f"{hashlib.sha256(Path(name).read_bytes()).hexdigest()}  {name}\n" for name in published),
+              encoding="utf-8",
+          )
+          Path(os.environ["RUNNER_TEMP"], "notes.md").write_text(manifest["notes"] + "\n", encoding="utf-8")
+          PY
+
+      - name: 上传到 Release 草稿
+        working-directory: ${{ runner.temp }}/release
+        run: |
+          # Published assets are what installed apps verify; never replace them.
+          burrow_release_draft="$(gh release view "$BURROW_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft 2>/dev/null || echo missing)"
+          case "$burrow_release_draft" in
+            missing)
+              gh release create "$BURROW_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft --prerelease --verify-tag \
+                --title "Burrow ${BURROW_RELEASE_TAG#v} Preview" --notes-file "$RUNNER_TEMP/notes.md"
+              ;;
+            true) ;;
+            *) echo "Release $BURROW_RELEASE_TAG is already published" >&2; exit 1 ;;
+          esac
+          shopt -s extglob
+          gh release upload "$BURROW_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --clobber -- !(update-*.json)
+          # Manifests last: apps must never see a manifest whose files are missing.
+          gh release upload "$BURROW_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --clobber -- update-*.json

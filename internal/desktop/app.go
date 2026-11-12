@@ -19,6 +19,7 @@ import (
 
 	"github.com/egoist/mygo"
 	nativeterm "github.com/egoist/mygo/burrow-terminal"
+	updatewindow "github.com/egoist/mygo/plugins/updater/native"
 	"github.com/egoist/mygo/ui"
 )
 
@@ -272,6 +273,8 @@ func Run() (runErr error) {
 	if err := a.loadAppPreferences(); err != nil {
 		a.security.errorText = locales.ErrorText(err)
 	}
+	a.applyUpdatePreferences()
+	mygo.Use(updatewindow.Plugin)
 	a.vault, err = vault.OpenWithKeyStore(ctx, db, directory, legacyUnlockKeys())
 	if err != nil {
 		a.security.errorText = locales.ErrorText(err)

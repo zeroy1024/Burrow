@@ -114,6 +114,7 @@ func (a *app) aboutSettings(c *ui.Context) {
 			})
 		})
 	}
+	a.updateSettings(c)
 	fields := make([]settingField, 0, len(dependencyNotices()))
 	for index, notice := range dependencyNotices() {
 		fields = append(fields, settingField{index, notice.name, notice.license, "", func() {

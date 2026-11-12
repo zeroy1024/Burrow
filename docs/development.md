@@ -46,7 +46,7 @@ build/darwin-arm64/burrow-0.1.8-arm64.zip
 build/darwin-arm64/burrow-0.1.8-arm64.dmg
 ```
 
-Windows packaging requires UPX 5.3.0+ on the host PATH for Windows ARM64 support. The build temporarily compiles a [Go command proxy](../scripts/upx-go/main.go), which runs UPX LZMA compression and integrity verification after MyGo's Windows `go build`, before signing/installer creation. Icons and relocation information are retained; `ghostty-vt.dll` is unchanged. Neither the Go toolchain nor MyGo source is modified. The proxy is added only to child-process PATH during the build.
+Windows executables are not compressed. With in-app updates enabled, MyGo also writes signed update archives (`.tar.gz`), deltas (`.delta`), and manifests (`update-<platform>.json`) to each platform's output directory. Without the update signing key it builds the apps and skips those files. See [in-app updates](#in-app-updates).
 
 Local builds also generate a portable ZIP containing the compressed EXE and `ghostty-vt.dll`:
 
@@ -109,9 +109,15 @@ Passing checks establish only the scope actually run. See [interpreting validati
 
 [Commit checks](../.github/workflows/check.yml) run on branch pushes, PRs, and manual dispatch using hosted `ubuntu-24.04`. They cover Go formatting, Python syntax, existing root/terminal race tests and vet, Linux build, and Windows cross-builds for both architectures. They also check third-party notices, English/Chinese catalogs, and generated-file consistency. Pinned Gitleaks, verified by SHA-256, scans working files and all checked-out history references. Checkout retains full history without persisted credentials. The workflow grants only `contents: read`, uses ordinary `pull_request`, and needs no custom repository Secrets.
 
-[Packaging](../.github/workflows/package.yml) runs on `v*` tag pushes or manual dispatch naming an existing version tag. Both check out that tag and require it to match `mygo.json`, such as `0.1.8` / `v0.1.8`. Manual dispatch can rebuild an existing version after workflow fixes without moving its tag. Hosted `ubuntu-24.04` cross-builds UPX NSIS installers for Windows amd64/arm64 and extracts them with the `7zip` package's `7z` for verification. Apple Silicon `macos-15` builds the ARM64 DMG. Installer checks include EXE, DLL, and both license files; macOS checks bundle license resources and DMG. Artifacts include `SHA256SUMS`, remain for 14 days, and do not create/update GitHub Releases.
+[Packaging](../.github/workflows/package.yml) runs on `v*` tag pushes or manual dispatch naming an existing version tag. Both check out that tag and require it to match `mygo.json`, such as `0.1.8` / `v0.1.8`. Manual dispatch can rebuild an existing version after workflow fixes without moving its tag. Hosted `ubuntu-24.04` cross-builds NSIS installers for Windows amd64/arm64 and extracts them with the `7zip` package's `7z` for verification. Apple Silicon `macos-15` builds the ARM64 DMG. Installer checks include EXE, DLL, and both license files; macOS checks bundle license resources and DMG. Both build jobs have only `contents: read` and keep their output as Actions artifacts for 14 days. A separate release job then checks the manifests against the files, writes `SHA256SUMS`, and uploads to the tag's draft Release. Only that job holds `contents: write`.
 
-GitHub needs no self-hosted runner registration. Configure two repository **Settings → Secrets and variables → Actions** Secrets for macOS packaging:
+GitHub needs no self-hosted runner registration. Configure three repository **Settings → Secrets and variables → Actions** Secrets for packaging:
+
+| Secret | Contents |
+|---|---|
+| `MYGO_UPDATER_PRIVATE_KEY` | Contents of `mygo-update.key` from `mygo keygen`, which signs in-app updates |
+
+macOS signing also needs:
 
 | Secret | Contents |
 |---|---|
@@ -128,7 +134,7 @@ Actions are pinned to commit SHAs and use `mise.toml`. Native windows, Docker pr
 
 GitHub Release notes must include a complete English section first, followed by the equivalent Simplified Chinese section. Keep changes, downloads, validation, and limitations consistent between both sections. Apply this order to every release.
 
-- Update the version in `mygo.json`, and check notices with `python3 scripts/licenses.py --check`.
+- Update the version in `mygo.json` and add that version's section to [CHANGELOG.md](../CHANGELOG.md) in the same commit; check notices with `python3 scripts/licenses.py --check`.
 - Use Gitleaks 8.30.1 or a compatible version to scan intended public history/files locally. Inspect all local refs for stashes, internal snapshots, or unprepared branches. Keep fully redacted results outside the repository.
 
   ```sh
@@ -139,19 +145,31 @@ GitHub Release notes must include a complete English section first, followed by 
 
 - Manually review screenshots, binary assets, author emails, historical messages, and diagnostic publication scope. Regex scanning cannot prove they are nonsensitive. Do not publish SQLite databases, private keys, Keychain contents, or raw MCP audits as issue attachments.
 - Enable private vulnerability reporting, Secret scanning / Push protection, and required main-branch checks in GitHub. Local files do not configure these repository settings automatically.
-- Initially push only selected branches and required tags; avoid `--mirror` exposing internal refs. After checking GitHub results/artifacts, manually prepare Release attachments and notes with actual platform acceptance and signing status.
+- Initially push only selected branches and required tags; avoid `--mirror` exposing internal refs. After checking GitHub results/artifacts, complete the English and Chinese notes in the draft Release the workflow created, with actual platform acceptance and signing status, then publish it manually.
+
+### In-app updates
+
+The app checks for and installs updates from GitHub Releases through MyGo's updater. Update files are signed with an Ed25519 key whose public half is `updates.publicKey` in `mygo.json`. Losing the private key strands installed apps, and anyone who has it can ship code to users; it is kept only in the maintainer's secret storage and the `MYGO_UPDATER_PRIVATE_KEY` Secret.
+
+- The release job requires all three platform manifests to match the tag's version, and the attachments to be exactly the archives and deltas the manifests name plus the three installers. It uploads those first and the manifests last, so apps never read a manifest whose files are missing.
+- When the tag has no Release, it creates a draft marked Pre-release with notes from the version's `CHANGELOG.md` section. An existing draft has its attachments replaced. A published Release fails the job; public attachments are never replaced.
+- Publishing the draft decides the channel: keeping Pre-release offers it only to users on the Preview channel, and unticking it makes it a stable release offered to everyone.
+- The Stable channel reads the manifest of the latest stable Release. The Preview channel reads the newest Release through the GitHub API, within its anonymous limit of 60 requests an hour per address. Deltas start from the latest stable release; previews download the whole archive.
+- The GitHub mirror URL in Settings is only prefixed to `https://github.com/` download URLs and does not proxy the GitHub API. Downloads are still verified with the built-in public key.
+
+A successful workflow is not acceptance of a cross-version upgrade. Replacement, relaunch, and data state after an upgrade need two consecutive versions run on each platform.
 
 ## CI job details
 
 `pkg-sftp` retains upstream formatting and is excluded from formatting gates. Its nested module disables only vet's `stdmethods`: upstream `RawPacket.ReadFrom` and `RequestPacket.ReadFrom` take buffers/length limits and are not `io.ReaderFrom`, producing false positives. Other analyzers remain enabled; app/terminal vet stays complete. Native UI, visual acceptance, and Docker-dependent SSH/FTP integration are outside basic commit checks.
 
-Windows jobs install NSIS and 7-Zip, download official pinned UPX 5.3.0 Linux tools, verify the preset SHA-256, and call the same `mise run build`. They extract installers for both architectures and verify EXE/DLL bytes against the current build before creating `SHA256SUMS`. A missing installer fails the job; a portable package alone is not a completed installer build.
+Windows jobs install NSIS and 7-Zip and call the same `mise run build`. They extract installers for both architectures, verify EXE/DLL bytes against the current build, and check the update manifests' version and archive size. A missing installer fails the job; a portable package alone is not a completed installer build.
 
-macOS retains APP signing, LZMA DMG, and ZIP generation, without UPX or transparent filesystem compression. CI uploads only verified DMGs and sums.
+macOS retains APP signing, LZMA DMG, and ZIP generation, without transparent filesystem compression. CI uploads only verified DMGs and update files.
 
-Artifacts are named `burrow-windows-amd64`, `burrow-windows-arm64`, and `burrow-macos-arm64`, containing installers/DMGs plus sums for 14 days. Local portable ZIPs are not uploaded. Workflows do not create Releases or publish to external repositories. Tags do not change `mygo.json`; update the project version before tagging.
+Artifacts are named `burrow-windows` and `burrow-macos`, containing installers/DMGs plus update archives, deltas, and manifests for 14 days. Local portable ZIPs are not uploaded. Tags do not change `mygo.json`; update the project version before tagging.
 
-UPX integrity/installer-content checks do not replace native Windows startup, DLL loading, installation, upgrades, uninstallation, or antivirus checks. MSI is not integrated.
+Installer-content checks do not replace native Windows startup, DLL loading, installation, upgrades, uninstallation, or antivirus checks. MSI is not integrated.
 
 Cross-build/static checks from macOS/Linux include:
 

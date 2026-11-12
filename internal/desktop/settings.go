@@ -196,9 +196,9 @@ func (a *app) settingsCategoryHasMatch(index int) bool {
 		"默认本地目录 同时传输数 同名冲突",
 		"快捷键 操作 新建会话 关闭选项卡 重新打开关闭的选项卡 切换到 上一个 下一个 显示 隐藏侧栏 终端模式 文件传输模式 拆分窗格 搜索当前页面 设置",
 		"私钥 导入 生成 ssh-agent 已保存的密码 添加到 agent 密钥与凭据",
-		"关于 版本 开源许可 MyGo Catppuccin JetBrains Mono",
+		"关于 版本 软件更新 检查更新 自动检查 更新渠道 正式版 预览版 系统代理 GitHub 镜像 开源许可 MyGo Catppuccin JetBrains Mono",
 	}
-	english := []string{"language system startup restore sessions close last tab active connection confirmation background main window menu bar tray hide dock icon command q cmd q", "app theme light dark system accent preview reduce motion window translucency global background blur macOS", "color scheme follow app fixed light dark terminal background font size line height cursor style blink scrollback", "default local directory concurrent transfers name conflict", "keyboard shortcuts new close reopen select tabs previous next sidebar terminal file mode split search current page settings", "private key import generate ssh-agent saved passwords add to agent credentials", "about version open source license MyGo Catppuccin JetBrains Mono"}
+	english := []string{"language system startup restore sessions close last tab active connection confirmation background main window menu bar tray hide dock icon command q cmd q", "app theme light dark system accent preview reduce motion window translucency global background blur macOS", "color scheme follow app fixed light dark terminal background font size line height cursor style blink scrollback", "default local directory concurrent transfers name conflict", "keyboard shortcuts new close reopen select tabs previous next sidebar terminal file mode split search current page settings", "private key import generate ssh-agent saved passwords add to agent credentials", "about version software update check for updates automatic channel stable preview system proxy GitHub mirror open source license MyGo Catppuccin JetBrains Mono"}
 	return (index == 5 && a.securitySettingsMatch()) || a.settingMatches(settingsCategories()[index].label, texts[index]+english[index])
 }
 

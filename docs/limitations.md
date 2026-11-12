@@ -9,7 +9,7 @@ This page records current boundaries. Validation applies only to the code versio
 - macOS requires version 13 or later. Windows amd64/arm64 has compilation and EXE/portable ZIP packaging entry points; native runtime acceptance requires a Windows environment. Linux has compilation checks without a guarantee of desktop runtime support. See [platform support](platform-support.md).
 - Linux monitoring requires suitable remote `/proc` data. Root disk capacity also requires usable SFTP statvfs support and a matching root mount.
 - App UI and business messages support English, Simplified Chinese, and System. Historical free text and raw system, third-party, and remote diagnostics retain their original content. Some native system text updates only after restarting. Native language switching, English layouts, and accessibility behavior have not been accepted; see [interface languages](i18n.md).
-- The app has no automatic update service. About shows the current version and licenses.
+- In-app updates come from GitHub Releases; About checks for updates and chooses the channel, system proxy, and GitHub mirror. Versions 0.1.8 and earlier need a manual install of a newer version. Cross-version upgrades have not had native acceptance on each platform, and the Preview channel depends on the GitHub API. About shows the current version and licenses.
 
 WireGuard currently supports a single peer as the first route hop, app-local DNS with IP servers, and passive FTP/FTPS. It does not manage OS VPN interfaces or network settings, execute imported hooks, support DNS search domains, or nest WireGuard after another gateway. See [WireGuard gateways](wireguard.md).
 

@@ -28,6 +28,9 @@ type appPreferences struct {
 	ShowTray             bool              `json:"showTray"`
 	ConfirmCloseActive   bool              `json:"confirmCloseActive"`
 	ShowAgentSessions    bool              `json:"showAgentSessions"`
+	UpdateChannel        string            `json:"updateChannel"`
+	UpdateSystemProxy    bool              `json:"updateSystemProxy"`
+	UpdateMirror         string            `json:"updateMirror"`
 	AppTheme             string            `json:"appTheme"`
 	Accent               string            `json:"accent"`
 	ReduceMotion         string            `json:"reduceMotion"`
@@ -85,6 +88,7 @@ func (a *app) loadAppPreferences() error {
 	a.prefs = appPreferences{
 		Version: 1, RestoreSessions: true, LastTabClose: "keep", ConfirmCloseActive: true,
 		WindowClose: "quit", ShowTray: true, ShowAgentSessions: true,
+		UpdateChannel: "preview", UpdateSystemProxy: true,
 		AppTheme: "system", Accent: "#0a84ff", ReduceMotion: "system", Translucency: true,
 		TermMode: a.terminal.mode.String(), TermFollowLight: a.terminal.followLight,
 		TermFollowDark: a.terminal.followDark, TermBackground: a.terminal.prefs.Background.String(),
@@ -149,6 +153,9 @@ func (a *app) validateAppPreferences() error {
 	}
 	if !slices.Contains([]string{"quit", "background"}, p.WindowClose) {
 		return locales.NewError(locales.MessageInvalidWindowCloseSetting)
+	}
+	if !slices.Contains([]string{"stable", "preview"}, p.UpdateChannel) {
+		return locales.NewError(locales.MessageInvalidUpdateChannel)
 	}
 	if a.backgroundEnabled() && !p.ShowTray {
 		return locales.NewError(locales.MessageBackgroundRunningRequiresTrayIcon)

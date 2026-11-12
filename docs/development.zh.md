@@ -46,7 +46,7 @@ build/darwin-arm64/burrow-0.1.8-arm64.zip
 build/darwin-arm64/burrow-0.1.8-arm64.dmg
 ```
 
-Windows 打包要求主机 PATH 上有 UPX 5.3.0 或更新版本，以支持 Windows ARM64。构建入口会临时编译 [Go 命令代理](../scripts/upx-go/main.go)，在 MyGo 的 Windows `go build` 完成后执行 UPX LZMA 压缩与完整性校验，再由 MyGo 签名并生成安装程序。压缩保留图标和重定位信息，`ghostty-vt.dll` 保持原样；不修改 Go 工具链或 MyGo 源码。构建期间只在子进程 PATH 中启用代理。
+Windows 可执行文件不压缩。启用应用内更新后，MyGo 还会在各平台输出目录写入签名的更新归档（`.tar.gz`）、增量包（`.delta`）和清单（`update-<平台>.json`）；未提供更新签名私钥时只构建应用，不生成这些文件。见[应用内更新](#应用内更新)。
 
 本地构建仍生成同时包含压缩后的 EXE 与 `ghostty-vt.dll` 的便携 ZIP：
 
@@ -109,9 +109,15 @@ GOCACHE=/private/tmp/burrow-go-build mise exec -- go test ./...
 
 [提交检查](../.github/workflows/check.yml)在分支 push、PR 和手动触发时运行，使用托管 `ubuntu-24.04`。检查范围包括 Go 格式、Python 语法、根模块与终端扩展的已有 race 测试和 vet、Linux 编译、Windows 双架构交叉编译；另检查第三方许可汇总、中英文语言资源及生成文件一致性，并使用固定版本、校验 SHA-256 的 Gitleaks 扫描工作文件和检出仓库的全部历史引用。检出保留完整历史且不持久化凭据；工作流仅授予 `contents: read`，使用普通 `pull_request`，无需提供自定义仓库 Secret。
 
-[编译打包](../.github/workflows/package.yml)由 `v*` 标签推送触发，也可在 Actions 中手动运行并填写已存在的版本标签。两种入口都检出指定标签的源码，并要求标签与 `mygo.json` 一致，例如版本 `0.1.8` 对应 `v0.1.8`。手动入口可在修复工作流后重建原版本，无需移动标签。Windows 使用托管 `ubuntu-24.04` 交叉构建 amd64/arm64 的 UPX NSIS 安装程序，并通过 `7zip` 包提供的 `7z` 解包校验；macOS 使用托管 Apple Silicon `macos-15` 构建 ARM64 DMG。安装程序校验包括 EXE、DLL 和两个许可文件，macOS 校验 APP 内许可资源及 DMG。各附件附有 `SHA256SUMS`，保留 14 天；工作流不创建或更新 GitHub Release。
+[编译打包](../.github/workflows/package.yml)由 `v*` 标签推送触发，也可在 Actions 中手动运行并填写已存在的版本标签。两种入口都检出指定标签的源码，并要求标签与 `mygo.json` 一致，例如版本 `0.1.8` 对应 `v0.1.8`。手动入口可在修复工作流后重建原版本，无需移动标签。Windows 使用托管 `ubuntu-24.04` 交叉构建 amd64/arm64 的 NSIS 安装程序，并通过 `7zip` 包提供的 `7z` 解包校验；macOS 使用托管 Apple Silicon `macos-15` 构建 ARM64 DMG。安装程序校验包括 EXE、DLL 和两个许可文件，macOS 校验 APP 内许可资源及 DMG。两个构建任务只有 `contents: read`，产物作为 Actions 附件保留 14 天；随后由单独的汇总任务核对清单与文件、生成 `SHA256SUMS`，并上传到该标签的 Release 草稿。只有汇总任务持有 `contents: write`。
 
-GitHub 不需要注册自托管 runner。macOS 打包需要在仓库的 **Settings → Secrets and variables → Actions** 配置两项 Secret：
+GitHub 不需要注册自托管 runner。打包需要在仓库的 **Settings → Secrets and variables → Actions** 配置三项 Secret：
+
+| Secret | 内容 |
+|---|---|
+| `MYGO_UPDATER_PRIVATE_KEY` | `mygo keygen` 生成的 `mygo-update.key` 内容，用于签名应用内更新 |
+
+macOS 签名另需：
 
 | Secret | 内容 |
 |---|---|
@@ -128,7 +134,7 @@ Actions 均固定到提交 SHA，工具链沿用 `mise.toml`。原生窗口、�
 
 GitHub Release 说明统一先放完整英文内容，再放对应的简体中文内容。两个部分的更新内容、下载、验证和限制保持一致；后续每次发布都沿用这个顺序。
 
-- 更新 `mygo.json` 的版本号，生成并检查第三方声明：`python3 scripts/licenses.py --check`。
+- 更新 `mygo.json` 的版本号，并在同一提交为该版本写入 [CHANGELOG.md](../CHANGELOG.md) 小节；生成并检查第三方声明：`python3 scripts/licenses.py --check`。
 - 使用 Gitleaks 8.30.1 或兼容版本在本地扫描计划公开的提交历史和工作文件；额外检查所有本地 refs，确认不会带出 stash、内部快照或未准备公开的分支。扫描结果留在仓库外并开启完整脱敏。
 
   ```sh
@@ -139,19 +145,31 @@ GitHub Release 说明统一先放完整英文内容，再放对应的简体中�
 
 - 人工确认截图、二进制素材、提交作者邮箱、历史提交消息和诊断材料的公开范围。正则扫描不能证明这些内容无敏感信息；SQLite、私钥、钥匙串内容和原始 MCP 审计不得作为问题附件公开。
 - 在 GitHub 启用私密漏洞报告、Secret scanning / Push protection，并为主分支配置所需检查；这些是仓库设置，不由本地文件自动启用。
-- 首次只推选定分支及必要标签，避免 `--mirror` 把内部 refs 一并公开。确认 GitHub 检查及产物校验通过后，再人工整理 Release 附件和版本说明，注明实际平台验收及签名状态。
+- 首次只推选定分支及必要标签，避免 `--mirror` 把内部 refs 一并公开。确认 GitHub 检查及产物校验通过后，在工作流生成的 Release 草稿中补全中英文版本说明，注明实际平台验收及签名状态，再人工发布。
+
+### 应用内更新
+
+应用通过 MyGo 的更新器从 GitHub Release 检查并安装更新，更新文件由 Ed25519 密钥签名，公钥位于 `mygo.json` 的 `updates.publicKey`。私钥丢失后已安装的应用无法再更新，泄露后他人可以向用户推送代码；它只保存在维护者的密钥管理和 `MYGO_UPDATER_PRIVATE_KEY` Secret 中。
+
+- 汇总任务要求三个平台的清单版本与标签一致，且附件恰好是清单引用的归档、增量包和三个安装程序。先上传这些文件，最后上传清单，避免应用读到引用缺失文件的清单。
+- 标签尚无 Release 时创建标记为 Pre-release 的草稿，说明取自 `CHANGELOG.md` 的对应小节；已有草稿时替换其附件；Release 已发布时任务失败，不替换已公开的附件。
+- 发布草稿时决定渠道：保留 Pre-release 只推送给选择预览版的用户，取消勾选则成为正式版并推送给所有用户。
+- 正式版渠道读取最新正式 Release 的清单；预览版渠道通过 GitHub API 读取最新一个 Release，匿名请求受每地址每小时 60 次的限制。增量包从最新正式版生成，预览版之间下载完整归档。
+- 设置中的 GitHub 镜像地址只作为前缀加在 `https://github.com/` 下载地址之前，不代理 GitHub API；下载内容仍按内置公钥校验。
+
+工作流成功不代表跨版本升级已经验收；替换、重启和升级后的数据状态需要在各平台用两个连续版本实际验证。
 
 ## CI 任务细节
 
 `pkg-sftp` 保留上游格式，不纳入格式门禁；其独立模块执行 vet 时关闭 `stdmethods`：上游的 `RawPacket.ReadFrom` 和 `RequestPacket.ReadFrom` 接收缓冲区与长度限制，并非 `io.ReaderFrom`，该分析项会误报。其余 vet 分析项保留，应用和终端扩展仍执行完整 vet。原生 UI、视觉验收及需要 Docker 服务的 SSH/FTP 集成测试不在这个基础提交检查中。
 
-Windows 打包任务安装 NSIS、7-Zip，并下载固定 UPX 5.3.0 的官方 Linux 主机工具，验证预置 SHA-256 后调用同一 `mise run build` 入口。它会解开两个架构的安装程序，核对其中的 EXE/DLL 与本次构建完全一致，再生成 `SHA256SUMS`。缺少安装程序时任务失败，不能以只生成便携包算作打包完成。
+Windows 打包任务安装 NSIS、7-Zip 后调用同一 `mise run build` 入口。它会解开两个架构的安装程序，核对其中的 EXE/DLL 与本次构建完全一致，并核对更新清单的版本和归档大小。缺少安装程序时任务失败，不能以只生成便携包算作打包完成。
 
-macOS 继续使用原有 APP 签名、LZMA DMG 和 ZIP 构建流程，不启用 UPX 或文件系统透明压缩。CI 只上传校验通过的 DMG 与摘要。
+macOS 继续使用原有 APP 签名、LZMA DMG 和 ZIP 构建流程，不启用文件系统透明压缩。CI 只上传校验通过的 DMG 与更新文件。
 
-产物按 `burrow-windows-amd64`、`burrow-windows-arm64`、`burrow-macos-arm64` 保存为 Actions 附件，分别包含安装程序或 DMG 以及摘要，保留 14 天；本地生成的便携 ZIP 不上传，workflow 不创建 Release 或发布到外部仓库。标签名不会自动修改 `mygo.json` 的版本，创建版本标签前先更新项目版本。
+产物按 `burrow-windows`、`burrow-macos` 保存为 Actions 附件，包含安装程序或 DMG 以及更新归档、增量包和清单，保留 14 天；本地生成的便携 ZIP 不上传。标签名不会自动修改 `mygo.json` 的版本，创建版本标签前先更新项目版本。
 
-UPX 内部完整性检查和安装程序内容校验不能替代 Windows 原生启动、DLL 加载、安装、升级、卸载及杀软误报检查。MSI 尚未接入。
+安装程序内容校验不能替代 Windows 原生启动、DLL 加载、安装、升级、卸载及杀软误报检查。MSI 尚未接入。
 
 可在 macOS/Linux 上进行目标编译与静态检查，例如：
 

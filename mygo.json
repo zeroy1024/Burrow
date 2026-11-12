@@ -18,5 +18,9 @@
   "i18n": {
     "dir": "internal/locales",
     "source": "zh-Hans"
+  },
+  "updates": {
+    "publicKey": "2lCM32NWWBMlf3uMUUz9x6tIrcCZeTxn1pQDjtg6F8Y=",
+    "github": "zeroy1024/Burrow"
   }
 }

@@ -2053,5 +2053,20 @@
         "type": "int"
       }
     }
-  }
+  },
+  "updateTitle": "软件更新",
+  "updateCheck": "检查更新",
+  "updateCheckMenu": "检查更新…",
+  "updateCurrentVersion": "当前版本 %s",
+  "updateAutomatic": "自动检查更新",
+  "updateAutomaticDetail": "启动后及每天在后台检查一次，发现新版本时提示",
+  "updateChannel": "更新渠道",
+  "updateChannelDetail": "正式版只接收正式发布，预览版同时接收预览和正式发布",
+  "updateChannelStable": "正式版",
+  "updateChannelPreview": "预览版",
+  "updateSystemProxy": "使用系统代理",
+  "updateSystemProxyDetail": "检查和下载更新时使用系统代理设置，关闭后直接连接",
+  "updateMirror": "GitHub 镜像地址",
+  "updateMirrorDetail": "作为前缀加在 GitHub 下载地址之前，留空则直接访问 GitHub；下载内容仍会校验签名",
+  "messageInvalidUpdateChannel": "更新渠道设置无效"
 }

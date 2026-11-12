@@ -1571,5 +1571,20 @@
         "type": "int"
       }
     }
-  }
+  },
+  "updateTitle": "Software update",
+  "updateCheck": "Check for updates",
+  "updateCheckMenu": "Check for Updates…",
+  "updateCurrentVersion": "Current version %s",
+  "updateAutomatic": "Check for updates automatically",
+  "updateAutomaticDetail": "Checks in the background after launch and once a day, and tells you when a new version is out",
+  "updateChannel": "Update channel",
+  "updateChannelDetail": "Stable receives stable releases only; Preview receives both previews and stable releases",
+  "updateChannelStable": "Stable",
+  "updateChannelPreview": "Preview",
+  "updateSystemProxy": "Use system proxy",
+  "updateSystemProxyDetail": "Checks and downloads go through the system proxy settings; turn off to connect directly",
+  "updateMirror": "GitHub mirror URL",
+  "updateMirrorDetail": "Prefixed to GitHub download URLs; leave empty to reach GitHub directly. Downloads are still verified by signature",
+  "messageInvalidUpdateChannel": "Invalid update channel setting"
 }
