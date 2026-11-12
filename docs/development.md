@@ -38,12 +38,12 @@ mise run build -- --platform windows/amd64,windows/arm64
 
 Targets are `darwin`, `windows`, and `linux` on `amd64` / `arm64`. Full macOS packaging must run on macOS using [scripts/build-macos.py](../scripts/build-macos.py): MyGo builds the app, pinned `dmgbuild==1.6.7` creates the DMG, and system `ditto` creates ZIPs. uv prepares compatible Python (3.10+) and script dependencies on first use.
 
-Name, slug, version, and output directory come from [mygo.json](../mygo.json). The current 0.1.6 Apple Silicon example is:
+Name, slug, version, and output directory come from [mygo.json](../mygo.json). The current 0.1.7 Apple Silicon example is:
 
 ```text
 build/darwin-arm64/Burrow.app
-build/darwin-arm64/burrow-0.1.6-arm64.zip
-build/darwin-arm64/burrow-0.1.6-arm64.dmg
+build/darwin-arm64/burrow-0.1.7-arm64.zip
+build/darwin-arm64/burrow-0.1.7-arm64.dmg
 ```
 
 Windows packaging requires UPX 5.3.0+ on the host PATH for Windows ARM64 support. The build temporarily compiles a [Go command proxy](../scripts/upx-go/main.go), which runs UPX LZMA compression and integrity verification after MyGo's Windows `go build`, before signing/installer creation. Icons and relocation information are retained; `ghostty-vt.dll` is unchanged. Neither the Go toolchain nor MyGo source is modified. The proxy is added only to child-process PATH during the build.
@@ -53,10 +53,10 @@ Local builds also generate a portable ZIP containing the compressed EXE and `gho
 ```text
 build/windows-amd64/Burrow.exe
 build/windows-amd64/ghostty-vt.dll
-build/windows-amd64/burrow-0.1.6-windows-amd64.zip
+build/windows-amd64/burrow-0.1.7-windows-amd64.zip
 ```
 
-On Windows, MyGo prepares NSIS. Cross-building installers from macOS/Linux requires `makensis` on the host. Without NSIS, EXE/portable ZIP outputs remain available, but the missing installer is explicitly reported and does not count as installer validation. The installer is `burrow-setup-0.1.6-amd64.exe`; ARM64 uses corresponding `arm64` paths/names.
+On Windows, MyGo prepares NSIS. Cross-building installers from macOS/Linux requires `makensis` on the host. Without NSIS, EXE/portable ZIP outputs remain available, but the missing installer is explicitly reported and does not count as installer validation. The installer is `burrow-setup-0.1.7-amd64.exe`; ARM64 uses corresponding `arm64` paths/names.
 
 macOS release packages use the fixed self-signed identity in [mygo.json](../mygo.json). The public certificate is [assets/signing/burrow-local.pem](../assets/signing/burrow-local.pem); the private key is managed by the default user Keychain. First use of a new key may require personal codesign authorization. Full packaging checks the identity first and fails if the original private key is missing, without generating another identity or falling back to temporary signing. Other build machines must import the same identity. See [macOS signing and unlock](macos-signing.md).
 
@@ -109,7 +109,7 @@ Passing checks establish only the scope actually run. See [interpreting validati
 
 [Commit checks](../.github/workflows/check.yml) run on branch pushes, PRs, and manual dispatch using hosted `ubuntu-24.04`. They cover Go formatting, Python syntax, existing root/terminal race tests and vet, Linux build, and Windows cross-builds for both architectures. They also check third-party notices, English/Chinese catalogs, and generated-file consistency. Pinned Gitleaks, verified by SHA-256, scans working files and all checked-out history references. Checkout retains full history without persisted credentials. The workflow grants only `contents: read`, uses ordinary `pull_request`, and needs no custom repository Secrets.
 
-[Packaging](../.github/workflows/package.yml) runs on `v*` tag pushes or manual dispatch naming an existing version tag. Both check out that tag and require it to match `mygo.json`, such as `0.1.6` / `v0.1.6`. Manual dispatch can rebuild an existing version after workflow fixes without moving its tag. Hosted `ubuntu-24.04` cross-builds UPX NSIS installers for Windows amd64/arm64 and extracts them with the `7zip` package's `7z` for verification. Apple Silicon `macos-15` builds the ARM64 DMG. Installer checks include EXE, DLL, and both license files; macOS checks bundle license resources and DMG. Artifacts include `SHA256SUMS`, remain for 14 days, and do not create/update GitHub Releases.
+[Packaging](../.github/workflows/package.yml) runs on `v*` tag pushes or manual dispatch naming an existing version tag. Both check out that tag and require it to match `mygo.json`, such as `0.1.7` / `v0.1.7`. Manual dispatch can rebuild an existing version after workflow fixes without moving its tag. Hosted `ubuntu-24.04` cross-builds UPX NSIS installers for Windows amd64/arm64 and extracts them with the `7zip` package's `7z` for verification. Apple Silicon `macos-15` builds the ARM64 DMG. Installer checks include EXE, DLL, and both license files; macOS checks bundle license resources and DMG. Artifacts include `SHA256SUMS`, remain for 14 days, and do not create/update GitHub Releases.
 
 GitHub needs no self-hosted runner registration. Configure two repository **Settings → Secrets and variables → Actions** Secrets for macOS packaging:
 
