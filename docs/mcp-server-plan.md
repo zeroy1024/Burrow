@@ -529,7 +529,7 @@ Set finite limits for these entry points, explicitly reporting limits in errors/
 
 Zero is not unlimited and client requests cannot raise server caps. Distinguish truncation, limit-aborted execution, and incomplete directory results. Closing a channel for output limits does not fabricate an exit code or stopped remote process.
 
-Current fixed values: HTTP bodies 2 MiB; commands 64 KiB; text writes 1 MiB; reads default 64 KiB/max 1 MiB; commands default 60 s/max 120 s; synchronous tools max two minutes. stdout max 1 MiB, stderr 64 KiB. Service max eight concurrent calls. Queue cap 1000 while retaining transfer concurrency. Enumeration caps are 10,000 per directory and 100,000 per task. Policies have at most 100 rules, regex 8192 bytes, and pages at most 1000 records.
+Current fixed values: HTTP bodies 2 MiB; commands 64 KiB; text writes 1 MiB; reads default 64 KiB/max 1 MiB; commands default 300 s/max 1800 s (30 minutes); the overall SSH tool call is capped at 30 minutes, and other synchronous tools at two minutes. HTTP response writes allow 30 minutes plus 15 seconds for completion. stdout max 1 MiB, stderr 64 KiB. Service max eight concurrent calls. Queue cap 1000 while retaining transfer concurrency. Enumeration caps are 10,000 per directory and 100,000 per task. Policies have at most 100 rules, regex 8192 bytes, and pages at most 1000 records.
 
 Response audit capture caps at 32 MiB; larger bodies retain size/truncation, not incomplete payloads. SSE saves received JSON events when the connection ends. Records describe attempted server responses, not guaranteed client receipt, and mark persistence failure. Capture-write failure faults MCP storage and blocks later business but cannot retract already transmitted bytes.
 

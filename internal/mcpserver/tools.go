@@ -20,6 +20,11 @@ import (
 	"github.com/zeroy1024/Burrow/internal/store"
 )
 
+const (
+	defaultExecTimeout = 5 * time.Minute
+	maxExecTimeout     = 30 * time.Minute
+)
+
 type Input struct {
 	ConnectionID string `json:"connection_id"`
 	Path         string `json:"path"`
@@ -60,14 +65,14 @@ func decodeInput(name string, raw json.RawMessage) (Input, error) {
 	if err := json.Unmarshal(raw, &in); err != nil {
 		return in, fail("invalid_argument", locales.MessageIncorrectToolArgumentType())
 	}
-	if in.Timeout < 0 || in.Timeout > 120 || in.Offset < 0 || in.Offset > 1000000 || in.Limit < 0 || in.Limit > 1000 || in.Length < 0 || in.Length > MaxText {
+	if in.Timeout < 0 || in.Timeout > int(maxExecTimeout/time.Second) || in.Offset < 0 || in.Offset > 1000000 || in.Limit < 0 || in.Limit > 1000 || in.Length < 0 || in.Length > MaxText {
 		return in, fail("invalid_argument", locales.MessageArgumentsExceedServerLimits())
 	}
 	if in.Limit == 0 {
 		in.Limit = 100
 	}
 	if in.Timeout == 0 {
-		in.Timeout = 60
+		in.Timeout = int(defaultExecTimeout / time.Second)
 	}
 	if in.Length == 0 {
 		in.Length = 65536
@@ -141,7 +146,11 @@ func (s *Service) Call(parent context.Context, keyID, name string, raw json.RawM
 		op = inbound.op
 	}
 	out["operation_id"] = op.ID
-	ctx, cancel := context.WithTimeout(parent, 2*time.Minute)
+	callTimeout := 2 * time.Minute
+	if name == "ssh_exec" {
+		callTimeout = maxExecTimeout
+	}
+	ctx, cancel := context.WithTimeout(parent, callTimeout)
 	ctx = WithOperation(ctx, op.ID, 0)
 	defer cancel()
 	s.mu.Lock()

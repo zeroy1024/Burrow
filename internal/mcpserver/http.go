@@ -88,7 +88,7 @@ func (s *Service) start(ctx context.Context) error {
 		s.Changed()
 		return err
 	}
-	srv := &http.Server{Handler: s.Handler(cfg), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 130 * time.Second, WriteTimeout: 135 * time.Second,
+	srv := &http.Server{Handler: s.Handler(cfg), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 130 * time.Second, WriteTimeout: maxExecTimeout + 15*time.Second,
 		IdleTimeout: 30 * time.Second, MaxHeaderBytes: 16 * 1024,
 		BaseContext: func(net.Listener) context.Context { return s.ctx }}
 	s.mu.Lock()
@@ -363,7 +363,11 @@ func toolSchema(name string) map[string]any {
 		add("connection_id", "string", true)
 		if name == "ssh_exec" {
 			add("command", "string", true)
-			add("timeout_seconds", "integer", false)
+			props["timeout_seconds"] = map[string]any{
+				"type": "integer",
+				"description": fmt.Sprintf("Execution timeout in seconds; default %d, maximum %d. Zero uses the default.",
+					int(defaultExecTimeout/time.Second), int(maxExecTimeout/time.Second)),
+			}
 		} else {
 			add("path", "string", true)
 		}
