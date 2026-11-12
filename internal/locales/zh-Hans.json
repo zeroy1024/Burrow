@@ -1,5 +1,11 @@
 {
   "@@locale": "zh-Hans",
+  "tcpKeepalive": "TCP 保活",
+  "tcpKeepaliveHelp": "通过 TCP 检测对端是否可达，不发送 SSH 请求。隧道沿用其承载连接的保活策略。",
+  "sshHealthCheck": "SSH 健康检测",
+  "sshHealthCheckHelp": "默认关闭。空闲时发送 SSH 请求，仅对已确认兼容的服务端启用。连续三个空闲检测周期未收到 SSH 数据时断开。",
+  "sshHealthCheckDisabled": "秒 · 0 为关闭健康检测",
+  "sshHealthCheckInvalid": "SSH 健康检测间隔必须介于 0 和 3600 秒之间。",
   "agentSessionDropped": "已省略较早的 %d 行",
   "agentSessionLabel": "AI 会话",
   "agentSessionInput": "输入",
@@ -553,7 +559,7 @@
   "messageGatewayName": "网关名称",
   "messageForExampleBastionHk": "例如 bastion-hk",
   "messageWouldCreateARoutingLoop": "会形成环路",
-  "messageUsesThisHostSAddressAuthenticationAndKeepaliveSettingsItsInitialCommandIs": "地址、认证与 Keepalive 取自该主机；不执行其初始命令。",
+  "messageUsesThisHostSAddressAuthenticationAndKeepaliveSettingsItsInitialCommandIs": "地址、认证、TCP 保活和 SSH 健康检测取自该主机；不执行其初始命令。",
   "messageSelectASavedSshHost": "选择已保存的 SSH 主机",
   "messageAnSshGatewayUsesItsSourceHostSGatewayRouteJustLikeA": "SSH 网关沿用源主机的「连接网关」，与直接连接该主机时的路径一致；请在主机设置中修改。",
   "messageSelectAnSshHostFirst": "选择 SSH 主机后确定",
@@ -917,8 +923,8 @@
   "messageAdvanced": "高级",
   "messageRemoteSystem": "远端系统",
   "messageDetectAutomatically": "自动识别",
-  "messageKeepaliveSeconds": "Keepalive 秒",
-  "messageSecondsDisablesKeepalive": "秒 · 0 为关闭",
+  "messageKeepaliveSeconds": "TCP 保活秒数",
+  "messageSecondsDisablesKeepalive": "秒 · 0 为关闭 TCP 保活",
   "messageInitialCommand": "初始命令",
   "messageTerminalColorScheme": "终端配色",
   "messageEnvironmentVariables": "环境变量",
@@ -1066,7 +1072,7 @@
   "messageMaximizePane": "放大窗格 ",
   "messageRestorePane": "恢复窗格 ",
   "messageClosePane2": "关闭窗格 ",
-  "messageLatency": "延迟",
+  "messageLatency": "TCP 往返延迟",
   "messageImportTerminalColorScheme": "导入终端配色",
   "messageChooseAGhosttyColorSchemeFile": "选择 Ghostty 格式的配色文件",
   "messageBuiltInColorSchemeCannotBeOverwrittenChangeItsNameBeforeImporting": "内置配色 %q 不能覆盖，请修改 name 后导入",
@@ -1653,7 +1659,7 @@
       }
     }
   },
-  "gatewaySourceSettings": "地址、认证、Keepalive 和上游均取自 SSH 主机「{name}」及其连接网关，修改请编辑该主机。网关不执行其初始命令。",
+  "gatewaySourceSettings": "地址、认证、TCP 保活、SSH 健康检测和上游均取自 SSH 主机「{name}」及其连接网关，修改请编辑该主机。网关不执行其初始命令。",
   "@gatewaySourceSettings": {
     "placeholders": {
       "name": {

@@ -34,6 +34,66 @@ type Messages struct{ locale string }
 // source language.
 func In(locale string) Messages { return Messages{locale} }
 
+// TcpKeepalive says "TCP 保活"
+// in the language the app shows.
+func TcpKeepalive() string { return In(i18n.Locale()).TcpKeepalive() }
+
+// TcpKeepalive says "TCP 保活"
+// in the language of msgs.
+func (msgs Messages) TcpKeepalive() string {
+	return Catalog.Format(msgs.locale, "tcpKeepalive", nil)
+}
+
+// TcpKeepaliveHelp says "通过 TCP 检测对端是否可达，不发送 SSH 请求。隧道沿用其承载连接的保活策略。"
+// in the language the app shows.
+func TcpKeepaliveHelp() string { return In(i18n.Locale()).TcpKeepaliveHelp() }
+
+// TcpKeepaliveHelp says "通过 TCP 检测对端是否可达，不发送 SSH 请求。隧道沿用其承载连接的保活策略。"
+// in the language of msgs.
+func (msgs Messages) TcpKeepaliveHelp() string {
+	return Catalog.Format(msgs.locale, "tcpKeepaliveHelp", nil)
+}
+
+// SshHealthCheck says "SSH 健康检测"
+// in the language the app shows.
+func SshHealthCheck() string { return In(i18n.Locale()).SshHealthCheck() }
+
+// SshHealthCheck says "SSH 健康检测"
+// in the language of msgs.
+func (msgs Messages) SshHealthCheck() string {
+	return Catalog.Format(msgs.locale, "sshHealthCheck", nil)
+}
+
+// SshHealthCheckHelp says "默认关闭。空闲时发送 SSH …"
+// in the language the app shows.
+func SshHealthCheckHelp() string { return In(i18n.Locale()).SshHealthCheckHelp() }
+
+// SshHealthCheckHelp says "默认关闭。空闲时发送 SSH …"
+// in the language of msgs.
+func (msgs Messages) SshHealthCheckHelp() string {
+	return Catalog.Format(msgs.locale, "sshHealthCheckHelp", nil)
+}
+
+// SshHealthCheckDisabled says "秒 · 0 为关闭健康检测"
+// in the language the app shows.
+func SshHealthCheckDisabled() string { return In(i18n.Locale()).SshHealthCheckDisabled() }
+
+// SshHealthCheckDisabled says "秒 · 0 为关闭健康检测"
+// in the language of msgs.
+func (msgs Messages) SshHealthCheckDisabled() string {
+	return Catalog.Format(msgs.locale, "sshHealthCheckDisabled", nil)
+}
+
+// SshHealthCheckInvalid says "SSH 健康检测间隔必须介于 0 和 3600 秒之间。"
+// in the language the app shows.
+func SshHealthCheckInvalid() string { return In(i18n.Locale()).SshHealthCheckInvalid() }
+
+// SshHealthCheckInvalid says "SSH 健康检测间隔必须介于 0 和 3600 秒之间。"
+// in the language of msgs.
+func (msgs Messages) SshHealthCheckInvalid() string {
+	return Catalog.Format(msgs.locale, "sshHealthCheckInvalid", nil)
+}
+
 // AgentSessionDropped says "已省略较早的 %d 行"
 // in the language the app shows.
 func AgentSessionDropped() string { return In(i18n.Locale()).AgentSessionDropped() }
@@ -5836,13 +5896,13 @@ func (msgs Messages) MessageWouldCreateARoutingLoop() string {
 	return Catalog.Format(msgs.locale, "messageWouldCreateARoutingLoop", nil)
 }
 
-// MessageUsesThisHostSAddressAuthenticationAndKeepaliveSettingsItsInitialCommandIs says "地址、认证与 Keepalive 取自该主机；不执行其初始命令。"
+// MessageUsesThisHostSAddressAuthenticationAndKeepaliveSettingsItsInitialCommandIs says "地址、认证、TCP 保活和 SSH 健康检测取自该主机；不执行其初始命令。"
 // in the language the app shows.
 func MessageUsesThisHostSAddressAuthenticationAndKeepaliveSettingsItsInitialCommandIs() string {
 	return In(i18n.Locale()).MessageUsesThisHostSAddressAuthenticationAndKeepaliveSettingsItsInitialCommandIs()
 }
 
-// MessageUsesThisHostSAddressAuthenticationAndKeepaliveSettingsItsInitialCommandIs says "地址、认证与 Keepalive 取自该主机；不执行其初始命令。"
+// MessageUsesThisHostSAddressAuthenticationAndKeepaliveSettingsItsInitialCommandIs says "地址、认证、TCP 保活和 SSH 健康检测取自该主机；不执行其初始命令。"
 // in the language of msgs.
 func (msgs Messages) MessageUsesThisHostSAddressAuthenticationAndKeepaliveSettingsItsInitialCommandIs() string {
 	return Catalog.Format(msgs.locale, "messageUsesThisHostSAddressAuthenticationAndKeepaliveSettingsItsInitialCommandIs", nil)
@@ -9708,23 +9768,23 @@ func (msgs Messages) MessageDetectAutomatically() string {
 	return Catalog.Format(msgs.locale, "messageDetectAutomatically", nil)
 }
 
-// MessageKeepaliveSeconds says "Keepalive 秒"
+// MessageKeepaliveSeconds says "TCP 保活秒数"
 // in the language the app shows.
 func MessageKeepaliveSeconds() string { return In(i18n.Locale()).MessageKeepaliveSeconds() }
 
-// MessageKeepaliveSeconds says "Keepalive 秒"
+// MessageKeepaliveSeconds says "TCP 保活秒数"
 // in the language of msgs.
 func (msgs Messages) MessageKeepaliveSeconds() string {
 	return Catalog.Format(msgs.locale, "messageKeepaliveSeconds", nil)
 }
 
-// MessageSecondsDisablesKeepalive says "秒 · 0 为关闭"
+// MessageSecondsDisablesKeepalive says "秒 · 0 为关闭 TCP 保活"
 // in the language the app shows.
 func MessageSecondsDisablesKeepalive() string {
 	return In(i18n.Locale()).MessageSecondsDisablesKeepalive()
 }
 
-// MessageSecondsDisablesKeepalive says "秒 · 0 为关闭"
+// MessageSecondsDisablesKeepalive says "秒 · 0 为关闭 TCP 保活"
 // in the language of msgs.
 func (msgs Messages) MessageSecondsDisablesKeepalive() string {
 	return Catalog.Format(msgs.locale, "messageSecondsDisablesKeepalive", nil)
@@ -11314,11 +11374,11 @@ func (msgs Messages) MessageClosePane2() string {
 	return Catalog.Format(msgs.locale, "messageClosePane2", nil)
 }
 
-// MessageLatency says "延迟"
+// MessageLatency says "TCP 往返延迟"
 // in the language the app shows.
 func MessageLatency() string { return In(i18n.Locale()).MessageLatency() }
 
-// MessageLatency says "延迟"
+// MessageLatency says "TCP 往返延迟"
 // in the language of msgs.
 func (msgs Messages) MessageLatency() string {
 	return Catalog.Format(msgs.locale, "messageLatency", nil)
@@ -15448,11 +15508,11 @@ func (msgs Messages) GatewayFollowName(name string) string {
 	return Catalog.Format(msgs.locale, "gatewayFollowName", map[string]any{"name": name})
 }
 
-// GatewaySourceSettings says "地址、认证、Keepalive 和上游均取自 SSH 主机「{name}…"
+// GatewaySourceSettings says "地址、认证、TCP 保活、SSH 健康检测和上游均取自 SSH 主机「{name}…"
 // in the language the app shows.
 func GatewaySourceSettings(name string) string { return In(i18n.Locale()).GatewaySourceSettings(name) }
 
-// GatewaySourceSettings says "地址、认证、Keepalive 和上游均取自 SSH 主机「{name}…"
+// GatewaySourceSettings says "地址、认证、TCP 保活、SSH 健康检测和上游均取自 SSH 主机「{name}…"
 // in the language of msgs.
 func (msgs Messages) GatewaySourceSettings(name string) string {
 	return Catalog.Format(msgs.locale, "gatewaySourceSettings", map[string]any{"name": name})

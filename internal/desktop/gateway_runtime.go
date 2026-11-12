@@ -185,13 +185,14 @@ func gatewayRuntimeKey(route []gatewayHop, steps []sshDialStep, scope string) st
 		step := steps[sshIndex]
 		sshIndex++
 		h := step.endpoint
-		keepalive := 0
+		keepalive, healthCheck := 0, 0
 		if h.session.SSH != nil {
 			keepalive = h.session.SSH.KeepAlive
+			healthCheck = h.session.SSH.HealthCheck
 		}
-		fmt.Fprintf(&identity, "%q %q %d %q %q %q %t %q %d %q %q\n",
+		fmt.Fprintf(&identity, "%q %q %d %q %q %q %t %q %d %d %q %q\n",
 			h.session.ID, h.address, h.port, h.user, h.session.Auth, h.session.KeyID,
-			h.session.PasswordSaved, h.session.PasswordRevision, keepalive, step.key.SecretID, step.key.Fingerprint)
+			h.session.PasswordSaved, h.session.PasswordRevision, keepalive, healthCheck, step.key.SecretID, step.key.Fingerprint)
 	}
 	return store.EndpointID([]byte(identity.String()))
 }

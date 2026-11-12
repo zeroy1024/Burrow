@@ -212,7 +212,7 @@ func (a *app) captureGatewayRoute(h host) ([]gatewayHop, error) {
 			endpoint.session.Gateway, endpoint.session.GatewayRoute = directGateway, nil
 			endpoint.session.Files = nil
 			if endpoint.session.SSH != nil {
-				endpoint.session.SSH = &sshOptions{KeepAlive: endpoint.session.SSH.KeepAlive}
+				endpoint.session.SSH = &sshOptions{KeepAlive: endpoint.session.SSH.KeepAlive, HealthCheck: endpoint.session.SSH.HealthCheck}
 			}
 			stored := snapshotWorkspaceSession(endpoint, endpoint.session, true, 0).Endpoint
 			hop.SSH = &stored

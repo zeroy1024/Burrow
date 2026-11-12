@@ -37,9 +37,13 @@ type Config struct {
 	// DialContext opens the underlying connection, such as through a jump host.
 	// Nil uses a TCP dialer with a 20-second timeout.
 	DialContext func(context.Context, string, string) (net.Conn, error)
-	// KeepAlive sends automatic requests at this interval; zero disables them.
-	// Each request has the same timeout; unsupported replies also prove liveness.
+	// KeepAlive configures idle time and probe spacing on an accessible TCP
+	// socket, with three failed probes. Zero disables TCP keepalive. A tunneled
+	// connection leaves its carrier's keepalive policy with that carrier.
 	KeepAlive time.Duration
+	// HealthCheck opts into SSH requests after this much receive inactivity.
+	// Zero disables them; three idle intervals without data end the transport.
+	HealthCheck time.Duration
 }
 
 // Connection owns a transport. Each channel or temporary Retain holds a lease;
@@ -62,7 +66,8 @@ type Connection struct {
 	failureErr  error
 	closeOnce   sync.Once
 	closeErr    error
-	probe       *latencyProbe
+	tcp         *net.TCPConn // only a direct connection to the SSH endpoint
+	activity    *activityConn
 }
 
 type lease struct {
@@ -85,7 +90,10 @@ func Dial(ctx context.Context, cfg Config) (*Connection, error) {
 		return nil, errors.New("SSH host key verification is required")
 	}
 	if cfg.KeepAlive < 0 {
-		return nil, errors.New("SSH keepalive interval must not be negative")
+		return nil, errors.New("TCP keepalive interval must not be negative")
+	}
+	if cfg.HealthCheck < 0 {
+		return nil, errors.New("SSH health-check interval must not be negative")
 	}
 	if cfg.SetupTimeout < 0 {
 		return nil, errors.New("SSH setup timeout must not be negative")
@@ -125,6 +133,25 @@ func Dial(ctx context.Context, cfg Config) (*Connection, error) {
 			raw.Close()
 		}
 	}()
+	var tcp *net.TCPConn
+	if socket, ok := raw.(*net.TCPConn); ok {
+		if err := socket.SetKeepAliveConfig(net.KeepAliveConfig{
+			Enable: cfg.KeepAlive > 0, Idle: cfg.KeepAlive, Interval: cfg.KeepAlive, Count: 3,
+		}); err != nil {
+			return nil, fmt.Errorf("configure TCP keepalive: %w", err)
+		}
+		// A custom dialer may return a TCP socket to a SOCKS proxy. Its RTT
+		// does not describe the SSH endpoint, even though its type is TCPConn.
+		if cfg.DialContext == nil {
+			tcp = socket
+		}
+	}
+	handshakeConn := raw
+	var activity *activityConn
+	if cfg.HealthCheck > 0 {
+		activity = &activityConn{Conn: raw, started: time.Now()}
+		handshakeConn = activity
+	}
 	// A jump-host channel has no socket deadline of its own. Closing only this
 	// raw connection bounds setup without changing a shared parent's deadline.
 	stopSetup := context.AfterFunc(setupCtx, func() { raw.Close() })
@@ -133,7 +160,7 @@ func Dial(ctx context.Context, cfg Config) (*Connection, error) {
 	if cfg.Auth == "password" && cfg.KeyboardInteractive != nil {
 		methods = append(methods, ssh.KeyboardInteractive(cfg.KeyboardInteractive))
 	}
-	transport, channels, requests, err := ssh.NewClientConn(raw, address, &ssh.ClientConfig{
+	transport, channels, requests, err := ssh.NewClientConn(handshakeConn, address, &ssh.ClientConfig{
 		User: cfg.User, Auth: methods, HostKeyCallback: cfg.HostKey,
 	})
 	if err != nil {
@@ -148,9 +175,10 @@ func Dial(ctx context.Context, cfg Config) (*Connection, error) {
 	c := &Connection{
 		client: ssh.NewClient(transport, channels, requests), raw: raw, ctx: ctx,
 		stopCancel: stopCancel, leases: make(map[*lease]struct{}), done: make(chan struct{}),
+		tcp: tcp, activity: activity,
 	}
-	if cfg.KeepAlive > 0 {
-		c.workers.Go(func() { c.keepAlive(cfg.KeepAlive) })
+	if cfg.HealthCheck > 0 {
+		c.workers.Go(func() { c.healthCheck(cfg.HealthCheck) })
 	}
 	go c.watch()
 	success = true
@@ -320,31 +348,6 @@ func (c *Connection) watch() {
 		l.release(true)
 	}
 	close(c.done)
-}
-
-func (c *Connection) keepAlive(interval time.Duration) {
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-c.done:
-			return
-		case <-c.ctx.Done():
-			return
-		case <-ticker.C:
-		}
-		ctx, cancel := context.WithTimeout(c.ctx, interval)
-		_, err := c.ProbeLatency(ctx)
-		cancel()
-		if err != nil {
-			if errors.Is(err, context.DeadlineExceeded) {
-				c.failTransport(errors.New("SSH keepalive timed out"))
-			} else {
-				c.failTransport(fmt.Errorf("SSH keepalive: %w", err))
-			}
-			return
-		}
-	}
 }
 
 func (c *Connection) failTransport(err error) {

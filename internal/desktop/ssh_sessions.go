@@ -406,18 +406,18 @@ func sameSSHPlan(left, right sshDialPlan) bool {
 	if left.trust != right.trust || len(left.steps) != len(right.steps) {
 		return false
 	}
-	keepalive := func(h host) int {
+	liveness := func(h host) [2]int {
 		if h.session.SSH != nil {
-			return h.session.SSH.KeepAlive
+			return [2]int{h.session.SSH.KeepAlive, h.session.SSH.HealthCheck}
 		}
-		return 0
+		return [2]int{}
 	}
 	for index, one := range left.steps {
 		two := right.steps[index]
 		a, b := one.endpoint, two.endpoint
 		if a.address != b.address || a.port != b.port || a.user != b.user || a.session.ID != b.session.ID ||
 			a.session.Auth != b.session.Auth || a.session.KeyID != b.session.KeyID || a.session.PasswordSaved != b.session.PasswordSaved || a.session.PasswordRevision != b.session.PasswordRevision ||
-			!a.session.UpdatedAt.Equal(b.session.UpdatedAt) || keepalive(a) != keepalive(b) ||
+			!a.session.UpdatedAt.Equal(b.session.UpdatedAt) || liveness(a) != liveness(b) ||
 			one.key.ID != two.key.ID || one.key.SecretID != two.key.SecretID || one.key.Fingerprint != two.key.Fingerprint {
 			return false
 		}

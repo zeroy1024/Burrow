@@ -59,7 +59,13 @@ Root capacity requires SFTP statvfs and confirmation that SFTP and Shell see the
 
 ## Latency and sampling intervals
 
-Shell status-bar latency is sampled independently of monitoring. Visible terminals share an SSH application-level round-trip measurement per connection group every five seconds. Results above three seconds, or no valid sample for ten seconds, display as unknown. This is not ICMP ping.
+Shell status-bar latency reads the kernel's TCP RTT estimate for an existing direct connection every five seconds, shared by terminals on the same connection group. It sends no SSH requests and never closes a connection. Read failures or no successful read for ten seconds display as unknown (`—`). Idle connections may retain an estimate from earlier traffic; this is network RTT, not SSH command response time or ICMP ping. macOS uses TCP_CONNECTION_INFO, Linux TCP_INFO, and Windows SIO_TCP_INFO.
+
+SOCKS proxies, SSH jump hosts, and the built-in WireGuard network stack display unknown target RTT: their connections are supplied by custom dialers, and Burrow does not label a proxy or first-hop socket's RTT as the final server's. Optional SSH health checks still address the SSH endpoint through its configured route.
+
+**Session → Advanced → TCP keepalive** sets the available TCP socket's idle time and probe spacing, with three failed probes; the default is 30 seconds and zero disables it. Direct SSH and SOCKS connections configure their OS TCP socket. SSH tunnels retain the outer connection's own policy; the built-in WireGuard stack has no OS TCP socket to configure here, and its persistent keepalive remains a separate gateway setting. Existing `keepAlive` values now configure TCP only and do not enable SSH requests.
+
+**SSH health check** is separately opt-in: zero (the default, including old profiles) sends no requests. A positive interval enables an OpenSSH-style global request only after receive inactivity. Incoming SSH traffic resets the failure count; three observed idle check intervals without data end the transport. At most one request remains pending, even if the server ignores it. Enable this only for compatible servers; an unsupported request can itself cause some servers to disconnect. There are no vendor-specific exceptions.
 
 Main metrics sample roughly every two seconds with a five-second Exec timeout and at most one request in flight; actual intervals include collection time. Root capacity samples roughly every ten seconds with an independent three-second timeout. Hidden windows and non-SSH pages do not start new latency samples. Monitoring keeps sampling on other pages; sampling pauses whenever the app builds no frames, and a trend resumed after more than its two-minute window starts over.
 

@@ -1085,16 +1085,20 @@ func (a *app) gatewayFacts(c *ui.Context, g gatewayConfig) {
 		if h.session.Auth == "password" && h.session.PasswordSaved {
 			auth += locales.MessageSaved()
 		}
-		keepalive := locales.CommonClose()
+		keepalive, healthCheck := locales.CommonClose(), locales.CommonClose()
 		if h.session.SSH != nil && h.session.SSH.KeepAlive > 0 {
 			keepalive = strconv.Itoa(h.session.SSH.KeepAlive) + locales.MessageS()
+		}
+		if h.session.SSH != nil && h.session.SSH.HealthCheck > 0 {
+			healthCheck = strconv.Itoa(h.session.SSH.HealthCheck) + locales.MessageS()
 		}
 		editHost = func() { a.openGatewayReference(gatewayRef{kind: gatewayRefHost, host: id}) }
 		facts = []fact{
 			{label: locales.MessageSourceHost(), render: chip("source", func() { gatewayTile(c, terminalIcon, color.NRGBA{}, tile, glyph, t.Radius.Chip) }, h.name, editHost)},
 			{label: locales.MessageAddress(), value: a.gatewayAddress(g), mono: true},
 			{label: locales.MessageAuthentication(), value: auth},
-			{label: "Keepalive", value: keepalive},
+			{label: locales.TcpKeepalive(), value: keepalive},
+			{label: locales.SshHealthCheck(), value: healthCheck},
 			upstream,
 			{label: locales.MessageConnectionSharing(), value: locales.MessageMultipleTargetsShareOneSshConnection()},
 		}

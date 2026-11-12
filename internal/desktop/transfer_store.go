@@ -417,6 +417,9 @@ func validateTransferEndpoint(endpoint storedSession, files bool) error {
 		if options.KeepAlive < 0 || options.KeepAlive > 3600 {
 			return locales.NewError(locales.MessageInvalidTransferKeepalive)
 		}
+		if options.HealthCheck < 0 || options.HealthCheck > 3600 {
+			return locales.NewError(locales.SshHealthCheckInvalid)
+		}
 		if !validPlatformOverride(options.Platform) {
 			return locales.NewError(locales.MessageInvalidTransferRemoteSystem)
 		}

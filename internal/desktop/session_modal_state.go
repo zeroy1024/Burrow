@@ -21,6 +21,7 @@ type hostDraft struct {
 	name, address, user, port, group, system              string
 	protocol, auth, keyID, password, passphrase           string
 	gateway, keepalive, initCommand, termScheme, platform string
+	healthCheck                                           string
 	remoteDir, localDir, encoding, ftpMode, ftpTLS        string
 	env                                                   []string
 	envInput, newGroup                                    string
@@ -48,7 +49,7 @@ type hostDraft struct {
 	saving                                                bool
 	agentResults                                          <-chan sessionAgentResult
 	generation                                            string
-	initialValues                                         [21]string
+	initialValues                                         [22]string
 	initialEnv                                            []string
 	initialPortEdited                                     bool
 }
@@ -71,7 +72,7 @@ func (a *app) startHostDraft() {
 	groups := a.catalogGroups()
 	page.draft = hostDraft{
 		port: "22", protocol: protocol, files: a.section == sectionFiles,
-		auth: "password", keepalive: "30", encoding: "UTF-8", ftpMode: "passive", ftpTLS: "explicit",
+		auth: "password", keepalive: "30", healthCheck: "0", encoding: "UTF-8", ftpMode: "passive", ftpTLS: "explicit",
 		creatingGroup: len(groups) == 0, advanced: a.modalAdvancedOpen(strings.ToLower(protocol)),
 	}
 	if len(groups) > 0 {
@@ -121,7 +122,7 @@ func (a *app) startEditHostDraft(id hostID) {
 		id: id, editing: true, files: h.protocol != "" && h.protocol != "ssh", protocol: protocol,
 		name: h.name, address: h.address, user: h.user, port: strconv.Itoa(h.port),
 		system: systems[h.os].name, auth: h.session.Auth, keyID: h.session.KeyID,
-		gateway: h.session.Gateway, passwordSaved: h.session.PasswordSaved, keepalive: "30", encoding: "UTF-8", ftpMode: "passive", ftpTLS: "explicit",
+		gateway: h.session.Gateway, passwordSaved: h.session.PasswordSaved, keepalive: "30", healthCheck: "0", encoding: "UTF-8", ftpMode: "passive", ftpTLS: "explicit",
 	}
 	if d.auth == "" {
 		d.auth = "password"
@@ -134,6 +135,7 @@ func (a *app) startEditHostDraft(id hostID) {
 	}
 	if p := h.session.SSH; p != nil && !d.files {
 		d.keepalive, d.initCommand, d.termScheme = strconv.Itoa(p.KeepAlive), p.InitCommand, p.TermScheme
+		d.healthCheck = strconv.Itoa(p.HealthCheck)
 		d.platform = p.Platform
 		d.env = slices.Clone(p.Env)
 	}
@@ -161,10 +163,10 @@ func (d *hostDraft) initState() {
 	d.initialValues, d.initialEnv, d.initialPortEdited = d.inputValues(), slices.Clone(d.env), d.portEdited
 }
 
-func (d *hostDraft) inputValues() [21]string {
-	return [21]string{d.name, d.address, d.user, d.port, d.group, d.system,
+func (d *hostDraft) inputValues() [22]string {
+	return [22]string{d.name, d.address, d.user, d.port, d.group, d.system,
 		d.protocol, d.auth, d.keyID, d.gateway, d.keepalive, d.initCommand, d.termScheme, d.platform,
-		d.remoteDir, d.localDir, d.encoding, d.ftpMode, d.ftpTLS, d.envInput, d.newGroup}
+		d.remoteDir, d.localDir, d.encoding, d.ftpMode, d.ftpTLS, d.envInput, d.newGroup, d.healthCheck}
 }
 
 func (d *hostDraft) dirty() bool {
@@ -214,7 +216,7 @@ func (d *hostDraft) hasAdvanced() bool {
 	if d.files {
 		return d.remoteDir != "" || d.localDir != "" || d.encoding != "UTF-8" || d.protocol == "FTP" && (d.ftpMode != "passive" || d.ftpTLS != "explicit")
 	}
-	return d.keepalive != "30" || d.initCommand != "" || d.termScheme != "" || len(d.env) > 0 || d.platform != ""
+	return d.keepalive != "30" || d.healthCheck != "0" || d.initCommand != "" || d.termScheme != "" || len(d.env) > 0 || d.platform != ""
 }
 
 func (d *hostDraft) advancedSummary(a *app) string {
@@ -237,7 +239,10 @@ func (d *hostDraft) advancedSummary(a *app) string {
 		}
 	} else {
 		if d.keepalive != "30" {
-			parts = append(parts, "Keepalive "+d.keepalive+locales.MessageS())
+			parts = append(parts, locales.TcpKeepalive()+" "+d.keepalive+locales.MessageS())
+		}
+		if d.healthCheck != "0" {
+			parts = append(parts, locales.SshHealthCheck()+" "+d.healthCheck+locales.MessageS())
 		}
 		if d.initCommand != "" {
 			parts = append(parts, locales.MessageInitialCommand())
@@ -307,6 +312,13 @@ func (a *app) draftError(d *hostDraft, field string) locales.Text {
 				return locales.Deferred(locales.MessageSeconds)
 			}
 		}
+	case "healthCheck":
+		if !d.files {
+			interval, err := strconv.Atoi(d.healthCheck)
+			if err != nil || interval < 0 || interval > 3600 {
+				return locales.Deferred(locales.SshHealthCheckInvalid)
+			}
+		}
 	case "env":
 		if !d.files {
 			for _, v := range d.env {
@@ -353,7 +365,7 @@ func (a *app) draftError(d *hostDraft, field string) locales.Text {
 func (a *app) validateDraft(d *hostDraft) bool {
 	d.errors = map[string]locales.Text{}
 	first := ""
-	for _, field := range []string{"name", "host", "port", "user", "key", "group", "keepalive", "env"} {
+	for _, field := range []string{"name", "host", "port", "user", "key", "group", "keepalive", "healthCheck", "env"} {
 		if message := a.draftError(d, field); !message.Empty() {
 			d.errors[field] = message
 			if first == "" {
@@ -400,11 +412,12 @@ func (a *app) draftHost(d *hostDraft) host {
 		}
 	} else {
 		keepalive, _ := strconv.Atoi(d.keepalive)
+		healthCheck, _ := strconv.Atoi(d.healthCheck)
 		env := slices.Clone(d.env)
 		if d.envInput != "" {
 			env = append(env, d.envInput)
 		}
-		h.session.SSH = &sshOptions{KeepAlive: keepalive, InitCommand: d.initCommand, TermScheme: d.termScheme, Env: env, Platform: d.platform}
+		h.session.SSH = &sshOptions{KeepAlive: keepalive, HealthCheck: healthCheck, InitCommand: d.initCommand, TermScheme: d.termScheme, Env: env, Platform: d.platform}
 	}
 	return h
 }

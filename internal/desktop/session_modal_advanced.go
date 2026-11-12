@@ -49,7 +49,7 @@ func (a *app) sessionSSHAdvanced(c *ui.Context, d *hostDraft) {
 		}
 		return input
 	})
-	a.sessionField(c, d, "keepalive", "Keepalive", "", func() ui.Element {
+	a.sessionField(c, d, "keepalive", locales.TcpKeepalive(), locales.TcpKeepaliveHelp(), func() ui.Element {
 		var input ui.Element
 		ui.Row(c).FillWidth().Gap(t.Space.N8).AlignItems(ui.Center).Children(func() {
 			input = a.sessionInput(
@@ -65,6 +65,15 @@ func (a *app) sessionSSHAdvanced(c *ui.Context, d *hostDraft) {
 				locales.MessageSecondsDisablesKeepalive(),
 				uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneTertiary},
 			)
+		})
+		return input
+	})
+	a.sessionField(c, d, "healthCheck", locales.SshHealthCheck(), locales.SshHealthCheckHelp(), func() ui.Element {
+		var input ui.Element
+		ui.Row(c).FillWidth().Gap(t.Space.N8).AlignItems(ui.Center).Children(func() {
+			input = a.sessionInput(c, d, "healthCheck", locales.SshHealthCheck(), &d.healthCheck, true).
+				Width(t.C.Input.NumberWidth).Shrink(0)
+			uikit.Text(c, locales.SshHealthCheckDisabled(), uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneTertiary})
 		})
 		return input
 	})

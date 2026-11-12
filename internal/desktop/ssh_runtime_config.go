@@ -113,7 +113,7 @@ func (a *app) dialSSHPlan(ctx context.Context, plan sshDialPlan, override sshSec
 
 func (a *app) sshRuntimeConfig(ctx context.Context, step sshDialStep, override sshSecretsOverride) (sshclient.Config, error) {
 	h := step.endpoint
-	cfg := sshclient.Config{Host: strings.Trim(h.address, "[]"), Port: h.port, User: h.user, Auth: h.session.Auth}
+	cfg := sshclient.Config{Host: strings.Trim(h.address, "[]"), Port: h.port, User: h.user, Auth: h.session.Auth, KeepAlive: 30 * time.Second}
 	if cfg.User == "" {
 		current, err := user.Current()
 		if err != nil {
@@ -123,6 +123,7 @@ func (a *app) sshRuntimeConfig(ctx context.Context, step sshDialStep, override s
 	}
 	if options := h.session.SSH; options != nil {
 		cfg.KeepAlive = time.Duration(options.KeepAlive) * time.Second
+		cfg.HealthCheck = time.Duration(options.HealthCheck) * time.Second
 	}
 	address := cfg.User + "@" + net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.Port))
 	cfg.KeyboardInteractive = func(user, instruction string, questions []string, echoes []bool) ([]string, error) {

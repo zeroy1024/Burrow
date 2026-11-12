@@ -31,7 +31,8 @@ type sessionConfig struct {
 }
 
 type sshOptions struct {
-	KeepAlive   int      `json:"keepAlive"`
+	KeepAlive   int      `json:"keepAlive"`             // TCP keepalive seconds
+	HealthCheck int      `json:"healthCheck,omitempty"` // SSH health-check seconds; zero is off
 	InitCommand string   `json:"initCommand,omitempty"`
 	TermScheme  string   `json:"termScheme,omitempty"`
 	Env         []string `json:"env,omitempty"`
@@ -246,6 +247,9 @@ func validateSessionProfile(h host, byID map[string]host, keyIDs map[string]bool
 	if options := h.session.SSH; options != nil {
 		if options.KeepAlive < 0 || options.KeepAlive > 3600 {
 			return errors.New("invalid keepalive interval")
+		}
+		if options.HealthCheck < 0 || options.HealthCheck > 3600 {
+			return locales.NewError(locales.SshHealthCheckInvalid)
 		}
 		if !validPlatformOverride(options.Platform) {
 			return errors.New("invalid remote platform")

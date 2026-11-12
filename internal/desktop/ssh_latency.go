@@ -1,7 +1,6 @@
 package desktop
 
 import (
-	"context"
 	"time"
 
 	"github.com/zeroy1024/Burrow/internal/sshclient"
@@ -11,7 +10,6 @@ import (
 
 const (
 	sshLatencyInterval = 5 * time.Second
-	sshLatencyTimeout  = 3 * time.Second
 	sshLatencyMaxAge   = 2 * sshLatencyInterval
 )
 
@@ -42,7 +40,7 @@ func (a *app) updateSSHLatency(c *ui.Context) {
 	a.sampleSSHLatency(c, sessions)
 }
 
-// sampleSSHLatency probes the connections of the shown sessions, once per
+// sampleSSHLatency reads passive TCP RTT for shown connections, once per
 // interval for each connection group, whichever window shows them.
 func (a *app) sampleSSHLatency(c *ui.Context, sessions []*remoteSession) {
 	seen := map[*sshConnectionGroup]bool{}
@@ -69,18 +67,14 @@ func (a *app) sampleSSHLatency(c *ui.Context, sessions []*remoteSession) {
 		}
 		state.pending, state.next = true, c.Now().Add(sshLatencyInterval)
 		c.After(sshLatencyInterval)
-		ctx, cancel := context.WithTimeout(a.ctx, sshLatencyTimeout)
 		a.sshWorkers.Go(func() {
-			defer cancel()
-			elapsed, err := connection.ProbeLatency(ctx)
+			elapsed, err := connection.TCPRTT()
 			a.window.Update(func() {
 				if a.ctx.Err() != nil || group.connection != connection || state.connection != connection {
 					return
 				}
 				state.pending = false
-				// A later caller can join an earlier unanswered protocol request.
-				// Its eventual late reply must not restore an expired measurement.
-				if err != nil || elapsed > sshLatencyTimeout {
+				if err != nil {
 					state.updated = time.Time{}
 					return
 				}
