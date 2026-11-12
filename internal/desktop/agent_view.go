@@ -98,13 +98,15 @@ func (a *app) agentCard(c *ui.Context, view *agentView, block *agentBlock, schem
 	})
 }
 
-// agentResultColor is the palette's green, yellow or red for how an operation ended.
+// agentResultColor chooses a palette color for the operation or transfer state.
 func agentResultColor(result agentResult, scheme *termtheme.Scheme) ui.Color {
 	index := 1
 	switch result.status {
 	case "completed", "queued":
 		index = 2
-	case "intercepted", "partial_intercepted", "permission_denied":
+	case "running":
+		index = 4
+	case "paused", "cancel_requested", "intercepted", "partial_intercepted", "permission_denied":
 		index = 3
 	}
 	if code := result.exitCode; code != nil && *code != 0 {

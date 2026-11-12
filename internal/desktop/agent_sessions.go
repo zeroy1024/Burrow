@@ -47,7 +47,7 @@ type agentBlock struct {
 	// dropped counts earlier lines given up to agentLineLimit.
 	dropped int
 	// results has one entry, or for an accepted transfer its queueing and
-	// then its end.
+	// latest task state, replaced when the task is resumed or changes state.
 	results []agentResult
 	queued  bool
 }
@@ -133,15 +133,28 @@ func (a *app) agentActivity(event mcpserver.Activity) {
 	a.agentChanged(view)
 }
 
-// agentTransferFinished adds how an accepted transfer ended to its block.
-func (a *app) agentTransferFinished(operationID, status, detail string) {
+// agentTransferChanged updates the retained card even after a failed attempt
+// has left running. A retry belongs to the same operation and card.
+func (a *app) agentTransferChanged(operationID, status, detail string) {
 	for _, view := range a.agents {
-		block := view.running[operationID]
-		if block == nil || !block.queued {
+		index := slices.IndexFunc(view.blocks, func(block *agentBlock) bool {
+			return block.request.OperationID == operationID && block.queued
+		})
+		if index < 0 {
 			continue
 		}
-		delete(view.running, operationID)
-		block.results = append(block.results, agentResult{status: status, detail: detail, elapsed: time.Since(block.request.At)})
+		block := view.blocks[index]
+		switch status {
+		case "queued", "running", "cancel_requested":
+			view.running[operationID] = block
+		default:
+			delete(view.running, operationID)
+		}
+		view.last = time.Now()
+		block.results = block.results[:1]
+		if status != "queued" {
+			block.results = append(block.results, agentResult{status: status, detail: detail, elapsed: view.last.Sub(block.request.At)})
+		}
 		a.agentChanged(view)
 		return
 	}
