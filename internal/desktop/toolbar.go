@@ -65,7 +65,11 @@ func (a *app) titleBar(c *ui.Context, shown float32) {
 				uikit.MenuOn(c, add, menu)
 			},
 		})
-		tabs.Scroller.DrawOver(func(_ *ui.Painter, _ ui.Rect) { a.terminalCapture.strip = tabs.Scroller.Bounds() })
+		tabs.Scroller.DrawOver(func(_ *ui.Painter, _ ui.Rect) {
+			if tabs.Scroller.Valid() {
+				a.terminalCapture.strip = tabs.Scroller.Bounds()
+			}
+		})
 		a.tabStripTarget(c, tabs)
 		if tabs.Select >= 0 {
 			a.selectTab(tabs.Select)

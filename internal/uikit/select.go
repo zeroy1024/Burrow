@@ -69,15 +69,29 @@ func Select[T comparable](c *ui.Context, selected *T, options []Option[T], props
 		} else {
 			text.Grow(1)
 		}
-		Icon(c, IconChevronDown, IconProps{Size: SizeSm, Tone: ToneTertiary}).Shrink(0).PassThrough()
+		chevronRot := float32(0)
+		if parts.Open() {
+			chevronRot = 180
+		}
+		Icon(c, IconChevronDown, IconProps{Size: SizeSm, Tone: ToneTertiary}).Key("chevron").Shrink(0).PassThrough().
+			AnimatePose(ui.Pose{Rotate: chevronRot}, Anim(c, p.Transition))
 	})
 	StyleDisabled(trigger, props.Disabled)
 	StyleFormControl(trigger, props.Error)
 	if !trigger.IsDisabled() {
 		parts.Popup(func(panel ui.Element) {
+			panel.Key(struct {
+				Kind    string
+				Trigger uint64
+			}{"uikit.select", trigger.ID()})
 			width, _ := c.Size()
 			available := max(0, width-2*t.Space.N4)
 			StyleSelectPopup(panel).MaxWidth(available).MinWidth(min(trigger.Bounds().W, available))
+			enter := ui.Motion{}
+			if !c.Preferences().ReduceMotion {
+				enter.Scale = t.Opacity.PopoverEnterScale
+			}
+			panel.Transition(ui.ElementTransition{Duration: t.Motion.Duration.Exit, Enter: &enter, Exit: &ui.Motion{}})
 			SelectPopupViewport(c, trigger, panel).Children(func() {
 				for _, option := range options {
 					// Item reads hover during construction, so its identity must already be assigned.
@@ -93,9 +107,12 @@ func Select[T comparable](c *ui.Context, selected *T, options []Option[T], props
 					StyleDisabled(item, option.Disabled)
 					item.FillWidth().MinWidth(0).MinHeight(p.Height).Padding(t.Space.N6, t.C.Menu.ItemPaddingX).Gap(t.Space.N8).
 						Radius(t.C.Menu.ItemRadius).AlignItems(ui.Center)
+					bg, fg := ui.Transparent, Color(t.Color.Text.Primary)
 					if item.Highlighted() {
-						item.Background(Color(t.C.Menu.ItemHover)).TextColor(Color(t.C.Menu.ItemHoverText))
+						bg, fg = Color(t.C.Menu.ItemHover), Color(t.C.Menu.ItemHoverText)
 					}
+					itemAnim := Tween(t.Motion.Duration.Fast)
+					item.Background(item.AnimateColor("bg", bg, itemAnim)).TextColor(item.AnimateColor("fg", fg, itemAnim))
 					item.Children(func() {
 						if option.Leading != nil {
 							option.Leading()
@@ -105,10 +122,12 @@ func Select[T comparable](c *ui.Context, selected *T, options []Option[T], props
 							ui.Text(c, option.Detail).FontSize(t.Font.Size.Footnote).SingleLine().Ellipsis("…").MinWidth(0).Shrink(1).PassThrough()
 						}
 						ui.Spacer(c).PassThrough()
-						mark := ui.Icon(c, IconSVG(IconCheck)).Size(t.Size.IconSm, t.Size.IconSm).Shrink(0).PassThrough()
-						if option.Value != *selected {
-							mark.Opacity(0)
+						checkTarget := float32(0)
+						if option.Value == *selected {
+							checkTarget = 1
 						}
+						mark := ui.Icon(c, IconSVG(IconCheck)).Size(t.Size.IconSm, t.Size.IconSm).Shrink(0).PassThrough()
+						mark.Opacity(Visual(mark, "check", checkTarget, t.Motion.Duration.Fast))
 					})
 				}
 			})

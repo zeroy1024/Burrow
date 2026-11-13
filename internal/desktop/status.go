@@ -308,7 +308,7 @@ func statusSkeleton(p *ui.Painter, r ui.Rect, shimmer bool) {
 			{Color: base, At: 0}, {Color: uikit.Color(s.Shimmer), At: .4}, {Color: base, At: .8},
 		}}, 0)
 	})
-	p.AnimationFrame()
+	p.AnimationFrameRate(30)
 }
 
 func statusCPU(c *ui.Context, metrics hostinfo.Metrics, samples []float64, sampled, shimmer bool) {
@@ -527,15 +527,16 @@ func statusProcess(c *ui.Context, key int, name, value string, share float32, ac
 	if active {
 		style, tone = uikit.TextLabel, uikit.ToneNeutral
 	}
-	ui.Row(c).Key(key).FillWidth().Height(t.C.KeyValue.RowHeight).Gap(t.Space.N8).AlignItems(ui.Center).
-		Draw(func(p *ui.Painter, r ui.Rect) {
-			if share <= 0 {
-				return
-			}
-			// The bar reaches into the panel padding so the text keeps the column's edge.
-			inset := t.Space.N6
-			p.Fill(ui.Rect{X: r.X - inset, Y: r.Y, W: (r.W + 2*inset) * share, H: r.H}, uikit.Color(t.C.Stats.ProcessBar), t.C.Stats.ProcessRadius)
-		}).Children(func() {
+	row := ui.Row(c).Key(key).FillWidth().Height(t.C.KeyValue.RowHeight).Gap(t.Space.N8).AlignItems(ui.Center)
+	shownShare := row.AnimateTo("share", share, uikit.Tween(t.Motion.Duration.Focus))
+	row.Draw(func(p *ui.Painter, r ui.Rect) {
+		if shownShare <= 0 {
+			return
+		}
+		// The bar reaches into the panel padding so the text keeps the column's edge.
+		inset := t.Space.N6
+		p.Fill(ui.Rect{X: r.X - inset, Y: r.Y, W: (r.W + 2*inset) * shownShare, H: r.H}, uikit.Color(t.C.Stats.ProcessBar), t.C.Stats.ProcessRadius)
+	}).Children(func() {
 		uikit.Text(c, name, uikit.TextProps{Style: uikit.TextMono, Tone: tone}).SingleLine().Ellipsis("…").Grow(1).MinWidth(0)
 		uikit.Text(c, value, uikit.TextProps{Style: style, Tone: tone}).FontFeatures("tnum").SingleLine().Shrink(0)
 	})

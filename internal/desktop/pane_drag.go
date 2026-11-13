@@ -102,7 +102,7 @@ func (a *app) paneDragHandle(c *ui.Context, source ui.Element, transfer paneTran
 	source.Drag(transfer).Cursor(ui.CursorDefault).FocusRing(false)
 	if transfer.fromTab {
 		source.DrawOver(func(_ *ui.Painter, _ ui.Rect) {
-			if transfer.tab == a.currentTab() {
+			if source.Valid() && transfer.tab == a.currentTab() {
 				a.terminalCapture.tabHandle, a.terminalCapture.tabSource = source.Bounds(), transfer.session
 			}
 		})

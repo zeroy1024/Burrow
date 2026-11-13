@@ -41,13 +41,16 @@ func Pane(c *ui.Context, props PaneProps, slots ...PaneSlots) ui.Element {
 		root.Key(props.Key)
 	}
 	if props.Kind == PaneFile {
+		focusTarget := float32(0)
+		if props.Focused {
+			focusTarget = 1
+		}
+		focus := Visual(root, "file-pane-focus", focusTarget, t.C.FilePaneFocus.Transition)
+		ink := Color(t.Color.Border.Card).Mix(Color(t.C.FilePaneFocus.BorderFocused), focus)
+		width := t.Size.Divider + (t.C.FilePaneFocus.BorderWidthFocused-t.Size.Divider)*focus
 		root.Background(Color(t.C.Card.Bg)).Radius(t.C.Card.Radius).Clip()
 		root.DrawOver(func(p *ui.Painter, rect ui.Rect) {
-			ink, width := t.Color.Border.Card, t.Size.Divider
-			if props.Focused {
-				ink, width = t.C.FilePaneFocus.BorderFocused, t.C.FilePaneFocus.BorderWidthFocused
-			}
-			p.Stroke(rect, Color(ink), t.C.Card.Radius, width)
+			p.Stroke(rect, ink, t.C.Card.Radius, width)
 		})
 	} else if !props.Lifted {
 		StylePaneFocus(root, props.Focused, props.Multiple, t)

@@ -304,7 +304,7 @@ func (a *app) mcpPage(c *ui.Context) {
 			workspace.Jump("audit-drawer-open", 0)
 			*initialized = true
 		}
-		shown := workspace.AnimateTo("audit-drawer-open", target, a.positionAnimation(uikit.Tween(t.C.Desktop.SidebarDuration)))
+		shown := workspace.AnimateTo("audit-drawer-open", target, a.positionAnimation(ui.Animation{Spring: uikit.Spring(t.Motion.Spring.Smooth)}))
 		if a.reduceMotion(c) {
 			shown = workspace.Jump("audit-drawer-open", target)
 		}

@@ -488,7 +488,7 @@ func (a *app) view(c *ui.Context) {
 	if a.page().sidebarCollapsed {
 		target = 0
 	}
-	shown := root.AnimateTo(sidebarMotionKey(a.section), target, a.positionAnimation(uikit.Tween(t.C.Desktop.SidebarDuration)))
+	shown := root.AnimateTo(sidebarMotionKey(a.section), target, a.positionAnimation(ui.Animation{Spring: uikit.Spring(t.Motion.Spring.Smooth)}))
 	root.Children(func() {
 		ui.Column(c).Key(pageHeaderKey(active)).FillWidth().Shrink(0).Background(headerBackground).Children(func() {
 			switch active {
@@ -593,47 +593,71 @@ func (a *app) interactionBlocked() bool {
 }
 
 func (a *app) navigation(c *ui.Context) {
-	uikit.Rail(c).Children(func() {
-		a.navigationButton(
+	rail := uikit.Rail(c)
+	railLayout := rail.LayoutBounds()
+	staticPill := railLayout.W <= 0 || railLayout.H <= 0
+	var buttons [5]ui.Element
+	targets := [5]section{sectionSSH, sectionFiles, sectionGateways, sectionMCP, sectionSettings}
+	selected := -1
+	for i, target := range targets {
+		if a.navigationSelected(target) {
+			selected = i
+			break
+		}
+	}
+	rail.Children(func() {
+		buttons[0] = a.navigationButton(
 			c,
 			sectionSSH,
 			"SSH",
 			terminalIcon,
+			staticPill,
 		)
-		a.navigationButton(
+		buttons[1] = a.navigationButton(
 			c,
 			sectionFiles,
 			"SFTP / FTP",
 			filesIcon,
+			staticPill,
 		)
-		a.navigationButton(
+		buttons[2] = a.navigationButton(
 			c,
 			sectionGateways,
 			locales.GatewaysTitle(),
 			routeIcon,
+			staticPill,
 		)
-		a.navigationButton(
+		buttons[3] = a.navigationButton(
 			c,
 			sectionMCP,
 			"MCP",
 			mcpIcon,
+			staticPill,
 		)
 		ui.Spacer(c).DragWindow()
-		a.navigationButton(
+		buttons[4] = a.navigationButton(
 			c,
 			sectionSettings,
 			locales.SettingsTitle(),
 			settingsIcon,
+			staticPill,
 		)
 	})
+	uikit.AnimateRailPill(c, rail, buttons[:], selected, a.reduceMotion(c))
 }
 
-func (a *app) navigationButton(c *ui.Context, target section, label string, icon *ui.SVG) {
-	props := uikit.RailButtonProps{Key: label, Label: label, Icon: icon, Selected: a.navigationSelected(target)}
+func (a *app) navigationButton(c *ui.Context, target section, label string, icon *ui.SVG, staticPill bool) ui.Element {
+	props := uikit.RailButtonProps{
+		Key:        label,
+		Label:      label,
+		Icon:       icon,
+		Selected:   a.navigationSelected(target),
+		StaticPill: staticPill,
+	}
 	if target == sectionSettings {
 		props.Handle = &a.settingsButton
 	}
-	uikit.RailButton(c, props).OnClick(func() {
+	return uikit.RailButton(c, props).OnClick(func() {
 		opening := target == sectionSettings && !a.settingsUI.open
 		a.switchSection(target)
 		if opening {
@@ -649,7 +673,7 @@ func (a *app) workspace(c *ui.Context, shown float32) {
 	if a.section != sectionSSH || !a.statusVisible {
 		statusTarget = 0
 	}
-	statusShown := panel.AnimateTo("status", statusTarget, a.positionAnimation(uikit.Tween(t.C.Desktop.SidebarDuration)))
+	statusShown := panel.AnimateTo("status", statusTarget, a.positionAnimation(ui.Animation{Spring: uikit.Spring(t.Motion.Spring.Smooth)}))
 	statusOpacity := uikit.Visual(panel, "status-opacity", statusTarget, t.C.Desktop.SidebarDuration)
 	panel.Children(func() {
 		uikit.Card(c).Key("sessions").Width(a.page().sidebarWidth * shown).Shrink(0).

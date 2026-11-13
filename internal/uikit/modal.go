@@ -154,31 +154,42 @@ func Modal(c *ui.Context, open *bool, props ModalProps, body func(ModalParts)) M
 					state.Requested = true
 				}
 			}
-			fade, scale := float32(0), float32(1)
+			t := theme.Current()
+			reduced := MotionReduced(c, props.Motion)
+			fade, scale, y := float32(0), float32(1), float32(0)
 			if state.EnterStarted.IsZero() {
 				state.EnterStarted = c.Now()
 			}
 			// A frame may rebuild the view before committing its first pose.
 			// Keep that pose for every pass of the opening frame.
 			if c.Now().Equal(state.EnterStarted) {
-				fade, scale = 1, p.EnterScale
+				fade = 1
+				if !reduced {
+					scale, y = p.EnterScale, t.Space.N6
+				}
 				c.AnimationFrame()
 			}
-			animation := Tween(p.Fade)
-			if state.Closing {
-				fade, scale = 1, p.ExitScale
-				animation = ui.Animation{Duration: p.Exit, Ease: Easing(theme.Current().Motion.Easing.In)}
+			backdropAnimation := Anim(c, p.Fade, props.Motion)
+			panelAnimation := ui.Animation{Spring: Spring(p.Enter)}
+			if reduced {
+				panelAnimation = backdropAnimation
 			}
-			if MotionReduced(c, props.Motion) {
-				scale = 1
+			if state.Closing {
+				fade = 1
+				if !reduced {
+					scale, y = p.ExitScale, t.Space.N4
+				}
+				exitAnim := ui.Animation{Duration: Dur(c, p.Exit, props.Motion), Ease: Easing(t.Motion.Easing.In)}
+				backdropAnimation = exitAnim
+				panelAnimation = exitAnim
 			}
 			if props.Compact {
 				styleModalScrim(backdrop, 1, Color(compact.Backdrop))
 			} else {
 				StyleModalScrim(backdrop, 1)
 			}
-			backdrop.AnimatePose(ui.Pose{Fade: fade}, animation)
-			panel.AnimatePose(ui.Pose{Scale: scale}, animation)
+			backdrop.AnimatePose(ui.Pose{Fade: fade}, backdropAnimation)
+			panel.AnimatePose(ui.Pose{Y: y, Scale: scale}, panelAnimation)
 			parts := ModalParts{Panel: panel, Backdrop: backdrop, Bounds: bounds, state: state, context: c}
 			if props.Header != nil {
 				props.Header(parts)

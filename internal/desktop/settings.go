@@ -59,13 +59,20 @@ func (a *app) settingsSidebar(c *ui.Context, shown float32) {
 		uikit.SiderHeader(c, uikit.SiderHeaderProps{Title: locales.SettingsTitle(), HideAdd: true})
 		a.sidebarSearch(c.Key("settings-search"), &a.settingsUI.query, &a.settingsUI.search,
 			locales.MessageSearchSettings(), locales.MessageSearchSettings())
-		ui.Column(c).FillWidth().Padding(t.C.Catalog.ListPaddingY, t.C.Catalog.ListPaddingX).Gap(t.C.Catalog.RowGap).Children(func() {
-			for index, category := range settingsCategories() {
-				uikit.SettingsNavItem(c, uikit.SettingsNavItemProps{
-					Key: category.id, Label: category.label, Icon: category.icon, Selected: a.settingsCategory == index,
+		categories := settingsCategories()
+		navList := ui.Column(c).Key("settings-nav-list").FillWidth().Padding(t.C.Catalog.ListPaddingY, t.C.Catalog.ListPaddingX).Gap(t.C.Catalog.RowGap)
+		navLayout := navList.LayoutBounds()
+		staticPill := navLayout.W <= 0 || navLayout.H <= 0
+		items := make([]ui.Element, len(categories))
+		navList.Children(func() {
+			for index, category := range categories {
+				items[index] = uikit.SettingsNavItem(c, uikit.SettingsNavItemProps{
+					Key: category.id, Label: category.label, Icon: category.icon,
+					Selected: a.settingsCategory == index, StaticPill: staticPill,
 				}).OnClick(func() { a.selectSettingsCategory(index) })
 			}
 		})
+		uikit.AnimateSettingsNavPill(c, navList, items, a.settingsCategory, a.reduceMotion(c))
 		ui.Box(c).Grow(1)
 		ui.Row(c).FillWidth().BorderWidth(t.Size.Divider, 0, 0, 0).BorderColor(uikit.Color(t.Color.Border.Subtle)).
 			Padding(t.Space.N10, t.Space.N16).Gap(t.Space.N8).AlignItems(ui.Center).Children(func() {
@@ -93,17 +100,33 @@ func (a *app) settings(c *ui.Context) {
 	}
 	t := theme.Current()
 	p := t.C.Settings
+	searching := strings.TrimSpace(a.settingsUI.query) != ""
+	var switchTransition ui.ElementTransition
+	if !a.reduceMotion(c) {
+		enter := ui.Motion{Opacity: 1, Y: p.SwitchY}
+		anim := ui.Animation{Spring: uikit.Spring(p.Enter)}
+		switchTransition = ui.ElementTransition{
+			Animation: &anim,
+			Enter:     &enter,
+		}
+	}
+	stageKey := any(a.settingsCategory)
+	if searching {
+		stageKey = "search"
+	}
 	uikit.Card(c).Key("settings-content").Grow(1).MinWidth(0).FillHeight().Children(func() {
 		ui.Row(c).FillWidth().Shrink(0).Padding(p.HeaderPaddingTop, p.HeaderPaddingRight, p.HeaderPaddingBottom, p.HeaderPaddingLeft).
 			BorderWidth(0, 0, t.Size.Divider, 0).BorderColor(uikit.Color(t.Color.Border.Divider)).AlignItems(ui.Center).Children(func() {
 			category := settingsCategories()[a.settingsCategory]
-			ui.Column(c).Grow(1).Gap(t.Space.N4).Children(func() {
-				title, subtitle := category.label, category.subtitle
-				if strings.TrimSpace(a.settingsUI.query) != "" {
-					title, subtitle = locales.MessageSearchResults(), locales.MessageMatchingSettingNamesAndDescriptionsChangesApplyImmediately()
-				}
-				uikit.Text(c, title, uikit.TextProps{Style: uikit.TextTitle})
-				uikit.Text(c, subtitle, uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneTertiary})
+			ui.Box(c).Key("settings-header-stage").Grow(1).Children(func() {
+				ui.Column(c).Key(stageKey).FillWidth().Gap(t.Space.N4).Transition(switchTransition).Children(func() {
+					title, subtitle := category.label, category.subtitle
+					if searching {
+						title, subtitle = locales.MessageSearchResults(), locales.MessageMatchingSettingNamesAndDescriptionsChangesApplyImmediately()
+					}
+					uikit.Text(c, title, uikit.TextProps{Style: uikit.TextTitle})
+					uikit.Text(c, subtitle, uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneTertiary})
+				})
 			})
 		})
 		viewport := ui.Box(c).Grow(1).MinHeight(0).FillWidth()
@@ -111,29 +134,31 @@ func (a *app) settings(c *ui.Context) {
 			scroll := &a.settingsUI.scroll[a.settingsCategory]
 			contentScroll := ui.Scroll(c).Fill().TrackScroll(scroll).Children(func() {
 				ui.Column(c).FillWidth().AlignItems(ui.Center).Children(func() {
-					content := ui.Column(c).Key(a.settingsCategory).FillWidth().MaxWidth(p.ContentMax+2*p.ContentPaddingX).
-						Padding(p.ContentPaddingY, p.ContentPaddingX).Gap(p.GroupGap)
-					content.Children(func() {
-						if !a.settingsUI.notice.Empty() {
-							uikit.Banner(c, a.settingsUI.notice.String(), uikit.BannerProps{Tone: uikit.ToneDanger, Icon: sessionAlertIcon})
-						}
-						if a.terminalError != nil {
-							uikit.Banner(c, a.terminalError.Error(), uikit.BannerProps{Tone: uikit.ToneDanger, Icon: sessionAlertIcon})
-						}
-						if strings.TrimSpace(a.settingsUI.query) != "" {
-							count := 0
-							for index := range settingsCategories() {
-								if a.settingsCategoryHasMatch(index) {
-									a.settingsCategoryContent(c, index)
-									count++
+					ui.Box(c).Key("settings-content-stage").FillWidth().MaxWidth(p.ContentMax + 2*p.ContentPaddingX).Children(func() {
+						content := ui.Column(c).Key(stageKey).FillWidth().
+							Padding(p.ContentPaddingY, p.ContentPaddingX).Gap(p.GroupGap).Transition(switchTransition)
+						content.Children(func() {
+							if !a.settingsUI.notice.Empty() {
+								uikit.Banner(c, a.settingsUI.notice.String(), uikit.BannerProps{Tone: uikit.ToneDanger, Icon: sessionAlertIcon})
+							}
+							if a.terminalError != nil {
+								uikit.Banner(c, a.terminalError.Error(), uikit.BannerProps{Tone: uikit.ToneDanger, Icon: sessionAlertIcon})
+							}
+							if searching {
+								count := 0
+								for index := range settingsCategories() {
+									if a.settingsCategoryHasMatch(index) {
+										a.settingsCategoryContent(c, index)
+										count++
+									}
 								}
+								if count == 0 {
+									uikit.EmptyMessage(c, locales.MessageNoMatchingSettings(), uikit.EmptySettingsSearch)
+								}
+							} else {
+								a.settingsCategoryContent(c, a.settingsCategory)
 							}
-							if count == 0 {
-								uikit.EmptyMessage(c, locales.MessageNoMatchingSettings(), uikit.EmptySettingsSearch)
-							}
-						} else {
-							a.settingsCategoryContent(c, a.settingsCategory)
-						}
+						})
 					})
 				})
 			})

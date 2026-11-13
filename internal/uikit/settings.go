@@ -159,10 +159,11 @@ func SettingsTextColumn(c *ui.Context) ui.Element {
 }
 
 type SettingsNavItemProps struct {
-	Key      any
-	Label    string
-	Icon     *ui.SVG
-	Selected bool
+	Key        any
+	Label      string
+	Icon       *ui.SVG
+	Selected   bool
+	StaticPill bool
 }
 
 func SettingsNavItem(c *ui.Context, props SettingsNavItemProps) ui.Element {
@@ -176,16 +177,27 @@ func SettingsNavItem(c *ui.Context, props SettingsNavItemProps) ui.Element {
 	}
 	bg, fg, icon := ui.Transparent, Color(t.Color.Text.Primary), Color(t.Color.Text.Secondary)
 	if props.Selected {
-		bg, fg, icon = Color(p.NavItemOn), Color(p.NavTextOn), Color(p.NavIconOn)
+		fg, icon = Color(p.NavTextOn), Color(p.NavIconOn)
+		if props.StaticPill {
+			bg = Color(p.NavItemOn)
+		}
 	} else if item.Hovered() {
 		bg = Color(t.Color.State.Hover)
 	}
-	return item.Background(bg).TextColor(fg).Children(func() {
+	anim := Tween(t.Motion.Duration.Focus)
+	return item.Background(item.AnimateColor("bg", bg, anim)).TextColor(item.AnimateColor("fg", fg, anim)).Children(func() {
 		ui.Box(c).Size(p.NavIconTile, p.NavIconTile).AlignItems(ui.Center).Justify(ui.Center).Children(func() {
-			ui.Icon(c, props.Icon).Size(t.Size.Icon, t.Size.Icon).TextColor(icon).PassThrough()
+			ic := ui.Icon(c, props.Icon).Size(t.Size.Icon, t.Size.Icon)
+			ic.TextColor(ic.AnimateColor("icon", icon, anim)).PassThrough()
 		})
 		ui.Text(c, props.Label).FontSize(t.Font.Size.Body).FontWeight(t.Font.Weight.Medium).PassThrough()
 	})
+}
+
+func AnimateSettingsNavPill(c *ui.Context, list ui.Element, items []ui.Element, selected int, reduceMotion bool) {
+	t := theme.Current()
+	p := t.C.Settings
+	animateNavPill(c, list, items, selected, Color(p.NavItemOn), p.NavItemRadius, t.Motion.Duration.Focus, reduceMotion)
 }
 
 type ThemeCardProps struct {
@@ -202,11 +214,19 @@ func ThemeCard(c *ui.Context, props ThemeCardProps) ui.Element {
 	var item ui.Element
 	ui.Column(c).Grow(1).Gap(t.Space.N8).Children(func() {
 		item = ui.ButtonBase(c).Key(props.Key).FillWidth().AspectRatio(p.Aspect).Radius(p.Radius).Clip().Label(props.Label).Selected(props.Selected).
-			Border(p.BorderWidth, Color(p.Border)).FocusRing(false)
+			FocusRing(false)
+		selectedTarget := float32(0)
+		borderColor := Color(p.Border)
 		if props.Selected {
-			item.Border(p.SelectedWidth, Color(p.Selected))
-			Shadow(item, p.SelectedShadow)
+			selectedTarget = 1
+			borderColor = Color(p.Selected)
+		} else if item.Hovered() {
+			borderColor = Color(t.Color.Border.ControlHover)
 		}
+		progress := Visual(item, "selected", selectedTarget, t.Motion.Duration.Focus)
+		borderWidth := p.BorderWidth + (p.SelectedWidth-p.BorderWidth)*progress
+		item.Border(borderWidth, item.AnimateColor("border", borderColor, Tween(t.Motion.Duration.Focus)))
+		ShadowOpacity(item, p.SelectedShadow, progress)
 		if item.FocusVisible() && !item.IsDisabled() {
 			Shadow(item, t.Shadow.ControlFocus)
 		}
@@ -244,9 +264,12 @@ func AccentSwatch(c *ui.Context, props AccentSwatchProps) ui.Element {
 	} else {
 		swatch.Background(Color(props.Colors[0]))
 	}
+	ringTarget := float32(0)
 	if props.Selected {
-		Shadow(swatch, theme.Shadow{{Spread: p.RingGap, Color: p.RingInset}, {Spread: p.RingGap + p.RingWidth, Color: t.Color.Accent.Default}})
+		ringTarget = 1
 	}
+	ring := theme.Shadow{{Spread: p.RingGap, Color: p.RingInset}, {Spread: p.RingGap + p.RingWidth, Color: t.Color.Accent.Default}}
+	ShadowOpacity(swatch, ring, Visual(swatch, "ring", ringTarget, t.Motion.Duration.Focus))
 	return Tip(c, swatch, props.Label)
 }
 
@@ -292,10 +315,18 @@ func SchemeCard(c *ui.Context, props SchemeCardProps, preview func()) ui.Element
 	p := t.C.SchemeCard
 	item := ui.ButtonBase(c).Key(props.Name).Grow(1).Basis(0).MinWidth(0).Padding(p.Padding).Radius(p.Radius).
 		Label(props.Name).Selected(props.Selected).Background(Color(t.Color.Surface.Card)).TextColor(Color(t.Color.Text.Primary)).
-		Border(p.BorderWidth, Color(p.Border)).FocusRing(false)
+		FocusRing(false)
+	selectedTarget := float32(0)
+	borderColor := Color(p.Border)
 	if props.Selected {
-		item.Border(p.SelectedWidth, Color(p.Selected))
+		selectedTarget = 1
+		borderColor = Color(p.Selected)
+	} else if item.Hovered() {
+		borderColor = Color(t.Color.Border.ControlHover)
 	}
+	progress := Visual(item, "selected", selectedTarget, t.Motion.Duration.Focus)
+	borderWidth := p.BorderWidth + (p.SelectedWidth-p.BorderWidth)*progress
+	item.Border(borderWidth, item.AnimateColor("border", borderColor, Tween(t.Motion.Duration.Focus)))
 	if item.FocusVisible() && !item.IsDisabled() {
 		Shadow(item, t.Shadow.ControlFocus)
 	}

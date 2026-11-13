@@ -74,7 +74,7 @@ func TabSpinner(c *ui.Context, props SpinnerProps) ui.Element {
 		phase := float32(0)
 		if !reduced {
 			phase = float32(p.Now().UnixNano()%int64(t.SpinnerPeriod)) / float32(t.SpinnerPeriod)
-			p.AnimationFrame()
+			p.AnimationFrameRate(60)
 		}
 		var arc ui.Path
 		const steps = 32

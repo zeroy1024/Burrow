@@ -20,11 +20,17 @@ func Switch(c *ui.Context, value *bool, props ToggleProps) ui.Element {
 	if *value {
 		target = 1
 	}
-	animation := ui.Snappy
+	animation := ui.Animation{Spring: Spring(p.Animation)}
 	if MotionReduced(c, props.Motion) {
 		animation = Anim(c, t.Motion.Duration.Focus, props.Motion)
 	}
 	position := e.AnimateTo("knob", target, animation)
+	pressTarget := float32(0)
+	if e.Pressed() && !e.IsDisabled() {
+		pressTarget = 1
+	}
+	press := e.AnimateTo("press", pressTarget, Anim(c, t.Motion.Duration.Fast, props.Motion))
+	stretch := press * t.Space.N2
 	e.Background(Color(p.Off).Mix(Color(p.On), position))
 	rtl := c.Direction() == ui.RightToLeft
 	if e.FocusVisible() && !e.IsDisabled() {
@@ -36,7 +42,7 @@ func Switch(c *ui.Context, value *bool, props ToggleProps) ui.Element {
 			at = 1 - at
 		}
 		diameter := rect.H - 2*p.Inset
-		knob := ui.Rect{X: rect.X + p.Inset + at*(rect.W-rect.H), Y: rect.Y + p.Inset, W: diameter, H: diameter}
+		knob := ui.Rect{X: rect.X + p.Inset + at*(rect.W-rect.H-stretch), Y: rect.Y + p.Inset, W: diameter + stretch, H: diameter}
 		for _, shadow := range p.KnobShadow {
 			painter.Shadow(knob, diameter/2, shadow.X, shadow.Y, shadow.Blur, shadow.Spread, Color(shadow.Color))
 		}
@@ -65,28 +71,47 @@ func Checkbox(c *ui.Context, value *bool, label string, options ...CheckProps) u
 		row.Mixed()
 	}
 	row.Children(func() {
-		box := ui.Box(c).Size(p.Size, p.Size).Radius(p.Radius).Shrink(0).Border(t.Size.Divider, Color(p.Border)).PassThrough()
-		if *value || props.Mixed {
-			box.Background(Color(p.On)).BorderColor(Color(p.On))
-		} else if row.Hovered() {
-			box.BorderColor(Color(p.On))
+		active := *value || props.Mixed
+		bgTarget, borderTarget, markTarget := ui.Transparent, Color(p.Border), float32(0)
+		if active {
+			bgTarget, borderTarget, markTarget = Color(p.On), Color(p.On), 1
+		} else if row.Hovered() && !row.IsDisabled() {
+			borderTarget = Color(p.On)
 		}
+		anim := Tween(t.Motion.Duration.Focus)
+		box := ui.Box(c).Size(p.Size, p.Size).Radius(p.Radius).Shrink(0).
+			Background(row.AnimateColor("bg", bgTarget, anim)).
+			Border(t.Size.Divider, row.AnimateColor("border", borderTarget, anim)).PassThrough()
 		if row.FocusVisible() && !row.IsDisabled() {
 			Shadow(box, t.Shadow.ControlFocus)
 		}
-		box.DrawOver(func(painter *ui.Painter, rect ui.Rect) {
-			if props.Mixed {
-				mark := ui.Rect{X: rect.X + rect.W/4, Y: rect.Y + rect.H/2 - t.Size.Divider/2,
-					W: rect.W / 2, H: t.Size.Divider}
-				painter.Fill(mark, Color(p.Mark), t.Size.Divider/2)
-			} else if *value {
+		markProgress := Visual(row, "mark", markTarget, t.Motion.Duration.Focus)
+		if markProgress > 0 {
+			mixed := props.Mixed
+			box.DrawOver(func(painter *ui.Painter, rect ui.Rect) {
+				ink := Color(p.Mark).Alpha(markProgress)
+				if mixed {
+					w := (rect.W / 2) * markProgress
+					mark := ui.Rect{X: rect.X + (rect.W-w)/2, Y: rect.Y + rect.H/2 - t.Size.Divider/2,
+						W: w, H: t.Size.Divider}
+					painter.Fill(mark, ink, t.Size.Divider/2)
+					return
+				}
 				var mark ui.Path
-				mark.MoveTo(rect.X+rect.W/4, rect.Y+rect.H/2).
-					LineTo(rect.X+rect.W*0.45, rect.Y+rect.H*0.7).
-					LineTo(rect.X+rect.W*0.8, rect.Y+rect.H*0.3)
-				painter.StrokePath(&mark, t.Size.Divider*2, Color(p.Mark))
-			}
-		})
+				x0, y0 := rect.X+rect.W/4, rect.Y+rect.H/2
+				x1, y1 := rect.X+rect.W*0.45, rect.Y+rect.H*0.7
+				x2, y2 := rect.X+rect.W*0.8, rect.Y+rect.H*0.3
+				mark.MoveTo(x0, y0)
+				if markProgress <= 0.45 {
+					k := markProgress / 0.45
+					mark.LineTo(x0+(x1-x0)*k, y0+(y1-y0)*k)
+				} else {
+					k := (markProgress - 0.45) / 0.55
+					mark.LineTo(x1, y1).LineTo(x1+(x2-x1)*k, y1+(y2-y1)*k)
+				}
+				painter.StrokePath(&mark, t.Size.Divider*2, ink)
+			})
+		}
 		if !props.HideLabel {
 			ui.Text(c, label).FontSize(t.Font.Size.Body).PassThrough()
 		}
@@ -104,14 +129,24 @@ func Radio[T comparable](c *ui.Context, selected *T, value T, label string, opti
 	row := ui.RadioBase(c, selected, value).Gap(t.Space.N8).AlignItems(ui.Center).
 		Label(label).Disabled(props.Disabled).FocusRing(false)
 	row.Children(func() {
+		on := *selected == value
+		borderTarget, dotTarget := Color(p.Border), float32(0)
+		if on {
+			borderTarget, dotTarget = Color(p.On), 1
+		} else if row.Hovered() && !row.IsDisabled() {
+			borderTarget = Color(p.On)
+		}
 		circle := ui.Box(c).Size(p.Size, p.Size).Radius(p.Size/2).Shrink(0).
-			Border(t.Size.Divider, Color(p.Border)).Center().PassThrough()
+			Border(t.Size.Divider, row.AnimateColor("border", borderTarget, Tween(t.Motion.Duration.Focus))).Center().PassThrough()
 		if row.FocusVisible() && !row.IsDisabled() {
 			Shadow(circle, t.Shadow.ControlFocus)
 		}
-		if *selected == value {
-			circle.BorderColor(Color(p.On)).Children(func() {
-				ui.Box(c).Size(p.RadioDot, p.RadioDot).Radius(p.RadioDot / 2).Background(Color(p.On)).PassThrough()
+		dotAlpha := Visual(row, "dot-alpha", dotTarget, t.Motion.Duration.Focus)
+		dotScale := row.AnimateTo("dot-scale", dotTarget, ui.Animation{Spring: Spring(t.C.Switch.Animation)})
+		if dotAlpha > 0 && dotScale > 0 {
+			circle.Children(func() {
+				size := p.RadioDot * dotScale
+				ui.Box(c).Size(size, size).Radius(size / 2).Background(Color(p.On).Alpha(dotAlpha)).PassThrough()
 			})
 		}
 		ui.Text(c, label).FontSize(t.Font.Size.Body).PassThrough()

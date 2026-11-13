@@ -255,7 +255,11 @@ func SessionTabInput(c *ui.Context, list, tab ui.Element, index, count int) TabI
 	middle.Hits = append(middle.Hits, tabHit{ID: tab.ID(), Selected: *selected})
 	// Paint follows commit, so this records the current transformed hit box;
 	// clipped-out tabs keep an empty rectangle and cannot catch a middle press.
-	tab.DrawOver(func(_ *ui.Painter, _ ui.Rect) { middle.Hits[slot].Rect = tab.Bounds() })
+	tab.DrawOver(func(_ *ui.Painter, _ ui.Rect) {
+		if tab.Valid() {
+			middle.Hits[slot].Rect = tab.Bounds()
+		}
+	})
 	if result.Close {
 		middle.Pending = false
 	}

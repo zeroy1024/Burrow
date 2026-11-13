@@ -66,6 +66,9 @@ func (a *app) recordTerminalCapture(c *ui.Context, session *remoteSession, outpu
 	rootWidth, rootHeight := c.Size()
 	live := session.terminal
 	output.DrawOver(func(painter *ui.Painter, _ ui.Rect) {
+		if !output.Valid() || !card.Valid() {
+			return
+		}
 		body, bounds, layout := output.Bounds(), card.Bounds(), card.LayoutBounds()
 		if layout.W <= 0 || layout.H <= 0 {
 			return

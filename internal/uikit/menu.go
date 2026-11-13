@@ -149,6 +149,11 @@ func menuPopup(
 			Anchor uint64
 		}{"uikit.menu", anchor.ID()})
 		StyleSelectPopup(panel).Role(ui.RoleMenu).Label(locales.MessageActionsMenu2()).Column().KeepFocus()
+		enter := ui.Motion{}
+		if !c.Preferences().ReduceMotion {
+			enter.Scale = t.Opacity.PopoverEnterScale
+		}
+		panel.Transition(ui.ElementTransition{Duration: t.Motion.Duration.Exit, Enter: &enter, Exit: &ui.Motion{}})
 		outside = panel.PressedOutside()
 		x, y, _ := panel.PointerPosition()
 		pointer := ui.Point{X: x, Y: y}
@@ -221,7 +226,9 @@ func menuPopup(
 						background, ink = Color(t.Color.Danger.Subtle), Color(t.Color.Danger.Text)
 					}
 				}
-				item.Background(background).TextColor(ink)
+				itemAnim := Tween(t.Motion.Duration.Fast)
+				animatedInk := item.AnimateColor("fg", ink, itemAnim)
+				item.Background(item.AnimateColor("bg", background, itemAnim)).TextColor(animatedInk)
 				StyleDisabled(item, entry.Disabled)
 				item.Children(func() {
 					if hasIcons {
@@ -236,7 +243,7 @@ func menuPopup(
 					ui.Text(c, entry.Label).FontSize(p.FontSize).SingleLine().PassThrough()
 					ui.Spacer(c).PassThrough()
 					if entry.Shortcut != "" {
-						Kbd(c, entry.Shortcut, KbdProps{Tone: KbdFlat}).TextColor(ink)
+						Kbd(c, entry.Shortcut, KbdProps{Tone: KbdFlat}).TextColor(animatedInk)
 					}
 					if hasChecks {
 						ui.Box(c).Size(t.Size.Icon, t.Size.Icon).Center().PassThrough().Children(func() {
