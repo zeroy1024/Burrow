@@ -441,7 +441,8 @@ func (a *app) mcpMainCardContent(c *ui.Context) {
 				{Label: locales.MessageAuditLog(), Icon: uikit.IconDocument, Count: &auditCount},
 			}
 			uikit.Segmented(c, &a.mcp.activeTab, items, uikit.SegmentedProps{
-				Label: locales.MessageMcpTabs(), CountMax: 99,
+				Motion: uikit.MotionOverride(a.reduceMotion(c)),
+				Label:  locales.MessageMcpTabs(), CountMax: 99,
 			})
 			ui.Spacer(c)
 			switch a.mcp.activeTab {
@@ -653,7 +654,7 @@ func (a *app) mcpKeysTab(c *ui.Context) {
 									more := uikit.SiderMore(c, row, uikit.SiderMoreProps{
 										Icon: moreIcon, Label: locales.ActionsForName(keyItem.Name),
 									})
-									uikit.RowMenuOn(c, row, more, menuEntries)
+									uikit.RowMenuOn(c, row, more, menuEntries, uikit.MotionOverride(a.reduceMotion(c)))
 								}
 							})
 						})
@@ -724,27 +725,27 @@ func (a *app) mcpPoliciesTab(c *ui.Context) {
 							c,
 							&a.mcp.policyCategorySeg,
 							catItems,
-							uikit.SegmentedProps{Size: uikit.SizeSm, Label: locales.MessageFilterPolicyCategories()},
+							uikit.SegmentedProps{Motion: uikit.MotionOverride(a.reduceMotion(c)), Size: uikit.SizeSm, Label: locales.MessageFilterPolicyCategories()},
 						)
 						uikit.FilterChip(
 							c,
 							locales.MessageApplicableConnections(),
 							&a.mcp.policyConnFilter,
 							a.mcpConnectionOptions(-1, true),
-							uikit.FilterChipProps{Key: "pol-conn-filter"},
+							uikit.FilterChipProps{Motion: uikit.MotionOverride(a.reduceMotion(c)), Key: "pol-conn-filter"},
 						)
 						uikit.FilterChip(
 							c,
 							locales.MessageApplicableKeys(),
 							&a.mcp.policyKeyFilter,
 							a.mcpKeyOptions(true),
-							uikit.FilterChipProps{Key: "pol-key-filter"},
+							uikit.FilterChipProps{Motion: uikit.MotionOverride(a.reduceMotion(c)), Key: "pol-key-filter"},
 						)
 						uikit.FilterChip(c, locales.MessageStatus(), &a.mcp.policyStateFilter, []uikit.Option[string]{
 							{Value: "all", Label: locales.MessageAll()},
 							{Value: "enabled", Label: locales.MessageEnabled()},
 							{Value: "disabled", Label: locales.MessageDisabled()},
-						}, uikit.FilterChipProps{Key: "pol-state-filter"})
+						}, uikit.FilterChipProps{Motion: uikit.MotionOverride(a.reduceMotion(c)), Key: "pol-state-filter"})
 					})
 					uikit.Banner(c, locales.MessageAnActionIsAllowedOnlyIfTheKeyIsAuthorizedAndNoEnabled(), uikit.BannerProps{
 						Icon: uikit.IconSVG(uikit.IconShield),
@@ -864,7 +865,7 @@ func (a *app) mcpPoliciesTab(c *ui.Context) {
 								more := uikit.SiderMore(c, row, uikit.SiderMoreProps{
 									Icon: moreIcon, Label: locales.ActionsForName(pol.Name),
 								})
-								if uikit.RowMenuOn(c, row, more, entries) {
+								if uikit.RowMenuOn(c, row, more, entries, uikit.MotionOverride(a.reduceMotion(c))) {
 									a.mcp.selectedPolicyID = pol.ID
 								}
 							})
@@ -896,14 +897,14 @@ func (a *app) mcpAuditTab(c *ui.Context) {
 							locales.MessageAccessKeys(),
 							&a.mcp.auditKeyFilter,
 							a.mcpKeyOptions(true),
-							uikit.FilterChipProps{Key: "aud-key-filter"},
+							uikit.FilterChipProps{Motion: uikit.MotionOverride(a.reduceMotion(c)), Key: "aud-key-filter"},
 						)
 						uikit.FilterChip(
 							c,
 							locales.MessageTargetConnection(),
 							&a.mcp.auditConnFilter,
 							a.mcpConnectionOptions(-1, true),
-							uikit.FilterChipProps{Key: "aud-conn-filter"},
+							uikit.FilterChipProps{Motion: uikit.MotionOverride(a.reduceMotion(c)), Key: "aud-conn-filter"},
 						)
 						uikit.FilterChip(c, locales.MessageActionType(), &a.mcp.auditTypeFilter, []uikit.Option[string]{
 							{Value: "all", Label: locales.MessageAll()},
@@ -913,18 +914,18 @@ func (a *app) mcpAuditTab(c *ui.Context) {
 							{Value: "policy.", Label: locales.MessagePolicyManagement()},
 							{Value: "mcp.", Label: locales.MessageProtocolRequest()},
 							{Value: "authentication", Label: locales.MessageAuthenticationFailed()},
-						}, uikit.FilterChipProps{Key: "aud-type-filter"})
+						}, uikit.FilterChipProps{Motion: uikit.MotionOverride(a.reduceMotion(c)), Key: "aud-type-filter"})
 						uikit.FilterChip(c, locales.MessageTime(), &a.mcp.auditTimeFilter, []uikit.Option[string]{
 							{Value: "today", Label: locales.MessageToday2()},
 							{Value: "7d", Label: locales.MessageLastDays()},
 							{Value: "30d", Label: locales.MessageLastDays2()},
-						}, uikit.FilterChipProps{Key: "aud-time-filter"})
+						}, uikit.FilterChipProps{Motion: uikit.MotionOverride(a.reduceMotion(c)), Key: "aud-time-filter"})
 						uikit.FilterChip(c, locales.MessageResult(), &a.mcp.auditResultFilter, []uikit.Option[string]{
 							{Value: "all", Label: locales.MessageAll()},
 							{Value: "intercepted", Label: locales.MessageBlockedByPolicy()},
 							{Value: "denied", Label: locales.MessagePermissionDeniedAuthenticationFailed()},
 							{Value: "done", Label: locales.MessageCompleted()},
-						}, uikit.FilterChipProps{Key: "aud-res-filter"})
+						}, uikit.FilterChipProps{Motion: uikit.MotionOverride(a.reduceMotion(c)), Key: "aud-res-filter"})
 					})
 				})
 				uikit.TableHeaderRow(c, columns)

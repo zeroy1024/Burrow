@@ -27,28 +27,29 @@ type MenuEntry struct {
 
 // RowMenuOn shares one popup and renderer between a row's context gesture and
 // its more button. Context gestures use a point anchor, never a native menu.
-func RowMenuOn(c *ui.Context, row, trigger ui.Element, entries []MenuEntry) bool {
-	return menuOn(c, trigger, row, entries, false)
+func RowMenuOn(c *ui.Context, row, trigger ui.Element, entries []MenuEntry, motion MotionMode) bool {
+	return menuOn(c, trigger, row, entries, false, motion)
 }
 
 // ContextMenuOn uses the shared popup at the context gesture without taking
 // over the row's primary click, keyboard navigation, role or expanded state.
 // Targets share the popup with children that own pointer input, such as a
 // tab's drag handle and close button.
-func ContextMenuOn(c *ui.Context, row ui.Element, entries []MenuEntry, targets ...ui.Element) bool {
+func ContextMenuOn(c *ui.Context, row ui.Element, entries []MenuEntry, motion MotionMode, targets ...ui.Element) bool {
 	return menuOn(
 		c,
 		row,
 		row,
 		entries,
 		true,
+		motion,
 		targets...,
 	)
 }
 
 // MenuOn adds a token-styled menu to an existing, independently styled trigger.
-func MenuOn(c *ui.Context, trigger ui.Element, entries []MenuEntry) ui.Element {
-	menuOn(c, trigger, ui.Element{}, entries, false)
+func MenuOn(c *ui.Context, trigger ui.Element, entries []MenuEntry, motion MotionMode) ui.Element {
+	menuOn(c, trigger, ui.Element{}, entries, false, motion)
 	return trigger
 }
 
@@ -62,6 +63,7 @@ func menuOn(
 	trigger, row ui.Element,
 	entries []MenuEntry,
 	contextOnly bool,
+	motion MotionMode,
 	targets ...ui.Element,
 ) bool {
 	state := ui.Local(trigger, "uikit.menu.state", func() menuState { return menuState{} })
@@ -124,7 +126,7 @@ func menuOn(
 				Size(0, 0).PassThrough().Role(ui.RoleNone)
 		})
 	}
-	outside := menuPopup(c, anchor, open, entries, false, opening, closeMenu, point)
+	outside := menuPopup(c, anchor, open, entries, false, opening, closeMenu, point, motion)
 	if wasOpen && !*open && !outside && !trigger.IsDisabled() {
 		focusTarget.Focus()
 	}
@@ -139,6 +141,7 @@ func menuPopup(
 	submenu, focusFirst bool,
 	closeMenu func(),
 	point *ui.Point,
+	motion MotionMode,
 ) bool {
 	outside := false
 	ui.PopoverBase(c, anchor, open, func(panel ui.Element) {
@@ -150,10 +153,13 @@ func menuPopup(
 		}{"uikit.menu", anchor.ID()})
 		StyleSelectPopup(panel).Role(ui.RoleMenu).Label(locales.MessageActionsMenu2()).Column().KeepFocus()
 		enter := ui.Motion{}
-		if !c.Preferences().ReduceMotion {
+		reduced := MotionReduced(c, motion)
+		if !reduced {
 			enter.Scale = t.Opacity.PopoverEnterScale
 		}
-		panel.Transition(ui.ElementTransition{Duration: t.Motion.Duration.Exit, Enter: &enter, Exit: &ui.Motion{}})
+		panel.Transition(ui.ElementTransition{
+			Duration: t.Motion.Duration.Exit, Colors: reduced, Enter: &enter, Exit: &ui.Motion{},
+		})
 		outside = panel.PressedOutside()
 		x, y, _ := panel.PointerPosition()
 		pointer := ui.Point{X: x, Y: y}
@@ -280,7 +286,7 @@ func menuPopup(
 				childOpen := *child == entry.ID
 				wasChildOpen := childOpen
 				item.Expanded(childOpen)
-				childOutside := menuPopup(c, item, &childOpen, entry.Children, true, keyOpen, closeMenu, nil)
+				childOutside := menuPopup(c, item, &childOpen, entry.Children, true, keyOpen, closeMenu, nil, motion)
 				if wasChildOpen && !childOpen {
 					*child = ""
 					c.Invalidate()

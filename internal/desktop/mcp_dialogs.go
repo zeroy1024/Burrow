@@ -214,7 +214,8 @@ func (a *app) mcpPolicyFields(c *ui.Context) {
 				category = uikit.Segmented(c, &draft.CategorySeg, uikit.SegmentItems(
 					[]string{locales.MessageCommandPolicy(), locales.MessageFilePolicy()},
 				), uikit.SegmentedProps{
-					Size: uikit.SizeSm, Label: locales.MessagePolicyCategory(),
+					Motion: uikit.MotionOverride(a.reduceMotion(c)),
+					Size:   uikit.SizeSm, Label: locales.MessagePolicyCategory(),
 				})
 				if previousCategory != draft.CategorySeg {
 					draft.Connections = []string{}
@@ -297,11 +298,11 @@ func (a *app) mcpPolicyFields(c *ui.Context) {
 						uikit.FilterChip(c, locales.MessageLocation(), &rule.Side, []uikit.Option[string]{
 							{Value: "remote", Label: locales.MessageRemotePath()},
 							{Value: "local", Label: locales.MessageLocalPath()},
-						}, uikit.FilterChipProps{Key: fmt.Sprintf("side-%d", ruleIdx)})
+						}, uikit.FilterChipProps{Motion: uikit.MotionOverride(a.reduceMotion(c)), Key: fmt.Sprintf("side-%d", ruleIdx)})
 						uikit.FilterChip(c, locales.MessageType(), &rule.Kind, []uikit.Option[string]{
 							{Value: "dir", Label: locales.MessageDirectories()},
 							{Value: "file", Label: locales.MessageFile()},
-						}, uikit.FilterChipProps{Key: fmt.Sprintf("kind-%d", ruleIdx)})
+						}, uikit.FilterChipProps{Motion: uikit.MotionOverride(a.reduceMotion(c)), Key: fmt.Sprintf("kind-%d", ruleIdx)})
 						uikit.Input(c.Key(fmt.Sprintf("path-%d", ruleIdx)), &rule.Path, uikit.InputProps{
 							Mono: true, Label: locales.MessageProtectedPath(), Placeholder: "/var/www/shop/public/config",
 						}).Grow(1)
@@ -350,7 +351,7 @@ func (a *app) mcpPolicyFields(c *ui.Context) {
 							{Value: "exact", Label: locales.MessageExactMatch()},
 							{Value: "regex", Label: locales.MessageRegularExpression()},
 							{Value: "contains", Label: locales.MessageSubstringMatch()},
-						}, uikit.SelectProps{Label: locales.MessageMatchMode()}).
+						}, uikit.SelectProps{Motion: uikit.MotionOverride(a.reduceMotion(c)), Label: locales.MessageMatchMode()}).
 							Width(t.C.Mcp.RuleModeWidth).Shrink(0)
 						uikit.Input(c.Key(fmt.Sprintf("cpat-%d", cmdIdx)), &cmdRule.Pattern, uikit.InputProps{
 							Mono: true, Label: locales.MessageMatchPattern(), Placeholder: "rm -rf /", Error: ruleErr,
@@ -574,7 +575,8 @@ func (a *app) mcpAuditDrawer(c *ui.Context) {
 						uikit.Segmented(c, &a.mcp.auditResponseTab, uikit.SegmentItems(
 							[]string{locales.MessageOutput(), "JSON"},
 						), uikit.SegmentedProps{
-							Label: locales.MessageResponseView(), Size: uikit.SizeSm,
+							Motion: uikit.MotionOverride(a.reduceMotion(c)),
+							Label:  locales.MessageResponseView(), Size: uikit.SizeSm,
 						})
 					})
 				}
@@ -778,7 +780,7 @@ func (a *app) mcpAuditDrawer(c *ui.Context) {
 							c,
 							&a.mcp.auditFileFilter,
 							filterItems,
-							uikit.SegmentedProps{Size: uikit.SizeSm, Label: locales.MessageFilterPerFileResults()},
+							uikit.SegmentedProps{Motion: uikit.MotionOverride(a.reduceMotion(c)), Size: uikit.SizeSm, Label: locales.MessageFilterPerFileResults()},
 						)
 						ui.Column(c).FillWidth().Gap(t.Space.N4).Children(func() {
 							for idx, f := range item.Files {
@@ -1354,7 +1356,7 @@ func (a *app) mcpRetentionModal(c *ui.Context) {
 				{Value: "7", Label: locales.MessageDays()},
 				{Value: "30", Label: locales.MessageDays2()},
 				{Value: "90", Label: locales.MessageDays3()},
-			}, uikit.FilterChipProps{Key: "ret-days"})
+			}, uikit.FilterChipProps{Motion: uikit.MotionOverride(a.reduceMotion(c)), Key: "ret-days"})
 			if previousDays != a.mcp.retentionDays {
 				a.configureMCPBackend()
 			}

@@ -7,12 +7,14 @@ Every released version has a `## <version> - <date>` section, English first, the
 - Add the GitHub repository address to **Settings → About**, with buttons to open it in the default browser and copy the address.
 - Show a confirmation after copying the project address or app version in **Settings → About**.
 - Refine interface animations with smoother spring motion for dialogs, sidebars, drawers, segmented tabs, and switches, plus smooth transitions when switching main sections, settings categories, dropdowns, menus, and server monitor meters.
+- Honor the app's **Reduce motion** setting for navigation, settings transitions, segmented controls, menus, and dropdowns while retaining fades and color transitions.
 
 **简体中文**
 
 - 在**设置 → 关于**中新增 GitHub 项目地址，支持在默认浏览器中打开和复制地址。
 - 在**设置 → 关于**中复制项目地址或应用版本后显示成功提示。
 - 优化全局界面动效：弹窗、侧边栏、抽屉、分段切换条与开关采用更顺滑的弹簧过渡，并在主导航切换、设置分类切换、菜单与下拉框展开以及监控进度条变化时提供平滑过渡。
+- 修复导航、设置页切换、分段切换条、菜单和下拉框未遵循应用内**减少动态效果**设置的问题，同时保留透明度和颜色过渡。
 
 ## 0.1.9 - 2026-11-13
 

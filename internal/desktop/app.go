@@ -648,6 +648,7 @@ func (a *app) navigation(c *ui.Context) {
 
 func (a *app) navigationButton(c *ui.Context, target section, label string, icon *ui.SVG, staticPill bool) ui.Element {
 	props := uikit.RailButtonProps{
+		Motion:     uikit.MotionOverride(a.reduceMotion(c)),
 		Key:        label,
 		Label:      label,
 		Icon:       icon,

@@ -32,7 +32,8 @@ func (a *app) sidebar(c *ui.Context, shown float32) {
 	newBinding := a.shortcutBinding("session.new")
 	newModifiers, newKey, _ := bindingToKey(newBinding)
 	result := uikit.Sider(c, title, uikit.SiderProps{
-		Label: directoryLabel, AddLabel: locales.CommonAdd(), AddIcon: plusIcon, Footer: summary, FooterIcon: serverIcon,
+		Motion: uikit.MotionOverride(a.reduceMotion(c)),
+		Label:  directoryLabel, AddLabel: locales.CommonAdd(), AddIcon: plusIcon, Footer: summary, FooterIcon: serverIcon,
 		Query: &a.page().query,
 		Search: uikit.SearchProps{Label: searchLabel, Placeholder: placeholder, Icon: searchIcon,
 			Handle: &a.page().search, Kbd: shortcutDisplay(a.shortcutBinding("host.search"))},

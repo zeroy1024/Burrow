@@ -452,7 +452,7 @@ func (a *app) gatewayDefaultBar(c *ui.Context) {
 				c,
 				&selected,
 				options,
-				uikit.SelectProps{Label: locales.MessageDefaultAppGateway(), Disabled: len(a.gateways) == 0},
+				uikit.SelectProps{Motion: uikit.MotionOverride(a.reduceMotion(c)), Label: locales.MessageDefaultAppGateway(), Disabled: len(a.gateways) == 0},
 			).
 				Width(t.Size.Sider).Shrink(0)
 			if input.Changed() {
@@ -561,7 +561,8 @@ func (a *app) gatewayList(c *ui.Context) {
 		}
 	}
 	result := uikit.Sider(c, locales.GatewaysTitle(), uikit.SiderProps{
-		Label: locales.MessageGatewayList(), AddLabel: locales.MessageAddGateway(), AddIcon: plusIcon, FooterIcon: routeIcon,
+		Motion: uikit.MotionOverride(a.reduceMotion(c)),
+		Label:  locales.MessageGatewayList(), AddLabel: locales.MessageAddGateway(), AddIcon: plusIcon, FooterIcon: routeIcon,
 		Footer: locales.GatewaysCount(len(a.gateways), live),
 		Query:  &page.query,
 		Search: uikit.SearchProps{Label: locales.MessageSearchGateways(), Placeholder: locales.MessageSearchGatewaysAndAddresses(), Icon: searchIcon,
@@ -699,7 +700,7 @@ func (a *app) gatewayRow(c *ui.Context, g gatewayConfig) {
 		more := uikit.SiderMore(c, row, uikit.SiderMoreProps{
 			Icon: moreIcon, Label: locales.ActionsForName(g.Name),
 		})
-		uikit.RowMenuOn(c, row, more, a.gatewayMenu(g))
+		uikit.RowMenuOn(c, row, more, a.gatewayMenu(g), uikit.MotionOverride(a.reduceMotion(c)))
 	})
 }
 
@@ -745,7 +746,7 @@ func (a *app) gatewayDetail(c *ui.Context) {
 				moreIcon,
 				uikit.IconButtonProps{Key: "gateway-more", Label: locales.MessageMoreGatewayActions(), Variant: uikit.IconFilled},
 			)
-			uikit.MenuOn(c, more, a.gatewayMenu(g))
+			uikit.MenuOn(c, more, a.gatewayMenu(g), uikit.MotionOverride(a.reduceMotion(c)))
 		})
 	})
 	viewport := ui.Box(c).Key("gateway-detail-viewport").Grow(1).MinHeight(0).FillWidth().Clip()
@@ -1457,7 +1458,7 @@ func (a *app) gatewayEditDialog(c *ui.Context, d *gatewayDraft) {
 					{Label: "SSH", IconSVG: terminalIcon, IconTone: uikit.ToneAccent},
 					{Label: "Socks5", IconSVG: globeIcon, IconTone: uikit.ToneTertiary},
 					{Label: "WireGuard", IconSVG: routeIcon, IconTone: uikit.ToneAccent},
-				}, uikit.SegmentedProps{Label: locales.MessageGatewayType(), Fill: true, Cards: true})
+				}, uikit.SegmentedProps{Motion: uikit.MotionOverride(a.reduceMotion(c)), Label: locales.MessageGatewayType(), Fill: true, Cards: true})
 			})
 			if gatewayKinds[kind] != d.value.Kind {
 				d.value.Kind, d.errorText = gatewayKinds[kind], locales.Text{}
@@ -1516,7 +1517,7 @@ func (a *app) gatewayDraftFields(c *ui.Context, d *gatewayDraft) {
 				c,
 				&d.value.SSHProfileID,
 				options,
-				uikit.SelectProps{Label: locales.MessageSshHost(), Placeholder: locales.MessageSelectASavedSshHost()},
+				uikit.SelectProps{Motion: uikit.MotionOverride(a.reduceMotion(c)), Label: locales.MessageSshHost(), Placeholder: locales.MessageSelectASavedSshHost()},
 			)
 		})
 		uikit.FormRow(c, locales.MessageUpstreamGateway(), uikit.FormRowProps{Key: "upstream", Help: locales.MessageAnSshGatewayUsesItsSourceHostSGatewayRouteJustLikeA()}, func() ui.Element {
@@ -1563,7 +1564,7 @@ func (a *app) gatewayDraftFields(c *ui.Context, d *gatewayDraft) {
 				c,
 				&d.auth,
 				uikit.SegmentItems([]string{locales.MessageNoAuthentication(), locales.MessageUsernameAndPassword()}),
-				uikit.SegmentedProps{Label: locales.MessageSocks5Authentication2(), Size: uikit.SizeSm},
+				uikit.SegmentedProps{Motion: uikit.MotionOverride(a.reduceMotion(c)), Label: locales.MessageSocks5Authentication2(), Size: uikit.SizeSm},
 			)
 		})
 		if d.auth == 1 {
@@ -1603,7 +1604,7 @@ func (a *app) gatewayDraftFields(c *ui.Context, d *gatewayDraft) {
 			options = append(options, option)
 		}
 		uikit.FormRow(c, locales.MessageUpstreamGateway(), uikit.FormRowProps{Key: "upstream", Help: locales.MessageTheOutboundRouteUsedToConnectToTheProxyServer()}, func() ui.Element {
-			return uikit.Select(c, &d.value.UpstreamID, options, uikit.SelectProps{Label: locales.MessageUpstreamGateway()})
+			return uikit.Select(c, &d.value.UpstreamID, options, uikit.SelectProps{Motion: uikit.MotionOverride(a.reduceMotion(c)), Label: locales.MessageUpstreamGateway()})
 		})
 	}
 	uikit.FormRow(c, locales.MessageRoutePreview(), uikit.FormRowProps{Key: "route-preview"}, func() ui.Element {

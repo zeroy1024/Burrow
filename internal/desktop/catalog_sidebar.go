@@ -160,7 +160,7 @@ func (a *app) catalogHeader(c *ui.Context, slot catalogSlot) ui.Element {
 	if a.page().catalogDrag == nil {
 		menu = a.catalogGroupMenu(c, group)
 	}
-	uikit.ContextMenuOn(c, header, menu)
+	uikit.ContextMenuOn(c, header, menu, uikit.MotionOverride(a.reduceMotion(c)))
 	if highlight && a.groupCollapsed(group) && !a.page().catalogDrag.autoExpanded[group] {
 		header.Children(func() {
 			progress := min(1, float32(c.Now().Sub(a.page().catalogDrag.hoverStarted))/float32(t.C.GroupHeader.ExpandDelay))

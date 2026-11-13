@@ -46,8 +46,8 @@ func TitleBarActions(c *ui.Context) ui.Element {
 	return ui.Row(c).PaddingEnd(p.ActionsPaddingRight).Gap(p.ActionsGap).Shrink(0)
 }
 
-func CountTabs(c *ui.Context, selected *int, items []SegItem) ui.Element {
+func CountTabs(c *ui.Context, selected *int, items []SegItem, motion MotionMode) ui.Element {
 	// Segmented's Start alignment keeps form columns compact; these filters
 	// live in a horizontal header and must share its vertical center.
-	return Segmented(c, selected, items, SegmentedProps{Size: SizeSm}).AlignSelf(ui.Center)
+	return Segmented(c, selected, items, SegmentedProps{Size: SizeSm, Motion: motion}).AlignSelf(ui.Center)
 }

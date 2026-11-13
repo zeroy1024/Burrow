@@ -13,6 +13,7 @@ type SiderProps struct {
 	AddMenu                 []MenuEntry
 	Query                   *string
 	Search                  SearchProps
+	Motion                  MotionMode
 }
 
 type SiderResult struct {
@@ -43,7 +44,7 @@ func Sider(c *ui.Context, title string, props SiderProps, body func()) SiderResu
 		header := SiderHeader(c, SiderHeaderProps{Title: title, AddLabel: addLabel, AddIcon: icon})
 		result.AddButton, result.Add = header.Add, header.Add.Clicked()
 		if len(props.AddMenu) != 0 {
-			MenuOn(c, header.Add, props.AddMenu)
+			MenuOn(c, header.Add, props.AddMenu, props.Motion)
 		}
 		search := props.Search
 		if search.Label == "" {
@@ -356,7 +357,7 @@ func (result *SiderRowResult) Present(c *ui.Context, view SiderRowPresentation) 
 		// Even when dragging has removed the menu entries, the disabled trigger
 		// must pass through RowMenuOn once to clear a previously open popover.
 		if len(props.Menu) != 0 || view.InteractionDisabled {
-			result.Menu = RowMenuOn(c, row, result.More, props.Menu)
+			result.Menu = RowMenuOn(c, row, result.More, props.Menu, props.Motion)
 		}
 	})
 }

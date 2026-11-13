@@ -99,6 +99,7 @@ func (a *app) keySettings(c *ui.Context) {
 						uikit.IconButtonProps{Label: locales.MessageKeyActions(), Disabled: a.credentials.busy},
 					),
 					a.managedKeyMenu(c, key),
+					uikit.MotionOverride(a.reduceMotion(c)),
 				)
 			})
 		}
@@ -285,7 +286,7 @@ func (a *app) credentialDialogs(c *ui.Context) {
 						c.Key(a.credentials.busy),
 						&d.keyType,
 						uikit.StringOptions([]string{"Ed25519", "RSA 4096"}),
-						uikit.SelectProps{Label: locales.MessageKeyType(), Disabled: a.credentials.busy},
+						uikit.SelectProps{Motion: uikit.MotionOverride(a.reduceMotion(c)), Label: locales.MessageKeyType(), Disabled: a.credentials.busy},
 					).Label(locales.MessageKeyType())
 				})
 				credentialField(c, locales.MessageComment(), func() ui.Element {

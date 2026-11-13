@@ -24,11 +24,13 @@ type SelectProps struct {
 	Error              string
 	Detail             string
 	Leading            func()
+	Motion             MotionMode
 }
 
 func Select[T comparable](c *ui.Context, selected *T, options []Option[T], props SelectProps) ui.Element {
 	t := theme.Current()
 	p := t.C.Input
+	reduced := MotionReduced(c, props.Motion)
 	parts := ui.SelectBase(c, selected)
 	trigger := StyleSelect(parts.Trigger, props.Label).Gap(p.Gap).Disabled(props.Disabled).FocusRing(false)
 	if props.Handle != nil {
@@ -73,8 +75,12 @@ func Select[T comparable](c *ui.Context, selected *T, options []Option[T], props
 		if parts.Open() {
 			chevronRot = 180
 		}
-		Icon(c, IconChevronDown, IconProps{Size: SizeSm, Tone: ToneTertiary}).Key("chevron").Shrink(0).PassThrough().
-			AnimatePose(ui.Pose{Rotate: chevronRot}, Anim(c, p.Transition))
+		chevron := Icon(c, IconChevronDown, IconProps{Size: SizeSm, Tone: ToneTertiary}).Key("chevron").Shrink(0).PassThrough()
+		if reduced {
+			chevron.Rotate(chevronRot)
+		} else {
+			chevron.AnimatePose(ui.Pose{Rotate: chevronRot}, Anim(c, p.Transition, props.Motion))
+		}
 	})
 	StyleDisabled(trigger, props.Disabled)
 	StyleFormControl(trigger, props.Error)
@@ -88,10 +94,12 @@ func Select[T comparable](c *ui.Context, selected *T, options []Option[T], props
 			available := max(0, width-2*t.Space.N4)
 			StyleSelectPopup(panel).MaxWidth(available).MinWidth(min(trigger.Bounds().W, available))
 			enter := ui.Motion{}
-			if !c.Preferences().ReduceMotion {
+			if !reduced {
 				enter.Scale = t.Opacity.PopoverEnterScale
 			}
-			panel.Transition(ui.ElementTransition{Duration: t.Motion.Duration.Exit, Enter: &enter, Exit: &ui.Motion{}})
+			panel.Transition(ui.ElementTransition{
+				Duration: t.Motion.Duration.Exit, Colors: reduced, Enter: &enter, Exit: &ui.Motion{},
+			})
 			SelectPopupViewport(c, trigger, panel).Children(func() {
 				for _, option := range options {
 					// Item reads hover during construction, so its identity must already be assigned.

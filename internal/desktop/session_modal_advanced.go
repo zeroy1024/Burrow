@@ -42,7 +42,7 @@ func (a *app) sessionSSHAdvanced(c *ui.Context, d *hostDraft) {
 			c,
 			&d.platform,
 			options,
-			uikit.SelectProps{Label: locales.MessageRemoteSystem()},
+			uikit.SelectProps{Motion: uikit.MotionOverride(a.reduceMotion(c)), Label: locales.MessageRemoteSystem()},
 		).Width(t.C.Input.SelectWidth)
 		if input.Changed() {
 			d.changed("platform")
@@ -110,7 +110,7 @@ func (a *app) sessionSchemeSelect(c *ui.Context, d *hostDraft) ui.Element {
 				Background(uikit.Color(scheme.Background)).PassThrough()
 		}})
 	}
-	props := uikit.SelectProps{Label: locales.MessageTerminalColorScheme()}
+	props := uikit.SelectProps{Motion: uikit.MotionOverride(a.reduceMotion(c)), Label: locales.MessageTerminalColorScheme()}
 	if selected == "" {
 		props.Detail = a.terminal.followLight + " / " + a.terminal.followDark
 		props.Leading = func() {
@@ -180,7 +180,7 @@ func (a *app) sessionFileAdvanced(c *ui.Context, d *hostDraft) {
 			c,
 			&d.encoding,
 			uikit.StringOptions([]string{"UTF-8", "GBK", "GB18030", "Big5", "Shift_JIS", "EUC-KR", "ISO-8859-1"}),
-			uikit.SelectProps{Label: locales.MessageFilenameEncoding()},
+			uikit.SelectProps{Motion: uikit.MotionOverride(a.reduceMotion(c)), Label: locales.MessageFilenameEncoding()},
 		).Width(t.C.Input.SelectWidth)
 		if input.Changed() {
 			d.changed("encoding")
@@ -198,7 +198,7 @@ func (a *app) sessionFileAdvanced(c *ui.Context, d *hostDraft) {
 					c,
 					&selected,
 					uikit.SegmentItems([]string{locales.MessagePassivePasv(), locales.MessageActivePort()}),
-					uikit.SegmentedProps{Label: locales.MessageFtpMode()},
+					uikit.SegmentedProps{Motion: uikit.MotionOverride(a.reduceMotion(c)), Label: locales.MessageFtpMode()},
 				)
 				if input.Changed() {
 					d.ftpMode = []string{"passive", "active"}[selected]
@@ -214,7 +214,7 @@ func (a *app) sessionFileAdvanced(c *ui.Context, d *hostDraft) {
 					c,
 					&selected,
 					uikit.SegmentItems([]string{locales.MessageNone(), locales.MessageExplicitTls(), locales.MessageImplicitTls()}),
-					uikit.SegmentedProps{Label: "TLS"},
+					uikit.SegmentedProps{Motion: uikit.MotionOverride(a.reduceMotion(c)), Label: "TLS"},
 				)
 				if input.Changed() {
 					d.ftpTLS = values[selected]

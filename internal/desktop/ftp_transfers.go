@@ -435,7 +435,7 @@ func (a *app) transferFilters(c *ui.Context, summary transferSummary, total int)
 	q := &a.transfers
 	active, done := summary.running+summary.queued+summary.paused, summary.done
 	items := []uikit.SegItem{{Label: locales.MessageAll(), Count: &total}, {Label: locales.MessageInProgress(), Count: &active}, {Label: locales.MessageCompleted(), Count: &done}}
-	if uikit.TransferFilters(c, locales.MessageTransferCategory(), &q.filter, items).Changed() {
+	if uikit.TransferFilters(c, locales.MessageTransferCategory(), &q.filter, items, uikit.MotionOverride(a.reduceMotion(c))).Changed() {
 		a.saveFilePreferences(c)
 	}
 }
@@ -466,7 +466,7 @@ func (a *app) transferRow(c *ui.Context, task *transferTask) {
 	result := uikit.TransferRow(c, &view)
 	menu := []uikit.MenuEntry{}
 	menu = append(menu, uikit.MenuEntry{ID: "reveal", Label: locales.MessageShowInFolder(), Icon: uikit.IconFolder, OnChoose: func() { a.revealTransferredFile(c, task) }})
-	uikit.ContextMenuOn(c, result.Root, menu)
+	uikit.ContextMenuOn(c, result.Root, menu, uikit.MotionOverride(a.reduceMotion(c)))
 	if result.Root.DoubleClicked() || result.Reveal {
 		a.revealTransferredFile(c, task)
 	}

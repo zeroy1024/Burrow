@@ -101,8 +101,9 @@ func (a *app) settings(c *ui.Context) {
 	t := theme.Current()
 	p := t.C.Settings
 	searching := strings.TrimSpace(a.settingsUI.query) != ""
+	reduced := a.reduceMotion(c)
 	var switchTransition ui.ElementTransition
-	if !a.reduceMotion(c) {
+	if !reduced {
 		enter := ui.Motion{Opacity: 1, Y: p.SwitchY}
 		anim := ui.Animation{Spring: uikit.Spring(p.Enter)}
 		switchTransition = ui.ElementTransition{
@@ -119,7 +120,11 @@ func (a *app) settings(c *ui.Context) {
 			BorderWidth(0, 0, t.Size.Divider, 0).BorderColor(uikit.Color(t.Color.Border.Divider)).AlignItems(ui.Center).Children(func() {
 			category := settingsCategories()[a.settingsCategory]
 			ui.Box(c).Key("settings-header-stage").Grow(1).Children(func() {
-				ui.Column(c).Key(stageKey).FillWidth().Gap(t.Space.N4).Transition(switchTransition).Children(func() {
+				header := ui.Column(c).Key(stageKey).FillWidth().Gap(t.Space.N4)
+				if !reduced {
+					header.Transition(switchTransition)
+				}
+				header.Children(func() {
 					title, subtitle := category.label, category.subtitle
 					if searching {
 						title, subtitle = locales.MessageSearchResults(), locales.MessageMatchingSettingNamesAndDescriptionsChangesApplyImmediately()
@@ -136,7 +141,10 @@ func (a *app) settings(c *ui.Context) {
 				ui.Column(c).FillWidth().AlignItems(ui.Center).Children(func() {
 					ui.Box(c).Key("settings-content-stage").FillWidth().MaxWidth(p.ContentMax + 2*p.ContentPaddingX).Children(func() {
 						content := ui.Column(c).Key(stageKey).FillWidth().
-							Padding(p.ContentPaddingY, p.ContentPaddingX).Gap(p.GroupGap).Transition(switchTransition)
+							Padding(p.ContentPaddingY, p.ContentPaddingX).Gap(p.GroupGap)
+						if !reduced {
+							content.Transition(switchTransition)
+						}
 						content.Children(func() {
 							if !a.settingsUI.notice.Empty() {
 								uikit.Banner(c, a.settingsUI.notice.String(), uikit.BannerProps{Tone: uikit.ToneDanger, Icon: sessionAlertIcon})
@@ -281,12 +289,12 @@ func (a *app) settingsGroup(c *ui.Context, id, title, help string, fields []sett
 	})
 }
 
-func settingsSegment(c *ui.Context, id, label string, options []string, current int, change func(int)) {
+func (a *app) settingsSegment(c *ui.Context, id, label string, options []string, current int, change func(int)) {
 	items := make([]uikit.SegItem, len(options))
 	for index, label := range options {
 		items[index] = uikit.SegItem{Label: label}
 	}
-	if uikit.Segmented(c.Key(id), &current, items, uikit.SegmentedProps{Label: label}).Changed() {
+	if uikit.Segmented(c.Key(id), &current, items, uikit.SegmentedProps{Motion: uikit.MotionOverride(a.reduceMotion(c)), Label: label}).Changed() {
 		change(current)
 	}
 }
@@ -304,7 +312,7 @@ func (a *app) generalSettings(c *ui.Context) {
 		for _, tag := range mygo.App.Languages() {
 			options = append(options, uikit.Option[string]{Value: tag, Label: i18n.Autonym(tag)})
 		}
-		if uikit.Select(c, &a.prefs.Locale, options, uikit.SelectProps{Label: locales.SettingsLanguage()}).
+		if uikit.Select(c, &a.prefs.Locale, options, uikit.SelectProps{Motion: uikit.MotionOverride(a.reduceMotion(c)), Label: locales.SettingsLanguage()}).
 			Width(theme.Current().C.Settings.ContentMax / 3).Label(locales.SettingsLanguage()).Changed() {
 			mygo.App.SetLocale(a.prefs.Locale)
 			a.preferencesChanged()
@@ -320,7 +328,7 @@ func (a *app) generalSettings(c *ui.Context) {
 		}},
 		{"MessageWhenTheLastTabCloses", locales.MessageWhenTheLastTabCloses(), "", "", func() {
 			values := []string{"keep", "closeWindow", "quit"}
-			settingsSegment(c, "last-tab-close", locales.MessageWhenTheLastTabCloses(), []string{locales.MessageKeepWindow(), locales.MessageCloseWindow(), locales.MessageQuitApp()}, slices.Index(values, a.prefs.LastTabClose), func(index int) { a.prefs.LastTabClose = values[index]; a.preferencesChanged() })
+			a.settingsSegment(c, "last-tab-close", locales.MessageWhenTheLastTabCloses(), []string{locales.MessageKeepWindow(), locales.MessageCloseWindow(), locales.MessageQuitApp()}, slices.Index(values, a.prefs.LastTabClose), func(index int) { a.prefs.LastTabClose = values[index]; a.preferencesChanged() })
 		}},
 		{"MessageConfirmBeforeClosingAnActiveConnection", locales.MessageConfirmBeforeClosingAnActiveConnection(), "", "", func() {
 			a.preferenceSwitch(c, locales.MessageConfirmBeforeClosingAnActiveConnection(), &a.prefs.ConfirmCloseActive)
@@ -333,7 +341,7 @@ func (a *app) generalSettings(c *ui.Context) {
 		{"MessageWhenTheMainWindowCloses", locales.MessageWhenTheMainWindowCloses(), "",
 			locales.MessageBackgroundRunningKeepsServicesAndConnections(), func() {
 				values := []string{"quit", "background"}
-				settingsSegment(
+				a.settingsSegment(
 					c,
 					"window-close",
 					locales.MessageWhenTheMainWindowCloses(),
@@ -411,7 +419,7 @@ func (a *app) appearanceSettings(c *ui.Context) {
 	}}, {"MessagePreview", locales.MessagePreview(), "", "", func() {
 		ui.Row(c).Gap(t.Space.N12).AlignItems(ui.Center).Children(func() {
 			uikit.Button(c, locales.MessagePrimary(), uikit.ButtonProps{Variant: uikit.ButtonPrimary})
-			settingsSegment(c, "accent-preview", locales.MessagePreview(), []string{locales.MessageOne(), locales.MessageTwo()}, 0, func(int) {})
+			a.settingsSegment(c, "accent-preview", locales.MessagePreview(), []string{locales.MessageOne(), locales.MessageTwo()}, 0, func(int) {})
 			on := true
 			uikit.Progress(c.Key("accent-progress-preview"), uikit.ProgressProps{
 				Value: 0.5, Height: t.C.Progress.Height, Track: t.C.Progress.Track, Fill: t.C.Progress.Fill,
@@ -426,7 +434,7 @@ func (a *app) appearanceSettings(c *ui.Context) {
 	a.settingsGroup(c, "MessageAccessibility", locales.MessageAccessibility(), locales.MessageSystemReducedMotionStillAppliesToMygoControlsWhenAppReducedMotionIs(), []settingField{
 		{"MessageReduceMotion", locales.MessageReduceMotion(), "", locales.MessageReduceMovementAndScalingWhileRetainingFadesAndColorTransitions(), func() {
 			values := []string{"system", "on", "off"}
-			settingsSegment(c, "reduce-motion", locales.MessageReduceMotion(), []string{locales.SettingsLanguageSystem(), locales.MessageAlwaysOn(), locales.CommonClose()}, slices.Index(values, a.prefs.ReduceMotion), func(index int) { a.prefs.ReduceMotion = values[index]; a.preferencesChanged() })
+			a.settingsSegment(c, "reduce-motion", locales.MessageReduceMotion(), []string{locales.SettingsLanguageSystem(), locales.MessageAlwaysOn(), locales.CommonClose()}, slices.Index(values, a.prefs.ReduceMotion), func(index int) { a.prefs.ReduceMotion = values[index]; a.preferencesChanged() })
 		}},
 		{"MessageWindowTranslucency", locales.MessageWindowTranslucency(), "", locales.MessageFrostedWindowBackgroundOnMacosAndBlurWithinBarsDisabledWhenTheSystem(), func() {
 			value := a.prefs.Translucency
@@ -551,7 +559,7 @@ func (a *app) terminalColorSettings(c *ui.Context) {
 					if a.terminal.mode.Kind == termtheme.FixedScheme {
 						index = 1
 					}
-					settingsSegment(c, "scheme-mode", locales.MessageColorSchemeMode(), []string{locales.MessageFollowAppAppearance(), locales.MessageFixedScheme()}, index, func(index int) {
+					a.settingsSegment(c, "scheme-mode", locales.MessageColorSchemeMode(), []string{locales.MessageFollowAppAppearance(), locales.MessageFixedScheme()}, index, func(index int) {
 						a.changeTerminalSettings(func() {
 							if index == 0 {
 								a.terminal.mode = termtheme.FollowAppTheme()
@@ -576,7 +584,7 @@ func (a *app) terminalColorSettings(c *ui.Context) {
 		})
 	}
 	a.settingsGroup(c, "MessageBackground", locales.MessageBackground(), "", []settingField{{"MessageTerminalBackground", locales.MessageTerminalBackground(), "", locales.MessageSchemeUseItsBackgroundInAnyAppearanceMatchCardUseTheCardBackground(), func() {
-		settingsSegment(c, "terminal-bg", locales.MessageTerminalBackground(), []string{locales.MessageSchemeDefault(), locales.MessageMatchCard()}, int(a.terminal.prefs.Background), func(index int) {
+		a.settingsSegment(c, "terminal-bg", locales.MessageTerminalBackground(), []string{locales.MessageSchemeDefault(), locales.MessageMatchCard()}, int(a.terminal.prefs.Background), func(index int) {
 			a.changeTerminalSettings(func() { a.terminal.prefs.Background = termtheme.BackgroundSource(index) })
 		})
 	}}})
@@ -689,7 +697,7 @@ func (a *app) terminalTextSettings(c *ui.Context) {
 				c,
 				&selected,
 				uikit.StringOptions(a.settingsUI.fonts),
-				uikit.SelectProps{Label: locales.MessageFont()},
+				uikit.SelectProps{Motion: uikit.MotionOverride(a.reduceMotion(c)), Label: locales.MessageFont()},
 			).Width(t.C.Settings.SelectWidth).Label(locales.MessageFont()).Changed() {
 				a.changeTerminalSettings(func() { a.terminal.prefs.FontFamily = []string{selected, "monospace"} })
 			}
@@ -720,7 +728,7 @@ func (a *app) terminalTextSettings(c *ui.Context) {
 	})
 	a.settingsGroup(c, "MessageCursor", locales.MessageCursor(), "", []settingField{
 		{"MessageStyle", locales.MessageStyle(), "", "", func() {
-			settingsSegment(c, "cursor-shape", locales.MessageCursorStyle(), []string{locales.MessageBlock(), locales.MessageBar(), locales.MessageUnderline()}, int(a.terminal.prefs.CursorShape), func(index int) {
+			a.settingsSegment(c, "cursor-shape", locales.MessageCursorStyle(), []string{locales.MessageBlock(), locales.MessageBar(), locales.MessageUnderline()}, int(a.terminal.prefs.CursorShape), func(index int) {
 				a.changeTerminalSettings(func() { a.terminal.prefs.CursorShape = termtheme.CursorShape(index) })
 			})
 		}},
@@ -770,7 +778,7 @@ func (a *app) fileSettings(c *ui.Context) {
 		}},
 		{"MessageNameConflicts", locales.MessageNameConflicts(), "", "", func() {
 			values := []string{"ask", "overwrite", "skip", "rename"}
-			settingsSegment(c, "conflict-policy", locales.MessageNameConflicts(), []string{locales.MessageAsk(), locales.MessageOverwrite(), locales.MessageSkip(), locales.MessageRename()}, slices.Index(values, a.prefs.ConflictPolicy), func(index int) { a.prefs.ConflictPolicy = values[index]; a.preferencesChanged() })
+			a.settingsSegment(c, "conflict-policy", locales.MessageNameConflicts(), []string{locales.MessageAsk(), locales.MessageOverwrite(), locales.MessageSkip(), locales.MessageRename()}, slices.Index(values, a.prefs.ConflictPolicy), func(index int) { a.prefs.ConflictPolicy = values[index]; a.preferencesChanged() })
 		}},
 	})
 }

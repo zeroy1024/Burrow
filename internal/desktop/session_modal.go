@@ -187,7 +187,7 @@ func (a *app) sessionProtocolPicker(c *ui.Context, d *hostDraft) {
 		uikit.Segmented(c.Key("file-protocol"), &selected, []uikit.SegItem{
 			{Label: "SFTP", IconSVG: folderLockIcon, IconTone: uikit.ToneAccent, Detail: locales.MessageEncryptedTransferOverSsh()},
 			{Label: "FTP", IconSVG: folderIcon, IconTone: uikit.ToneTertiary, Detail: locales.MessageClassicFtpWithOptionalTls()},
-		}, uikit.SegmentedProps{Label: locales.MessageProtocol(), Fill: true, Cards: true})
+		}, uikit.SegmentedProps{Motion: uikit.MotionOverride(a.reduceMotion(c)), Label: locales.MessageProtocol(), Fill: true, Cards: true})
 	})
 	if before != selected {
 		a.setModalAdvancedOpen(strings.ToLower(d.protocol), d.advanced)
@@ -311,7 +311,7 @@ func (a *app) sessionDraftFields(c *ui.Context, d *hostDraft, dismiss func()) {
 			c.Key("auth"),
 			&index,
 			uikit.SegmentItems(labels),
-			uikit.SegmentedProps{Label: locales.MessageAuthenticationMethod()},
+			uikit.SegmentedProps{Motion: uikit.MotionOverride(a.reduceMotion(c)), Label: locales.MessageAuthenticationMethod()},
 		)
 		if input.Changed() {
 			d.auth = values[index]
@@ -379,7 +379,7 @@ func (a *app) sessionDraftFields(c *ui.Context, d *hostDraft, dismiss func()) {
 			c,
 			&d.gateway,
 			a.hostGatewayOptions(d),
-			uikit.SelectProps{Label: locales.MessageConnectionGateway()},
+			uikit.SelectProps{Motion: uikit.MotionOverride(a.reduceMotion(c)), Label: locales.MessageConnectionGateway()},
 		)
 		if input.Changed() {
 			d.changed("gateway")
@@ -399,7 +399,7 @@ func (a *app) sessionDraftFields(c *ui.Context, d *hostDraft, dismiss func()) {
 		}
 		options := append(a.groupNames(), locales.MessageNewGroup2())
 		previous := d.group
-		input := uikit.Select(c, &d.group, uikit.StringOptions(options), uikit.SelectProps{Label: locales.MessageGroup()})
+		input := uikit.Select(c, &d.group, uikit.StringOptions(options), uikit.SelectProps{Motion: uikit.MotionOverride(a.reduceMotion(c)), Label: locales.MessageGroup()})
 		if input.Changed() {
 			if d.group == locales.MessageNewGroup2() {
 				d.group = previous
@@ -475,7 +475,8 @@ func (a *app) sessionKeySelect(c *ui.Context, d *hostDraft) ui.Element {
 	}
 	options = append(options, uikit.Option[string]{Value: "__import__", Label: locales.MessageImportPrivateKey2()})
 	input := uikit.Select(c.Key("private-key"), &d.keyID, options, uikit.SelectProps{
-		Label: locales.MessagePrivateKeys(), Placeholder: locales.MessageSelectAPrivateKey(), Handle: d.handles["key"], Error: d.errors["key"].String(),
+		Motion: uikit.MotionOverride(a.reduceMotion(c)),
+		Label:  locales.MessagePrivateKeys(), Placeholder: locales.MessageSelectAPrivateKey(), Handle: d.handles["key"], Error: d.errors["key"].String(),
 		Leading: func() {
 			uikit.Icon(c, sessionKeyIcon, uikit.IconProps{Size: uikit.SizeSm, Tone: uikit.ToneTertiary}).PassThrough()
 		},

@@ -127,7 +127,7 @@ func (a *app) updateSettings(c *ui.Context) {
 		}},
 		{"UpdateChannel", locales.UpdateChannel(), locales.UpdateChannelDetail(), "", func() {
 			values := []string{"stable", "preview"}
-			settingsSegment(c, "update-channel", locales.UpdateChannel(),
+			a.settingsSegment(c, "update-channel", locales.UpdateChannel(),
 				[]string{locales.UpdateChannelStable(), locales.UpdateChannelPreview()},
 				slices.Index(values, a.prefs.UpdateChannel), func(index int) {
 					a.prefs.UpdateChannel = values[index]

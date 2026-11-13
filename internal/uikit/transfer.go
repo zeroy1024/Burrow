@@ -58,8 +58,8 @@ func TransferHeaderSummary(c *ui.Context, summary string) ui.Element {
 		TextColor(Color(t.C.FileList.Meta)).SingleLine().Shrink(1)
 }
 
-func TransferFilters(c *ui.Context, label string, selected *int, items []SegItem) ui.Element {
-	return CountTabs(c, selected, items).Label(label)
+func TransferFilters(c *ui.Context, label string, selected *int, items []SegItem, motion MotionMode) ui.Element {
+	return CountTabs(c, selected, items, motion).Label(label)
 }
 
 func TransferAction(c *ui.Context, key, label string, icon *ui.SVG, disabled bool) ui.Element {

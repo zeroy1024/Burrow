@@ -328,6 +328,7 @@ func (a *app) fileToolbar(c *ui.Context, session *fileSession, pane *filePaneSta
 			c,
 			uikit.IconButton(c, moreIcon, uikit.IconButtonProps{Label: locales.MessageMoreFileActions()}),
 			a.filePaneMenu(c, session, pane),
+			uikit.MotionOverride(a.reduceMotion(c)),
 		)
 	})
 }
@@ -408,7 +409,7 @@ func (a *app) fileBreadcrumbs(c *ui.Context, session *fileSession, pane *filePan
 	if pane.remote {
 		icon = serverIcon
 	}
-	bar := uikit.PathBar(c, uikit.PathBarProps{Path: pane.path, Segments: segments, Icon: icon, Separator: fileForwardIcon})
+	bar := uikit.PathBar(c, uikit.PathBarProps{Motion: uikit.MotionOverride(a.reduceMotion(c)), Path: pane.path, Segments: segments, Icon: icon, Separator: fileForwardIcon})
 	if bar.Chosen {
 		a.navigateFiles(c, session, pane, bar.Target)
 	}
@@ -460,7 +461,7 @@ func (a *app) fileRow(
 		slices.ContainsFunc(drag.entries, func(source fileEntry) bool { return source.path == entry.path }) {
 		row.Opacity(t.C.DragLift.SourceOpacity)
 	}
-	uikit.ContextMenuOn(tableRow.Context, row, a.filePaneMenu(c, session, pane))
+	uikit.ContextMenuOn(tableRow.Context, row, a.filePaneMenu(c, session, pane), uikit.MotionOverride(a.reduceMotion(tableRow.Context)))
 	row.Children(func() {
 		kind, values := fileTableRowData(entry)
 		uikit.FileIcon(c, kind, entry.name, uikit.FileIconProps{Selected: tableRow.Selected, Focused: tableRow.Focused})

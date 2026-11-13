@@ -62,7 +62,7 @@ func (a *app) titleBar(c *ui.Context, shown float32) {
 					plusIcon,
 					uikit.IconButtonProps{Key: locales.MessageNewSession(), Label: locales.MessageNewSession(), Variant: uikit.IconOnWindow},
 				)
-				uikit.MenuOn(c, add, menu)
+				uikit.MenuOn(c, add, menu, uikit.MotionOverride(a.reduceMotion(c)))
 			},
 		})
 		tabs.Scroller.DrawOver(func(_ *ui.Painter, _ ui.Rect) {
@@ -159,6 +159,7 @@ func (a *app) tabButton(c *ui.Context, list ui.Element, index int, tab *workspac
 			c,
 			button,
 			menu,
+			uikit.MotionOverride(a.reduceMotion(c)),
 			parts.DragHandle,
 			parts.Close,
 		)

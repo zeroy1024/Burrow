@@ -41,6 +41,7 @@ type segmentedPillState struct {
 func Segmented(c *ui.Context, selected *int, items []SegItem, props SegmentedProps) ui.Element {
 	t := theme.Current()
 	p := t.C.Segmented
+	reduced := MotionReduced(c, props.Motion)
 	parts := ui.SegmentedBase(c, selected, len(items))
 	height := p.ItemHeightMd + 2*p.Padding
 	if props.Size == SizeSm || props.Size == SizeXs {
@@ -114,9 +115,9 @@ func Segmented(c *ui.Context, selected *int, items []SegItem, props SegmentedPro
 	if !staticPill && *selected >= 0 && *selected < len(segments) {
 		targetRect := segments[*selected].LayoutBounds()
 		if targetRect.W > 0 && targetRect.H > 0 {
-			if !pillState.seeded {
+			if reduced || !pillState.seeded {
 				fromRect := targetRect
-				if prev := pillState.lastSelected; prev >= 0 && prev < len(segments) {
+				if prev := pillState.lastSelected; !reduced && prev >= 0 && prev < len(segments) {
 					if candidate := segments[prev].LayoutBounds(); candidate.W > 0 && candidate.H > 0 {
 						fromRect = candidate
 					}
@@ -133,9 +134,6 @@ func Segmented(c *ui.Context, selected *int, items []SegItem, props SegmentedPro
 				parts.Track.Jump("pill-h", targetRect.H)
 			}
 			pillAnim := ui.Animation{Spring: Spring(t.Motion.Spring.Smooth)}
-			if MotionReduced(c, props.Motion) {
-				pillAnim = Anim(c, p.Transition, props.Motion)
-			}
 			pillX := parts.Track.AnimateTo("pill-x", targetRect.X-trackLayout.X, pillAnim)
 			pillY := parts.Track.AnimateTo("pill-y", targetRect.Y-trackLayout.Y, pillAnim)
 			pillW := parts.Track.AnimateTo("pill-w", targetRect.W, pillAnim)

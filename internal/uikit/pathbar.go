@@ -17,6 +17,7 @@ type PathBarProps struct {
 	Segments  []PathSegment
 	Icon      *ui.SVG
 	Separator *ui.SVG
+	Motion    MotionMode
 }
 
 type PathItem struct {
@@ -122,7 +123,7 @@ func PathBar(c *ui.Context, props PathBarProps) PathBarParts {
 						entries = append(entries, MenuEntry{ID: segment.Target, Label: segment.Label, Icon: IconFolder,
 							OnChoose: func() { parts.Chosen, parts.Target, parts.Index = true, segment.Target, hidden }})
 					}
-					MenuOn(c, item, entries)
+					MenuOn(c, item, entries, props.Motion)
 				} else {
 					parts.Items = append(parts.Items, PathItem{Element: item, Target: target})
 					if item.Clicked() {

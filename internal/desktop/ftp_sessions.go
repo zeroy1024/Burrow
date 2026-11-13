@@ -165,7 +165,7 @@ func (a *app) fileTitleBar(c *ui.Context, shown float32) {
 					plusIcon,
 					uikit.IconButtonProps{Key: locales.MessageNewFileSession(), Label: locales.MessageNewFileSession(), Variant: uikit.IconOnWindow},
 				)
-				uikit.MenuOn(c, add, menu)
+				uikit.MenuOn(c, add, menu, uikit.MotionOverride(a.reduceMotion(c)))
 			},
 		})
 		if tabs.Select >= 0 {
@@ -228,6 +228,7 @@ func (a *app) fileTabButton(c *ui.Context, list ui.Element, index int, session *
 			c,
 			button,
 			menu,
+			uikit.MotionOverride(a.reduceMotion(c)),
 			parts.Close,
 		)
 	})

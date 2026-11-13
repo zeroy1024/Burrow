@@ -111,6 +111,6 @@ func (a *app) settingsSchemeSelect(c *ui.Context, label string, value *string) b
 		}})
 	}
 	// The value may be a per-frame copy; keep the control's identity stable.
-	uikit.Select(c.Key("settings-scheme"), value, options, uikit.SelectProps{Label: label}).Width(t.C.Settings.SelectWidth)
+	uikit.Select(c.Key("settings-scheme"), value, options, uikit.SelectProps{Motion: uikit.MotionOverride(a.reduceMotion(c)), Label: label}).Width(t.C.Settings.SelectWidth)
 	return *value != previous
 }

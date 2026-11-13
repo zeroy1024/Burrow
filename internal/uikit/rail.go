@@ -2,7 +2,6 @@ package uikit
 
 import (
 	"runtime"
-	"time"
 
 	"github.com/egoist/mygo/ui"
 	"github.com/zeroy1024/Burrow/internal/locales"
@@ -24,6 +23,7 @@ type RailButtonProps struct {
 	Selected   bool
 	StaticPill bool
 	Handle     *ui.Handle
+	Motion     MotionMode
 }
 
 // RailButton returns an activation target; the application owns page switching.
@@ -65,12 +65,14 @@ func RailButton(c *ui.Context, props RailButtonProps) ui.Element {
 		Shadow(button, t.Shadow.ControlFocus)
 	}
 	button.Children(func() {
-		scale := float32(1)
-		if button.Pressed() {
-			scale = 0.9
+		icon := ui.Icon(c, props.Icon).Size(t.Size.IconMd, t.Size.IconMd).PassThrough()
+		if !MotionReduced(c, props.Motion) {
+			scale := float32(1)
+			if button.Pressed() {
+				scale = 0.9
+			}
+			icon.AnimatePose(ui.Pose{Scale: scale}, ui.Animation{Spring: Spring(t.Motion.Spring.Displace)})
 		}
-		ui.Icon(c, props.Icon).Size(t.Size.IconMd, t.Size.IconMd).PassThrough().
-			AnimatePose(ui.Pose{Scale: scale}, ui.Animation{Spring: Spring(t.Motion.Spring.Displace)})
 	})
 	ui.TooltipBase(c, button, func(tip ui.Element) {
 		StyleTooltip(tip).AttachTo(button, ui.AnchorRight, ui.AnchorLeft).
@@ -92,11 +94,12 @@ func AnimateRailPill(c *ui.Context, rail ui.Element, items []ui.Element, selecte
 	if runtime.GOOS == "windows" {
 		bg = Color(t.Color.Accent.Tint10)
 	}
-	animateNavPill(c, rail, items, selected, bg, r.ButtonRadius, r.Transition, reduceMotion)
+	animateNavPill(c, rail, items, selected, bg, r.ButtonRadius, reduceMotion)
 }
 
-func animateNavPill(c *ui.Context, track ui.Element, items []ui.Element, selected int, bg ui.Color, radius float32, fallback time.Duration, reduceMotion bool) {
+func animateNavPill(c *ui.Context, track ui.Element, items []ui.Element, selected int, bg ui.Color, radius float32, reduceMotion bool) {
 	t := theme.Current()
+	reduced := reduceMotion || c.Preferences().ReduceMotion
 	pillState := ui.Local(track, "nav-pill-state", func() navPillState {
 		return navPillState{lastSelected: -1}
 	})
@@ -105,9 +108,9 @@ func animateNavPill(c *ui.Context, track ui.Element, items []ui.Element, selecte
 	if !staticPill && selected >= 0 && selected < len(items) {
 		targetRect := items[selected].LayoutBounds()
 		if targetRect.W > 0 && targetRect.H > 0 {
-			if !pillState.seeded {
+			if reduced || !pillState.seeded {
 				fromRect := targetRect
-				if prev := pillState.lastSelected; prev >= 0 && prev < len(items) {
+				if prev := pillState.lastSelected; !reduced && prev >= 0 && prev < len(items) {
 					if candidate := items[prev].LayoutBounds(); candidate.W > 0 && candidate.H > 0 {
 						fromRect = candidate
 					}
@@ -124,9 +127,6 @@ func animateNavPill(c *ui.Context, track ui.Element, items []ui.Element, selecte
 				track.Jump("pill-h", targetRect.H)
 			}
 			pillAnim := ui.Animation{Spring: Spring(t.Motion.Spring.Smooth)}
-			if reduceMotion || c.Preferences().ReduceMotion {
-				pillAnim = Tween(fallback)
-			}
 			pillX := track.AnimateTo("pill-x", targetRect.X-trackLayout.X, pillAnim)
 			pillY := track.AnimateTo("pill-y", targetRect.Y-trackLayout.Y, pillAnim)
 			pillW := track.AnimateTo("pill-w", targetRect.W, pillAnim)

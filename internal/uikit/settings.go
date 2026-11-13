@@ -197,7 +197,7 @@ func SettingsNavItem(c *ui.Context, props SettingsNavItemProps) ui.Element {
 func AnimateSettingsNavPill(c *ui.Context, list ui.Element, items []ui.Element, selected int, reduceMotion bool) {
 	t := theme.Current()
 	p := t.C.Settings
-	animateNavPill(c, list, items, selected, Color(p.NavItemOn), p.NavItemRadius, t.Motion.Duration.Focus, reduceMotion)
+	animateNavPill(c, list, items, selected, Color(p.NavItemOn), p.NavItemRadius, reduceMotion)
 }
 
 type ThemeCardProps struct {

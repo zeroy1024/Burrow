@@ -98,8 +98,9 @@ func CopyField(c *ui.Context, value string, props CopyFieldProps) CopyFieldResul
 }
 
 type FilterChipProps struct {
-	Key   any
-	Label string
+	Key    any
+	Label  string
+	Motion MotionMode
 }
 
 // FilterChip renders an inline prefix-labeled dropdown pill ("Secret Key 全部 ▾").
@@ -145,7 +146,7 @@ func FilterChip[T comparable](c *ui.Context, prefix string, selected *T, options
 			},
 		})
 	}
-	MenuOn(c, trigger, entries)
+	MenuOn(c, trigger, entries, props.Motion)
 	trigger.Children(func() {
 		ui.Text(c, prefix).FontSize(t.Font.Size.Small).TextColor(Color(t.Color.Text.Secondary)).SingleLine().Shrink(0).PassThrough()
 		ui.Text(c, currentLabel).FontSize(t.Font.Size.Small).FontWeight(t.Font.Weight.Semibold).
