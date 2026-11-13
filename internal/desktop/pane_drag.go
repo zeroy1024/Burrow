@@ -375,7 +375,7 @@ func (a *app) dragPreview(c *ui.Context) {
 	visible := float32(1)
 	if d.phase == dragReturning {
 		r.X, r.Y = d.returnRect.X, d.returnRect.Y
-		animation = ui.Animation{Spring: uikit.Spring(t.C.ReorderMotion.Cancel)}
+		animation = a.positionAnimation(ui.Animation{Spring: uikit.Spring(t.C.ReorderMotion.Cancel)})
 		visible = 0
 	}
 	// Return the compact preview to its source without stretching it into a pane.

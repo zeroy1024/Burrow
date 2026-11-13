@@ -53,6 +53,7 @@ func Switch(c *ui.Context, value *bool, props ToggleProps) ui.Element {
 
 type CheckProps struct {
 	Mixed, Disabled bool
+	Motion          MotionMode
 	// HideLabel keeps label for accessibility only, for a box in a table cell
 	// whose column header already names it.
 	HideLabel bool
@@ -85,11 +86,15 @@ func Checkbox(c *ui.Context, value *bool, label string, options ...CheckProps) u
 		if row.FocusVisible() && !row.IsDisabled() {
 			Shadow(box, t.Shadow.ControlFocus)
 		}
-		markProgress := Visual(row, "mark", markTarget, t.Motion.Duration.Focus)
-		if markProgress > 0 {
+		alpha := Visual(row, "mark", markTarget, t.Motion.Duration.Focus)
+		if alpha > 0 {
+			markProgress := alpha
+			if MotionReduced(c, props.Motion) {
+				markProgress = 1
+			}
 			mixed := props.Mixed
 			box.DrawOver(func(painter *ui.Painter, rect ui.Rect) {
-				ink := Color(p.Mark).Alpha(markProgress)
+				ink := Color(p.Mark).Alpha(alpha)
 				if mixed {
 					w := (rect.W / 2) * markProgress
 					mark := ui.Rect{X: rect.X + (rect.W-w)/2, Y: rect.Y + rect.H/2 - t.Size.Divider/2,
@@ -142,7 +147,12 @@ func Radio[T comparable](c *ui.Context, selected *T, value T, label string, opti
 			Shadow(circle, t.Shadow.ControlFocus)
 		}
 		dotAlpha := Visual(row, "dot-alpha", dotTarget, t.Motion.Duration.Focus)
-		dotScale := row.AnimateTo("dot-scale", dotTarget, ui.Animation{Spring: Spring(t.C.Switch.Animation)})
+		dotScale := float32(1)
+		if MotionReduced(c, props.Motion) {
+			row.Jump("dot-scale", dotTarget)
+		} else {
+			dotScale = row.AnimateTo("dot-scale", dotTarget, ui.Animation{Spring: Spring(t.C.Switch.Animation)})
+		}
 		if dotAlpha > 0 && dotScale > 0 {
 			circle.Children(func() {
 				size := p.RadioDot * dotScale

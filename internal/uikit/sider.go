@@ -1,6 +1,8 @@
 package uikit
 
 import (
+	"time"
+
 	"github.com/zeroy1024/Burrow/internal/locales"
 	"github.com/zeroy1024/Burrow/internal/theme"
 
@@ -226,11 +228,18 @@ func SiderGroupContents(c *ui.Context, props SiderGroupContentProps) {
 		ContentTransition(ui.ContentTransition{Numeric: true, Down: props.CountDown, Animation: &countAnimation})
 }
 
-func SiderGroupExpand(c *ui.Context, progress float32) {
+func SiderGroupExpand(c *ui.Context, started time.Time, reduced bool) {
 	p := theme.Current().C.GroupHeader
 	ui.Box(c).Absolute().Bottom(0).Left(0).Right(0).Height(p.ExpandHeight).
-		Background(Color(p.ExpandTrack)).PassThrough().Children(func() {
-		ui.Box(c).Absolute().Top(0).Bottom(0).Left(0).WidthPercent(progress * 100).Background(Color(p.ExpandFill)).PassThrough()
+		Background(Color(p.ExpandTrack)).PassThrough().Draw(func(painter *ui.Painter, rect ui.Rect) {
+		if !reduced {
+			progress := min(1, float32(painter.Now().Sub(started))/float32(p.ExpandDelay))
+			if progress < 1 {
+				painter.AnimationFrame()
+			}
+			rect.W *= progress
+		}
+		painter.Fill(rect, Color(p.ExpandFill), 0)
 	})
 }
 

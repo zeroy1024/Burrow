@@ -1588,7 +1588,10 @@ func (a *app) gatewayDraftFields(c *ui.Context, d *gatewayDraft) {
 			})
 			if d.value.SOCKS.PasswordSaved {
 				uikit.FormRow(c, locales.MessageSavedPassword(), uikit.FormRowProps{Key: "socks-clear", Inline: true}, func() ui.Element {
-					return uikit.Checkbox(c, &d.clearPassword, locales.MessageClearSavedPasswords())
+					return uikit.Checkbox(
+						c, &d.clearPassword, locales.MessageClearSavedPasswords(),
+						uikit.CheckProps{Motion: uikit.MotionOverride(a.reduceMotion(c))},
+					)
 				})
 			}
 		}

@@ -86,6 +86,7 @@ type remoteSession struct {
 	contentWidth, contentHeight float32
 	columns, rows               int
 	closing                     bool
+	closeMaximized              bool
 	closeStarted                time.Time
 	revealing                   bool
 	revealStarted               time.Time
@@ -182,6 +183,9 @@ func appendSessionLines(session *remoteSession, lines ...terminalLine) {
 }
 
 func (a *app) focusSession(tab *workspaceTab, session *remoteSession) {
+	if session.closing {
+		return
+	}
 	tab.focused = session
 	// The target may still be waiting for its terminal view to be created.
 	session.focusPending = true
@@ -344,8 +348,31 @@ func (tab *workspaceTab) canClosePane(session *remoteSession) bool {
 }
 
 func (a *app) closePane(tab *workspaceTab, session *remoteSession) {
-	if tab.canClosePane(session) {
-		session.closing = true
+	if !tab.canClosePane(session) {
+		return
+	}
+	session.closing = true
+	// Close the channel now. The terminal renderer stays alive for the exit copy.
+	stopSSH(session)
+	if tab.focused != session {
+		return
+	}
+	session.closeMaximized = tab.maximized
+	a.setPaneZoom(tab, false)
+	a.focusRemainingPane(tab)
+}
+
+func (a *app) focusRemainingPane(tab *workspaceTab) {
+	for _, next := range tab.root.sessions() {
+		if next.closing {
+			continue
+		}
+		if tab == a.currentTab() && a.activeSection() == sectionSSH {
+			a.focusSession(tab, next)
+		} else {
+			tab.focused = next
+		}
+		return
 	}
 }
 
@@ -353,14 +380,10 @@ func (a *app) removePane(tab *workspaceTab, session *remoteSession) {
 	releaseSSH(session)
 	tab.root = tab.root.remove(session)
 	if tab.focused == session {
-		if tab == a.currentTab() && a.activeSection() == sectionSSH {
-			a.focusSession(tab, tab.root.firstSession())
-		} else {
-			tab.focused = tab.root.firstSession()
-		}
+		a.focusRemainingPane(tab)
+		a.setPaneZoom(tab, false)
 	}
 	a.markPaneLayout(tab, theme.Current().C.Desktop.PaneEnterDuration)
-	a.setPaneZoom(tab, false)
 }
 
 // Runtime endpoints are snapshots; catalog edits cannot retarget a live channel.

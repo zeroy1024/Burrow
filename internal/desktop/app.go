@@ -696,13 +696,20 @@ func (a *app) workspace(c *ui.Context, shown float32) {
 		})
 		status := uikit.Card(c).Key("status").Width(t.Size.StatsPanel * statusShown).Shrink(0).
 			MarginStart(t.C.Window.Gutter * statusShown).Hidden(statusShown == 0 && statusOpacity == 0)
+		if !a.statusVisible {
+			status.PassThrough()
+		}
 		if a.reduceMotion(c) && !a.statusVisible && statusOpacity > 0 {
 			// Geometry changes immediately; the old panel can still fade over the
 			// expanded workspace without animating its width.
 			status.Absolute().Top(0).Right(0).Bottom(0).Width(t.Size.StatsPanel)
 		}
 		status.Opacity(statusOpacity).Children(func() {
-			uikit.SidePanelBody(c).Children(func() { a.serverStatus(c) })
+			if a.statusVisible {
+				uikit.SidePanelBody(c).Key("status-content").Transition(ui.ElementTransition{
+					Colors: true, Duration: t.C.Desktop.SidebarDuration, Exit: &ui.Motion{},
+				}).Children(func() { a.serverStatus(c) })
+			}
 		})
 		a.sidebarResizeHandle(c, shown)
 	})

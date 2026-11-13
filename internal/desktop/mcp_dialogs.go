@@ -311,6 +311,7 @@ func (a *app) mcpPolicyFields(c *ui.Context) {
 								c.Key(fmt.Sprintf("sub-%d", ruleIdx)),
 								&rule.IncludeSubdir,
 								locales.MessageIncludeSubdirectories(),
+								uikit.CheckProps{Motion: uikit.MotionOverride(a.reduceMotion(c))},
 							)
 						}
 					})
@@ -382,6 +383,7 @@ func (a *app) mcpPolicyFields(c *ui.Context) {
 							c.Key(fmt.Sprintf("cicase-%d", cmdIdx)),
 							&cmdRule.IgnoreCase,
 							locales.MessageIgnoreCaseInArguments(),
+							uikit.CheckProps{Motion: uikit.MotionOverride(a.reduceMotion(c))},
 						)
 					}
 				})
@@ -955,6 +957,7 @@ func (a *app) mcpKeyModal(c *ui.Context) {
 		Width:           t.C.Mcp.KeyModalWidth,
 		Disabled:        a.mcpBusy(),
 		DismissDisabled: draft.OneTimeView && !draft.SavedConfirmed,
+		Motion:          uikit.MotionOverride(a.reduceMotion(c)),
 		Footer: func(parts uikit.ModalParts) {
 			uikit.ModalFooter(c).Children(func() {
 				if draft.OneTimeView {
@@ -996,6 +999,7 @@ func (a *app) mcpKeyModal(c *ui.Context) {
 					Secret:       draft.GeneratedKey,
 					ConfigJSON:   a.mcpClientConfigJSON(),
 					Confirmed:    &draft.SavedConfirmed,
+					Motion:       uikit.MotionOverride(a.reduceMotion(c)),
 					OnCopySecret: func() { mygo.Clipboard.WriteText(draft.GeneratedKey) },
 					OnCopyConfig: func() { mygo.Clipboard.WriteText(a.mcpClientConfigJSON()) },
 				})
@@ -1096,7 +1100,11 @@ func (a *app) mcpKeyGrantsSection(c *ui.Context, draft *mcpKeyModalDraft) {
 					Variant: uikit.SearchFilter, Icon: uikit.IconSVG(uikit.IconSearch),
 					Label: locales.MessageSearchConnections(), Placeholder: locales.MessageSearchNamesOrAddresses(),
 				}).Root.Grow(1).MinWidth(0)
-				if uikit.Checkbox(c.Key("only-granted"), &draft.OnlyGranted, locales.MessageShowAuthorizedOnly()).Changed() {
+				filter := uikit.Checkbox(
+					c.Key("only-granted"), &draft.OnlyGranted, locales.MessageShowAuthorizedOnly(),
+					uikit.CheckProps{Motion: uikit.MotionOverride(a.reduceMotion(c))},
+				)
+				if filter.Changed() {
 					// 记下开启时已授权的连接，之后取消勾选不会让该行立刻消失。
 					draft.GrantedSnapshot = nil
 					if draft.OnlyGranted {
@@ -1131,7 +1139,7 @@ func (a *app) mcpKeyGrantsSection(c *ui.Context, draft *mcpKeyModalDraft) {
 		if len(draft.Grants) == 0 {
 			empty = locales.MessageNoSavedConnectionsYet()
 		}
-		uikit.PermissionMatrix(c, rows, empty, func(id, capability string, enabled bool) {
+		uikit.PermissionMatrix(c, rows, empty, uikit.MotionOverride(a.reduceMotion(c)), func(id, capability string, enabled bool) {
 			for i := range draft.Grants {
 				if draft.Grants[i].ConnectionID == id {
 					draft.Grants[i].setPermission(capability, enabled)
@@ -1209,6 +1217,7 @@ func (a *app) mcpKeyConfirmModal(c *ui.Context) {
 		Compact:    true,
 		Width:      t.C.Mcp.DialogWidth,
 		Disabled:   a.mcpBusy(),
+		Motion:     uikit.MotionOverride(a.reduceMotion(c)),
 	}, func(parts uikit.ModalParts) {
 		uikit.Text(
 			c,
@@ -1260,6 +1269,7 @@ func (a *app) mcpPolicyDeleteModal(c *ui.Context) {
 		Title:      fmt.Sprintf(locales.MessageDeletePolicy(), dlg.Name),
 		Compact:    true,
 		Width:      t.C.Mcp.DialogWidth,
+		Motion:     uikit.MotionOverride(a.reduceMotion(c)),
 	}, func(parts uikit.ModalParts) {
 		uikit.Text(c, locales.MessageAfterDeletionThisPolicyWillNoLongerBlockFutureOperationsThisCannotBe(), uikit.TextProps{
 			Style: uikit.TextSmall, Tone: uikit.ToneSecondary,
@@ -1285,6 +1295,7 @@ func (a *app) mcpListenModal(c *ui.Context) {
 		Title:   locales.MessageEditListenerConfiguration(),
 		Compact: true,
 		Width:   t.C.Mcp.DialogWidth,
+		Motion:  uikit.MotionOverride(a.reduceMotion(c)),
 	}, func(parts uikit.ModalParts) {
 		uikit.Text(c, locales.MessageOnlyLocalListeningIsSupportedSavingAlsoUpdatesTheClientConfiguration(), uikit.TextProps{
 			Style: uikit.TextFootnote, Tone: uikit.ToneSecondary,
@@ -1345,6 +1356,7 @@ func (a *app) mcpRetentionModal(c *ui.Context) {
 		Title:   locales.MessageAuditRetention(),
 		Compact: true,
 		Width:   t.C.Mcp.DialogWidth,
+		Motion:  uikit.MotionOverride(a.reduceMotion(c)),
 	}, func(parts uikit.ModalParts) {
 		uikit.Text(c, locales.MessageCleanupRemovesFinishedOperationsAndTheirPerFileDetailsActiveTasksUnverifiedStates(), uikit.TextProps{
 			Style: uikit.TextFootnote, Tone: uikit.ToneSecondary,
@@ -1383,6 +1395,7 @@ func (a *app) mcpClientConfigModal(c *ui.Context) {
 		Title:   locales.MessageClientConfiguration(),
 		Compact: true,
 		Width:   t.C.Mcp.DialogWidth,
+		Motion:  uikit.MotionOverride(a.reduceMotion(c)),
 	}, func(parts uikit.ModalParts) {
 		uikit.Text(c, locales.MessageConfigurationCopiedReplaceYourSecretKeyWithYourSavedKey(), uikit.TextProps{
 			Style: uikit.TextFootnote, Tone: uikit.ToneSecondary,

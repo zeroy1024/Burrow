@@ -71,13 +71,13 @@ func (a *app) serverStatus(c *ui.Context) {
 				// A placeholder shimmers while its value is on the way: before
 				// the first sample, or while a rate waits for its second. It stays
 				// still once collection fails or the server cannot provide it.
-				motion := !a.reduceMotion(c)
-				shimmer, diskShimmer := func(string) bool { return motion }, motion
+				reduced := a.reduceMotion(c)
+				shimmer, diskShimmer := func(string) bool { return !reduced }, !reduced
 				if m != nil {
 					if m.metrics != nil {
 						metrics, history = *m.metrics, m.history
 						live = statusLive{label: locales.MessageLive(), ink: t.Color.Success.Default, halo: t.Color.Success.Halo}
-						if motion {
+						if !reduced {
 							live.beat = m.updatedAt
 						}
 						if stats := m.diskStats; stats != nil && m.diskIdentity == metrics.DiskKey {
@@ -85,7 +85,7 @@ func (a *app) serverStatus(c *ui.Context) {
 							percent := float64(diskUsed) / float64(diskTotal) * 100
 							disk = &percent
 						}
-						shimmer = func(item string) bool { return motion && !slices.Contains(metrics.Unavailable, item) }
+						shimmer = func(item string) bool { return !reduced && !slices.Contains(metrics.Unavailable, item) }
 						diskShimmer = shimmer(locales.MessageMountInformation()) && m.diskError == ""
 					} else if !m.errorText.Empty() {
 						live = statusLive{label: locales.MessageCollectionFailed(), ink: t.Color.Danger.Default, halo: t.Color.Danger.Tint14}
@@ -98,9 +98,9 @@ func (a *app) serverStatus(c *ui.Context) {
 					uikit.Text(c, notice, uikit.TextProps{Style: uikit.TextCaption, Tone: uikit.ToneSecondary})
 				}
 				statusCPU(c, metrics, history.cpu, m != nil && m.metrics != nil, shimmer("CPU"))
-				statusResources(c, metrics, disk, diskUsed, diskTotal, shimmer(locales.MessageMemory()), diskShimmer)
+				statusResources(c, metrics, disk, diskUsed, diskTotal, shimmer(locales.MessageMemory()), diskShimmer, reduced)
 				statusNetwork(c, metrics, history, shimmer(locales.MessageNetwork()))
-				statusProcesses(c, metrics, shimmer(locales.MessageTopProcesses()))
+				statusProcesses(c, metrics, shimmer(locales.MessageTopProcesses()), reduced)
 				a.statusFacts(c, &a.statusFactsOpen, facts, factsMessage, metrics.Uptime)
 			}
 			ui.Box(c).Height(t.Space.N8)
@@ -383,7 +383,10 @@ func statusLoad(metrics hostinfo.Metrics) (text string, high bool) {
 	return strings.Join(fields, " "), high
 }
 
-func statusResources(c *ui.Context, metrics hostinfo.Metrics, disk *float64, diskUsed, diskTotal uint64, memoryShimmer, diskShimmer bool) {
+func statusResources(
+	c *ui.Context, metrics hostinfo.Metrics, disk *float64, diskUsed, diskTotal uint64,
+	memoryShimmer, diskShimmer, reduced bool,
+) {
 	t := theme.Current()
 	ui.Column(c).Gap(t.Space.N14).Children(func() {
 		memory, free := "—", ""
@@ -391,16 +394,16 @@ func statusResources(c *ui.Context, metrics hostinfo.Metrics, disk *float64, dis
 			memory = fmt.Sprintf("%.1f / %.1f GB", float64(metrics.MemoryUsed)/1e9, float64(metrics.MemoryTotal)/1e9)
 			free = fmt.Sprintf(locales.MessageGbAvailable(), float64(metrics.MemoryTotal-metrics.MemoryUsed)/1e9)
 		}
-		statusResource(c, locales.MessageMemory(), "", metrics.Memory, memory, free, memoryShimmer)
+		statusResource(c, locales.MessageMemory(), "", metrics.Memory, memory, free, memoryShimmer, reduced)
 		usage := "—"
 		if disk != nil {
 			usage = fmt.Sprintf("%.1f / %.1f GB", float64(diskUsed)/1e9, float64(diskTotal)/1e9)
 		}
-		statusResource(c, locales.MessageDisk(), "/", disk, usage, statusFilesystem(metrics), diskShimmer)
+		statusResource(c, locales.MessageDisk(), "/", disk, usage, statusFilesystem(metrics), diskShimmer, reduced)
 	})
 }
 
-func statusResource(c *ui.Context, label, mount string, percent *float64, usage, detail string, shimmer bool) {
+func statusResource(c *ui.Context, label, mount string, percent *float64, usage, detail string, shimmer, reduced bool) {
 	t := theme.Current()
 	ui.Column(c).Gap(t.Space.N6).Children(func() {
 		ui.Row(c).FillWidth().Gap(t.Space.N4).AlignItems(ui.Baseline).Children(func() {
@@ -419,7 +422,9 @@ func statusResource(c *ui.Context, label, mount string, percent *float64, usage,
 		if percent == nil {
 			statusPlaceholder(c, t.C.Progress.HeightMeter, shimmer)
 		} else {
-			uikit.Meter(c, *percent, 0, 100, uikit.MeterProps{Label: label, Value: usage})
+			uikit.Meter(c, *percent, 0, 100, uikit.MeterProps{
+				Label: label, Value: usage, Motion: uikit.MotionOverride(reduced),
+			})
 		}
 		ui.Row(c).FillWidth().Gap(t.Space.N8).Children(func() {
 			uikit.Text(c, usage, uikit.TextProps{Style: uikit.TextCaption, Tone: uikit.ToneSecondary}).
@@ -482,7 +487,7 @@ func statusRate(c *ui.Context, label string, value *float64, samples []float64, 
 	})
 }
 
-func statusProcesses(c *ui.Context, metrics hostinfo.Metrics, shimmer bool) {
+func statusProcesses(c *ui.Context, metrics hostinfo.Metrics, shimmer, reduced bool) {
 	t := theme.Current()
 	meta := "CPU"
 	if metrics.Processes != nil {
@@ -514,21 +519,26 @@ func statusProcesses(c *ui.Context, metrics hostinfo.Metrics, shimmer bool) {
 					// A process shown as 0.0% recedes with the empty rows.
 					active = process.CPU >= 0.05
 				}
-				statusProcess(c, index, name, value, share, active)
+				statusProcess(c, index, name, value, share, active, reduced)
 			}
 		})
 	})
 }
 
 // statusProcess draws a Top row over a bar of its share of one core.
-func statusProcess(c *ui.Context, key int, name, value string, share float32, active bool) {
+func statusProcess(c *ui.Context, key int, name, value string, share float32, active, reduced bool) {
 	t := theme.Current()
 	style, tone := uikit.TextSmall, uikit.ToneTertiary
 	if active {
 		style, tone = uikit.TextLabel, uikit.ToneNeutral
 	}
 	row := ui.Row(c).Key(key).FillWidth().Height(t.C.KeyValue.RowHeight).Gap(t.Space.N8).AlignItems(ui.Center)
-	shownShare := row.AnimateTo("share", share, uikit.Tween(t.Motion.Duration.Focus))
+	shownShare := share
+	if reduced {
+		row.Jump("share", share)
+	} else {
+		shownShare = row.AnimateTo("share", share, uikit.Tween(t.Motion.Duration.Focus))
+	}
 	row.Draw(func(p *ui.Painter, r ui.Rect) {
 		if shownShare <= 0 {
 			return

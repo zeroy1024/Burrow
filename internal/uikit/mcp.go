@@ -284,7 +284,10 @@ type PermissionMatrixRow struct {
 // PermissionMatrix renders the read/write/exec checkbox table of the Secret
 // Key authorization modal as one bordered panel with row dividers. empty is
 // shown in place of rows when there are none.
-func PermissionMatrix(c *ui.Context, rows []PermissionMatrixRow, empty string, onToggle func(id, capability string, enabled bool)) ui.Element {
+func PermissionMatrix(
+	c *ui.Context, rows []PermissionMatrixRow, empty string, motion MotionMode,
+	onToggle func(id, capability string, enabled bool),
+) ui.Element {
 	t := theme.Current()
 	colW := t.C.Mcp.PermissionColumn
 	return Inset(c, InsetProps{Raised: true}).FillWidth().Padding(0).Clip().Children(func() {
@@ -344,7 +347,8 @@ func PermissionMatrix(c *ui.Context, rows []PermissionMatrixRow, empty string, o
 								return
 							}
 							val := current
-							if Checkbox(c, &val, item.Name+" "+capLabel, CheckProps{HideLabel: true}).Changed() && onToggle != nil {
+							check := Checkbox(c, &val, item.Name+" "+capLabel, CheckProps{HideLabel: true, Motion: motion})
+							if check.Changed() && onToggle != nil {
 								onToggle(item.ID, capKey, val)
 							}
 						})
@@ -489,6 +493,7 @@ func DirectoryListEditor(c *ui.Context, paths []string, props DirectoryListEdito
 type OneTimeSecretProps struct {
 	KeyName, Secret, ConfigJSON string
 	Confirmed                   *bool
+	Motion                      MotionMode
 	OnCopySecret, OnCopyConfig  func()
 }
 
@@ -512,7 +517,7 @@ func OneTimeSecretCard(c *ui.Context, props OneTimeSecretProps) ui.Element {
 			props.OnCopyConfig()
 		}
 		if props.Confirmed != nil {
-			Checkbox(c, props.Confirmed, locales.MessageIHaveCopiedAndSecurelySavedTheKey())
+			Checkbox(c, props.Confirmed, locales.MessageIHaveCopiedAndSecurelySavedTheKey(), CheckProps{Motion: props.Motion})
 		}
 	})
 }

@@ -71,7 +71,7 @@ func (a *app) terminals(c *ui.Context, size ui.Point) {
 		// Stable siblings let layout transitions follow sessions across arbitrary tree edits.
 		for i, placement := range panes {
 			placement.session.layoutRect = placement.rect
-			if placement.session != focusedSession {
+			if placement.session != focusedSession && !placement.session.closeMaximized {
 				targets[i] = a.terminalPane(c, tab, placement)
 			}
 		}
@@ -84,6 +84,12 @@ func (a *app) terminals(c *ui.Context, size ui.Point) {
 			}
 			targets[i] = a.terminalPane(c, tab, placement)
 		}
+		for _, placement := range panes {
+			if placement.session.closeMaximized {
+				placement.rect = bounds
+				a.terminalPane(c, tab, placement)
+			}
+		}
 		if !tab.maximized && tab.zoomMix == 0 {
 			for _, split := range splits {
 				a.terminalDivider(c, split)
@@ -93,7 +99,7 @@ func (a *app) terminals(c *ui.Context, size ui.Point) {
 		_, catalogActive, _ := a.catalogHostTransfer()
 		if a.drag != nil && a.drag.phase == dragActive || catalogActive {
 			for i, placement := range panes {
-				if tab.maximized && placement.session != tab.focused {
+				if placement.session.closing || tab.maximized && placement.session != tab.focused {
 					continue
 				}
 				targets[i].Children(func() {
@@ -151,15 +157,16 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 	if headed {
 		topPadding += p.HeaderHeight
 	}
-	// Only the inner card clips. Its wrapper owns the focus border and overlay hairline.
-	pane := uikit.Pane(c, uikit.PaneProps{
-		Key: fmt.Sprintf("pane-wrap-%d", session.id), Label: h.name + locales.MessageSshTerminal(), Surface: surface,
-		Focused: tab.focused == session, Multiple: multiple, Lifted: a.lifted(session),
-	}).Absolute().Left(rect.X).Top(rect.Y).Size(rect.W, rect.H).Bind(&session.frame)
+	// Keep the wrapper in the split layout while the SDK fades an inert copy.
+	pane := ui.Box(c).Key(session).Absolute().Left(rect.X).Top(rect.Y).Size(rect.W, rect.H).
+		PassThrough().Bind(&session.frame)
+	if session.closing {
+		return pane
+	}
 	a.paneMotion(c, pane, tab, session)
 	_, catalogActive, _ := a.catalogHostTransfer()
-	frozen := !session.revealing && (a.drag != nil || catalogActive || a.resizing != nil ||
-		tab.workspaceResizedAt.Equal(c.Now()) || pane.Transitioning() || c.Now().Before(tab.layoutUntil))
+	layoutMoving := tab.workspaceResizedAt.Equal(c.Now()) || pane.Transitioning() || c.Now().Before(tab.layoutUntil)
+	frozen := !session.revealing && (a.drag != nil || catalogActive || a.resizing != nil || layoutMoving)
 	if session.contentWidth == 0 || !frozen {
 		if session.contentWidth != rect.W || session.contentHeight != rect.H {
 			if session.scroll.offset.Y >= session.scroll.offset.MaxY {
@@ -171,16 +178,33 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 			session.columns = max(1, int((rect.W-2*p.ContentSide)/a.cellWidth))
 			session.rows = max(1, int((rect.H-topPadding-bottomPadding)/prefs.LineHeight))
 		}
-	} else if !session.closing {
+	} else if layoutMoving {
 		c.After(p.FrameInterval)
 	}
-	pane.OnClick(func() { a.focusSession(tab, session) })
 
 	scroll := &session.scroll
-	focused, hovered := tab.focused == session, pane.Hovered()
+	focused := tab.focused == session
+	opacity := float32(1)
+	if !focused {
+		opacity = 1 - tab.zoomMix
+	}
+	exit := ui.Motion{}
+	if !a.reduceMotion(c) {
+		exit.Scale = t.C.Desktop.PaneCloseScale
+	}
+	exitAnimation := uikit.Tween(t.C.Desktop.PaneCloseDuration)
+	var paneSurface ui.Element
+	pane.Children(func() {
+		paneSurface = uikit.Pane(c, uikit.PaneProps{
+			Key: "surface", Label: h.name + locales.MessageSshTerminal(), Surface: surface,
+			Focused: focused, Multiple: multiple, Lifted: a.lifted(session),
+		}).Fill().Opacity(opacity).Transition(ui.ElementTransition{Colors: true, Animation: &exitAnimation, Exit: &exit}).
+			OnClick(func() { a.focusSession(tab, session) })
+	})
+	hovered := paneSurface.Hovered()
 	appearance := uikit.PaneVisualStyle(pane, focused, hovered, multiple, surface)
 	var card, hairline ui.Element
-	pane.Children(func() {
+	paneSurface.Children(func() {
 		card = uikit.TerminalSurface(c, s, prefs.Background, func() {})
 		uikit.StylePaneCard(card, surface, background, t.C.Pane.Radius)
 		card.Children(func() {
@@ -282,8 +306,8 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 			actions := uikit.PaneActions(c, actionsWidth, surface)
 			// An agent's record cannot be split; its corner carries the AI chip instead.
 			actions.Hidden(session.agent != nil)
-			x, y, over := pane.PointerPosition()
-			inActionBand := x >= pane.Bounds().W-actionsWidth-p.ActionRevealPadding && y <= p.HeaderHeight+p.ActionRight
+			x, y, over := paneSurface.PointerPosition()
+			inActionBand := x >= paneSurface.Bounds().W-actionsWidth-p.ActionRevealPadding && y <= p.HeaderHeight+p.ActionRight
 			nearActions := over && inActionBand
 			var keyboardFocus bool
 			bounds := pane.Bounds()
@@ -359,14 +383,9 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 	if a.lifted(session) {
 		card.Opacity(0)
 		hairline.Opacity(0)
-		uikit.StylePanePlaceholder(pane)
+		uikit.StylePanePlaceholder(paneSurface)
 	}
-	a.paneDrop(
-		c,
-		pane,
-		session,
-		true,
-	)
+	a.paneDrop(c, pane, session, true)
 	return pane
 }
 

@@ -169,19 +169,19 @@ func Modal(c *ui.Context, open *bool, props ModalProps, body func(ModalParts)) M
 				}
 				c.AnimationFrame()
 			}
-			backdropAnimation := Anim(c, p.Fade, props.Motion)
+			backdropAnimation := Tween(p.Fade)
 			panelAnimation := ui.Animation{Spring: Spring(p.Enter)}
 			if reduced {
-				panelAnimation = backdropAnimation
+				backdropAnimation = Tween(p.ReduceFade)
+				panelAnimation = ui.Animation{Duration: t.Motion.Duration.InstantNonzero}
 			}
 			if state.Closing {
 				fade = 1
+				backdropAnimation = ui.Animation{Duration: p.Exit, Ease: Easing(t.Motion.Easing.In)}
 				if !reduced {
 					scale, y = p.ExitScale, t.Space.N4
+					panelAnimation = backdropAnimation
 				}
-				exitAnim := ui.Animation{Duration: Dur(c, p.Exit, props.Motion), Ease: Easing(t.Motion.Easing.In)}
-				backdropAnimation = exitAnim
-				panelAnimation = exitAnim
 			}
 			if props.Compact {
 				styleModalScrim(backdrop, 1, Color(compact.Backdrop))

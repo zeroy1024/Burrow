@@ -139,7 +139,10 @@ func (a *app) fileActionModal(c *ui.Context) {
 		}
 		ui.Row(c).Key("actions").Justify(ui.End).Gap(t.Space.N8).Children(func() {
 			uikit.Button(c, locales.CommonCancel(), uikit.ButtonProps{}).OnClick(parts.RequestDismiss)
-			clicked = uikit.Button(c, action, uikit.ButtonProps{Variant: variant, Disabled: nameError != "", Loading: dialog.busy}).Clicked()
+			clicked = uikit.Button(c, action, uikit.ButtonProps{
+				Variant: variant, Disabled: nameError != "", Loading: dialog.busy,
+				Motion: uikit.MotionOverride(a.reduceMotion(c)),
+			}).Clicked()
 		})
 	})
 	if (clicked || submitted || result.Submit) && nameError == "" {
@@ -189,7 +192,10 @@ func (a *app) fileConflictModal(c *ui.Context) {
 			locales.MessageDestination()+path.Join(conflict.target, entry.name),
 			uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneSecondary},
 		)
-		uikit.Checkbox(c, &conflict.applyAll, locales.MessageApplyThisChoiceToAllConflicts())
+		uikit.Checkbox(
+			c, &conflict.applyAll, locales.MessageApplyThisChoiceToAllConflicts(),
+			uikit.CheckProps{Motion: uikit.MotionOverride(a.reduceMotion(c))},
+		)
 		ui.Row(c).Justify(ui.End).Gap(t.Space.N8).Children(func() {
 			uikit.Button(c, locales.CommonCancel(), uikit.ButtonProps{}).OnClick(parts.RequestDismiss)
 			if uikit.Button(c, locales.MessageSkip(), uikit.ButtonProps{}).Clicked() {

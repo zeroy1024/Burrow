@@ -40,7 +40,12 @@ func (a *app) beginWorkspaceFrame(c *ui.Context) {
 			d.overTabs = false
 		}
 	}
+	reduced := a.reduceMotion(c)
 	for _, tab := range a.tabs {
+		if reduced {
+			tab.layoutUntil, tab.layoutPending = time.Time{}, false
+			continue
+		}
 		if tab.layoutPending {
 			tab.layoutUntil, tab.layoutPending = c.Now().Add(tab.layoutDuration), false
 		}
@@ -133,7 +138,10 @@ func (a *app) zoomProgress(c *ui.Context, tab *workspaceTab) float32 {
 	if tab.maximized {
 		target = 1
 	}
-	if tab.zoomStarted.IsZero() || a.reduceMotion(c) {
+	if a.reduceMotion(c) {
+		tab.zoomStarted = time.Time{}
+	}
+	if tab.zoomStarted.IsZero() {
 		tab.zoomMix = target
 		return tab.zoomMix
 	}
@@ -149,6 +157,10 @@ func (a *app) zoomProgress(c *ui.Context, tab *workspaceTab) float32 {
 
 func (a *app) paneMotion(c *ui.Context, pane ui.Element, tab *workspaceTab, session *remoteSession) {
 	t := theme.Current()
+	reduced := a.reduceMotion(c)
+	if reduced {
+		session.revealing = false
+	}
 	animation := ui.Animation{Spring: uikit.Spring(t.C.ReorderMotion.PaneDisplace)}
 	if tab.layoutDuration == t.C.Desktop.ZoomDuration {
 		animation = ui.Animation{Spring: uikit.Spring(t.C.Desktop.ZoomSpring)}
@@ -163,21 +175,6 @@ func (a *app) paneMotion(c *ui.Context, pane ui.Element, tab *workspaceTab, sess
 	if !session.revealing && !tab.workspaceResizedAt.Equal(c.Now()) {
 		pane.Transition(transition)
 	}
-	alpha := float32(1)
-	if tab.focused != session {
-		alpha *= 1 - tab.zoomMix
-	} else if !session.revealing && a.reduceMotion(c) && !tab.zoomStarted.IsZero() {
-		alpha *= min(1, float32(c.Now().Sub(tab.zoomStarted))/float32(t.C.Desktop.ZoomDuration))
-	}
-	pose := ui.Pose{}
-	if session.closing {
-		pose.Fade = 1
-		if !a.reduceMotion(c) {
-			pose.Scale = t.C.Desktop.PaneCloseScale
-		}
-	}
-	pane.AnimatePose(pose, uikit.Tween(t.C.Desktop.PaneCloseDuration))
-	pane.Opacity(alpha)
 	if tab.maximized && tab.focused != session && tab.zoomMix >= 1 {
 		pane.Hidden(true)
 	}
@@ -239,6 +236,7 @@ func (a *app) terminalDivider(c *ui.Context, split splitPlacement) {
 		}
 	} else if a.resizing == node {
 		a.resizing = nil
+		c.AnimationFrame()
 	}
 	animation := ui.Animation{Spring: uikit.Spring(t.C.ReorderMotion.PaneDisplace)}
 	if held {

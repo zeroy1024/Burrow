@@ -389,7 +389,8 @@ func (a *app) appearanceSettings(c *ui.Context) {
 			choice := a.appearance
 			for index, label := range []string{locales.MessageLight2(), locales.MessageDark2(), locales.SettingsLanguageSystem()} {
 				uikit.ThemeCard(c, uikit.ThemeCardProps{Key: index, Label: label, Appearance: index,
-					Selected: a.appearance == index, Choice: &choice}).OnClick(func() { a.setAppearance(index) })
+					Selected: a.appearance == index, Choice: &choice, Motion: uikit.MotionOverride(a.reduceMotion(c)),
+				}).OnClick(func() { a.setAppearance(index) })
 			}
 			if choice != a.appearance {
 				a.setAppearance(choice)

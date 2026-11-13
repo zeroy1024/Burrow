@@ -206,6 +206,7 @@ type ThemeCardProps struct {
 	Appearance int
 	Selected   bool
 	Choice     *int
+	Motion     MotionMode
 }
 
 func ThemeCard(c *ui.Context, props ThemeCardProps) ui.Element {
@@ -232,7 +233,7 @@ func ThemeCard(c *ui.Context, props ThemeCardProps) ui.Element {
 		}
 		item.Draw(func(painter *ui.Painter, rect ui.Rect) { drawThemeThumbnail(painter, rect, props.Appearance, t) })
 		ui.Row(c).Justify(ui.Center).Gap(t.Space.N6).AlignItems(ui.Center).Children(func() {
-			Radio(c, props.Choice, props.Appearance, props.Label)
+			Radio(c, props.Choice, props.Appearance, props.Label, CheckProps{Motion: props.Motion})
 		})
 	})
 	return item

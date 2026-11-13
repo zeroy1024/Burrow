@@ -250,7 +250,7 @@ func (a *app) nativeTerminalDragContents(c *ui.Context, session *remoteSession, 
 					).PassThrough()
 					return
 				}
-				nativeterm.View(c, preview.view).Fill().PassThrough().Unselectable().InputMethod(false).
+				nativeterm.ViewWithReducedMotion(c, preview.view, true).Fill().PassThrough().Unselectable().InputMethod(false).
 					HandleInput(nil).ContextMenu(func(*ui.Menu) {})
 			})
 		})

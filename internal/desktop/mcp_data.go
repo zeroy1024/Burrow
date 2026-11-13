@@ -559,7 +559,7 @@ func (a *app) saveMCPBackendPolicy() {
 		form.NameError = locales.Deferred(locales.MessageThePolicyNameIsTooLongUseNoMoreThanBytes)
 	}
 	if !form.NameError.Empty() {
-		form.Scroll.ScrollTo(0, 0, ui.Animation{})
+		form.Scroll.ScrollTo(0, 0, a.positionAnimation(ui.Animation{}))
 		return
 	}
 	draft := a.mcp.policyDraft
@@ -578,7 +578,7 @@ func (a *app) saveMCPBackendPolicy() {
 	}
 	if err := mcpserver.ValidatePolicy(p); err != nil {
 		form.SaveError = locales.ErrorText(err)
-		form.Scroll.ScrollTo(0, 0, ui.Animation{})
+		form.Scroll.ScrollTo(0, 0, a.positionAnimation(ui.Animation{}))
 		return
 	}
 	a.mcpWork(func() error { return a.mcpBackend.service.SavePolicy(a.ctx, p) }, func(err error) {
@@ -586,7 +586,7 @@ func (a *app) saveMCPBackendPolicy() {
 			form.modal.Close()
 		} else {
 			form.SaveError = locales.ErrorText(err)
-			form.Scroll.ScrollTo(0, 0, ui.Animation{})
+			form.Scroll.ScrollTo(0, 0, a.positionAnimation(ui.Animation{}))
 		}
 	})
 }

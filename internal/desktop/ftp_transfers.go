@@ -300,20 +300,24 @@ func (a *app) transferDock(c *ui.Context, maxHeight float32) {
 			a.transferHeader(c, session, tasks)
 			if !q.collapsed {
 				// Only the inert exit copy remains while the dock closes.
-				scroller := ui.Scroll(c.Key("transfer-rows")).Grow(1).MinHeight(0).TrackScroll(scroll).
-					Transition(ui.ElementTransition{Duration: t.Motion.Duration.Focus, Exit: &ui.Motion{}}).Children(func() {
-					ui.Column(c).FillWidth().Children(func() {
+				list := ui.Local(dock, "transfer-list-state", func() ui.ListState { return ui.ListState{KeepOffset: true} })
+				scroller := ui.List(c.Key("transfer-rows"), list, max(1, len(rows))).Grow(1).MinHeight(0).TrackScroll(scroll).
+					Transition(ui.ElementTransition{Duration: t.Motion.Duration.Focus, Exit: &ui.Motion{}}).
+					ItemKey(func(index int) any {
 						if len(rows) == 0 {
-							message := locales.MessageNoTransfersInThisCategory()
-							if len(tasks) == 0 {
-								message = locales.MessageNoTransfersYet()
-							}
-							uikit.TransferDockEmpty(c, message)
+							return "empty"
 						}
-						for _, task := range rows {
-							a.transferRow(c, task)
-						}
-					})
+						return rows[index].id
+					}).Rows(func(row ui.ListRow) {
+					if len(rows) != 0 {
+						a.transferRow(row.Context, rows[row.Index])
+						return
+					}
+					message := locales.MessageNoTransfersInThisCategory()
+					if len(tasks) == 0 {
+						message = locales.MessageNoTransfersYet()
+					}
+					uikit.TransferDockEmpty(row.Context, message)
 				})
 				uikit.Scrollbars(c, card, scroller, scroll, uikit.ScrollbarProps{Label: locales.MessageTransferListScrollbar()})
 			}

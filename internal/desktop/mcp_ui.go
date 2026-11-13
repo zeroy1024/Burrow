@@ -325,8 +325,11 @@ func (a *app) mcpPage(c *ui.Context) {
 				}
 				ui.Box(c).Key("mcp-audit-drawer-viewport").Width(a.mcp.auditDrawerWidth * shown).
 					MarginStart(t.C.Window.Gutter * shown).Shrink(0).FillHeight().Clip().Children(func() {
-					uikit.Card(c).Key("mcp-audit-drawer").Width(a.mcp.auditDrawerWidth).
-						Shrink(0).FillHeight().Children(func() { a.mcpAuditDrawer(c) })
+					if target == 1 {
+						transition := ui.ElementTransition{Colors: true, Duration: t.Motion.Duration.Focus, Exit: &ui.Motion{}}
+						uikit.Card(c).Key("mcp-audit-drawer").Width(a.mcp.auditDrawerWidth).Shrink(0).FillHeight().
+							Transition(transition).Children(func() { a.mcpAuditDrawer(c) })
+					}
 				})
 			}
 		})

@@ -301,7 +301,10 @@ func (a *app) credentialDialogs(c *ui.Context) {
 						uikit.InputProps{Label: locales.MessagePrivateKeyPassphrase(), Mono: true},
 					).Input.FillWidth()
 				})
-				uikit.Checkbox(c, &d.remember, locales.MessageSaveTheKeyPassphraseWithEncryption())
+				uikit.Checkbox(
+					c, &d.remember, locales.MessageSaveTheKeyPassphraseWithEncryption(),
+					uikit.CheckProps{Motion: uikit.MotionOverride(a.reduceMotion(c))},
+				)
 			}
 		}
 		if !d.errorText.Empty() {

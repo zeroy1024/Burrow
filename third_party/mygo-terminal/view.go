@@ -32,7 +32,17 @@ import (
 // elsewhere) to underline a link and open it on click: a hyperlink (OSC 8),
 // a URL printed as text, or a file path with Options.OpenLink.
 func View(c *ui.Context, t *Terminal) ui.Element {
+	return ViewWithReducedMotion(c, t, c.Preferences().ReduceMotion)
+}
+
+// ViewWithReducedMotion keeps the cursor steady when reduced is true, while
+// preserving the cursor shape and blink mode requested by the terminal program.
+func ViewWithReducedMotion(c *ui.Context, t *Terminal, reduced bool) ui.Element {
 	v := t.viewOf(c)
+	if v.reduceMotion != reduced {
+		v.reduceMotion = reduced
+		v.blinkStart = c.Now()
+	}
 	// A terminal's grid is left to right in a right-to-left interface too.
 	e := ui.Box(c).Direction(ui.LeftToRight).Focusable().FocusRing(false).Clip().Label("Terminal")
 	v.build(c, e)
@@ -187,9 +197,10 @@ type view struct {
 	preedit      string
 	preeditCaret int
 
-	focused    bool
-	blinkStart time.Time
-	caretCell  [2]int // the cursor's cell, for input methods
+	focused      bool
+	reduceMotion bool
+	blinkStart   time.Time
+	caretCell    [2]int // the cursor's cell, for input methods
 	// selecting tells that the primary button selects; reporting that a
 	// press went to the program, which gets the release too.
 	selecting, reporting bool
@@ -345,11 +356,6 @@ func (v *view) build(c *ui.Context, e ui.Element) {
 			// Input methods drop their composition with the focus.
 			v.preedit, v.pending = "", nil
 		}
-	}
-	// The cursor blinks, every 600 ms, while the terminal has the focus.
-	if v.focused && v.cursor.Blinking && v.cursor.Visible {
-		since := c.Now().Sub(v.blinkStart)
-		c.After(blinkPeriod - since%blinkPeriod)
 	}
 	if v.ticking {
 		c.After(40 * time.Millisecond)

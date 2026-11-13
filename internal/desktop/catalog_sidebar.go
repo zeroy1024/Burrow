@@ -21,7 +21,7 @@ func (a *app) catalogTransition(kind catalogDragKind) ui.ElementTransition {
 		if d.phase != catalogDragging {
 			duration = t.C.ReorderMotion.GroupRestore
 		}
-		animation = ui.Animation{Duration: duration, Ease: uikit.Easing(t.Motion.Easing.Out)}
+		animation = a.positionAnimation(uikit.Tween(duration))
 	}
 	return ui.ElementTransition{
 		Position: true, Size: true, Animation: &animation,
@@ -127,7 +127,6 @@ func (a *app) catalogPlaceholder(c *ui.Context, slot catalogSlot) ui.Element {
 }
 
 func (a *app) catalogHeader(c *ui.Context, slot catalogSlot) ui.Element {
-	t := theme.Current()
 	group := slot.group
 	expanded := a.catalogExpanded(group)
 	count := a.catalogModeCount(group.hosts)
@@ -163,8 +162,7 @@ func (a *app) catalogHeader(c *ui.Context, slot catalogSlot) ui.Element {
 	uikit.ContextMenuOn(c, header, menu, uikit.MotionOverride(a.reduceMotion(c)))
 	if highlight && a.groupCollapsed(group) && !a.page().catalogDrag.autoExpanded[group] {
 		header.Children(func() {
-			progress := min(1, float32(c.Now().Sub(a.page().catalogDrag.hoverStarted))/float32(t.C.GroupHeader.ExpandDelay))
-			uikit.SiderGroupExpand(c, progress)
+			uikit.SiderGroupExpand(c, a.page().catalogDrag.hoverStarted, a.reduceMotion(c))
 		})
 	}
 	return header

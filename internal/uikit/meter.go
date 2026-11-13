@@ -5,7 +5,10 @@ import (
 	"github.com/zeroy1024/Burrow/internal/theme"
 )
 
-type MeterProps struct{ Label, Value string }
+type MeterProps struct {
+	Label, Value string
+	Motion       MotionMode
+}
 
 func Meter(c *ui.Context, value, low, high float64, props MeterProps) ui.Element {
 	if high <= low {
@@ -22,7 +25,12 @@ func Meter(c *ui.Context, value, low, high float64, props MeterProps) ui.Element
 	}
 	container := ui.Box(c).Height(p.HeightMeter).FillWidth().Radius(p.Radius).Background(Color(p.Track)).Role(ui.RoleMeter).
 		Label(props.Label).Value(props.Value).Range(low, high, value)
-	shown := container.AnimateTo("meter", float32(fraction), Tween(t.Motion.Duration.Focus))
+	shown := float32(fraction)
+	if MotionReduced(c, props.Motion) {
+		container.Jump("meter", shown)
+	} else {
+		shown = container.AnimateTo("meter", shown, Tween(t.Motion.Duration.Focus))
+	}
 	fillColor := container.AnimateColor("fill", Color(ink), Tween(t.Motion.Duration.Focus))
 	return container.Children(func() {
 		ui.Box(c).WidthPercent(shown * 100).Height(p.HeightMeter).Radius(p.Radius).Background(fillColor)

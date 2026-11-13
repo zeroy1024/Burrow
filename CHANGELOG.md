@@ -8,6 +8,9 @@ Every released version has a `## <version> - <date>` section, English first, the
 - Show a confirmation after copying the project address or app version in **Settings → About**.
 - Refine interface animations with smoother spring motion for dialogs, sidebars, drawers, segmented tabs, and switches, plus smooth transitions when switching main sections, settings categories, dropdowns, menus, and server monitor meters.
 - Honor the app's **Reduce motion** setting for navigation, settings transitions, segmented controls, menus, and dropdowns while retaining fades and color transitions.
+- Stop SSH panes, the server monitor, and the MCP audit drawer from accepting input as soon as they start closing. Restore input to the window when a dialog finishes fading out.
+- Honor **Reduce motion** for pane reveals, drag returns, monitoring bars, and MCP dialogs and controls. In this mode, the SSH cursor stays steady even when a remote program requests blinking.
+- Reduce redraw work while a catalog drag is held still and keep long transfer lists responsive while progress updates.
 
 **简体中文**
 
@@ -15,6 +18,9 @@ Every released version has a `## <version> - <date>` section, English first, the
 - 在**设置 → 关于**中复制项目地址或应用版本后显示成功提示。
 - 优化全局界面动效：弹窗、侧边栏、抽屉、分段切换条与开关采用更顺滑的弹簧过渡，并在主导航切换、设置分类切换、菜单与下拉框展开以及监控进度条变化时提供平滑过渡。
 - 修复导航、设置页切换、分段切换条、菜单和下拉框未遵循应用内**减少动态效果**设置的问题，同时保留透明度和颜色过渡。
+- SSH 窗格、服务器监控面板和 MCP 审计抽屉开始关闭时立即停止接收输入。弹窗淡出结束时同步恢复底层窗口的交互。
+- 窗格显现、拖拽回弹、监控条以及 MCP 弹窗和控件现在遵循**减少动态效果**设置。启用时，即使远端程序要求闪烁，SSH 光标也会保持静止。
+- 减少目录拖拽停住时的界面重绘，改善长传输列表在进度更新时的响应速度。
 
 ## 0.1.9 - 2026-11-13
 

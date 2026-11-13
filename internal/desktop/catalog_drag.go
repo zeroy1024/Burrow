@@ -390,10 +390,11 @@ func (a *app) updateCatalogDestination(c *ui.Context) {
 		d.hoverGroup, d.hoverStarted = header, c.Now()
 	}
 	if header != nil && a.groupCollapsed(header) && !d.autoExpanded[header] {
-		if c.Now().Sub(d.hoverStarted) >= theme.Current().C.GroupHeader.ExpandDelay {
+		remaining := theme.Current().C.GroupHeader.ExpandDelay - c.Now().Sub(d.hoverStarted)
+		if remaining <= 0 {
 			d.autoExpanded[header] = true
 		} else {
-			c.AnimationFrame()
+			c.After(remaining)
 		}
 	}
 	ids := a.catalogPreviewHosts(group)
@@ -428,7 +429,8 @@ func (a *app) scrollCatalogDrag(c *ui.Context) {
 	t := theme.Current()
 	d := a.page().catalogDrag
 	now := c.Now()
-	dt := float32(now.Sub(d.lastFrame).Seconds())
+	// A drag can sit idle between frames. Do not apply that time as one scroll step.
+	dt := float32(min(now.Sub(d.lastFrame), 2*t.C.Desktop.FrameInterval).Seconds())
 	d.lastFrame = now
 	r := a.page().catalogScroll.Bounds(c)
 	if !containsCatalogPoint(r, a.pointer) {
@@ -441,11 +443,14 @@ func (a *app) scrollCatalogDrag(c *ui.Context) {
 	} else if a.pointer.Y > r.Y+r.H-zone {
 		depth = min(1, (a.pointer.Y-(r.Y+r.H-zone))/zone)
 	}
+	previous := a.page().catalogScroll.Y
+	if depth == 0 || depth < 0 && previous <= 0 || depth > 0 && previous >= a.page().catalogScroll.MaxY {
+		return
+	}
 	speed := t.C.DropIndicator.AutoScrollMax * depth * depth
 	if depth < 0 {
 		speed = -speed
 	}
-	previous := a.page().catalogScroll.Y
 	a.page().catalogScroll.Y = min(max(previous+speed*dt, 0), a.page().catalogScroll.MaxY)
 	if a.page().catalogScroll.Y != previous {
 		delta := a.page().catalogScroll.Y - previous
@@ -455,8 +460,8 @@ func (a *app) scrollCatalogDrag(c *ui.Context) {
 				a.page().catalogSlots[i].headerRect.Y -= delta
 			}
 		}
-		c.AnimationFrame()
 	}
+	c.AnimationFrame()
 }
 
 func (a *app) finishCatalogDrag(c *ui.Context) {
@@ -473,8 +478,11 @@ func (a *app) finishCatalogDrag(c *ui.Context) {
 	}
 	if d.held {
 		a.scrollCatalogDrag(c)
+		group, index, hover, expanded := d.targetGroup, d.targetIndex, d.hoverGroup, len(d.autoExpanded)
 		a.updateCatalogDestination(c)
-		c.AnimationFrame()
+		if group != d.targetGroup || index != d.targetIndex || hover != d.hoverGroup || expanded != len(d.autoExpanded) {
+			c.AnimationFrame()
+		}
 		return
 	}
 	if !d.released {

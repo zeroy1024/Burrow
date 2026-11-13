@@ -13,7 +13,6 @@ import (
 	"github.com/zeroy1024/Burrow/internal/theme"
 	"github.com/zeroy1024/Burrow/internal/uikit"
 
-	"github.com/egoist/mygo"
 	nativeterm "github.com/egoist/mygo/burrow-terminal"
 	"github.com/egoist/mygo/ui"
 )
@@ -90,7 +89,7 @@ func (a *app) attachSSH(session *remoteSession, run *sshRuntime) {
 		},
 	}
 	prefs := a.terminal.prefs
-	blink := prefs.CursorBlink && !a.sshReduceMotion()
+	blink := prefs.CursorBlink
 	scrollbackLines := a.prefs.ScrollbackLines
 	columns, rows := run.conn.Size()
 	var view *nativeterm.Terminal
@@ -160,17 +159,6 @@ func (a *app) sshSessionFocused(session *remoteSession) bool {
 	return a.activeSection() == sectionSSH && tab != nil && tab.focused == session
 }
 
-func (a *app) sshReduceMotion() bool {
-	switch a.prefs.ReduceMotion {
-	case "on":
-		return true
-	case "off":
-		return false
-	default:
-		return mygo.Theme.Preferences().ReduceMotion
-	}
-}
-
 func (a *app) sshFont() nativeterm.Font {
 	p := a.terminal.prefs
 	font := ui.Font{Family: strings.Join(p.FontFamily, ", "), Size: p.FontSize}
@@ -207,7 +195,7 @@ func (a *app) syncSSHTerminal(session *remoteSession) {
 		live.view.SetFont(font)
 		live.font = font
 	}
-	shape, blink := a.terminal.prefs.CursorShape, a.terminal.prefs.CursorBlink && !a.sshReduceMotion()
+	shape, blink := a.terminal.prefs.CursorShape, a.terminal.prefs.CursorBlink
 	if shape != live.cursor || blink != live.blink {
 		code := map[termtheme.CursorShape]int{termtheme.CursorBlock: 2, termtheme.CursorUnderline: 4, termtheme.CursorBar: 6}[shape]
 		if blink {
@@ -222,7 +210,8 @@ func (a *app) syncSSHTerminal(session *remoteSession) {
 // geometry, clipping, opacity and chrome already used by the prototype.
 func (a *app) sshTerminalView(c *ui.Context, session *remoteSession) ui.Element {
 	a.syncSSHTerminal(session)
-	output := nativeterm.View(c, session.terminal.view).Bind(&session.focus).Label(session.endpoint.name + locales.MessageSshTerminal())
+	output := nativeterm.ViewWithReducedMotion(c, session.terminal.view, a.reduceMotion(c)).
+		Bind(&session.focus).Label(session.endpoint.name + locales.MessageSshTerminal())
 	if session.focusPending {
 		if a.sshSessionFocused(session) {
 			output.Focus()
