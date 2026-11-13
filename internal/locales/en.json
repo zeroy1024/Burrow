@@ -58,6 +58,8 @@
   "messageClearAll": "Clear All",
   "messageClearAll2": "Clear All…",
   "aboutTitle": "About",
+  "aboutProject": "GitHub repository",
+  "aboutOpenInBrowser": "Open in browser",
   "commonClose": "Off",
   "messageClosePaneOrTab": "Close pane or tab",
   "messageBurrowWillOpenWithoutAnUnlockPasswordYourSavedCredentialsWillBeKept": "Burrow will open without an unlock password. Your saved credentials will be kept.",

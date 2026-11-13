@@ -109,11 +109,39 @@ func (a *app) aboutSettings(c *ui.Context) {
 				uikit.Button(c, locales.CommonCopy(), uikit.ButtonProps{}).OnClick(func() {
 					if err := mygo.Clipboard.Write(transfer.TextData("Burrow " + appVersion())); err != nil {
 						a.settingsUI.notice = locales.ErrorText(err)
+						return
 					}
+					uikit.Toast(c, uikit.ToastProps{
+						ID: "about-version-copied", Tone: uikit.ToneSuccess, Title: locales.Deferred(locales.MessageCopied),
+					})
 				})
 			})
 		})
 	}
+	projectURL := updateGitHub + updateRepository
+	a.settingsGroup(c, "AboutProject", locales.AboutProject(), "", []settingField{
+		{"AboutProject", locales.AboutProject(), projectURL, "", func() {
+			uikit.Button(c, locales.AboutOpenInBrowser(), uikit.ButtonProps{}).OnClick(func() {
+				go func() {
+					if err := mygo.Shell.OpenExternal(projectURL); err != nil {
+						mygo.RunOnMain(func() {
+							a.settingsUI.notice = locales.ErrorText(err)
+							a.window.Invalidate()
+						})
+					}
+				}()
+			})
+			uikit.Button(c, locales.MessageCopyAddress(), uikit.ButtonProps{}).OnClick(func() {
+				if err := mygo.Clipboard.Write(transfer.TextData(projectURL)); err != nil {
+					a.settingsUI.notice = locales.ErrorText(err)
+					return
+				}
+				uikit.Toast(c, uikit.ToastProps{
+					ID: "about-project-copied", Tone: uikit.ToneSuccess, Title: locales.Deferred(locales.MessageCopied),
+				})
+			})
+		}},
+	})
 	a.updateSettings(c)
 	fields := make([]settingField, 0, len(dependencyNotices()))
 	for index, notice := range dependencyNotices() {

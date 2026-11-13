@@ -58,6 +58,8 @@
   "messageClearAll": "全部清除",
   "messageClearAll2": "全部清除…",
   "aboutTitle": "关于",
+  "aboutProject": "GitHub 项目",
+  "aboutOpenInBrowser": "在浏览器中打开",
   "commonClose": "关闭",
   "messageClosePaneOrTab": "关闭分屏或选项卡",
   "messageBurrowWillOpenWithoutAnUnlockPasswordYourSavedCredentialsWillBeKept": "关闭后，打开 Burrow 将不再要求输入解锁密码，已保存的凭据会保留。",

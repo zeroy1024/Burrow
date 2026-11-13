@@ -628,6 +628,26 @@ func (msgs Messages) AboutTitle() string {
 	return Catalog.Format(msgs.locale, "aboutTitle", nil)
 }
 
+// AboutProject says "GitHub 项目"
+// in the language the app shows.
+func AboutProject() string { return In(i18n.Locale()).AboutProject() }
+
+// AboutProject says "GitHub 项目"
+// in the language of msgs.
+func (msgs Messages) AboutProject() string {
+	return Catalog.Format(msgs.locale, "aboutProject", nil)
+}
+
+// AboutOpenInBrowser says "在浏览器中打开"
+// in the language the app shows.
+func AboutOpenInBrowser() string { return In(i18n.Locale()).AboutOpenInBrowser() }
+
+// AboutOpenInBrowser says "在浏览器中打开"
+// in the language of msgs.
+func (msgs Messages) AboutOpenInBrowser() string {
+	return Catalog.Format(msgs.locale, "aboutOpenInBrowser", nil)
+}
+
 // CommonClose says "关闭"
 // in the language the app shows.
 func CommonClose() string { return In(i18n.Locale()).CommonClose() }
