@@ -16,12 +16,13 @@ type SegItem struct {
 }
 
 type SegmentedProps struct {
-	Size     Size
-	Fill     bool
-	Label    string
-	Cards    bool
-	Motion   MotionMode
-	CountMax int
+	Size             Size
+	Fill             bool
+	Label            string
+	Cards            bool
+	Motion           MotionMode
+	CountMax         int
+	SelectedIconTone Tone
 }
 
 func SegmentItems(labels []string) []SegItem {
@@ -30,12 +31,6 @@ func SegmentItems(labels []string) []SegItem {
 		items[index] = SegItem{Label: label}
 	}
 	return items
-}
-
-type segmentedPillState struct {
-	seeded       bool
-	lastSelected int
-	lastTrackW   float32
 }
 
 func Segmented(c *ui.Context, selected *int, items []SegItem, props SegmentedProps) ui.Element {
@@ -56,11 +51,6 @@ func Segmented(c *ui.Context, selected *int, items []SegItem, props SegmentedPro
 	} else {
 		parts.Track.Height(height).AlignSelf(ui.Start)
 	}
-	trackLayout := parts.Track.LayoutBounds()
-	staticPill := trackLayout.W <= 0
-	pillState := ui.Local(parts.Track, "uikit.segmented.pill", func() segmentedPillState {
-		return segmentedPillState{lastSelected: *selected}
-	})
 	segments := make([]ui.Element, len(items))
 	// A FormRow label can explicitly focus the compound host. On the rebuild
 	// following that request, hand focus to the selected native radio.
@@ -82,16 +72,19 @@ func Segmented(c *ui.Context, selected *int, items []SegItem, props SegmentedPro
 			} else {
 				segment.Height(height - 2*p.Padding)
 			}
-			StyleSegment(segment, p, index == *selected, staticPill)
 			segment.Children(func() {
 				iconSize := t.Size.IconSm
 				if props.Cards {
 					iconSize = t.C.Modal.ProtocolIcon
 				}
+				iconTone := item.IconTone
+				if index == *selected && props.SelectedIconTone != ToneNeutral {
+					iconTone = props.SelectedIconTone
+				}
 				if item.IconSVG != nil {
-					Icon(c, item.IconSVG, IconProps{Size: SizeSm, Tone: item.IconTone}).Size(iconSize, iconSize).PassThrough()
+					Icon(c, item.IconSVG, IconProps{Size: SizeSm, Tone: iconTone}).Size(iconSize, iconSize).PassThrough()
 				} else if item.Icon != "" {
-					Icon(c, item.Icon, IconProps{Size: SizeSm, Tone: item.IconTone}).Size(iconSize, iconSize).PassThrough()
+					Icon(c, item.Icon, IconProps{Size: SizeSm, Tone: iconTone}).Size(iconSize, iconSize).PassThrough()
 				}
 				if item.Detail != "" {
 					ui.Column(c).Gap(t.Space.N2).PassThrough().Children(func() {
@@ -112,47 +105,26 @@ func Segmented(c *ui.Context, selected *int, items []SegItem, props SegmentedPro
 			})
 		}
 	})
-	if !staticPill && *selected >= 0 && *selected < len(segments) {
-		targetRect := segments[*selected].LayoutBounds()
-		if targetRect.W > 0 && targetRect.H > 0 {
-			if reduced || !pillState.seeded {
-				fromRect := targetRect
-				if prev := pillState.lastSelected; !reduced && prev >= 0 && prev < len(segments) {
-					if candidate := segments[prev].LayoutBounds(); candidate.W > 0 && candidate.H > 0 {
-						fromRect = candidate
-					}
-				}
-				parts.Track.Jump("pill-x", fromRect.X-trackLayout.X)
-				parts.Track.Jump("pill-y", fromRect.Y-trackLayout.Y)
-				parts.Track.Jump("pill-w", fromRect.W)
-				parts.Track.Jump("pill-h", fromRect.H)
-				pillState.seeded = true
-			} else if pillState.lastTrackW != trackLayout.W {
-				parts.Track.Jump("pill-x", targetRect.X-trackLayout.X)
-				parts.Track.Jump("pill-y", targetRect.Y-trackLayout.Y)
-				parts.Track.Jump("pill-w", targetRect.W)
-				parts.Track.Jump("pill-h", targetRect.H)
-			}
-			pillAnim := ui.Animation{Spring: Spring(t.Motion.Spring.Smooth)}
-			pillX := parts.Track.AnimateTo("pill-x", targetRect.X-trackLayout.X, pillAnim)
-			pillY := parts.Track.AnimateTo("pill-y", targetRect.Y-trackLayout.Y, pillAnim)
-			pillW := parts.Track.AnimateTo("pill-w", targetRect.W, pillAnim)
-			pillH := parts.Track.AnimateTo("pill-h", targetRect.H, pillAnim)
-			parts.Track.Draw(func(painter *ui.Painter, r ui.Rect) {
-				if pillW <= 0 || pillH <= 0 {
-					return
-				}
-				pill := ui.Rect{X: r.X + pillX, Y: r.Y + pillY, W: pillW, H: pillH}
-				for _, layer := range p.ShadowOn {
-					if !layer.Inset {
-						painter.Shadow(pill, p.ItemRadius, layer.X, layer.Y, layer.Blur, layer.Spread, Color(layer.Color))
-					}
-				}
-				painter.Fill(pill, Color(p.BgOn), p.ItemRadius)
-			})
+	animation := Tween(p.Transition)
+	for index, segment := range segments {
+		ink := Color(p.Text)
+		if index == *selected {
+			ink = Color(p.TextOn)
 		}
+		segment.TextColor(segment.AnimateColor("text", ink, animation))
 	}
-	pillState.lastSelected = *selected
-	pillState.lastTrackW = trackLayout.W
+	paintSlidingSelection(
+		parts.Track,
+		segments,
+		*selected,
+		slidingSelectionStyle{
+			background: Color(p.BgOn),
+			hover:      Color(p.BgHover),
+			radius:     p.ItemRadius,
+			shadow:     p.ShadowOn,
+			feedback:   animation,
+			reduced:    reduced,
+		},
+	)
 	return parts.Track
 }

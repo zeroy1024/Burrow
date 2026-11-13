@@ -8,9 +8,9 @@ Design sources: `ssh-v6.html`, `common.css`, `parts/split_style.css`, `focus.py`
 
 | Layer | Count | Purpose |
 |---|---|---|
-| palette (primitives) | 282 | Literal colors/scales, including 50 derived values |
-| semantic (per theme) | 504 | Light follows the design; Dark has 111 derived overrides |
-| component | 1125 | Semantic references only; follows the current theme |
+| palette (primitives) | 298 | Literal colors/scales, including 58 derived values |
+| semantic (per theme) | 514 | Light follows the design; Dark has 120 derived overrides |
+| component | 1126 | Semantic references only; follows the current theme |
 
 ## 1. Layers and reference rules
 
@@ -65,7 +65,7 @@ siderItem.nameColor             <- component, references semantics only
 
 - Missing from designs: pressed state, `size.dropLine` (2px MyGo `ListState.Reorder` line), `menu.*` derived from raised/dragged surfaces, button hover/pressed, icon-button hover.
 - Tab/pane drag reuse sidebar springs: `reorderMotion.tabDisplace / paneDisplace / paneDrop`.
-- The complete Dark theme: 111 overrides and `palette.graphite / darkTint / whiteA / blackA / inkDark`.
+- The complete Dark theme: 120 overrides and `palette.graphite / darkTint / whiteA / blackA / inkDark`.
 - FTP v3 danger red, extra native-pane dimensions, and demo throughput are derived. Deprecated sidebar connection/selection tokens remain generated for compatibility but must not be used by new components. `siderItem.bgActive` is catalog focus only.
 - Conflicting designs follow the main source: legacy sidebar selection retains `common.css` `#efeff1` instead of drag-design `#f2f2f4`; current focus follows `color.state.selectedAccent`. Icon stroke uses 1.75 from `icons.js`, not drag-design 1.7.
 - Check dark brand-glyph contrast (for example CentOS/Debian); glyph rendering can mix toward white without rewriting the original brand palette.
@@ -82,10 +82,13 @@ siderItem.nameColor             <- component, references semantics only
 | `palette.gray.60` | #f6f6f7 |  |
 | `palette.gray.75` | #f4f4f5 |  |
 | `palette.gray.100` | #f2f2f4 |  |
+| `palette.gray.110` | #f1f1f4 |  |
 | `palette.gray.125` | #f0f0f2 |  |
 | `palette.gray.150` | #efeff1 |  |
 | `palette.gray.175` | #ececef |  |
 | `palette.gray.190` | #ededf0 |  |
+| `palette.gray.195` | #eaeaf0 |  |
+| `palette.gray.198` | #e7e7ec |  |
 | `palette.gray.200` | #e7e7e8 |  |
 | `palette.gray.225` | #e6e6e9 |  |
 | `palette.gray.250` | #e3e3e6 |  |
@@ -97,7 +100,11 @@ siderItem.nameColor             <- component, references semantics only
 | `palette.gray.475` | #aeaeb2 |  |
 | `palette.gray.500` | #a1a1a6 |  |
 | `palette.gray.600` | #8e8e93 |  |
+| `palette.gray.650` | #85858b |  |
+| `palette.gray.680` | #737379 |  |
 | `palette.gray.700` | #6e6e73 |  |
+| `palette.gray.710` | #6c6c72 |  |
+| `palette.gray.730` | #626269 |  |
 | `palette.gray.750` | #5b5b62 |  |
 | `palette.gray.800` | #4a4a50 |  |
 | `palette.gray.850` | #3a3a3f |  |
@@ -108,6 +115,7 @@ siderItem.nameColor             <- component, references semantics only
 |---|---|---|
 | `palette.blue.50` | #eaf3fe |  |
 | `palette.blue.75` | #e8f2fe |  |
+| `palette.blue.90` | #dcecff |  |
 | `palette.blue.100` | #d7e9fd | Folder icon fill |
 | `palette.blue.300` | #5ba7f7 |  |
 | `palette.blue.500` | #0a84ff | Brand blue / accent matching the logo |
@@ -204,16 +212,22 @@ siderItem.nameColor             <- component, references semantics only
 | `palette.graphite.900` | #1c1c1e | **derived** Dark theme |
 | `palette.graphite.850` | #202022 | **derived** Dark theme |
 | `palette.graphite.800` | #252527 | **derived** Dark theme |
+| `palette.graphite.775` | #29292b | **derived** Dark theme |
 | `palette.graphite.750` | #2a2a2d | **derived** Dark theme |
 | `palette.graphite.700` | #2e2e31 | **derived** Dark theme |
+| `palette.graphite.680` | #303034 | **derived** Dark theme |
 | `palette.graphite.650` | #333336 | **derived** Dark theme |
+| `palette.graphite.620` | #38383d | **derived** Dark theme |
 | `palette.graphite.600` | #3a3a3d | **derived** Dark theme |
 | `palette.graphite.550` | #444448 | **derived** Dark theme |
+| `palette.graphite.545` | #45454b | **derived** Dark theme |
 | `palette.graphite.500` | #5a5a5f | **derived** Dark theme |
 | `palette.graphite.400` | #6e6e73 | **derived** Dark theme |
 | `palette.graphite.300` | #8e8e93 | **derived** Dark theme |
 | `palette.graphite.250` | #98989d | **derived** Dark theme |
 | `palette.graphite.200` | #a1a1a6 | **derived** Dark theme |
+| `palette.graphite.190` | #a6a6ad | **derived** Dark theme |
+| `palette.graphite.175` | #b0b0b6 | **derived** Dark theme |
 | `palette.graphite.150` | #c7c7cc | **derived** Dark theme |
 | `palette.graphite.100` | #d1d1d6 | **derived** Dark theme |
 | `palette.graphite.50` | #f5f5f7 | **derived** Dark theme |
@@ -224,6 +238,8 @@ siderItem.nameColor             <- component, references semantics only
 | `palette.darkTint.blue300` | #4da3ff | **derived** Dark theme |
 | `palette.darkTint.blue200` | #6cb4ff | **derived** Dark theme |
 | `palette.darkTint.blueSubtle` | #16304d | **derived** Dark theme |
+| `palette.darkTint.blueSelection` | #254361 | **derived** Dark theme |
+| `palette.darkTint.blueSelectionText` | #8dc2ff | **derived** Dark theme |
 | `palette.darkTint.green400` | #32d74b | **derived** Dark theme |
 | `palette.darkTint.green300` | #5fd97a | **derived** Dark theme |
 | `palette.darkTint.greenSubtle` | #173523 | **derived** Dark theme |
@@ -491,22 +507,28 @@ siderItem.nameColor             <- component, references semantics only
 ### color
 | token | Light | Dark (derived) | Purpose |
 |---|---|---|---|
-| `color.bg.window` | #e7e7e8 | #1c1c1e | Window background: title bar, rail, gaps between cards |
+| `color.bg.window` | #e7e7e8 | #161618 | Window background: title bar, rail, gaps between cards |
 | `color.surface.card` | #ffffff | #252527 | Content cards, sidebar, FTP panes |
 | `color.surface.terminal` | #fbfbfc | #202022 | Terminal card container background, excluding terminal text colors |
-| `color.surface.raised` | #ffffff | #2e2e31 | Raised surfaces: dragged cards, ghosts, selected segments |
-| `color.surface.sunken` | #f4f4f5 | #2a2a2d | Search field |
+| `color.surface.raised` | #ffffff | #2e2e31 | Raised surfaces: menus, dragged cards, and previews |
+| `color.surface.sunken` | #f4f4f5 | #2a2a2d | Background for search fields, inputs, and dropdowns |
 | `color.surface.field` | #f6f6f7 | #2a2a2d | Breadcrumb path field |
-| `color.surface.zebra` | #fafafb | rgba(255,255,255,0.06) | Alternating list rows |
-| `color.surface.control` | #f2f2f4 | #2e2e31 | Neutral control background: icon buttons, segments, badges, queue icons |
+| `color.surface.zebra` | #fafafb | #29292b | Alternating list rows |
+| `color.surface.settingsGroup` | #fafafb | rgba(255,255,255,0.06) | Settings group background |
+| `color.surface.control` | #f2f2f4 | #2e2e31 | Neutral control background: icon buttons, badges, and queue icons |
 | `color.surface.controlStrong` | #ececef | #333336 | Inline sidebar More button |
+| `color.surface.segmentTrack` | #eaeaf0 | #2e2e31 | Segmented control track |
+| `color.surface.segmentSelected` | #ffffff | #45454b | Selected segment background |
 | `color.surface.keycap` | #ffffff | #2e2e31 | Keycap background |
 | `color.surface.liftStack` | #f9f9fa | #333336 |  |
 | `color.state.hover` | #f7f7f8 | #2a2a2d | Row hover |
 | `color.state.selected` | #efeff1 | #333336 | Selected sidebar row |
+| `color.state.rowHover` | #f1f1f4 | #303034 | Hovered list row |
+| `color.state.rowSelected` | #e7e7ec | #38383d | Selected row in an unfocused pane |
 | `color.state.pressed` | #e6e6e9 | #3a3a3d | **derived** Pressed state, absent from design |
-| `color.state.onWindow` | #d6d6d8 | #3a3a3d | Active controls on window background: rail and title toggles |
-| `color.state.selectedAccent` | #e8f2fe | #16304d | Selected file row |
+| `color.state.onWindow` | #d6d6d8 | #3a3a3d | Active title bar toggles on the window background |
+| `color.state.railSelected` | rgba(0,0,0,0.14) | #3a3a3d | Selected main navigation background |
+| `color.state.selectedAccent` | #dcecff | #254361 | Selected row in the focused pane and focused catalog item |
 | `color.state.tabHover` | rgba(255,255,255,0.45) | rgba(255,255,255,0.1) |  |
 | `color.state.railHover` | rgba(0,0,0,0.045) | rgba(255,255,255,0.06) |  |
 | `color.state.railPressed` | rgba(0,0,0,0.12) | rgba(255,255,255,0.12) |  |
@@ -516,16 +538,19 @@ siderItem.nameColor             <- component, references semantics only
 | `color.border.divider` | #f2f2f4 | #333336 | Header and table-header bottom lines |
 | `color.border.tab` | #efeff1 | #333336 | Legacy tab line / FTP pane border |
 | `color.border.control` | #e6e6e9 | #444448 | Button borders and vertical status separators |
+| `color.border.field` | rgba(0,0,0,0.04) | rgba(255,255,255,0.06) | Input and dropdown outline |
+| `color.border.fieldHover` | rgba(0,0,0,0.12) | rgba(255,255,255,0.16) | Input and dropdown outline on hover |
+| `color.border.check` | #85858b | ＝ | Unchecked control outline |
 | `color.border.keycap` | #e3e3e6 | #444448 | Keycap border |
 | `color.border.separatorWindow` | #d2d2d6 | #444448 | Title-bar button-group divider |
 | `color.border.onGlass` | rgba(0,0,0,0.1) | rgba(255,255,255,0.12) | Vertical glass-bar divider |
 | `color.border.raised` | rgba(0,0,0,0.08) | rgba(255,255,255,0.1) | 0.5px raised-surface border |
 | `color.border.hairlineStrong` | rgba(0,0,0,0.1) | rgba(255,255,255,0.12) | Dragged-card border |
-| `color.border.controlHover` | #c7c7cc | #444448 | Hovered input border |
+| `color.border.controlHover` | #c7c7cc | #444448 | Secondary control outline on hover |
 | `color.text.primary` | #1d1d1f | #f5f5f7 |  |
-| `color.text.secondary` | #8e8e93 | #98989d | Secondary text, host subtitles, status bars |
-| `color.text.tertiary` | #a1a1a6 | #6e6e73 | Close ×, keycaps, captions |
-| `color.text.quaternary` | #b0b0b5 | #5a5a5f | Group counter |
+| `color.text.secondary` | #626269 | #b0b0b6 | Secondary text, host subtitles, status bars |
+| `color.text.tertiary` | #6c6c72 | #a6a6ad | Close ×, keycaps, captions |
+| `color.text.quaternary` | #737379 | #8e8e93 | Group counter |
 | `color.text.muted` | #6e6e73 | #a1a1a6 | Unselected tabs, rail icons, button icons |
 | `color.text.strong` | #3a3a3f | #d1d1d6 | Secondary button text |
 | `color.text.action` | #4a4a50 | #c7c7cc | Title-bar action button |
@@ -534,7 +559,8 @@ siderItem.nameColor             <- component, references semantics only
 | `color.text.placeholder` | #c7c7cc | #5a5a5f | Breadcrumb separator |
 | `color.text.onAccent` | #ffffff | ＝ |  |
 | `color.text.accent` | #0a6fd6 | #4da3ff | Blue text: badges, notices, highlighted groups |
-| `color.text.accentStrong` | #0a5bc4 | #6cb4ff | Selected filename |
+| `color.text.accentStrong` | #0a5bc4 | #6cb4ff | Strong accent text |
+| `color.text.selectedAccent` | #0a5bc4 | #8dc2ff | Selected row text in the focused pane |
 | `color.icon.default` | #6e6e73 | #a1a1a6 |  |
 | `color.icon.subtle` | #8e8e93 | ＝ |  |
 | `color.icon.faint` | #a1a1a6 | #6e6e73 |  |
@@ -1075,9 +1101,9 @@ References and resolved Light values; Dark follows the corresponding semantic va
 | `tab.weightSelected` | `{font.weight.medium}` | 500 |  |
 | `tab.bgSelected` | `{color.glass.titleTab}` | rgba(255,255,255,0.85) | Selected title-bar tab |
 | `tab.shadowSelected` | `{shadow.titleTab}` | 0px 0px 0px 0.5px rgba(0,0,0,0.07), 0px 1px 2px 0px rgba(0,0,0,0.05) |  |
-| `tab.close` | `{color.text.tertiary}` | #a1a1a6 | Close ×, keycaps, captions |
+| `tab.close` | `{color.text.tertiary}` | #6c6c72 | Close ×, keycaps, captions |
 | `tab.dotSize` | `{size.dotSm}` | 6px |  |
-| `tab.addIcon` | `{color.text.secondary}` | #8e8e93 | Secondary text, host subtitles, status bars |
+| `tab.addIcon` | `{color.text.secondary}` | #626269 | Secondary text, host subtitles, status bars |
 | `tab.contentHeight` | `{size.tabContentHeight}` | 20px |  |
 | `tab.stripHeight` | `{size.tabStripHeight}` | 36px |  |
 | `tab.dragHandleInset` | `{size.tabDragHandleInset}` | 30px |  |
@@ -1086,14 +1112,14 @@ References and resolved Light values; Dark follows the corresponding semantic va
 | `tab.bgHover` | `{color.state.tabHover}` | rgba(255,255,255,0.45) |  |
 | `tab.dotConnected` | `{color.success.default}` | #30c45a | Online dots and completed progress |
 | `tab.dotError` | `{color.danger.default}` | #ff3b30 | Failure dots and icons |
-| `tab.ringDisconnected` | `{color.text.tertiary}` | #a1a1a6 | Close ×, keycaps, captions |
+| `tab.ringDisconnected` | `{color.text.tertiary}` | #6c6c72 | Close ×, keycaps, captions |
 | `tab.ringWidth` | `{size.focusRing}` | 1.5px | Focus-ring / dashed drop-frame width |
 | `tab.spinner` | `{color.warning.default}` | #f5a623 | Connecting |
 | `tab.spinnerTrack` | `{color.warning.halo}` | rgba(245,166,35,0.18) |  |
 | `tab.spinnerSize` | `{size.tabSpinner}` | 10px |  |
 | `tab.spinnerStroke` | `{size.iconStroke}` | 1.75px | Lucide-style stroke width |
 | `tab.spinnerPeriod` | `{motion.duration.spin}` | 800ms | One connecting-spinner revolution |
-| `tab.textDisconnected` | `{color.text.tertiary}` | #a1a1a6 | Close ×, keycaps, captions |
+| `tab.textDisconnected` | `{color.text.tertiary}` | #6c6c72 | Close ×, keycaps, captions |
 | `tab.textErrorSelected` | `{color.danger.text}` | #d70015 | Failure text |
 | `tab.stateTransition` | `{motion.duration.focus}` | 160ms | Focus/hover transition |
 
@@ -1104,7 +1130,7 @@ References and resolved Light values; Dark follows the corresponding semantic va
 | `titleAction.radius` | `{radius.control}` | 7px |  |
 | `titleAction.icon` | `{color.text.action}` | #4a4a50 | Title-bar action button |
 | `titleAction.iconSize` | `{size.iconMd}` | 15px |  |
-| `titleAction.bgOn` | `{color.state.onWindow}` | #d6d6d8 | Active controls on window background: rail and title toggles |
+| `titleAction.bgOn` | `{color.state.onWindow}` | #d6d6d8 | Active title bar toggles on the window background |
 | `titleAction.iconOn` | `{color.text.primary}` | #1d1d1f |  |
 | `titleAction.bgPrimary` | `{color.accent.default}` | #0a84ff | Primary accent #0a84ff |
 | `titleAction.iconPrimary` | `{color.text.onAccent}` | #ffffff |  |
@@ -1122,7 +1148,7 @@ References and resolved Light values; Dark follows the corresponding semantic va
 | `rail.buttonSize` | `{size.railButton}` | 34px |  |
 | `rail.buttonRadius` | `{radius.railButton}` | 8px |  |
 | `rail.icon` | `{color.text.muted}` | #6e6e73 | Unselected tabs, rail icons, button icons |
-| `rail.bgOn` | `{color.state.onWindow}` | #d6d6d8 | Active controls on window background: rail and title toggles |
+| `rail.bgOn` | `{color.state.railSelected}` | rgba(0,0,0,0.14) | Selected main navigation background |
 | `rail.iconOn` | `{color.text.primary}` | #1d1d1f |  |
 | `rail.transition` | `{motion.duration.focus}` | 160ms | Focus/hover transition |
 
@@ -1142,14 +1168,14 @@ References and resolved Light values; Dark follows the corresponding semantic va
 | `sider.titleWeight` | `{font.weight.semibold}` | 600 |  |
 | `sider.addButtonSize` | `{size.controlMd}` | 26px |  |
 | `sider.addButtonRadius` | `{radius.controlSm}` | 6px |  |
-| `sider.addButtonBg` | `{color.surface.control}` | #f2f2f4 | Neutral control background: icon buttons, segments, badges, queue icons |
+| `sider.addButtonBg` | `{color.surface.control}` | #f2f2f4 | Neutral control background: icon buttons, badges, and queue icons |
 | `sider.addButtonIcon` | `{color.text.muted}` | #6e6e73 | Unselected tabs, rail icons, button icons |
 | `sider.listPaddingX` | `{space.8}` | 8px |  |
 | `sider.listPaddingY` | `{space.2}` | 2px |  |
 | `sider.footerBorder` | `{color.border.subtle}` | #f0f0f2 | Inner dividers: sidebar footer, status bars, progress tracks |
 | `sider.footerPaddingX` | `{space.16}` | 16px |  |
 | `sider.footerPaddingY` | `{space.10}` | 10px |  |
-| `sider.footerText` | `{color.text.secondary}` | #8e8e93 | Secondary text, host subtitles, status bars |
+| `sider.footerText` | `{color.text.secondary}` | #626269 | Secondary text, host subtitles, status bars |
 | `sider.footerSize` | `{font.size.small}` | 12px | Sidebar footer and secondary host information |
 
 ### search
@@ -1157,15 +1183,15 @@ References and resolved Light values; Dark follows the corresponding semantic va
 |---|---|---|---|
 | `search.height` | `{size.controlLg}` | 30px |  |
 | `search.radius` | `{radius.control}` | 7px |  |
-| `search.bg` | `{color.surface.sunken}` | #f4f4f5 | Search field |
+| `search.bg` | `{color.surface.sunken}` | #f4f4f5 | Background for search fields, inputs, and dropdowns |
 | `search.paddingX` | `{space.9}` | 9px |  |
 | `search.gap` | `{space.6}` | 6px |  |
 | `search.marginX` | `{space.12}` | 12px |  |
 | `search.marginBottom` | `{space.8}` | 8px |  |
-| `search.text` | `{color.text.secondary}` | #8e8e93 | Secondary text, host subtitles, status bars |
+| `search.text` | `{color.text.secondary}` | #626269 | Secondary text, host subtitles, status bars |
 | `search.fontSize` | `{font.size.body}` | 12.5px | Tabs, buttons, lists |
 | `search.kbdSize` | `{font.size.caption}` | 11px | Keycaps, status badges, counters |
-| `search.kbdText` | `{color.text.tertiary}` | #a1a1a6 | Close ×, keycaps, captions |
+| `search.kbdText` | `{color.text.tertiary}` | #6c6c72 | Close ×, keycaps, captions |
 | `search.kbdBorder` | `{color.border.keycap}` | #e3e3e6 | Keycap border |
 | `search.kbdBg` | `{color.surface.keycap}` | #ffffff | Keycap background |
 | `search.kbdRadius` | `{radius.keycap}` | 4px |  |
@@ -1184,8 +1210,8 @@ References and resolved Light values; Dark follows the corresponding semantic va
 | `groupHeader.gap` | `{space.4}` | 4px |  |
 | `groupHeader.fontSize` | `{font.size.footnote}` | 11.5px | Group headers, subtitles, status bars |
 | `groupHeader.weight` | `{font.weight.medium}` | 500 |  |
-| `groupHeader.text` | `{color.text.secondary}` | #8e8e93 | Secondary text, host subtitles, status bars |
-| `groupHeader.count` | `{color.text.quaternary}` | #b0b0b5 | Group counter |
+| `groupHeader.text` | `{color.text.secondary}` | #626269 | Secondary text, host subtitles, status bars |
+| `groupHeader.count` | `{color.text.quaternary}` | #737379 | Group counter |
 | `groupHeader.countSize` | `{font.size.caption}` | 11px | Keycaps, status badges, counters |
 | `groupHeader.dropBg` | `{color.accent.tint08}` | rgba(10,132,255,0.08) | Group drop highlight |
 | `groupHeader.dropText` | `{color.text.accent}` | #0a6fd6 | Blue text: badges, notices, highlighted groups |
@@ -1207,8 +1233,8 @@ References and resolved Light values; Dark follows the corresponding semantic va
 | `siderItem.gap` | `{space.9}` | 9px |  |
 | `siderItem.radius` | `{radius.control}` | 7px |  |
 | `siderItem.spacing` | `{space.1}` | 1px |  |
-| `siderItem.bgHover` | `{color.state.hover}` | #f7f7f8 | Row hover |
-| `siderItem.bgActive` | `{color.state.selectedAccent}` | #e8f2fe | **derived** Added catalog focus background, independent of open sessions |
+| `siderItem.bgHover` | `{color.state.rowHover}` | #f1f1f4 | Hovered list row |
+| `siderItem.bgActive` | `{color.state.selectedAccent}` | #dcecff | **derived** Added catalog focus background, independent of open sessions |
 | `siderItem.bgSelected` | `{color.state.selected}` | #efeff1 | **deprecated** Sidebar no longer shows connection/selection state |
 | `siderItem.nameSize` | `{font.size.bodyLg}` | 13px | Hostnames and headings |
 | `siderItem.nameWeight` | `{font.weight.medium}` | 500 |  |
@@ -1218,7 +1244,7 @@ References and resolved Light values; Dark follows the corresponding semantic va
 | `siderItem.subFamily` | `{font.family.mono}` | JetBrains Mono, Menlo, monospace |  |
 | `siderItem.subLineHeight` | `{font.lineHeight.sub}` | 15px |  |
 | `siderItem.subTracking` | `{font.tracking.mono}` | -0.2px |  |
-| `siderItem.subColor` | `{color.text.secondary}` | #8e8e93 | Secondary text, host subtitles, status bars |
+| `siderItem.subColor` | `{color.text.secondary}` | #626269 | Secondary text, host subtitles, status bars |
 | `siderItem.dotSize` | `{size.dot}` | 7px | **deprecated** Sidebar no longer shows connection/selection state |
 | `siderItem.dotHalo` | `{size.dotHalo}` | 3px | **deprecated** Sidebar no longer shows connection/selection state |
 | `siderItem.dotOnline` | `{color.success.default}` | #30c45a | **deprecated** Sidebar no longer shows connection/selection state |
@@ -1265,7 +1291,7 @@ References and resolved Light values; Dark follows the corresponding semantic va
 | `pane.headerFontSize` | `{font.size.body}` | 12.5px | Tabs, buttons, lists |
 | `pane.name` | `{color.text.primary}` | #1d1d1f |  |
 | `pane.nameWeight` | `{font.weight.semibold}` | 600 |  |
-| `pane.host` | `{color.text.secondary}` | #8e8e93 | Secondary text, host subtitles, status bars |
+| `pane.host` | `{color.text.secondary}` | #626269 | Secondary text, host subtitles, status bars |
 | `pane.hostSize` | `{font.size.footnote}` | 11.5px | Group headers, subtitles, status bars |
 | `pane.hostFamily` | `{font.family.mono}` | JetBrains Mono, Menlo, monospace |  |
 | `pane.buttonSize` | `{size.controlSm}` | 24px |  |
@@ -1304,7 +1330,7 @@ References and resolved Light values; Dark follows the corresponding semantic va
 | `paneFocus.contentOpacityHover` | `{opacity.paneHoverContent}` | 0.78 |  |
 | `paneFocus.contentSaturateHover` | `{opacity.paneHoverSaturate}` | 0.7 |  |
 | `paneFocus.buttonsOpacityUnfocused` | `{opacity.hidden}` | 0 |  |
-| `paneFocus.cursorRingUnfocused` | `{color.text.secondary}` | #8e8e93 | Secondary text, host subtitles, status bars |
+| `paneFocus.cursorRingUnfocused` | `{color.text.secondary}` | #626269 | Secondary text, host subtitles, status bars |
 | `paneFocus.transition` | `{motion.duration.focus}` | 160ms | Focus/hover transition |
 | `paneFocus.kbdSize` | `{font.size.caption2}` | 10.5px | ⌘N chip and count capsules |
 | `paneFocus.kbdWeight` | `{font.weight.medium}` | 500 |  |
@@ -1312,7 +1338,7 @@ References and resolved Light values; Dark follows the corresponding semantic va
 | `paneFocus.kbdPaddingX` | `{space.5}` | 5px |  |
 | `paneFocus.kbdPaddingY` | `{space.3}` | 3px |  |
 | `paneFocus.kbdBg` | `{color.fill.quiet}` | rgba(0,0,0,0.05) | ⌘N chip and badges on glass |
-| `paneFocus.kbdText` | `{color.text.secondary}` | #8e8e93 | Secondary text, host subtitles, status bars |
+| `paneFocus.kbdText` | `{color.text.secondary}` | #626269 | Secondary text, host subtitles, status bars |
 | `paneFocus.kbdBgFocused` | `{color.accent.default}` | #0a84ff | Primary accent #0a84ff |
 | `paneFocus.kbdTextFocused` | `{color.text.onAccent}` | #ffffff |  |
 | `paneFocus.kbdLineHeight` | `{font.lineHeight.keycap}` | 12px |  |
@@ -1363,7 +1389,7 @@ References and resolved Light values; Dark follows the corresponding semantic va
 | `statusBar.gap` | `{space.14}` | 14px |  |
 | `statusBar.gapPane` | `{space.10}` | 10px |  |
 | `statusBar.fontSize` | `{font.size.footnote}` | 11.5px | Group headers, subtitles, status bars |
-| `statusBar.text` | `{color.text.secondary}` | #8e8e93 | Secondary text, host subtitles, status bars |
+| `statusBar.text` | `{color.text.secondary}` | #626269 | Secondary text, host subtitles, status bars |
 | `statusBar.hostFamily` | `{font.family.mono}` | JetBrains Mono, Menlo, monospace |  |
 | `statusBar.hostColor` | `{color.text.primary}` | #1d1d1f |  |
 | `statusBar.hostWeight` | `{font.weight.semibold}` | 600 |  |
@@ -1382,7 +1408,7 @@ References and resolved Light values; Dark follows the corresponding semantic va
 | `badge.paddingYCompact` | `{space.1}` | 1px |  |
 | `badge.radius` | `{radius.pill}` | 20px |  |
 | `badge.gap` | `{space.5}` | 5px |  |
-| `badge.neutralBg` | `{color.surface.control}` | #f2f2f4 | Neutral control background: icon buttons, segments, badges, queue icons |
+| `badge.neutralBg` | `{color.surface.control}` | #f2f2f4 | Neutral control background: icon buttons, badges, and queue icons |
 | `badge.neutralText` | `{color.text.neutralBadge}` | #5b5b62 | Neutral badge text |
 | `badge.neutralBgOnGlass` | `{color.fill.quiet}` | rgba(0,0,0,0.05) | ⌘N chip and badges on glass |
 | `badge.okBg` | `{color.success.subtle}` | #ebf8ef |  |
@@ -1402,7 +1428,7 @@ References and resolved Light values; Dark follows the corresponding semantic va
 | `badge.runDot` | `{color.accent.default}` | #0a84ff | Primary accent #0a84ff |
 | `badge.neutralDot` | `{color.status.offline}` | #cfcfd4 | Offline dot |
 | `badge.mutedBg` | `{color.surface.field}` | #f6f6f7 | Breadcrumb path field |
-| `badge.mutedText` | `{color.text.tertiary}` | #a1a1a6 | Close ×, keycaps, captions |
+| `badge.mutedText` | `{color.text.tertiary}` | #6c6c72 | Close ×, keycaps, captions |
 
 ### button
 | token | Reference | Light value | Description |
@@ -1419,13 +1445,13 @@ References and resolved Light values; Dark follows the corresponding semantic va
 | `button.primaryText` | `{color.text.onAccent}` | #ffffff |  |
 | `button.bgHover` | `{color.state.hover}` | #f7f7f8 | **derived** Not specified in design |
 | `button.bgPressed` | `{color.state.pressed}` | #e6e6e9 | **derived** Not specified in design |
-| `button.bg` | `{color.surface.control}` | #f2f2f4 | Neutral control background: icon buttons, segments, badges, queue icons |
+| `button.bg` | `{color.surface.control}` | #f2f2f4 | Neutral control background: icon buttons, badges, and queue icons |
 | `button.transition` | `{motion.duration.focus}` | 160ms | Focus/hover transition |
 | `button.heightSm` | `{size.controlSm}` | 24px |  |
 | `button.heightLg` | `{size.buttonLarge}` | 32px |  |
 | `button.paddingXSm` | `{space.9}` | 9px |  |
 | `button.paddingXLg` | `{space.14}` | 14px |  |
-| `button.secondaryBg` | `{color.surface.control}` | #f2f2f4 | Neutral control background: icon buttons, segments, badges, queue icons |
+| `button.secondaryBg` | `{color.surface.control}` | #f2f2f4 | Neutral control background: icon buttons, badges, and queue icons |
 | `button.secondaryBgHover` | `{color.surface.controlStrong}` | #ececef | Inline sidebar More button |
 | `button.plainBgHover` | `{color.state.hover}` | #f7f7f8 | Row hover |
 | `button.primaryBgHover` | `{color.accent.hover}` | #0a6fd6 |  |
@@ -1449,7 +1475,7 @@ References and resolved Light values; Dark follows the corresponding semantic va
 | `iconButton.icon` | `{color.icon.default}` | #6e6e73 |  |
 | `iconButton.iconSubtle` | `{color.icon.subtle}` | #8e8e93 |  |
 | `iconButton.iconFaint` | `{color.icon.faint}` | #a1a1a6 |  |
-| `iconButton.bg` | `{color.surface.control}` | #f2f2f4 | Neutral control background: icon buttons, segments, badges, queue icons |
+| `iconButton.bg` | `{color.surface.control}` | #f2f2f4 | Neutral control background: icon buttons, badges, and queue icons |
 | `iconButton.bgHover` | `{color.state.hover}` | #f7f7f8 | **derived** Not specified in design |
 | `iconButton.iconSize` | `{size.icon}` | 16px |  |
 | `iconButton.stroke` | `{size.iconStroke}` | 1.75px | Lucide-style stroke width |
@@ -1457,7 +1483,7 @@ References and resolved Light values; Dark follows the corresponding semantic va
 | `iconButton.transition` | `{motion.duration.focus}` | 160ms | Focus/hover transition |
 | `iconButton.bgOn` | `{color.state.pressed}` | #e6e6e9 | Pressed state, absent from design |
 | `iconButton.iconOn` | `{color.text.primary}` | #1d1d1f |  |
-| `iconButton.bgFilled` | `{color.surface.control}` | #f2f2f4 | Neutral control background: icon buttons, segments, badges, queue icons |
+| `iconButton.bgFilled` | `{color.surface.control}` | #f2f2f4 | Neutral control background: icon buttons, badges, and queue icons |
 | `iconButton.iconHover` | `{color.text.primary}` | #1d1d1f |  |
 | `iconButton.iconSizeSm` | `{size.iconSm}` | 14px |  |
 | `iconButton.iconSizeXs` | `{size.iconXs}` | 12px |  |
@@ -1476,7 +1502,7 @@ References and resolved Light values; Dark follows the corresponding semantic va
 ### segmented
 | token | Reference | Light value | Description |
 |---|---|---|---|
-| `segmented.bg` | `{color.surface.control}` | #f2f2f4 | Neutral control background: icon buttons, segments, badges, queue icons |
+| `segmented.bg` | `{color.surface.segmentTrack}` | #eaeaf0 | Segmented control track |
 | `segmented.radius` | `{radius.control}` | 7px |  |
 | `segmented.padding` | `{space.2}` | 2px |  |
 | `segmented.fontSize` | `{font.size.footnote}` | 11.5px | Group headers, subtitles, status bars |
@@ -1484,12 +1510,12 @@ References and resolved Light values; Dark follows the corresponding semantic va
 | `segmented.itemPaddingY` | `{space.2}` | 2px |  |
 | `segmented.itemRadius` | `{radius.chip}` | 5px |  |
 | `segmented.text` | `{color.text.muted}` | #6e6e73 | Unselected tabs, rail icons, button icons |
-| `segmented.bgOn` | `{color.surface.raised}` | #ffffff | Raised surfaces: dragged cards, ghosts, selected segments |
+| `segmented.bgOn` | `{color.surface.segmentSelected}` | #ffffff | Selected segment background |
 | `segmented.textOn` | `{color.text.primary}` | #1d1d1f |  |
 | `segmented.shadowOn` | `{shadow.segment}` | 0px 1px 2px 0px rgba(0,0,0,0.08) |  |
 | `segmented.transition` | `{motion.duration.focus}` | 160ms | Focus/hover transition |
 | `segmented.bgHover` | `{color.state.hover}` | #f7f7f8 | Row hover |
-| `segmented.countText` | `{color.text.tertiary}` | #a1a1a6 | Close ×, keycaps, captions |
+| `segmented.countText` | `{color.text.tertiary}` | #6c6c72 | Close ×, keycaps, captions |
 | `segmented.countTextOn` | `{color.text.muted}` | #6e6e73 | Unselected tabs, rail icons, button icons |
 | `segmented.itemHeightMd` | `{size.segmentedItem}` | 24px |  |
 | `segmented.heightSm` | `{size.controlSm}` | 24px |  |
@@ -1512,7 +1538,7 @@ References and resolved Light values; Dark follows the corresponding semantic va
 | token | Reference | Light value | Description |
 |---|---|---|---|
 | `fileList.headerHeight` | `{size.listRow}` | 30px |  |
-| `fileList.headerText` | `{color.text.secondary}` | #8e8e93 | Secondary text, host subtitles, status bars |
+| `fileList.headerText` | `{color.text.secondary}` | #626269 | Secondary text, host subtitles, status bars |
 | `fileList.headerSize` | `{font.size.footnote}` | 11.5px | Group headers, subtitles, status bars |
 | `fileList.headerBorder` | `{color.border.divider}` | #f2f2f4 | Header and table-header bottom lines |
 | `fileList.rowHeight` | `{size.listRow}` | 30px |  |
@@ -1521,9 +1547,9 @@ References and resolved Light values; Dark follows the corresponding semantic va
 | `fileList.rowGap` | `{space.2}` | 2px |  |
 | `fileList.fontSize` | `{font.size.body}` | 12.5px | Tabs, buttons, lists |
 | `fileList.zebra` | `{color.surface.zebra}` | #fafafb | Alternating list rows |
-| `fileList.bgSelected` | `{color.state.selectedAccent}` | #e8f2fe | Selected file row |
-| `fileList.textSelected` | `{color.text.accentStrong}` | #0a5bc4 | Selected filename |
-| `fileList.meta` | `{color.text.secondary}` | #8e8e93 | Secondary text, host subtitles, status bars |
+| `fileList.bgSelected` | `{color.state.selectedAccent}` | #dcecff | Selected row in the focused pane and focused catalog item |
+| `fileList.textSelected` | `{color.text.selectedAccent}` | #0a5bc4 | Selected row text in the focused pane |
+| `fileList.meta` | `{color.text.secondary}` | #626269 | Secondary text, host subtitles, status bars |
 | `fileList.fileIcon` | `{color.icon.subtle}` | #8e8e93 |  |
 | `fileList.folderIcon` | `{color.icon.folder}` | #5ba7f7 |  |
 | `fileList.folderFill` | `{color.icon.folderFill}` | #d7e9fd |  |
@@ -1598,7 +1624,7 @@ References and resolved Light values; Dark follows the corresponding semantic va
 | `dragLift.threshold` | `{motion.drag.threshold}` | 4px | Movement threshold in px |
 | `dragLift.holdDelay` | `{motion.duration.hold}` | 150ms | Pick up after long press |
 | `dragLift.scale` | `{motion.drag.liftScale}` | 1.03 |  |
-| `dragLift.bg` | `{color.surface.raised}` | #ffffff | Raised surfaces: dragged cards, ghosts, selected segments |
+| `dragLift.bg` | `{color.surface.raised}` | #ffffff | Raised surfaces: menus, dragged cards, and previews |
 | `dragLift.radius` | `{radius.lift}` | 9px |  |
 | `dragLift.shadow` | `{shadow.lift}` | 0px 0px 0px 0.5px rgba(0,0,0,0.1), 0px 10px 28px 0px rgba(0,0,0,0.16), 0px 2px 6px 0px rgba(0,0,0,0.08) | Dragged card |
 | `dragLift.stackShadow` | `{shadow.liftStack}` | 0px 0px 0px 0.5px rgba(0,0,0,0.08), 0px 4px 10px 0px rgba(0,0,0,0.06) | Stacked multiselection cards |
@@ -1638,7 +1664,7 @@ References and resolved Light values; Dark follows the corresponding semantic va
 ### dragGhost
 | token | Reference | Light value | Description |
 |---|---|---|---|
-| `dragGhost.bg` | `{color.surface.raised}` | #ffffff | Raised surfaces: dragged cards, ghosts, selected segments |
+| `dragGhost.bg` | `{color.surface.raised}` | #ffffff | Raised surfaces: menus, dragged cards, and previews |
 | `dragGhost.radius` | `{radius.dropZone}` | 8px |  |
 | `dragGhost.shadow` | `{shadow.ghost}` | 0px 8px 24px 0px rgba(0,0,0,0.12), 0px 0px 0px 0.5px rgba(0,0,0,0.08) | FTP drag ghost |
 | `dragGhost.paddingLeft` | `{space.10}` | 10px |  |
@@ -1735,7 +1761,7 @@ References and resolved Light values; Dark follows the corresponding semantic va
 | `dialog.groupWidth` | `{size.groupDialogWidth}` | 320px |  |
 | `dialog.portWidth` | `{size.portFieldWidth}` | 90px |  |
 | `dialog.titleSize` | `{size.dialogTitleSize}` | 18px |  |
-| `dialog.bg` | `{color.surface.raised}` | #ffffff | Raised surfaces: dragged cards, ghosts, selected segments |
+| `dialog.bg` | `{color.surface.raised}` | #ffffff | Raised surfaces: menus, dragged cards, and previews |
 | `dialog.backdrop` | `{color.overlay.backdrop}` | rgba(0,0,0,0.4) | Dialog backdrop |
 | `dialog.shadow` | `{shadow.dialog}` | 0px 10px 30px 0px rgba(0,0,0,0.3) | Dialog shadow |
 | `dialog.radius` | `{radius.card}` | 10px |  |
@@ -1752,7 +1778,7 @@ References and resolved Light values; Dark follows the corresponding semantic va
 | `stats.sectionGap` | `{size.statsSectionGap}` | 18px |  |
 | `stats.netChartHeight` | `{size.statsNetChartHeight}` | 20px | Upload/download mini trends |
 | `stats.valueLarge` | `{size.statsValueLarge}` | 28px | Main CPU value |
-| `stats.hostBg` | `{color.surface.sunken}` | #f4f4f5 | Search field |
+| `stats.hostBg` | `{color.surface.sunken}` | #f4f4f5 | Background for search fields, inputs, and dropdowns |
 | `stats.hostRadius` | `{radius.card}` | 10px |  |
 | `stats.processBar` | `{color.accent.tint10}` | rgba(10,132,255,0.1) | New-output badge / flash |
 | `stats.processRadius` | `{radius.controlSm}` | 6px |  |
@@ -1816,9 +1842,9 @@ References and resolved Light values; Dark follows the corresponding semantic va
 | `filePaneFocus.labelWeightInactive` | `{font.weight.medium}` | 500 |  |
 | `filePaneFocus.labelPaddingX` | `{space.8}` | 8px |  |
 | `filePaneFocus.labelRadius` | `{radius.controlSm}` | 6px |  |
-| `filePaneFocus.selBgActive` | `{color.state.selectedAccent}` | #e8f2fe | Selected file row |
-| `filePaneFocus.selTextActive` | `{color.text.accentStrong}` | #0a5bc4 | Selected filename |
-| `filePaneFocus.selBgInactive` | `{color.state.selected}` | #efeff1 | Selected sidebar row |
+| `filePaneFocus.selBgActive` | `{color.state.selectedAccent}` | #dcecff | Selected row in the focused pane and focused catalog item |
+| `filePaneFocus.selTextActive` | `{color.text.selectedAccent}` | #0a5bc4 | Selected row text in the focused pane |
+| `filePaneFocus.selBgInactive` | `{color.state.rowSelected}` | #e7e7ec | Selected row in an unfocused pane |
 | `filePaneFocus.selTextInactive` | `{color.text.primary}` | #1d1d1f |  |
 | `filePaneFocus.transition` | `{motion.duration.focus}` | 160ms | Focus/hover transition |
 | `filePaneFocus.borderFocused` | `{color.accent.default}` | #0a84ff | Primary accent #0a84ff |
@@ -1909,7 +1935,7 @@ References and resolved Light values; Dark follows the corresponding semantic va
 |---|---|---|---|
 | `transferRow.upBg` | `{color.accent.subtle}` | #eaf3fe | Light blue background: upload, running, notices |
 | `transferRow.upIcon` | `{color.accent.default}` | #0a84ff | Primary accent #0a84ff |
-| `transferRow.downBg` | `{color.surface.control}` | #f2f2f4 | Neutral control background: icon buttons, segments, badges, queue icons |
+| `transferRow.downBg` | `{color.surface.control}` | #f2f2f4 | Neutral control background: icon buttons, badges, and queue icons |
 | `transferRow.downIcon` | `{color.text.muted}` | #6e6e73 | Unselected tabs, rail icons, button icons |
 | `transferRow.doneBg` | `{color.success.subtle}` | #ebf8ef |  |
 | `transferRow.doneIcon` | `{color.success.text}` | #1f8a3f |  |
@@ -1920,7 +1946,7 @@ References and resolved Light values; Dark follows the corresponding semantic va
 | `transferRow.runBg` | `{color.accent.subtle}` | #eaf3fe | Light blue background: upload, running, notices |
 | `transferRow.runText` | `{color.text.accent}` | #0a6fd6 | Blue text: badges, notices, highlighted groups |
 | `transferRow.runDot` | `{color.accent.default}` | #0a84ff | Primary accent #0a84ff |
-| `transferRow.pausedBg` | `{color.surface.control}` | #f2f2f4 | Neutral control background: icon buttons, segments, badges, queue icons |
+| `transferRow.pausedBg` | `{color.surface.control}` | #f2f2f4 | Neutral control background: icon buttons, badges, and queue icons |
 | `transferRow.pausedText` | `{color.text.muted}` | #6e6e73 | Unselected tabs, rail icons, button icons |
 | `transferRow.pausedDot` | `{color.status.paused}` | #c7c7cc | Paused progress |
 | `transferRow.doneBadgeBg` | `{color.success.subtle}` | #ebf8ef |  |
@@ -1969,11 +1995,11 @@ References and resolved Light values; Dark follows the corresponding semantic va
 | `input.height` | `{size.control}` | 28px |  |
 | `input.paddingX` | `{space.9}` | 9px |  |
 | `input.radius` | `{radius.control}` | 7px |  |
-| `input.bg` | `{color.surface.card}` | #ffffff | Content cards, sidebar, FTP panes |
+| `input.bg` | `{color.surface.sunken}` | #f4f4f5 | Background for search fields, inputs, and dropdowns |
 | `input.text` | `{color.text.primary}` | #1d1d1f |  |
 | `input.fontSize` | `{font.size.body}` | 12.5px | Tabs, buttons, lists |
-| `input.border` | `{color.border.control}` | #e6e6e9 | Button borders and vertical status separators |
-| `input.borderHover` | `{color.border.separatorWindow}` | #d2d2d6 | Title-bar button-group divider |
+| `input.border` | `{color.border.field}` | rgba(0,0,0,0.04) | Input and dropdown outline |
+| `input.borderHover` | `{color.border.fieldHover}` | rgba(0,0,0,0.12) | Input and dropdown outline on hover |
 | `input.borderFocus` | `{color.accent.default}` | #0a84ff | Primary accent #0a84ff |
 | `input.borderWidth` | `{size.divider}` | 1px |  |
 | `input.transition` | `{motion.duration.focus}` | 160ms | Focus/hover transition |
@@ -1981,7 +2007,7 @@ References and resolved Light values; Dark follows the corresponding semantic va
 | `input.focusShadow` | `{shadow.inputFocus}` | inset 0px 0px 0px 1.5px #0a84ff, 0px 0px 0px 3px rgba(10,132,255,0.16) | Focused input: inner ring and outer glow |
 | `input.errorShadow` | `{shadow.inputError}` | inset 0px 0px 0px 1.5px #ff3b30, 0px 0px 0px 3px rgba(255,59,48,0.14) | Input error, taking priority over focus |
 | `input.placeholder` | `{color.text.placeholder}` | #c7c7cc | Breadcrumb separator |
-| `input.icon` | `{color.text.tertiary}` | #a1a1a6 | Close ×, keycaps, captions |
+| `input.icon` | `{color.text.tertiary}` | #6c6c72 | Close ×, keycaps, captions |
 | `input.monoFont` | `{font.family.mono}` | JetBrains Mono, Menlo, monospace |  |
 | `input.monoSize` | `{size.inputMonoSize}` | 12px |  |
 | `input.monoTracking` | `{font.tracking.inputMono}` | -0.1px |  |
@@ -1991,7 +2017,7 @@ References and resolved Light values; Dark follows the corresponding semantic va
 | `input.caret` | `{color.accent.default}` | #0a84ff | Primary accent #0a84ff |
 | `input.chipHeight` | `{size.controlXs}` | 22px |  |
 | `input.chipRadius` | `{radius.chip}` | 5px |  |
-| `input.chipBg` | `{color.surface.control}` | #f2f2f4 | Neutral control background: icon buttons, segments, badges, queue icons |
+| `input.chipBg` | `{color.surface.controlStrong}` | #ececef | Inline sidebar More button |
 | `input.chipFontSize` | `{font.size.footnote}` | 11.5px | Group headers, subtitles, status bars |
 | `input.selectWidth` | `{size.transferProgressWidth}` | 180px |  |
 | `input.portWidth` | `{size.formLabel}` | 72px |  |
@@ -2025,7 +2051,7 @@ References and resolved Light values; Dark follows the corresponding semantic va
 | `modal.titleSize` | `{font.size.title}` | 15px | Large heading from the sidebar-drag design |
 | `modal.titleWeight` | `{font.weight.semibold}` | 600 |  |
 | `modal.subtitleSize` | `{font.size.footnote}` | 11.5px | Group headers, subtitles, status bars |
-| `modal.subtitle` | `{color.text.secondary}` | #8e8e93 | Secondary text, host subtitles, status bars |
+| `modal.subtitle` | `{color.text.secondary}` | #626269 | Secondary text, host subtitles, status bars |
 | `modal.bodyPaddingX` | `{space.24}` | 24px |  |
 | `modal.divider` | `{color.border.divider}` | #f2f2f4 | Header and table-header bottom lines |
 | `modal.footerPaddingTop` | `{space.14}` | 14px |  |
@@ -2058,7 +2084,7 @@ References and resolved Light values; Dark follows the corresponding semantic va
 | `formRow.errorSize` | `{font.size.footnote}` | 11.5px | Group headers, subtitles, status bars |
 | `formRow.errorIcon` | `{size.formErrorIcon}` | 12px |  |
 | `formRow.errorGap` | `{space.5}` | 5px |  |
-| `formRow.description` | `{color.text.tertiary}` | #a1a1a6 | Close ×, keycaps, captions |
+| `formRow.description` | `{color.text.tertiary}` | #6c6c72 | Close ×, keycaps, captions |
 | `formRow.descriptionSize` | `{font.size.footnote}` | 11.5px | Group headers, subtitles, status bars |
 | `formRow.descGap` | `{space.4}` | 4px |  |
 
@@ -2069,12 +2095,12 @@ References and resolved Light values; Dark follows the corresponding semantic va
 | `testResult.fontSize` | `{font.size.small}` | 12px | Sidebar footer and secondary host information |
 | `testResult.icon` | `{size.iconSm}` | 14px |  |
 | `testResult.spinnerSize` | `{size.testSpinner}` | 13px |  |
-| `testResult.testing` | `{color.text.secondary}` | #8e8e93 | Secondary text, host subtitles, status bars |
+| `testResult.testing` | `{color.text.secondary}` | #626269 | Secondary text, host subtitles, status bars |
 | `testResult.success` | `{color.success.text}` | #1f8a3f |  |
 | `testResult.successIcon` | `{color.success.default}` | #30c45a | Online dots and completed progress |
 | `testResult.fail` | `{color.danger.text}` | #d70015 | Failure text |
 | `testResult.failIcon` | `{color.danger.default}` | #ff3b30 | Failure dots and icons |
-| `testResult.info` | `{color.text.tertiary}` | #a1a1a6 | Close ×, keycaps, captions |
+| `testResult.info` | `{color.text.tertiary}` | #6c6c72 | Close ×, keycaps, captions |
 | `testResult.infoSize` | `{size.formErrorIcon}` | 12px |  |
 | `testResult.crossfade` | `{motion.duration.focus}` | 160ms | Focus/hover transition |
 
@@ -2084,11 +2110,11 @@ References and resolved Light values; Dark follows the corresponding semantic va
 | `collapse.headerHeight` | `{size.titlebar}` | 44px |  |
 | `collapse.chevron` | `{size.collapseChevron}` | 12px |  |
 | `collapse.chevronStroke` | `{size.collapseChevronStroke}` | 2.25px |  |
-| `collapse.chevronColor` | `{color.text.secondary}` | #8e8e93 | Secondary text, host subtitles, status bars |
+| `collapse.chevronColor` | `{color.text.secondary}` | #626269 | Secondary text, host subtitles, status bars |
 | `collapse.title` | `{color.text.primary}` | #1d1d1f |  |
 | `collapse.titleSize` | `{font.size.bodyLg}` | 13px | Hostnames and headings |
 | `collapse.titleWeight` | `{font.weight.semibold}` | 600 |  |
-| `collapse.summary` | `{color.text.tertiary}` | #a1a1a6 | Close ×, keycaps, captions |
+| `collapse.summary` | `{color.text.tertiary}` | #6c6c72 | Close ×, keycaps, captions |
 | `collapse.summarySize` | `{font.size.small}` | 12px | Sidebar footer and secondary host information |
 | `collapse.duration` | `{motion.duration.collapse}` | 180ms | Collapse all groups while dragging a group |
 | `collapse.chevronRotate` | `{size.collapseChevronRotate}` | 90px |  |
@@ -2114,7 +2140,7 @@ References and resolved Light values; Dark follows the corresponding semantic va
 | `settings.navItemHeight` | `{size.modalIconTile}` | 32px |  |
 | `settings.navItemRadius` | `{radius.control}` | 7px |  |
 | `settings.navItemOn` | `{color.accent.subtle}` | #eaf3fe | Light blue background: upload, running, notices |
-| `settings.navTextOn` | `{color.text.accentStrong}` | #0a5bc4 | Selected filename |
+| `settings.navTextOn` | `{color.text.accentStrong}` | #0a5bc4 | Strong accent text |
 | `settings.navIconOn` | `{color.accent.default}` | #0a84ff | Primary accent #0a84ff |
 | `settings.navIconTile` | `{size.controlXs}` | 22px |  |
 | `settings.headerPaddingTop` | `{space.16}` | 16px |  |
@@ -2124,7 +2150,7 @@ References and resolved Light values; Dark follows the corresponding semantic va
 | `settings.titleSize` | `{font.size.title}` | 15px | Large heading from the sidebar-drag design |
 | `settings.titleWeight` | `{font.weight.semibold}` | 600 |  |
 | `settings.subtitleSize` | `{font.size.footnote}` | 11.5px | Group headers, subtitles, status bars |
-| `settings.subtitle` | `{color.text.secondary}` | #8e8e93 | Secondary text, host subtitles, status bars |
+| `settings.subtitle` | `{color.text.secondary}` | #626269 | Secondary text, host subtitles, status bars |
 | `settings.close` | `{size.control}` | 28px |  |
 | `settings.contentMax` | `{size.settingsContent}` | 720px |  |
 | `settings.contentPaddingY` | `{space.20}` | 20px |  |
@@ -2134,7 +2160,7 @@ References and resolved Light values; Dark follows the corresponding semantic va
 | `settings.groupTitle` | `{color.text.muted}` | #6e6e73 | Unselected tabs, rail icons, button icons |
 | `settings.groupTitleGap` | `{space.8}` | 8px |  |
 | `settings.groupGap` | `{space.22}` | 22px |  |
-| `settings.groupBg` | `{color.surface.zebra}` | #fafafb | Alternating list rows |
+| `settings.groupBg` | `{color.surface.settingsGroup}` | #fafafb | Settings group background |
 | `settings.groupRadius` | `{radius.card}` | 10px |  |
 | `settings.groupBorder` | `{color.border.raised}` | rgba(0,0,0,0.08) | 0.5px raised-surface border |
 | `settings.groupBorderWidth` | `{size.hairline}` | 0.5px | 0.5px border |
@@ -2146,7 +2172,7 @@ References and resolved Light values; Dark follows the corresponding semantic va
 | `settings.rowLabelSize` | `{font.size.bodyLg}` | 13px | Hostnames and headings |
 | `settings.rowLabel` | `{color.text.primary}` | #1d1d1f |  |
 | `settings.rowDescSize` | `{font.size.footnote}` | 11.5px | Group headers, subtitles, status bars |
-| `settings.rowDesc` | `{color.text.secondary}` | #8e8e93 | Secondary text, host subtitles, status bars |
+| `settings.rowDesc` | `{color.text.secondary}` | #626269 | Secondary text, host subtitles, status bars |
 | `settings.fadeHeight` | `{size.settingsFadeHeight}` | 40px |  |
 | `settings.enterY` | `{space.8}` | 8px |  |
 | `settings.exitY` | `{space.4}` | 4px |  |
@@ -2212,7 +2238,7 @@ References and resolved Light values; Dark follows the corresponding semantic va
 |---|---|---|---|
 | `shortcutField.width` | `{size.settingsShortcut}` | 176px |  |
 | `shortcutField.keyGap` | `{space.4}` | 4px |  |
-| `shortcutField.keyText` | `{color.text.secondary}` | #8e8e93 | Secondary text, host subtitles, status bars |
+| `shortcutField.keyText` | `{color.text.secondary}` | #626269 | Secondary text, host subtitles, status bars |
 | `shortcutField.prompt` | `{color.text.accent}` | #0a6fd6 | Blue text: badges, notices, highlighted groups |
 | `shortcutField.controlGap` | `{space.8}` | 8px |  |
 
@@ -2221,8 +2247,8 @@ References and resolved Light values; Dark follows the corresponding semantic va
 |---|---|---|---|
 | `helpTip.size` | `{size.iconSm}` | 14px |  |
 | `helpTip.gap` | `{space.4}` | 4px |  |
-| `helpTip.icon` | `{color.text.tertiary}` | #a1a1a6 | Close ×, keycaps, captions |
-| `helpTip.iconHover` | `{color.text.secondary}` | #8e8e93 | Secondary text, host subtitles, status bars |
+| `helpTip.icon` | `{color.text.tertiary}` | #6c6c72 | Close ×, keycaps, captions |
+| `helpTip.iconHover` | `{color.text.secondary}` | #626269 | Secondary text, host subtitles, status bars |
 
 ### kbd
 | token | Reference | Light value | Description |
@@ -2234,7 +2260,7 @@ References and resolved Light values; Dark follows the corresponding semantic va
 | `kbd.fontSize` | `{font.size.caption}` | 11px | Keycaps, status badges, counters |
 | `kbd.bg` | `{color.surface.keycap}` | #ffffff | Keycap background |
 | `kbd.border` | `{color.border.keycap}` | #e3e3e6 | Keycap border |
-| `kbd.text` | `{color.text.tertiary}` | #a1a1a6 | Close ×, keycaps, captions |
+| `kbd.text` | `{color.text.tertiary}` | #6c6c72 | Close ×, keycaps, captions |
 | `kbd.inkBg` | `{color.keycap.inkBg}` | rgba(255,255,255,0.16) |  |
 | `kbd.inkText` | `{color.keycap.inkText}` | rgba(255,255,255,0.75) |  |
 | `kbd.accentBg` | `{color.keycap.accentBg}` | rgba(255,255,255,0.2) |  |
@@ -2261,7 +2287,7 @@ References and resolved Light values; Dark follows the corresponding semantic va
 |---|---|---|---|
 | `check.size` | `{size.check}` | 14px |  |
 | `check.radius` | `{radius.keycap}` | 4px |  |
-| `check.border` | `{color.border.keycap}` | #e3e3e6 | Keycap border |
+| `check.border` | `{color.border.check}` | #85858b | Unchecked control outline |
 | `check.on` | `{color.accent.default}` | #0a84ff | Primary accent #0a84ff |
 | `check.mark` | `{color.text.onAccent}` | #ffffff |  |
 | `check.radioDot` | `{size.radioDot}` | 4.5px |  |
@@ -2274,11 +2300,11 @@ References and resolved Light values; Dark follows the corresponding semantic va
 | `banner.radius` | `{radius.railButton}` | 8px |  |
 | `banner.gap` | `{space.8}` | 8px |  |
 | `banner.icon` | `{size.iconSm}` | 14px |  |
-| `banner.neutralBg` | `{color.surface.control}` | #f2f2f4 | Neutral control background: icon buttons, segments, badges, queue icons |
+| `banner.neutralBg` | `{color.surface.control}` | #f2f2f4 | Neutral control background: icon buttons, badges, and queue icons |
 | `banner.neutralText` | `{color.text.strong}` | #3a3a3f | Secondary button text |
-| `banner.neutralIcon` | `{color.text.secondary}` | #8e8e93 | Secondary text, host subtitles, status bars |
+| `banner.neutralIcon` | `{color.text.secondary}` | #626269 | Secondary text, host subtitles, status bars |
 | `banner.infoBg` | `{color.accent.subtle}` | #eaf3fe | Light blue background: upload, running, notices |
-| `banner.infoText` | `{color.text.accentStrong}` | #0a5bc4 | Selected filename |
+| `banner.infoText` | `{color.text.accentStrong}` | #0a5bc4 | Strong accent text |
 | `banner.infoIcon` | `{color.accent.default}` | #0a84ff | Primary accent #0a84ff |
 | `banner.warnBg` | `{color.warning.subtle}` | #fdf3e3 |  |
 | `banner.warnText` | `{color.warning.textStrong}` | #b26a00 |  |
@@ -2296,8 +2322,8 @@ References and resolved Light values; Dark follows the corresponding semantic va
 | `panel.sectionGap` | `{space.8}` | 8px |  |
 | `panel.divider` | `{color.border.divider}` | #f2f2f4 | Header and table-header bottom lines |
 | `panel.statLabel` | `{color.text.primary}` | #1d1d1f |  |
-| `panel.statValue` | `{color.text.secondary}` | #8e8e93 | Secondary text, host subtitles, status bars |
-| `panel.caption` | `{color.text.tertiary}` | #a1a1a6 | Close ×, keycaps, captions |
+| `panel.statValue` | `{color.text.secondary}` | #626269 | Secondary text, host subtitles, status bars |
+| `panel.caption` | `{color.text.tertiary}` | #6c6c72 | Close ×, keycaps, captions |
 
 ### sparkline
 | token | Reference | Light value | Description |
@@ -2315,9 +2341,9 @@ References and resolved Light values; Dark follows the corresponding semantic va
 | token | Reference | Light value | Description |
 |---|---|---|---|
 | `keyValue.rowHeight` | `{size.keyValueRow}` | 22px |  |
-| `keyValue.key` | `{color.text.secondary}` | #8e8e93 | Secondary text, host subtitles, status bars |
+| `keyValue.key` | `{color.text.secondary}` | #626269 | Secondary text, host subtitles, status bars |
 | `keyValue.value` | `{color.text.primary}` | #1d1d1f |  |
-| `keyValue.valueDim` | `{color.text.tertiary}` | #a1a1a6 | Close ×, keycaps, captions |
+| `keyValue.valueDim` | `{color.text.tertiary}` | #6c6c72 | Close ×, keycaps, captions |
 | `keyValue.font` | `{font.size.footnote}` | 11.5px | Group headers, subtitles, status bars |
 
 ### emptyState
@@ -2325,10 +2351,10 @@ References and resolved Light values; Dark follows the corresponding semantic va
 |---|---|---|---|
 | `emptyState.iconTile` | `{size.titlebar}` | 44px |  |
 | `emptyState.iconRadius` | `{radius.window}` | 12px |  |
-| `emptyState.iconBg` | `{color.surface.control}` | #f2f2f4 | Neutral control background: icon buttons, segments, badges, queue icons |
-| `emptyState.icon` | `{color.text.secondary}` | #8e8e93 | Secondary text, host subtitles, status bars |
+| `emptyState.iconBg` | `{color.surface.control}` | #f2f2f4 | Neutral control background: icon buttons, badges, and queue icons |
+| `emptyState.icon` | `{color.text.secondary}` | #626269 | Secondary text, host subtitles, status bars |
 | `emptyState.title` | `{font.size.bodyLg}` | 13px | Hostnames and headings |
-| `emptyState.detail` | `{color.text.secondary}` | #8e8e93 | Secondary text, host subtitles, status bars |
+| `emptyState.detail` | `{color.text.secondary}` | #626269 | Secondary text, host subtitles, status bars |
 | `emptyState.maxWidth` | `{size.emptyMaxWidth}` | 220px |  |
 
 ### toast
@@ -2354,7 +2380,7 @@ References and resolved Light values; Dark follows the corresponding semantic va
 |---|---|---|---|
 | `popover.radius` | `{radius.window}` | 12px |  |
 | `popover.padding` | `{space.12}` | 12px |  |
-| `popover.bg` | `{color.surface.raised}` | #ffffff | Raised surfaces: dragged cards, ghosts, selected segments |
+| `popover.bg` | `{color.surface.raised}` | #ffffff | Raised surfaces: menus, dragged cards, and previews |
 | `popover.shadow` | `{shadow.lift}` | 0px 0px 0px 0.5px rgba(0,0,0,0.1), 0px 10px 28px 0px rgba(0,0,0,0.16), 0px 2px 6px 0px rgba(0,0,0,0.08) | Dragged card |
 
 ### trayPanel
@@ -2367,7 +2393,7 @@ References and resolved Light values; Dark follows the corresponding semantic va
 |---|---|---|---|
 | `latency.warnMs` | `{size.latencyWarn}` | 150 |  |
 | `latency.badMs` | `{size.latencyBad}` | 400 |  |
-| `latency.normal` | `{color.text.secondary}` | #8e8e93 | Secondary text, host subtitles, status bars |
+| `latency.normal` | `{color.text.secondary}` | #626269 | Secondary text, host subtitles, status bars |
 | `latency.warn` | `{color.warning.text}` | #c7861a | Connecting text / bell |
 | `latency.bad` | `{color.danger.text}` | #d70015 | Failure text |
 
@@ -2378,7 +2404,8 @@ References and resolved Light values; Dark follows the corresponding semantic va
 | `listRow.radius` | `{radius.controlSm}` | 6px |  |
 | `listRow.paddingX` | `{space.8}` | 8px |  |
 | `listRow.gap` | `{space.9}` | 9px |  |
-| `listRow.meta` | `{color.text.secondary}` | #8e8e93 | Secondary text, host subtitles, status bars |
+| `listRow.meta` | `{color.text.secondary}` | #626269 | Secondary text, host subtitles, status bars |
+| `listRow.bgHover` | `{color.state.rowHover}` | #f1f1f4 | Hovered list row |
 
 ### paneHeader
 | token | Reference | Light value | Description |
@@ -2413,7 +2440,7 @@ References and resolved Light values; Dark follows the corresponding semantic va
 | `paneFooter.metricIconGap` | `{space.4}` | 4px |  |
 | `paneFooter.metricsMinWidth` | `{size.paneMetricsMinWidth}` | 380px | Minimum pane width for CPU and memory in the pane footer |
 | `paneFooter.metricsNetMinWidth` | `{size.paneMetricsNetMinWidth}` | 560px | Minimum pane width for network rates in the pane footer |
-| `paneFooter.text` | `{color.text.secondary}` | #8e8e93 | Secondary text, host subtitles, status bars |
+| `paneFooter.text` | `{color.text.secondary}` | #626269 | Secondary text, host subtitles, status bars |
 | `paneFooter.font` | `{font.size.footnote}` | 11.5px | Group headers, subtitles, status bars |
 | `paneFooter.divider` | `{color.border.divider}` | #f2f2f4 | Header and table-header bottom lines |
 
@@ -2454,7 +2481,7 @@ References and resolved Light values; Dark follows the corresponding semantic va
 | `inset.compactPaddingX` | `{space.8}` | 8px |  |
 | `inset.compactPaddingY` | `{space.6}` | 6px |  |
 | `inset.compactRadius` | `{radius.controlSm}` | 6px |  |
-| `inset.bg` | `{color.surface.sunken}` | #f4f4f5 | Search field |
+| `inset.bg` | `{color.surface.sunken}` | #f4f4f5 | Background for search fields, inputs, and dropdowns |
 | `inset.border` | `{color.border.subtle}` | #f0f0f2 | Inner dividers: sidebar footer, status bars, progress tracks |
 | `inset.raisedBg` | `{color.surface.card}` | #ffffff | Content cards, sidebar, FTP panes |
 | `inset.warningBg` | `{color.warning.subtle}` | #fdf3e3 |  |
@@ -2471,4 +2498,4 @@ References and resolved Light values; Dark follows the corresponding semantic va
 | `iconTile.radius` | `{radius.control}` | 7px |  |
 | `iconTile.sizeLg` | `{size.modalIconTile}` | 32px |  |
 | `iconTile.radiusLg` | `{radius.railButton}` | 8px |  |
-| `iconTile.bg` | `{color.surface.control}` | #f2f2f4 | Neutral control background: icon buttons, segments, badges, queue icons |
+| `iconTile.bg` | `{color.surface.control}` | #f2f2f4 | Neutral control background: icon buttons, badges, and queue icons |

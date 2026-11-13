@@ -1454,11 +1454,22 @@ func (a *app) gatewayEditDialog(c *ui.Context, d *gatewayDraft) {
 			MaxHeight(parts.Bounds.MaxHeight - headerHeight - footerHeight).TrackScroll(&d.scroll).Children(func() {
 			kind := slices.Index(gatewayKinds, d.value.Kind)
 			ui.Column(c).FillWidth().Shrink(0).Padding(0, p.BodyPaddingX, t.Space.N8, p.BodyPaddingX).Children(func() {
-				uikit.Segmented(c.Key("gateway-kind"), &kind, []uikit.SegItem{
-					{Label: "SSH", IconSVG: terminalIcon, IconTone: uikit.ToneAccent},
-					{Label: "Socks5", IconSVG: globeIcon, IconTone: uikit.ToneTertiary},
-					{Label: "WireGuard", IconSVG: routeIcon, IconTone: uikit.ToneAccent},
-				}, uikit.SegmentedProps{Motion: uikit.MotionOverride(a.reduceMotion(c)), Label: locales.MessageGatewayType(), Fill: true, Cards: true})
+				uikit.Segmented(
+					c.Key("gateway-kind"),
+					&kind,
+					[]uikit.SegItem{
+						{Label: "SSH", IconSVG: terminalIcon},
+						{Label: "Socks5", IconSVG: globeIcon},
+						{Label: "WireGuard", IconSVG: routeIcon},
+					},
+					uikit.SegmentedProps{
+						Motion:           uikit.MotionOverride(a.reduceMotion(c)),
+						Label:            locales.MessageGatewayType(),
+						Fill:             true,
+						Cards:            true,
+						SelectedIconTone: uikit.ToneAccent,
+					},
+				)
 			})
 			if gatewayKinds[kind] != d.value.Kind {
 				d.value.Kind, d.errorText = gatewayKinds[kind], locales.Text{}

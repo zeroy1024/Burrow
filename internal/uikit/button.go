@@ -159,26 +159,3 @@ func styleIconButton(e ui.Element, t *theme.Theme, variant IconVariant, on bool)
 	}
 	return e
 }
-
-func StyleSegment(e ui.Element, p theme.SegmentedTokens, selected bool, showPill ...bool) ui.Element {
-	pill := len(showPill) == 0 || showPill[0]
-	bg, fg, shadow := ui.Transparent, Color(p.Text), float32(0)
-	if selected {
-		fg = Color(p.TextOn)
-		if pill {
-			bg, shadow = Color(p.BgOn), 1
-		}
-	} else if e.Hovered() {
-		bg = Color(p.BgHover)
-	}
-	animation := Tween(p.Transition)
-	e.TextColor(e.AnimateColor("text", fg, animation))
-	if selected && pill {
-		// On initial mount before the track measures bounds, paint synchronously
-		// so switching to the track's sliding pill leaves no fading background behind.
-		e.Background(bg)
-		return ShadowOpacity(e, p.ShadowOn, 1)
-	}
-	e.Background(e.AnimateColor("background", bg, animation))
-	return ShadowOpacity(e, p.ShadowOn, Visual(e, "shadow", shadow, p.Transition))
-}

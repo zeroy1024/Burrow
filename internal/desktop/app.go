@@ -594,8 +594,6 @@ func (a *app) interactionBlocked() bool {
 
 func (a *app) navigation(c *ui.Context) {
 	rail := uikit.Rail(c)
-	railLayout := rail.LayoutBounds()
-	staticPill := railLayout.W <= 0 || railLayout.H <= 0
 	var buttons [5]ui.Element
 	targets := [5]section{sectionSSH, sectionFiles, sectionGateways, sectionMCP, sectionSettings}
 	selected := -1
@@ -611,28 +609,24 @@ func (a *app) navigation(c *ui.Context) {
 			sectionSSH,
 			"SSH",
 			terminalIcon,
-			staticPill,
 		)
 		buttons[1] = a.navigationButton(
 			c,
 			sectionFiles,
 			"SFTP / FTP",
 			filesIcon,
-			staticPill,
 		)
 		buttons[2] = a.navigationButton(
 			c,
 			sectionGateways,
 			locales.GatewaysTitle(),
 			routeIcon,
-			staticPill,
 		)
 		buttons[3] = a.navigationButton(
 			c,
 			sectionMCP,
 			"MCP",
 			mcpIcon,
-			staticPill,
 		)
 		ui.Spacer(c).DragWindow()
 		buttons[4] = a.navigationButton(
@@ -640,20 +634,18 @@ func (a *app) navigation(c *ui.Context) {
 			sectionSettings,
 			locales.SettingsTitle(),
 			settingsIcon,
-			staticPill,
 		)
 	})
 	uikit.AnimateRailPill(c, rail, buttons[:], selected, a.reduceMotion(c))
 }
 
-func (a *app) navigationButton(c *ui.Context, target section, label string, icon *ui.SVG, staticPill bool) ui.Element {
+func (a *app) navigationButton(c *ui.Context, target section, label string, icon *ui.SVG) ui.Element {
 	props := uikit.RailButtonProps{
-		Motion:     uikit.MotionOverride(a.reduceMotion(c)),
-		Key:        label,
-		Label:      label,
-		Icon:       icon,
-		Selected:   a.navigationSelected(target),
-		StaticPill: staticPill,
+		Motion:   uikit.MotionOverride(a.reduceMotion(c)),
+		Key:      label,
+		Label:    label,
+		Icon:     icon,
+		Selected: a.navigationSelected(target),
 	}
 	if target == sectionSettings {
 		props.Handle = &a.settingsButton

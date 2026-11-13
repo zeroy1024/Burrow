@@ -184,10 +184,21 @@ func (a *app) sessionProtocolPicker(c *ui.Context, d *hostDraft) {
 	}
 	before := selected
 	ui.Column(c).FillWidth().Shrink(0).Padding(0, t.C.Modal.BodyPaddingX, t.Space.N8, t.C.Modal.BodyPaddingX).Children(func() {
-		uikit.Segmented(c.Key("file-protocol"), &selected, []uikit.SegItem{
-			{Label: "SFTP", IconSVG: folderLockIcon, IconTone: uikit.ToneAccent, Detail: locales.MessageEncryptedTransferOverSsh()},
-			{Label: "FTP", IconSVG: folderIcon, IconTone: uikit.ToneTertiary, Detail: locales.MessageClassicFtpWithOptionalTls()},
-		}, uikit.SegmentedProps{Motion: uikit.MotionOverride(a.reduceMotion(c)), Label: locales.MessageProtocol(), Fill: true, Cards: true})
+		uikit.Segmented(
+			c.Key("file-protocol"),
+			&selected,
+			[]uikit.SegItem{
+				{Label: "SFTP", IconSVG: folderLockIcon, Detail: locales.MessageEncryptedTransferOverSsh()},
+				{Label: "FTP", IconSVG: folderIcon, Detail: locales.MessageClassicFtpWithOptionalTls()},
+			},
+			uikit.SegmentedProps{
+				Motion:           uikit.MotionOverride(a.reduceMotion(c)),
+				Label:            locales.MessageProtocol(),
+				Fill:             true,
+				Cards:            true,
+				SelectedIconTone: uikit.ToneAccent,
+			},
+		)
 	})
 	if before != selected {
 		a.setModalAdvancedOpen(strings.ToLower(d.protocol), d.advanced)

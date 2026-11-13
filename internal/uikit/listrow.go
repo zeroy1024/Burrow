@@ -35,10 +35,10 @@ func ListRow(c *ui.Context, props ListRowProps) ui.Element {
 	}
 	background, text := ui.Transparent, Color(t.Color.Text.Primary)
 	if props.Odd {
-		background = Color(t.Color.Surface.Zebra)
+		background = Color(t.C.FileList.Zebra)
 	}
 	if row.Hovered() {
-		background = Color(t.Color.State.Hover)
+		background = Color(p.BgHover)
 	}
 	if props.Selected {
 		if props.Focused {

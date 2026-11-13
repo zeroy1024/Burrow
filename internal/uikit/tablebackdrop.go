@@ -58,7 +58,7 @@ func paintTableBackdrop(c *ui.Context, parts TableParts, scroll *ui.ScrollState,
 						selected := parts.State.Selection.Has(props.Key(index))
 						background, ink := ui.Transparent, Color(t.Color.Text.Primary)
 						if props.Zebra && index%2 != 0 {
-							background = Color(t.Color.Surface.Zebra)
+							background = Color(t.C.FileList.Zebra)
 						}
 						if selected {
 							background, ink = Color(t.C.FilePaneFocus.SelBgInactive), Color(t.C.FilePaneFocus.SelTextInactive)

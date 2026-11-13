@@ -56,7 +56,7 @@ func SearchField(c *ui.Context, value *string, props SearchProps) SearchParts {
 	if props.Variant == SearchSunken {
 		parts.Root.Margin(0, p.MarginX, p.MarginBottom, p.MarginX).Background(Color(p.Bg))
 	} else {
-		parts.Root.Background(Color(t.C.Input.Bg)).Border(t.C.Input.BorderWidth, Color(t.C.Input.Border))
+		parts.Root.Background(Color(t.C.Input.Bg))
 	}
 	parts.Root.Children(func() {
 		parts.Input = ui.TextInputBase(c.Key("input"), value).Fill().MinWidth(0).
@@ -94,11 +94,16 @@ func SearchField(c *ui.Context, value *string, props SearchProps) SearchParts {
 		}
 	})
 	StyleDisabled(parts.Root, props.Disabled)
-	focus := float32(0)
-	if parts.Input.FocusVisible() && !parts.Input.IsDisabled() {
-		focus = 1
+	focused := parts.Input.FocusVisible() && !parts.Input.IsDisabled()
+	if props.Variant == SearchFilter {
+		styleFormControl(parts.Root, "", focused)
+	} else {
+		focus := float32(0)
+		if focused {
+			focus = 1
+		}
+		ShadowOpacity(parts.Root, t.C.Input.FocusShadow, Visual(parts.Root, "input-focus", focus, t.C.Input.Transition))
 	}
-	ShadowOpacity(parts.Root, t.C.Input.FocusShadow, Visual(parts.Root, "input-focus", focus, t.C.Input.Transition))
 	parts.Changed = parts.Input.Changed() || *value != previous
 	return parts
 }

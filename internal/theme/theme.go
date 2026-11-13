@@ -50,10 +50,13 @@ type PaletteTokensGray struct {
 	N60  color.NRGBA
 	N75  color.NRGBA
 	N100 color.NRGBA
+	N110 color.NRGBA
 	N125 color.NRGBA
 	N150 color.NRGBA
 	N175 color.NRGBA
 	N190 color.NRGBA
+	N195 color.NRGBA
+	N198 color.NRGBA
 	N200 color.NRGBA
 	N225 color.NRGBA
 	N250 color.NRGBA
@@ -65,7 +68,11 @@ type PaletteTokensGray struct {
 	N475 color.NRGBA
 	N500 color.NRGBA
 	N600 color.NRGBA
+	N650 color.NRGBA
+	N680 color.NRGBA
 	N700 color.NRGBA
+	N710 color.NRGBA
+	N730 color.NRGBA
 	N750 color.NRGBA
 	N800 color.NRGBA
 	N850 color.NRGBA
@@ -76,6 +83,7 @@ type PaletteTokensGray struct {
 type PaletteTokensBlue struct {
 	N50  color.NRGBA
 	N75  color.NRGBA
+	N90  color.NRGBA
 	N100 color.NRGBA // 文件夹图标填充
 	N300 color.NRGBA
 	N500 color.NRGBA // 品牌蓝 / accent（logo 同色）
@@ -172,16 +180,22 @@ type PaletteTokensGraphite struct {
 	N900 color.NRGBA // 深色主题 [derived]
 	N850 color.NRGBA // 深色主题 [derived]
 	N800 color.NRGBA // 深色主题 [derived]
+	N775 color.NRGBA // 深色主题 [derived]
 	N750 color.NRGBA // 深色主题 [derived]
 	N700 color.NRGBA // 深色主题 [derived]
+	N680 color.NRGBA // 深色主题 [derived]
 	N650 color.NRGBA // 深色主题 [derived]
+	N620 color.NRGBA // 深色主题 [derived]
 	N600 color.NRGBA // 深色主题 [derived]
 	N550 color.NRGBA // 深色主题 [derived]
+	N545 color.NRGBA // 深色主题 [derived]
 	N500 color.NRGBA // 深色主题 [derived]
 	N400 color.NRGBA // 深色主题 [derived]
 	N300 color.NRGBA // 深色主题 [derived]
 	N250 color.NRGBA // 深色主题 [derived]
 	N200 color.NRGBA // 深色主题 [derived]
+	N190 color.NRGBA // 深色主题 [derived]
+	N175 color.NRGBA // 深色主题 [derived]
 	N150 color.NRGBA // 深色主题 [derived]
 	N100 color.NRGBA // 深色主题 [derived]
 	N50  color.NRGBA // 深色主题 [derived]
@@ -189,18 +203,20 @@ type PaletteTokensGraphite struct {
 
 // PaletteTokensDarkTint groups tokens.
 type PaletteTokensDarkTint struct {
-	Blue300     color.NRGBA // 深色主题 [derived]
-	Blue200     color.NRGBA // 深色主题 [derived]
-	BlueSubtle  color.NRGBA // 深色主题 [derived]
-	Green400    color.NRGBA // 深色主题 [derived]
-	Green300    color.NRGBA // 深色主题 [derived]
-	GreenSubtle color.NRGBA // 深色主题 [derived]
-	Amber400    color.NRGBA // 深色主题 [derived]
-	Amber300    color.NRGBA // 深色主题 [derived]
-	AmberSubtle color.NRGBA // 深色主题 [derived]
-	Red400      color.NRGBA // 深色 danger [derived]
-	Red300      color.NRGBA // 深色 danger 文字 [derived]
-	RedSubtle   color.NRGBA // 深色 danger 浅底 [derived]
+	Blue300           color.NRGBA // 深色主题 [derived]
+	Blue200           color.NRGBA // 深色主题 [derived]
+	BlueSubtle        color.NRGBA // 深色主题 [derived]
+	BlueSelection     color.NRGBA // 深色主题 [derived]
+	BlueSelectionText color.NRGBA // 深色主题 [derived]
+	Green400          color.NRGBA // 深色主题 [derived]
+	Green300          color.NRGBA // 深色主题 [derived]
+	GreenSubtle       color.NRGBA // 深色主题 [derived]
+	Amber400          color.NRGBA // 深色主题 [derived]
+	Amber300          color.NRGBA // 深色主题 [derived]
+	AmberSubtle       color.NRGBA // 深色主题 [derived]
+	Red400            color.NRGBA // 深色 danger [derived]
+	Red300            color.NRGBA // 深色 danger 文字 [derived]
+	RedSubtle         color.NRGBA // 深色 danger 浅底 [derived]
 }
 
 // PaletteTokensWhiteA groups tokens.
@@ -499,25 +515,31 @@ type ColorsBg struct {
 
 // ColorsSurface groups tokens.
 type ColorsSurface struct {
-	Card          color.NRGBA // 内容卡片 / sider / FTP 面板
-	Terminal      color.NRGBA // 终端卡片容器底色（仅容器，不含终端文字配色）
-	Raised        color.NRGBA // 浮起层：拖动卡片、ghost、分段控件选中
-	Sunken        color.NRGBA // 搜索框
-	Field         color.NRGBA // 面包屑路径框
-	Zebra         color.NRGBA // 列表斑马纹
-	Control       color.NRGBA // 中性控件底：图标按钮 bg、分段控件、中性徽章、队列图标
-	ControlStrong color.NRGBA // sider 行内「更多」按钮
-	Keycap        color.NRGBA // 键帽 kbd 底
-	LiftStack     color.NRGBA
+	Card            color.NRGBA // 内容卡片 / sider / FTP 面板
+	Terminal        color.NRGBA // 终端卡片容器底色（仅容器，不含终端文字配色）
+	Raised          color.NRGBA // 浮起层：菜单、拖动卡片及预览
+	Sunken          color.NRGBA // 搜索框、输入框和下拉框底色
+	Field           color.NRGBA // 面包屑路径框
+	Zebra           color.NRGBA // 列表斑马纹
+	SettingsGroup   color.NRGBA // 设置分组底色
+	Control         color.NRGBA // 中性控件底：图标按钮、中性徽章、队列图标
+	ControlStrong   color.NRGBA // sider 行内「更多」按钮
+	SegmentTrack    color.NRGBA // 分段控件轨道
+	SegmentSelected color.NRGBA // 分段控件选中底色
+	Keycap          color.NRGBA // 键帽 kbd 底
+	LiftStack       color.NRGBA
 }
 
 // ColorsState groups tokens.
 type ColorsState struct {
 	Hover          color.NRGBA // 行悬停
 	Selected       color.NRGBA // sider 选中行
+	RowHover       color.NRGBA // 列表行悬停
+	RowSelected    color.NRGBA // 非焦点窗格的选中行
 	Pressed        color.NRGBA // 按下（设计稿未画） [derived]
-	OnWindow       color.NRGBA // 窗口底色上的激活按钮（rail、标题栏开关）
-	SelectedAccent color.NRGBA // 文件列表选中行
+	OnWindow       color.NRGBA // 窗口底色上的激活按钮（标题栏开关）
+	RailSelected   color.NRGBA // 主导航选中底色
+	SelectedAccent color.NRGBA // 当前窗格的选中行及目录焦点
 	TabHover       color.NRGBA
 	RailHover      color.NRGBA
 	RailPressed    color.NRGBA
@@ -531,29 +553,33 @@ type ColorsBorder struct {
 	Divider         color.NRGBA // 头部底线、表头底线
 	Tab             color.NRGBA // 旧版 tab 线 / FTP 面板描边
 	Control         color.NRGBA // 按钮描边、状态栏竖分隔
+	Field           color.NRGBA // 输入框和下拉框描边
+	FieldHover      color.NRGBA // 输入框和下拉框悬停描边
+	Check           color.NRGBA // 未选中选框描边
 	Keycap          color.NRGBA // kbd 描边
 	SeparatorWindow color.NRGBA // 标题栏按钮组分隔线
 	OnGlass         color.NRGBA // 玻璃栏内竖分隔
 	Raised          color.NRGBA // 浮起层 0.5px 描边
 	HairlineStrong  color.NRGBA // 拖动卡片描边
-	ControlHover    color.NRGBA // 输入框悬停描边
+	ControlHover    color.NRGBA // 次要控件悬停描边
 }
 
 // ColorsText groups tokens.
 type ColorsText struct {
-	Primary      color.NRGBA
-	Secondary    color.NRGBA // 次要文字、主机副标题、状态栏
-	Tertiary     color.NRGBA // 关闭 ×、kbd、caption
-	Quaternary   color.NRGBA // 分组计数
-	Muted        color.NRGBA // 未选中 tab、rail 图标、按钮图标
-	Strong       color.NRGBA // 次级按钮文字
-	Action       color.NRGBA // 标题栏动作按钮
-	NeutralBadge color.NRGBA // 中性徽章文字
-	Disabled     color.NRGBA // 非焦点窗格主机
-	Placeholder  color.NRGBA // 面包屑分隔符
-	OnAccent     color.NRGBA
-	Accent       color.NRGBA // 蓝色文字（徽章、提示、高亮分组）
-	AccentStrong color.NRGBA // 选中文件名
+	Primary        color.NRGBA
+	Secondary      color.NRGBA // 次要文字、主机副标题、状态栏
+	Tertiary       color.NRGBA // 关闭 ×、kbd、caption
+	Quaternary     color.NRGBA // 分组计数
+	Muted          color.NRGBA // 未选中 tab、rail 图标、按钮图标
+	Strong         color.NRGBA // 次级按钮文字
+	Action         color.NRGBA // 标题栏动作按钮
+	NeutralBadge   color.NRGBA // 中性徽章文字
+	Disabled       color.NRGBA // 非焦点窗格主机
+	Placeholder    color.NRGBA // 面包屑分隔符
+	OnAccent       color.NRGBA
+	Accent         color.NRGBA // 蓝色文字（徽章、提示、高亮分组）
+	AccentStrong   color.NRGBA // 高亮强调文字
+	SelectedAccent color.NRGBA // 当前窗格的选中行文字
 }
 
 // ColorsIcon groups tokens.
@@ -1294,7 +1320,7 @@ type RailTokens struct {
 	ButtonSize    float32       // ← size.railButton
 	ButtonRadius  float32       // ← radius.railButton
 	Icon          color.NRGBA   // ← color.text.muted
-	BgOn          color.NRGBA   // ← color.state.onWindow
+	BgOn          color.NRGBA   // ← color.state.railSelected
 	IconOn        color.NRGBA   // ← color.text.primary
 	Transition    time.Duration // ← motion.duration.focus
 }
@@ -1379,7 +1405,7 @@ type SiderItemTokens struct {
 	Gap               float32       // ← space.9
 	Radius            float32       // ← radius.control
 	Spacing           float32       // ← space.1
-	BgHover           color.NRGBA   // ← color.state.hover
+	BgHover           color.NRGBA   // ← color.state.rowHover
 	BgActive          color.NRGBA   // ← color.state.selectedAccent
 	BgSelected        color.NRGBA   // ← color.state.selected; Deprecated: 侧栏不再显示状态/选中
 	NameSize          float32       // ← font.size.bodyLg
@@ -1648,7 +1674,7 @@ type FloatButtonTokens struct {
 
 // SegmentedTokens groups tokens.
 type SegmentedTokens struct {
-	Bg           color.NRGBA   // ← color.surface.control
+	Bg           color.NRGBA   // ← color.surface.segmentTrack
 	Radius       float32       // ← radius.control
 	Padding      float32       // ← space.2
 	FontSize     float32       // ← font.size.footnote
@@ -1656,7 +1682,7 @@ type SegmentedTokens struct {
 	ItemPaddingY float32       // ← space.2
 	ItemRadius   float32       // ← radius.chip
 	Text         color.NRGBA   // ← color.text.muted
-	BgOn         color.NRGBA   // ← color.surface.raised
+	BgOn         color.NRGBA   // ← color.surface.segmentSelected
 	TextOn       color.NRGBA   // ← color.text.primary
 	ShadowOn     Shadow        // ← shadow.segment
 	Transition   time.Duration // ← motion.duration.focus
@@ -1694,7 +1720,7 @@ type FileListTokens struct {
 	FontSize         float32     // ← font.size.body
 	Zebra            color.NRGBA // ← color.surface.zebra
 	BgSelected       color.NRGBA // ← color.state.selectedAccent
-	TextSelected     color.NRGBA // ← color.text.accentStrong
+	TextSelected     color.NRGBA // ← color.text.selectedAccent
 	Meta             color.NRGBA // ← color.text.secondary
 	FileIcon         color.NRGBA // ← color.icon.subtle
 	FolderIcon       color.NRGBA // ← color.icon.folder
@@ -1989,8 +2015,8 @@ type FilePaneFocusTokens struct {
 	LabelPaddingX       float32       // ← space.8
 	LabelRadius         float32       // ← radius.controlSm
 	SelBgActive         color.NRGBA   // ← color.state.selectedAccent
-	SelTextActive       color.NRGBA   // ← color.text.accentStrong
-	SelBgInactive       color.NRGBA   // ← color.state.selected
+	SelTextActive       color.NRGBA   // ← color.text.selectedAccent
+	SelBgInactive       color.NRGBA   // ← color.state.rowSelected
 	SelTextInactive     color.NRGBA   // ← color.text.primary
 	Transition          time.Duration // ← motion.duration.focus
 	BorderFocused       color.NRGBA   // ← color.accent.default
@@ -2141,11 +2167,11 @@ type InputTokens struct {
 	Height         float32       // ← size.control
 	PaddingX       float32       // ← space.9
 	Radius         float32       // ← radius.control
-	Bg             color.NRGBA   // ← color.surface.card
+	Bg             color.NRGBA   // ← color.surface.sunken
 	Text           color.NRGBA   // ← color.text.primary
 	FontSize       float32       // ← font.size.body
-	Border         color.NRGBA   // ← color.border.control
-	BorderHover    color.NRGBA   // ← color.border.separatorWindow
+	Border         color.NRGBA   // ← color.border.field
+	BorderHover    color.NRGBA   // ← color.border.fieldHover
 	BorderFocus    color.NRGBA   // ← color.accent.default
 	BorderWidth    float32       // ← size.divider
 	Transition     time.Duration // ← motion.duration.focus
@@ -2163,7 +2189,7 @@ type InputTokens struct {
 	Caret          color.NRGBA   // ← color.accent.default
 	ChipHeight     float32       // ← size.controlXs
 	ChipRadius     float32       // ← radius.chip
-	ChipBg         color.NRGBA   // ← color.surface.control
+	ChipBg         color.NRGBA   // ← color.surface.controlStrong
 	ChipFontSize   float32       // ← font.size.footnote
 	SelectWidth    float32       // ← size.transferProgressWidth
 	PortWidth      float32       // ← size.formLabel
@@ -2306,7 +2332,7 @@ type SettingsTokens struct {
 	GroupTitle          color.NRGBA   // ← color.text.muted
 	GroupTitleGap       float32       // ← space.8
 	GroupGap            float32       // ← space.22
-	GroupBg             color.NRGBA   // ← color.surface.zebra
+	GroupBg             color.NRGBA   // ← color.surface.settingsGroup
 	GroupRadius         float32       // ← radius.card
 	GroupBorder         color.NRGBA   // ← color.border.raised
 	GroupBorderWidth    float32       // ← size.hairline
@@ -2433,7 +2459,7 @@ type SpinnerTokens struct {
 type CheckTokens struct {
 	Size     float32     // ← size.check
 	Radius   float32     // ← radius.keycap
-	Border   color.NRGBA // ← color.border.keycap
+	Border   color.NRGBA // ← color.border.check
 	On       color.NRGBA // ← color.accent.default
 	Mark     color.NRGBA // ← color.text.onAccent
 	RadioDot float32     // ← size.radioDot
@@ -2551,6 +2577,7 @@ type ListRowTokens struct {
 	PaddingX float32     // ← space.8
 	Gap      float32     // ← space.9
 	Meta     color.NRGBA // ← color.text.secondary
+	BgHover  color.NRGBA // ← color.state.rowHover
 }
 
 // PaneHeaderTokens groups tokens.
@@ -2739,10 +2766,13 @@ var Palette = PaletteTokens{
 		N60:  color.NRGBA{R: 0xf6, G: 0xf6, B: 0xf7, A: 0xff},
 		N75:  color.NRGBA{R: 0xf4, G: 0xf4, B: 0xf5, A: 0xff},
 		N100: color.NRGBA{R: 0xf2, G: 0xf2, B: 0xf4, A: 0xff},
+		N110: color.NRGBA{R: 0xf1, G: 0xf1, B: 0xf4, A: 0xff},
 		N125: color.NRGBA{R: 0xf0, G: 0xf0, B: 0xf2, A: 0xff},
 		N150: color.NRGBA{R: 0xef, G: 0xef, B: 0xf1, A: 0xff},
 		N175: color.NRGBA{R: 0xec, G: 0xec, B: 0xef, A: 0xff},
 		N190: color.NRGBA{R: 0xed, G: 0xed, B: 0xf0, A: 0xff},
+		N195: color.NRGBA{R: 0xea, G: 0xea, B: 0xf0, A: 0xff},
+		N198: color.NRGBA{R: 0xe7, G: 0xe7, B: 0xec, A: 0xff},
 		N200: color.NRGBA{R: 0xe7, G: 0xe7, B: 0xe8, A: 0xff},
 		N225: color.NRGBA{R: 0xe6, G: 0xe6, B: 0xe9, A: 0xff},
 		N250: color.NRGBA{R: 0xe3, G: 0xe3, B: 0xe6, A: 0xff},
@@ -2754,7 +2784,11 @@ var Palette = PaletteTokens{
 		N475: color.NRGBA{R: 0xae, G: 0xae, B: 0xb2, A: 0xff},
 		N500: color.NRGBA{R: 0xa1, G: 0xa1, B: 0xa6, A: 0xff},
 		N600: color.NRGBA{R: 0x8e, G: 0x8e, B: 0x93, A: 0xff},
+		N650: color.NRGBA{R: 0x85, G: 0x85, B: 0x8b, A: 0xff},
+		N680: color.NRGBA{R: 0x73, G: 0x73, B: 0x79, A: 0xff},
 		N700: color.NRGBA{R: 0x6e, G: 0x6e, B: 0x73, A: 0xff},
+		N710: color.NRGBA{R: 0x6c, G: 0x6c, B: 0x72, A: 0xff},
+		N730: color.NRGBA{R: 0x62, G: 0x62, B: 0x69, A: 0xff},
 		N750: color.NRGBA{R: 0x5b, G: 0x5b, B: 0x62, A: 0xff},
 		N800: color.NRGBA{R: 0x4a, G: 0x4a, B: 0x50, A: 0xff},
 		N850: color.NRGBA{R: 0x3a, G: 0x3a, B: 0x3f, A: 0xff},
@@ -2763,6 +2797,7 @@ var Palette = PaletteTokens{
 	Blue: PaletteTokensBlue{
 		N50:  color.NRGBA{R: 0xea, G: 0xf3, B: 0xfe, A: 0xff},
 		N75:  color.NRGBA{R: 0xe8, G: 0xf2, B: 0xfe, A: 0xff},
+		N90:  color.NRGBA{R: 0xdc, G: 0xec, B: 0xff, A: 0xff},
 		N100: color.NRGBA{R: 0xd7, G: 0xe9, B: 0xfd, A: 0xff},
 		N300: color.NRGBA{R: 0x5b, G: 0xa7, B: 0xf7, A: 0xff},
 		N500: color.NRGBA{R: 0x0a, G: 0x84, B: 0xff, A: 0xff},
@@ -2839,33 +2874,41 @@ var Palette = PaletteTokens{
 		N900: color.NRGBA{R: 0x1c, G: 0x1c, B: 0x1e, A: 0xff},
 		N850: color.NRGBA{R: 0x20, G: 0x20, B: 0x22, A: 0xff},
 		N800: color.NRGBA{R: 0x25, G: 0x25, B: 0x27, A: 0xff},
+		N775: color.NRGBA{R: 0x29, G: 0x29, B: 0x2b, A: 0xff},
 		N750: color.NRGBA{R: 0x2a, G: 0x2a, B: 0x2d, A: 0xff},
 		N700: color.NRGBA{R: 0x2e, G: 0x2e, B: 0x31, A: 0xff},
+		N680: color.NRGBA{R: 0x30, G: 0x30, B: 0x34, A: 0xff},
 		N650: color.NRGBA{R: 0x33, G: 0x33, B: 0x36, A: 0xff},
+		N620: color.NRGBA{R: 0x38, G: 0x38, B: 0x3d, A: 0xff},
 		N600: color.NRGBA{R: 0x3a, G: 0x3a, B: 0x3d, A: 0xff},
 		N550: color.NRGBA{R: 0x44, G: 0x44, B: 0x48, A: 0xff},
+		N545: color.NRGBA{R: 0x45, G: 0x45, B: 0x4b, A: 0xff},
 		N500: color.NRGBA{R: 0x5a, G: 0x5a, B: 0x5f, A: 0xff},
 		N400: color.NRGBA{R: 0x6e, G: 0x6e, B: 0x73, A: 0xff},
 		N300: color.NRGBA{R: 0x8e, G: 0x8e, B: 0x93, A: 0xff},
 		N250: color.NRGBA{R: 0x98, G: 0x98, B: 0x9d, A: 0xff},
 		N200: color.NRGBA{R: 0xa1, G: 0xa1, B: 0xa6, A: 0xff},
+		N190: color.NRGBA{R: 0xa6, G: 0xa6, B: 0xad, A: 0xff},
+		N175: color.NRGBA{R: 0xb0, G: 0xb0, B: 0xb6, A: 0xff},
 		N150: color.NRGBA{R: 0xc7, G: 0xc7, B: 0xcc, A: 0xff},
 		N100: color.NRGBA{R: 0xd1, G: 0xd1, B: 0xd6, A: 0xff},
 		N50:  color.NRGBA{R: 0xf5, G: 0xf5, B: 0xf7, A: 0xff},
 	},
 	DarkTint: PaletteTokensDarkTint{
-		Blue300:     color.NRGBA{R: 0x4d, G: 0xa3, B: 0xff, A: 0xff},
-		Blue200:     color.NRGBA{R: 0x6c, G: 0xb4, B: 0xff, A: 0xff},
-		BlueSubtle:  color.NRGBA{R: 0x16, G: 0x30, B: 0x4d, A: 0xff},
-		Green400:    color.NRGBA{R: 0x32, G: 0xd7, B: 0x4b, A: 0xff},
-		Green300:    color.NRGBA{R: 0x5f, G: 0xd9, B: 0x7a, A: 0xff},
-		GreenSubtle: color.NRGBA{R: 0x17, G: 0x35, B: 0x23, A: 0xff},
-		Amber400:    color.NRGBA{R: 0xff, G: 0xb3, B: 0x40, A: 0xff},
-		Amber300:    color.NRGBA{R: 0xff, G: 0xc1, B: 0x5c, A: 0xff},
-		AmberSubtle: color.NRGBA{R: 0x3d, G: 0x2e, B: 0x12, A: 0xff},
-		Red400:      color.NRGBA{R: 0xff, G: 0x45, B: 0x3a, A: 0xff},
-		Red300:      color.NRGBA{R: 0xff, G: 0x69, B: 0x61, A: 0xff},
-		RedSubtle:   color.NRGBA{R: 0x3a, G: 0x1d, B: 0x1c, A: 0xff},
+		Blue300:           color.NRGBA{R: 0x4d, G: 0xa3, B: 0xff, A: 0xff},
+		Blue200:           color.NRGBA{R: 0x6c, G: 0xb4, B: 0xff, A: 0xff},
+		BlueSubtle:        color.NRGBA{R: 0x16, G: 0x30, B: 0x4d, A: 0xff},
+		BlueSelection:     color.NRGBA{R: 0x25, G: 0x43, B: 0x61, A: 0xff},
+		BlueSelectionText: color.NRGBA{R: 0x8d, G: 0xc2, B: 0xff, A: 0xff},
+		Green400:          color.NRGBA{R: 0x32, G: 0xd7, B: 0x4b, A: 0xff},
+		Green300:          color.NRGBA{R: 0x5f, G: 0xd9, B: 0x7a, A: 0xff},
+		GreenSubtle:       color.NRGBA{R: 0x17, G: 0x35, B: 0x23, A: 0xff},
+		Amber400:          color.NRGBA{R: 0xff, G: 0xb3, B: 0x40, A: 0xff},
+		Amber300:          color.NRGBA{R: 0xff, G: 0xc1, B: 0x5c, A: 0xff},
+		AmberSubtle:       color.NRGBA{R: 0x3d, G: 0x2e, B: 0x12, A: 0xff},
+		Red400:            color.NRGBA{R: 0xff, G: 0x45, B: 0x3a, A: 0xff},
+		Red300:            color.NRGBA{R: 0xff, G: 0x69, B: 0x61, A: 0xff},
+		RedSubtle:         color.NRGBA{R: 0x3a, G: 0x1d, B: 0x1c, A: 0xff},
 	},
 	WhiteA: PaletteTokensWhiteA{
 		A06: color.NRGBA{R: 0xff, G: 0xff, B: 0xff, A: 0x0f},
@@ -3088,23 +3131,29 @@ func lightSemantic() Semantic {
 				Window: Palette.Gray.N200,
 			},
 			Surface: ColorsSurface{
-				Card:          Palette.Gray.N0,
-				Terminal:      Palette.Gray.N25,
-				Raised:        Palette.Gray.N0,
-				Sunken:        Palette.Gray.N75,
-				Field:         Palette.Gray.N60,
-				Zebra:         Palette.Gray.N40,
-				Control:       Palette.Gray.N100,
-				ControlStrong: Palette.Gray.N175,
-				Keycap:        Palette.Gray.N0,
-				LiftStack:     color.NRGBA{R: 0xf9, G: 0xf9, B: 0xfa, A: 0xff},
+				Card:            Palette.Gray.N0,
+				Terminal:        Palette.Gray.N25,
+				Raised:          Palette.Gray.N0,
+				Sunken:          Palette.Gray.N75,
+				Field:           Palette.Gray.N60,
+				Zebra:           Palette.Gray.N40,
+				SettingsGroup:   Palette.Gray.N40,
+				Control:         Palette.Gray.N100,
+				ControlStrong:   Palette.Gray.N175,
+				SegmentTrack:    Palette.Gray.N195,
+				SegmentSelected: Palette.Gray.N0,
+				Keycap:          Palette.Gray.N0,
+				LiftStack:       color.NRGBA{R: 0xf9, G: 0xf9, B: 0xfa, A: 0xff},
 			},
 			State: ColorsState{
 				Hover:          Palette.Gray.N50,
 				Selected:       Palette.Gray.N150,
+				RowHover:       Palette.Gray.N110,
+				RowSelected:    Palette.Gray.N198,
 				Pressed:        Palette.Gray.N225,
 				OnWindow:       Palette.Gray.N300,
-				SelectedAccent: Palette.Blue.N75,
+				RailSelected:   Palette.Black.A14,
+				SelectedAccent: Palette.Blue.N90,
 				TabHover:       color.NRGBA{R: 0xff, G: 0xff, B: 0xff, A: 0x73},
 				RailHover:      color.NRGBA{R: 0x00, G: 0x00, B: 0x00, A: 0x0b},
 				RailPressed:    Palette.Black.A12,
@@ -3116,6 +3165,9 @@ func lightSemantic() Semantic {
 				Divider:         Palette.Gray.N100,
 				Tab:             Palette.Gray.N150,
 				Control:         Palette.Gray.N225,
+				Field:           Palette.Black.A04,
+				FieldHover:      Palette.Black.A12,
+				Check:           Palette.Gray.N650,
 				Keycap:          Palette.Gray.N250,
 				SeparatorWindow: Palette.Gray.N325,
 				OnGlass:         Palette.Black.A10,
@@ -3124,19 +3176,20 @@ func lightSemantic() Semantic {
 				ControlHover:    Palette.Gray.N400,
 			},
 			Text: ColorsText{
-				Primary:      Palette.Gray.N900,
-				Secondary:    Palette.Gray.N600,
-				Tertiary:     Palette.Gray.N500,
-				Quaternary:   Palette.Gray.N450,
-				Muted:        Palette.Gray.N700,
-				Strong:       Palette.Gray.N850,
-				Action:       Palette.Gray.N800,
-				NeutralBadge: Palette.Gray.N750,
-				Disabled:     Palette.Gray.N475,
-				Placeholder:  Palette.Gray.N400,
-				OnAccent:     Palette.Gray.N0,
-				Accent:       Palette.Blue.N600,
-				AccentStrong: Palette.Blue.N700,
+				Primary:        Palette.Gray.N900,
+				Secondary:      Palette.Gray.N730,
+				Tertiary:       Palette.Gray.N710,
+				Quaternary:     Palette.Gray.N680,
+				Muted:          Palette.Gray.N700,
+				Strong:         Palette.Gray.N850,
+				Action:         Palette.Gray.N800,
+				NeutralBadge:   Palette.Gray.N750,
+				Disabled:       Palette.Gray.N475,
+				Placeholder:    Palette.Gray.N400,
+				OnAccent:       Palette.Gray.N0,
+				Accent:         Palette.Blue.N600,
+				AccentStrong:   Palette.Blue.N700,
+				SelectedAccent: Palette.Blue.N700,
 			},
 			Icon: ColorsIcon{
 				Default:    Palette.Gray.N700,
@@ -3674,21 +3727,27 @@ func lightSemantic() Semantic {
 
 // darkOverrides applies the derived dark theme on top of light (semantic tier only).
 func darkOverrides(s *Semantic) {
-	s.Color.Bg.Window = Palette.Graphite.N900
+	s.Color.Bg.Window = Palette.Graphite.N950
 	s.Color.Surface.Card = Palette.Graphite.N800
 	s.Color.Surface.Terminal = Palette.Graphite.N850
 	s.Color.Surface.Raised = Palette.Graphite.N700
 	s.Color.Surface.Sunken = Palette.Graphite.N750
 	s.Color.Surface.Field = Palette.Graphite.N750
-	s.Color.Surface.Zebra = Palette.WhiteA.A06
+	s.Color.Surface.Zebra = Palette.Graphite.N775
 	s.Color.Surface.Control = Palette.Graphite.N700
 	s.Color.Surface.ControlStrong = Palette.Graphite.N650
 	s.Color.Surface.Keycap = Palette.Graphite.N700
+	s.Color.Surface.SettingsGroup = Palette.WhiteA.A06
+	s.Color.Surface.SegmentTrack = Palette.Graphite.N700
+	s.Color.Surface.SegmentSelected = Palette.Graphite.N545
 	s.Color.State.Hover = Palette.Graphite.N750
 	s.Color.State.Selected = Palette.Graphite.N650
 	s.Color.State.Pressed = Palette.Graphite.N600
 	s.Color.State.OnWindow = Palette.Graphite.N600
-	s.Color.State.SelectedAccent = Palette.DarkTint.BlueSubtle
+	s.Color.State.RailSelected = Palette.Graphite.N600
+	s.Color.State.RowHover = Palette.Graphite.N680
+	s.Color.State.RowSelected = Palette.Graphite.N620
+	s.Color.State.SelectedAccent = Palette.DarkTint.BlueSelection
 	s.Color.Border.Card = Palette.WhiteA.A08
 	s.Color.Border.Terminal = Palette.WhiteA.A10
 	s.Color.Border.Subtle = Palette.Graphite.N650
@@ -3697,13 +3756,15 @@ func darkOverrides(s *Semantic) {
 	s.Color.Border.Control = Palette.Graphite.N550
 	s.Color.Border.Keycap = Palette.Graphite.N550
 	s.Color.Border.SeparatorWindow = Palette.Graphite.N550
+	s.Color.Border.Field = Palette.WhiteA.A06
+	s.Color.Border.FieldHover = Palette.WhiteA.A16
 	s.Color.Border.OnGlass = Palette.WhiteA.A12
 	s.Color.Border.Raised = Palette.WhiteA.A10
 	s.Color.Border.HairlineStrong = Palette.WhiteA.A12
 	s.Color.Text.Primary = Palette.Graphite.N50
-	s.Color.Text.Secondary = Palette.Graphite.N250
-	s.Color.Text.Tertiary = Palette.Graphite.N400
-	s.Color.Text.Quaternary = Palette.Graphite.N500
+	s.Color.Text.Secondary = Palette.Graphite.N175
+	s.Color.Text.Tertiary = Palette.Graphite.N190
+	s.Color.Text.Quaternary = Palette.Graphite.N300
 	s.Color.Text.Muted = Palette.Graphite.N200
 	s.Color.Text.Strong = Palette.Graphite.N100
 	s.Color.Text.Action = Palette.Graphite.N150
@@ -3712,6 +3773,7 @@ func darkOverrides(s *Semantic) {
 	s.Color.Text.Placeholder = Palette.Graphite.N500
 	s.Color.Text.Accent = Palette.DarkTint.Blue300
 	s.Color.Text.AccentStrong = Palette.DarkTint.Blue200
+	s.Color.Text.SelectedAccent = Palette.DarkTint.BlueSelectionText
 	s.Color.Icon.Default = Palette.Graphite.N200
 	s.Color.Icon.Subtle = Palette.Graphite.N300
 	s.Color.Icon.Faint = Palette.Graphite.N400
@@ -3869,7 +3931,7 @@ func buildComponents(s *Semantic) Components {
 			ButtonSize:    s.Size.RailButton,
 			ButtonRadius:  s.Radius.RailButton,
 			Icon:          s.Color.Text.Muted,
-			BgOn:          s.Color.State.OnWindow,
+			BgOn:          s.Color.State.RailSelected,
 			IconOn:        s.Color.Text.Primary,
 			Transition:    s.Motion.Duration.Focus,
 		},
@@ -3946,7 +4008,7 @@ func buildComponents(s *Semantic) Components {
 			Gap:               s.Space.N9,
 			Radius:            s.Radius.Control,
 			Spacing:           s.Space.N1,
-			BgHover:           s.Color.State.Hover,
+			BgHover:           s.Color.State.RowHover,
 			BgActive:          s.Color.State.SelectedAccent,
 			BgSelected:        s.Color.State.Selected,
 			NameSize:          s.Font.Size.BodyLg,
@@ -4191,7 +4253,7 @@ func buildComponents(s *Semantic) Components {
 			PrimaryIcon: s.Color.Text.OnAccent,
 		},
 		Segmented: SegmentedTokens{
-			Bg:           s.Color.Surface.Control,
+			Bg:           s.Color.Surface.SegmentTrack,
 			Radius:       s.Radius.Control,
 			Padding:      s.Space.N2,
 			FontSize:     s.Font.Size.Footnote,
@@ -4199,7 +4261,7 @@ func buildComponents(s *Semantic) Components {
 			ItemPaddingY: s.Space.N2,
 			ItemRadius:   s.Radius.Chip,
 			Text:         s.Color.Text.Muted,
-			BgOn:         s.Color.Surface.Raised,
+			BgOn:         s.Color.Surface.SegmentSelected,
 			TextOn:       s.Color.Text.Primary,
 			ShadowOn:     s.Shadow.Segment,
 			Transition:   s.Motion.Duration.Focus,
@@ -4233,7 +4295,7 @@ func buildComponents(s *Semantic) Components {
 			FontSize:         s.Font.Size.Body,
 			Zebra:            s.Color.Surface.Zebra,
 			BgSelected:       s.Color.State.SelectedAccent,
-			TextSelected:     s.Color.Text.AccentStrong,
+			TextSelected:     s.Color.Text.SelectedAccent,
 			Meta:             s.Color.Text.Secondary,
 			FileIcon:         s.Color.Icon.Subtle,
 			FolderIcon:       s.Color.Icon.Folder,
@@ -4494,8 +4556,8 @@ func buildComponents(s *Semantic) Components {
 			LabelPaddingX:       s.Space.N8,
 			LabelRadius:         s.Radius.ControlSm,
 			SelBgActive:         s.Color.State.SelectedAccent,
-			SelTextActive:       s.Color.Text.AccentStrong,
-			SelBgInactive:       s.Color.State.Selected,
+			SelTextActive:       s.Color.Text.SelectedAccent,
+			SelBgInactive:       s.Color.State.RowSelected,
 			SelTextInactive:     s.Color.Text.Primary,
 			Transition:          s.Motion.Duration.Focus,
 			BorderFocused:       s.Color.Accent.Default,
@@ -4632,11 +4694,11 @@ func buildComponents(s *Semantic) Components {
 			Height:         s.Size.Control,
 			PaddingX:       s.Space.N9,
 			Radius:         s.Radius.Control,
-			Bg:             s.Color.Surface.Card,
+			Bg:             s.Color.Surface.Sunken,
 			Text:           s.Color.Text.Primary,
 			FontSize:       s.Font.Size.Body,
-			Border:         s.Color.Border.Control,
-			BorderHover:    s.Color.Border.SeparatorWindow,
+			Border:         s.Color.Border.Field,
+			BorderHover:    s.Color.Border.FieldHover,
 			BorderFocus:    s.Color.Accent.Default,
 			BorderWidth:    s.Size.Divider,
 			Transition:     s.Motion.Duration.Focus,
@@ -4654,7 +4716,7 @@ func buildComponents(s *Semantic) Components {
 			Caret:          s.Color.Accent.Default,
 			ChipHeight:     s.Size.ControlXs,
 			ChipRadius:     s.Radius.Chip,
-			ChipBg:         s.Color.Surface.Control,
+			ChipBg:         s.Color.Surface.ControlStrong,
 			ChipFontSize:   s.Font.Size.Footnote,
 			SelectWidth:    s.Size.TransferProgressWidth,
 			PortWidth:      s.Size.FormLabel,
@@ -4783,7 +4845,7 @@ func buildComponents(s *Semantic) Components {
 			GroupTitle:          s.Color.Text.Muted,
 			GroupTitleGap:       s.Space.N8,
 			GroupGap:            s.Space.N22,
-			GroupBg:             s.Color.Surface.Zebra,
+			GroupBg:             s.Color.Surface.SettingsGroup,
 			GroupRadius:         s.Radius.Card,
 			GroupBorder:         s.Color.Border.Raised,
 			GroupBorderWidth:    s.Size.Hairline,
@@ -4892,7 +4954,7 @@ func buildComponents(s *Semantic) Components {
 		Check: CheckTokens{
 			Size:     s.Size.Check,
 			Radius:   s.Radius.Keycap,
-			Border:   s.Color.Border.Keycap,
+			Border:   s.Color.Border.Check,
 			On:       s.Color.Accent.Default,
 			Mark:     s.Color.Text.OnAccent,
 			RadioDot: s.Size.RadioDot,
@@ -4990,6 +5052,7 @@ func buildComponents(s *Semantic) Components {
 			PaddingX: s.Space.N8,
 			Gap:      s.Space.N9,
 			Meta:     s.Color.Text.Secondary,
+			BgHover:  s.Color.State.RowHover,
 		},
 		PaneHeader: PaneHeaderTokens{
 			HeightCompact: s.Size.PaneHeader,

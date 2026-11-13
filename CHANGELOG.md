@@ -11,6 +11,11 @@ Every released version has a `## <version> - <date>` section, English first, the
 - Stop SSH panes, the server monitor, and the MCP audit drawer from accepting input as soon as they start closing. Restore input to the window when a dialog finishes fading out.
 - Honor **Reduce motion** for pane reveals, drag returns, monitoring bars, and MCP dialogs and controls. In this mode, the SSH cursor stays steady even when a remote program requests blinking.
 - Reduce redraw work while a catalog drag is held still and keep long transfer lists responsive while progress updates.
+- Improve secondary text, list hover and selection, and segmented controls in light and dark themes.
+- Match the fill of inputs and dropdowns to the sidebar search field, with subtle outlines that become more visible on hover.
+- Use the accent color for the selected icon in the gateway type and file site protocol pickers, and the same gray for all unselected icons.
+- Keep the sliding selection visible over hover and press highlights in segmented controls, the main navigation, and the settings sidebar.
+- Keep the selected item in the light theme's main navigation visible over the translucent window background on macOS.
 
 **简体中文**
 
@@ -21,6 +26,11 @@ Every released version has a `## <version> - <date>` section, English first, the
 - SSH 窗格、服务器监控面板和 MCP 审计抽屉开始关闭时立即停止接收输入。弹窗淡出结束时同步恢复底层窗口的交互。
 - 窗格显现、拖拽回弹、监控条以及 MCP 弹窗和控件现在遵循**减少动态效果**设置。启用时，即使远端程序要求闪烁，SSH 光标也会保持静止。
 - 减少目录拖拽停住时的界面重绘，改善长传输列表在进度更新时的响应速度。
+- 优化浅色和深色主题，让次要文字、列表悬停与选中状态和分段切换条更容易分辨。
+- 输入框和下拉框沿用侧栏搜索框的底色，默认描边更淡，悬停时更明显。
+- 统一网关类型和文件站点协议选择器的图标配色，选中项使用强调色，未选中项使用同一种灰色。
+- 修复分段控件、主导航和设置侧栏切换时，悬停或按下底色遮挡滑动选中块的问题。
+- 修复 macOS 浅色主题下，主导航选中底色容易与半透明窗口背景融为一体的问题。
 
 ## 0.1.9 - 2026-11-13
 

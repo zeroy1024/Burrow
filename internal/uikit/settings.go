@@ -159,11 +159,10 @@ func SettingsTextColumn(c *ui.Context) ui.Element {
 }
 
 type SettingsNavItemProps struct {
-	Key        any
-	Label      string
-	Icon       *ui.SVG
-	Selected   bool
-	StaticPill bool
+	Key      any
+	Label    string
+	Icon     *ui.SVG
+	Selected bool
 }
 
 func SettingsNavItem(c *ui.Context, props SettingsNavItemProps) ui.Element {
@@ -175,17 +174,12 @@ func SettingsNavItem(c *ui.Context, props SettingsNavItemProps) ui.Element {
 	if item.FocusVisible() && !item.IsDisabled() {
 		Shadow(item, t.Shadow.ControlFocus)
 	}
-	bg, fg, icon := ui.Transparent, Color(t.Color.Text.Primary), Color(t.Color.Text.Secondary)
+	fg, icon := Color(t.Color.Text.Primary), Color(t.Color.Text.Secondary)
 	if props.Selected {
 		fg, icon = Color(p.NavTextOn), Color(p.NavIconOn)
-		if props.StaticPill {
-			bg = Color(p.NavItemOn)
-		}
-	} else if item.Hovered() {
-		bg = Color(t.Color.State.Hover)
 	}
 	anim := Tween(t.Motion.Duration.Focus)
-	return item.Background(item.AnimateColor("bg", bg, anim)).TextColor(item.AnimateColor("fg", fg, anim)).Children(func() {
+	return item.TextColor(item.AnimateColor("fg", fg, anim)).Children(func() {
 		ui.Box(c).Size(p.NavIconTile, p.NavIconTile).AlignItems(ui.Center).Justify(ui.Center).Children(func() {
 			ic := ui.Icon(c, props.Icon).Size(t.Size.Icon, t.Size.Icon)
 			ic.TextColor(ic.AnimateColor("icon", icon, anim)).PassThrough()
@@ -197,7 +191,18 @@ func SettingsNavItem(c *ui.Context, props SettingsNavItemProps) ui.Element {
 func AnimateSettingsNavPill(c *ui.Context, list ui.Element, items []ui.Element, selected int, reduceMotion bool) {
 	t := theme.Current()
 	p := t.C.Settings
-	animateNavPill(c, list, items, selected, Color(p.NavItemOn), p.NavItemRadius, reduceMotion)
+	paintSlidingSelection(
+		list,
+		items,
+		selected,
+		slidingSelectionStyle{
+			background: Color(p.NavItemOn),
+			hover:      Color(t.Color.State.Hover),
+			radius:     p.NavItemRadius,
+			feedback:   Tween(t.Motion.Duration.Focus),
+			reduced:    reduceMotion || c.Preferences().ReduceMotion,
+		},
+	)
 }
 
 type ThemeCardProps struct {

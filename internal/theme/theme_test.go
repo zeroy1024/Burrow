@@ -14,7 +14,7 @@ func TestLightMatchesMockups(t *testing.T) {
 		"accent":       {th.Color.Accent.Default, Hex("#0a84ff")},
 		"text primary": {th.Color.Text.Primary, Hex("#1d1d1f")},
 		"selected row": {th.C.SiderItem.BgSelected, Hex("#efeff1")},
-		"rail on":      {th.C.Rail.BgOn, Hex("#d6d6d8")},
+		"rail on":      {th.C.Rail.BgOn, Hex("#00000024")},
 		"focus ring":   {th.C.PaneFocus.RingFocused[0].Color, Hex("#0a84ff")},
 	}
 	for name, c := range checks {

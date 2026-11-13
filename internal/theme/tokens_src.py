@@ -18,11 +18,13 @@ def L(x,y,b,s,c,inset=False): return dict(x=x,y=y,blur=b,spread=s,color=c,inset=
 A=lambda base,a: f'rgba({base},{a})'
 PALETTE={
  'gray':{'0':C('#ffffff'),'25':C('#fbfbfc'),'40':C('#fafafb'),'50':C('#f7f7f8'),'60':C('#f6f6f7'),'75':C('#f4f4f5'),
-   '100':C('#f2f2f4'),'125':C('#f0f0f2'),'150':C('#efeff1'),'175':C('#ececef'),'190':C('#ededf0'),'200':C('#e7e7e8'),'225':C('#e6e6e9'),
+   '100':C('#f2f2f4'),'110':C('#f1f1f4'),'125':C('#f0f0f2'),'150':C('#efeff1'),'175':C('#ececef'),'190':C('#ededf0'),
+   '195':C('#eaeaf0'),'198':C('#e7e7ec'),'200':C('#e7e7e8'),'225':C('#e6e6e9'),
    '250':C('#e3e3e6'),'300':C('#d6d6d8'),'325':C('#d2d2d6'),'350':C('#cfcfd4'),'400':C('#c7c7cc'),'450':C('#b0b0b5'),
-   '475':C('#aeaeb2'),'500':C('#a1a1a6'),'600':C('#8e8e93'),'700':C('#6e6e73'),'750':C('#5b5b62'),'800':C('#4a4a50'),
+   '475':C('#aeaeb2'),'500':C('#a1a1a6'),'600':C('#8e8e93'),'650':C('#85858b'),'680':C('#737379'),'700':C('#6e6e73'),
+   '710':C('#6c6c72'),'730':C('#626269'),'750':C('#5b5b62'),'800':C('#4a4a50'),
    '850':C('#3a3a3f'),'900':C('#1d1d1f')},
- 'blue':{'50':C('#eaf3fe'),'75':C('#e8f2fe'),'100':C('#d7e9fd','文件夹图标填充'),'300':C('#5ba7f7'),'500':C('#0a84ff','品牌蓝 / accent（logo 同色）'),'600':C('#0a6fd6'),'700':C('#0a5bc4')},
+ 'blue':{'50':C('#eaf3fe'),'75':C('#e8f2fe'),'90':C('#dcecff'),'100':C('#d7e9fd','文件夹图标填充'),'300':C('#5ba7f7'),'500':C('#0a84ff','品牌蓝 / accent（logo 同色）'),'600':C('#0a6fd6'),'700':C('#0a5bc4')},
  'green':{'50':C('#ebf8ef'),'500':C('#30c45a'),'700':C('#1f8a3f')},
  'amber':{'50':C('#fdf3e3'),'500':C('#f5a623'),'600':C('#c7861a'),'700':C('#b26a00')},
  'traffic':{'red':C('#ff5f57'),'yellow':C('#febc2e'),'green':C('#28c840')},
@@ -33,8 +35,14 @@ PALETTE={
  'amberA':{'a14':C(A('245,166,35','.14')),'a18':C(A('245,166,35','.18'))},
  'ink':{'a92':C(A('30,30,32','.92'),'tooltip 底')},
  # dark-only primitives (all derived)
- 'graphite':{k:C(v,'深色主题',True) for k,v in [('950','#161618'),('900','#1c1c1e'),('850','#202022'),('800','#252527'),('750','#2a2a2d'),('700','#2e2e31'),('650','#333336'),('600','#3a3a3d'),('550','#444448'),('500','#5a5a5f'),('400','#6e6e73'),('300','#8e8e93'),('250','#98989d'),('200','#a1a1a6'),('150','#c7c7cc'),('100','#d1d1d6'),('50','#f5f5f7')]},
- 'darkTint':{k:C(v,'深色主题',True) for k,v in [('blue300','#4da3ff'),('blue200','#6cb4ff'),('blueSubtle','#16304d'),('green400','#32d74b'),('green300','#5fd97a'),('greenSubtle','#173523'),('amber400','#ffb340'),('amber300','#ffc15c'),('amberSubtle','#3d2e12')]},
+ 'graphite':{k:C(v,'深色主题',True) for k,v in [
+   ('950','#161618'),('900','#1c1c1e'),('850','#202022'),('800','#252527'),('775','#29292b'),('750','#2a2a2d'),
+   ('700','#2e2e31'),('680','#303034'),('650','#333336'),('620','#38383d'),('600','#3a3a3d'),('550','#444448'),
+   ('545','#45454b'),('500','#5a5a5f'),('400','#6e6e73'),('300','#8e8e93'),('250','#98989d'),('200','#a1a1a6'),
+   ('190','#a6a6ad'),('175','#b0b0b6'),('150','#c7c7cc'),('100','#d1d1d6'),('50','#f5f5f7')]},
+ 'darkTint':{k:C(v,'深色主题',True) for k,v in [
+   ('blue300','#4da3ff'),('blue200','#6cb4ff'),('blueSubtle','#16304d'),('blueSelection','#254361'),('blueSelectionText','#8dc2ff'),
+   ('green400','#32d74b'),('green300','#5fd97a'),('greenSubtle','#173523'),('amber400','#ffb340'),('amber300','#ffc15c'),('amberSubtle','#3d2e12')]},
  'whiteA':{k:C(A('255,255,255',v),'深色主题',True) for k,v in [('a06','.06'),('a08','.08'),('a10','.10'),('a12','.12'),('a14','.14'),('a16','.16'),('a20','.20')]},
  'blackA':{k:C(A('0,0,0',v),'深色主题',True) for k,v in [('a25','.25'),('a30','.30'),('a35','.35'),('a40','.40'),('a45','.45'),('a50','.50')]},
  'inkDark':{'a95':C(A('58,58,62','.95'),'深色 tooltip 底',True)},
@@ -63,20 +71,26 @@ SEM={
   'surface':{
     'card':C(P('gray.0'),'内容卡片 / sider / FTP 面板'),
     'terminal':C(P('gray.25'),'终端卡片容器底色（仅容器，不含终端文字配色）'),
-    'raised':C(P('gray.0'),'浮起层：拖动卡片、ghost、分段控件选中'),
-    'sunken':C(P('gray.75'),'搜索框'),
+    'raised':C(P('gray.0'),'浮起层：菜单、拖动卡片及预览'),
+    'sunken':C(P('gray.75'),'搜索框、输入框和下拉框底色'),
     'field':C(P('gray.60'),'面包屑路径框'),
     'zebra':C(P('gray.40'),'列表斑马纹'),
-    'control':C(P('gray.100'),'中性控件底：图标按钮 bg、分段控件、中性徽章、队列图标'),
+    'settingsGroup':C(P('gray.40'),'设置分组底色'),
+    'control':C(P('gray.100'),'中性控件底：图标按钮、中性徽章、队列图标'),
     'controlStrong':C(P('gray.175'),'sider 行内「更多」按钮'),
+    'segmentTrack':C(P('gray.195'),'分段控件轨道'),
+    'segmentSelected':C(P('gray.0'),'分段控件选中底色'),
     'keycap':C(P('gray.0'),'键帽 kbd 底'),
   },
   'state':{
     'hover':C(P('gray.50'),'行悬停'),
     'selected':C(P('gray.150'),'sider 选中行'),
+    'rowHover':C(P('gray.110'),'列表行悬停'),
+    'rowSelected':C(P('gray.198'),'非焦点窗格的选中行'),
     'pressed':C(P('gray.225'),'按下（设计稿未画）',True),
-    'onWindow':C(P('gray.300'),'窗口底色上的激活按钮（rail、标题栏开关）'),
-    'selectedAccent':C(P('blue.75'),'文件列表选中行'),
+    'onWindow':C(P('gray.300'),'窗口底色上的激活按钮（标题栏开关）'),
+    'railSelected':C(P('black.a14'),'主导航选中底色'),
+    'selectedAccent':C(P('blue.90'),'当前窗格的选中行及目录焦点'),
   },
   'border':{
     'card':C(P('black.a06'),'卡片 0.5px 外描边'),
@@ -85,6 +99,9 @@ SEM={
     'divider':C(P('gray.100'),'头部底线、表头底线'),
     'tab':C(P('gray.150'),'旧版 tab 线 / FTP 面板描边'),
     'control':C(P('gray.225'),'按钮描边、状态栏竖分隔'),
+    'field':C(P('black.a04'),'输入框和下拉框描边'),
+    'fieldHover':C(P('black.a12'),'输入框和下拉框悬停描边'),
+    'check':C(P('gray.650'),'未选中选框描边'),
     'keycap':C(P('gray.250'),'kbd 描边'),
     'separatorWindow':C(P('gray.325'),'标题栏按钮组分隔线'),
     'onGlass':C(P('black.a10'),'玻璃栏内竖分隔'),
@@ -93,9 +110,9 @@ SEM={
   },
   'text':{
     'primary':C(P('gray.900')),
-    'secondary':C(P('gray.600'),'次要文字、主机副标题、状态栏'),
-    'tertiary':C(P('gray.500'),'关闭 ×、kbd、caption'),
-    'quaternary':C(P('gray.450'),'分组计数'),
+    'secondary':C(P('gray.730'),'次要文字、主机副标题、状态栏'),
+    'tertiary':C(P('gray.710'),'关闭 ×、kbd、caption'),
+    'quaternary':C(P('gray.680'),'分组计数'),
     'muted':C(P('gray.700'),'未选中 tab、rail 图标、按钮图标'),
     'strong':C(P('gray.850'),'次级按钮文字'),
     'action':C(P('gray.800'),'标题栏动作按钮'),
@@ -104,7 +121,8 @@ SEM={
     'placeholder':C(P('gray.400'),'面包屑分隔符'),
     'onAccent':C(P('gray.0')),
     'accent':C(P('blue.600'),'蓝色文字（徽章、提示、高亮分组）'),
-    'accentStrong':C(P('blue.700'),'选中文件名'),
+    'accentStrong':C(P('blue.700'),'高亮强调文字'),
+    'selectedAccent':C(P('blue.700'),'当前窗格的选中行文字'),
   },
   'icon':{'default':C(P('gray.700')),'subtle':C(P('gray.600')),'faint':C(P('gray.500')),'folder':C(P('blue.300')),'folderFill':C(P('blue.100'))},
   'accent':{
@@ -200,17 +218,22 @@ SEM={
 
 # ------------------------------------------------------------------ 2b. DARK overrides (all derived)
 DARK={
- 'color.bg.window':P('graphite.900'),
+ 'color.bg.window':P('graphite.950'),
  'color.surface.card':P('graphite.800'),'color.surface.terminal':P('graphite.850'),'color.surface.raised':P('graphite.700'),
- 'color.surface.sunken':P('graphite.750'),'color.surface.field':P('graphite.750'),'color.surface.zebra':P('whiteA.a06'),'color.surface.control':P('graphite.700'),
+ 'color.surface.sunken':P('graphite.750'),'color.surface.field':P('graphite.750'),'color.surface.zebra':P('graphite.775'),'color.surface.control':P('graphite.700'),
  'color.surface.controlStrong':P('graphite.650'),'color.surface.keycap':P('graphite.700'),
- 'color.state.hover':P('graphite.750'),'color.state.selected':P('graphite.650'),'color.state.pressed':P('graphite.600'),'color.state.onWindow':P('graphite.600'),'color.state.selectedAccent':P('darkTint.blueSubtle'),
+ 'color.surface.settingsGroup':P('whiteA.a06'),'color.surface.segmentTrack':P('graphite.700'),'color.surface.segmentSelected':P('graphite.545'),
+ 'color.state.hover':P('graphite.750'),'color.state.selected':P('graphite.650'),'color.state.pressed':P('graphite.600'),'color.state.onWindow':P('graphite.600'),
+ 'color.state.railSelected':P('graphite.600'),
+ 'color.state.rowHover':P('graphite.680'),'color.state.rowSelected':P('graphite.620'),'color.state.selectedAccent':P('darkTint.blueSelection'),
  'color.border.card':P('whiteA.a08'),'color.border.terminal':P('whiteA.a10'),'color.border.subtle':P('graphite.650'),'color.border.divider':P('graphite.650'),
  'color.border.tab':P('graphite.650'),'color.border.control':P('graphite.550'),'color.border.keycap':P('graphite.550'),'color.border.separatorWindow':P('graphite.550'),
+ 'color.border.field':P('whiteA.a06'),'color.border.fieldHover':P('whiteA.a16'),
  'color.border.onGlass':P('whiteA.a12'),'color.border.raised':P('whiteA.a10'),'color.border.hairlineStrong':P('whiteA.a12'),
- 'color.text.primary':P('graphite.50'),'color.text.secondary':P('graphite.250'),'color.text.tertiary':P('graphite.400'),'color.text.quaternary':P('graphite.500'),
+ 'color.text.primary':P('graphite.50'),'color.text.secondary':P('graphite.175'),'color.text.tertiary':P('graphite.190'),'color.text.quaternary':P('graphite.300'),
  'color.text.muted':P('graphite.200'),'color.text.strong':P('graphite.100'),'color.text.action':P('graphite.150'),'color.text.neutralBadge':P('graphite.150'),
  'color.text.disabled':P('graphite.400'),'color.text.placeholder':P('graphite.500'),'color.text.accent':P('darkTint.blue300'),'color.text.accentStrong':P('darkTint.blue200'),
+ 'color.text.selectedAccent':P('darkTint.blueSelectionText'),
  'color.icon.default':P('graphite.200'),'color.icon.subtle':P('graphite.300'),'color.icon.faint':P('graphite.400'),'color.icon.folderFill':P('darkTint.blueSubtle'),
  'color.accent.subtle':P('darkTint.blueSubtle'),'color.accent.tint16':P('blueA.a28'),'color.accent.tint10':P('blueA.a18'),
  'color.success.default':P('darkTint.green400'),'color.success.text':P('darkTint.green300'),'color.success.subtle':P('darkTint.greenSubtle'),
@@ -249,7 +272,7 @@ COMP={
  'titleAction':{'size':'size.control','radius':'radius.control','icon':'color.text.action','iconSize':'size.iconMd','bgOn':'color.state.onWindow','iconOn':'color.text.primary',
    'bgPrimary':'color.accent.default','iconPrimary':'color.text.onAccent','separator':'color.border.separatorWindow','separatorHeight':'size.separatorTall','separatorMarginX':'space.6'},
  'rail':{'width':'size.rail','gap':'space.6','paddingTop':'space.4','paddingBottom':'space.10','buttonSize':'size.railButton','buttonRadius':'radius.railButton',
-   'icon':'color.text.muted','bgOn':'color.state.onWindow','iconOn':'color.text.primary'},
+   'icon':'color.text.muted','bgOn':'color.state.railSelected','iconOn':'color.text.primary'},
  'sider':{'width':'size.sider','bg':'color.surface.card','radius':'radius.card','shadow':'shadow.card','marginRight':'space.8',
    'headerPaddingTop':'space.16','headerPaddingRight':'space.12','headerPaddingBottom':'space.10','headerPaddingLeft':'space.16','titleSize':'font.size.bodyLg','titleWeight':'font.weight.semibold',
    'addButtonSize':'size.controlMd','addButtonRadius':'radius.controlSm','addButtonBg':'color.surface.control','addButtonIcon':'color.text.muted',
@@ -262,7 +285,7 @@ COMP={
    'dropBg':'color.accent.tint08','dropText':'color.text.accent','dropCount':'color.accent.default',
    'expandTrack':'color.accent.tint15','expandFill':'color.accent.default','expandHeight':'size.progressThin','expandDelay':'motion.duration.autoExpand'},
  'siderItem':{'paddingTop':'space.6','paddingRight':'space.6','paddingBottom':'space.6','paddingLeft':'space.8','gap':'space.9','radius':'radius.control','spacing':'space.1',
-   'bgHover':'color.state.hover','bgActive':'color.state.selectedAccent','bgSelected':'color.state.selected',
+   'bgHover':'color.state.rowHover','bgActive':'color.state.selectedAccent','bgSelected':'color.state.selected',
    'nameSize':'font.size.bodyLg','nameWeight':'font.weight.medium','nameLineHeight':'font.lineHeight.name','nameColor':'color.text.primary',
    'subSize':'font.size.footnote','subFamily':'font.family.mono','subLineHeight':'font.lineHeight.sub','subTracking':'font.tracking.mono','subColor':'color.text.secondary',
    'dotSize':'size.dot','dotHalo':'size.dotHalo','dotOnline':'color.success.default','dotOnlineHalo':'color.success.halo','dotOffline':'color.status.offline',
@@ -297,12 +320,12 @@ COMP={
  'iconButton':{'size':'size.controlMd','sizeSm':'size.controlSm','sizeXs':'size.controlXs','radius':'radius.controlSm','icon':'color.icon.default','iconSubtle':'color.icon.subtle','iconFaint':'color.icon.faint',
    'bg':'color.surface.control','bgHover':'color.state.hover','iconSize':'size.icon','stroke':'size.iconStroke'},
  'floatButton':{'size':'size.controlLg','bg':'color.surface.card','shadow':'shadow.floatButton','icon':'color.text.strong','primaryBg':'color.accent.default','primaryIcon':'color.text.onAccent'},
- 'segmented':{'bg':'color.surface.control','radius':'radius.control','padding':'space.2','fontSize':'font.size.footnote','itemPaddingX':'space.9','itemPaddingY':'space.2','itemRadius':'radius.chip',
-   'text':'color.text.muted','bgOn':'color.surface.raised','textOn':'color.text.primary','shadowOn':'shadow.segment'},
+ 'segmented':{'bg':'color.surface.segmentTrack','radius':'radius.control','padding':'space.2','fontSize':'font.size.footnote','itemPaddingX':'space.9','itemPaddingY':'space.2','itemRadius':'radius.chip',
+   'text':'color.text.muted','bgOn':'color.surface.segmentSelected','textOn':'color.text.primary','shadowOn':'shadow.segment'},
  'breadcrumb':{'height':'size.controlMd','radius':'radius.controlSm','bg':'color.surface.field','bgOnGlass':'color.fill.quieter','paddingX':'space.8','gap':'space.3','text':'color.text.muted','current':'color.text.primary','separator':'color.text.placeholder'},
  'fileList':{'headerHeight':'size.listRow','headerText':'color.text.secondary','headerSize':'font.size.footnote','headerBorder':'color.border.divider',
    'rowHeight':'size.listRow','rowRadius':'radius.controlSm','rowPaddingX':'space.8','rowGap':'space.2','fontSize':'font.size.body','zebra':'color.surface.zebra',
-   'bgSelected':'color.state.selectedAccent','textSelected':'color.text.accentStrong','meta':'color.text.secondary','fileIcon':'color.icon.subtle','folderIcon':'color.icon.folder','folderFill':'color.icon.folderFill',
+   'bgSelected':'color.state.selectedAccent','textSelected':'color.text.selectedAccent','meta':'color.text.secondary','fileIcon':'color.icon.subtle','folderIcon':'color.icon.folder','folderFill':'color.icon.folderFill',
    'paneHeaderHeight':'size.fileHeader'},
  'progress':{'height':'size.progress','radius':'radius.bar','track':'color.border.subtle','fill':'color.accent.default','fillNeutral':'color.fill.strong','fillPaused':'color.status.paused','fillDone':'color.success.default'},
  'tooltip':{'bg':'color.tooltip.bg','text':'color.tooltip.text','kbd':'color.tooltip.kbd','fontSize':'font.size.footnote','paddingX':'space.8','paddingY':'space.4','radius':'radius.controlSm','shadow':'shadow.tooltip','arrow':'space.4'},
@@ -561,7 +584,7 @@ COMP['filePaneFocus']={
  'labelWeightActive':'font.weight.semibold','labelTextInactive':'color.text.muted',
  'labelWeightInactive':'font.weight.medium','labelPaddingX':'space.8',
  'labelRadius':'radius.controlSm','selBgActive':'color.state.selectedAccent',
- 'selTextActive':'color.text.accentStrong','selBgInactive':'color.state.selected',
+ 'selTextActive':'color.text.selectedAccent','selBgInactive':'color.state.rowSelected',
  'selTextInactive':'color.text.primary','transition':'motion.duration.focus',
 }
 COMP['FTPSplit']={
@@ -656,7 +679,7 @@ PALETTE['easing']['inOut']=BZ([.42,0,.58,1])
 PALETTE['spring']['content']=SP({'duration':350,'bounce':0})
 SEM['space']['20']=D(P('space.20'))
 SEM['color']['overlay']={'backdrop':C(P('blackA.a40'),'弹窗遮罩')}
-SEM['color']['border']['controlHover']=C(P('gray.400'),'输入框悬停描边')
+SEM['color']['border']['controlHover']=C(P('gray.400'),'次要控件悬停描边')
 DARK['color.border.controlHover']=P('graphite.550')
 SEM['shadow']['dialog']=SH([L(0,10,30,0,P('blackA.a30'))],'弹窗阴影')
 DARK['shadow.dialog']=[L(0,10,30,0,P('blackA.a50'))]
@@ -671,8 +694,8 @@ COMP['groupHeader']['countMotion']='motion.spring.content'
 COMP['search'].update({'transition':'motion.duration.focus','easing':'motion.easing.search'})
 COMP['input']={
  'height':'size.control','paddingX':'space.9','radius':'radius.control',
- 'bg':'color.surface.control','text':'color.text.primary','fontSize':'font.size.body',
- 'border':'color.border.control','borderHover':'color.border.controlHover',
+ 'bg':'color.surface.sunken','text':'color.text.primary','fontSize':'font.size.body',
+ 'border':'color.border.field','borderHover':'color.border.fieldHover',
  'borderFocus':'color.accent.default','borderWidth':'size.divider','transition':'motion.duration.focus',
 }
 COMP['segmented']['bgHover']='color.state.hover'
@@ -751,10 +774,10 @@ COMP['modal']={
  'fade':'motion.duration.focus','exit':'motion.duration.exit','reduceFade':'motion.duration.focus',
 }
 COMP['input'].update({
- 'gap':'space.7','bg':'color.surface.card','borderHover':'color.border.separatorWindow','focusShadow':'shadow.inputFocus','errorShadow':'shadow.inputError',
+ 'gap':'space.7','focusShadow':'shadow.inputFocus','errorShadow':'shadow.inputError',
  'placeholder':'color.text.placeholder','icon':'color.text.tertiary','monoFont':'font.family.mono','monoSize':'size.inputMonoSize','monoTracking':'font.tracking.inputMono',
  'disabledBg':'color.surface.field','disabledText':'color.text.disabled','disabledBorder':'color.border.subtle','caret':'color.accent.default',
- 'chipHeight':'size.controlXs','chipRadius':'radius.chip','chipBg':'color.surface.control','chipFontSize':'font.size.footnote',
+ 'chipHeight':'size.controlXs','chipRadius':'radius.chip','chipBg':'color.surface.controlStrong','chipFontSize':'font.size.footnote',
 })
 COMP['formRow']={
  'labelWidth':'size.formLabel','labelGap':'space.12','rowGap':'space.12','label':'color.text.muted','labelSize':'font.size.body','labelHeight':'size.control',
@@ -782,7 +805,7 @@ COMP['settings']={
  'titleSize':'font.size.title','titleWeight':'font.weight.semibold','subtitleSize':'font.size.footnote','subtitle':'color.text.secondary','close':'size.control',
  'contentMax':'size.settingsContent','contentPaddingY':'space.20','contentPaddingX':'size.settingsHeaderPaddingX',
  'groupTitleSize':'font.size.small','groupTitleWeight':'font.weight.semibold','groupTitle':'color.text.muted','groupTitleGap':'space.8',
- 'groupGap':'space.22','groupBg':'color.surface.zebra','groupRadius':'radius.card','groupBorder':'color.border.raised','groupBorderWidth':'size.hairline',
+ 'groupGap':'space.22','groupBg':'color.surface.settingsGroup','groupRadius':'radius.card','groupBorder':'color.border.raised','groupBorderWidth':'size.hairline',
  'rowMinHeight':'size.settingsRowHeight','rowPaddingY':'space.9','rowPaddingX':'space.14','rowDivider':'color.border.subtle','rowDividerInset':'space.14',
  'rowLabelSize':'font.size.bodyLg','rowLabel':'color.text.primary','rowDescSize':'font.size.footnote','rowDesc':'color.text.secondary',
  'fadeHeight':'size.settingsFadeHeight',
@@ -879,7 +902,7 @@ COMP['badge'].update({
 })
 COMP['divider']={'color':'color.border.divider','width':'size.divider','verticalHeight':'size.separatorShort'}
 COMP['spinner']={'sizeXs':'size.iconXs','sizeSm':'size.iconSm','sizeMd':'size.icon','color':'color.icon.default','period':'motion.duration.spin'}
-COMP['check']={'size':'size.check','radius':'radius.keycap','border':'color.border.keycap','on':'color.accent.default','mark':'color.text.onAccent','radioDot':'size.radioDot'}
+COMP['check']={'size':'size.check','radius':'radius.keycap','border':'color.border.check','on':'color.accent.default','mark':'color.text.onAccent','radioDot':'size.radioDot'}
 COMP['segmented'].update({'countText':'color.text.tertiary','countTextOn':'color.text.muted','itemHeightMd':'size.segmentedItem','heightSm':'size.controlSm'})
 COMP['banner']={
  'paddingX':'space.12','paddingY':'space.9','radius':'radius.railButton','gap':'space.8','icon':'size.iconSm',
@@ -907,7 +930,7 @@ COMP['toast']={
 COMP['popover']={'radius':'radius.window','padding':'space.12','bg':'color.surface.raised','shadow':'shadow.lift'}
 COMP['trayPanel']={'width':'size.trayPanel'}
 COMP['latency']={'warnMs':'size.latencyWarn','badMs':'size.latencyBad','normal':'color.text.secondary','warn':'color.warning.text','bad':'color.danger.text'}
-COMP['listRow']={'height':'size.listRow','radius':'radius.controlSm','paddingX':'space.8','gap':'space.9','meta':'color.text.secondary'}
+COMP['listRow']={'height':'size.listRow','radius':'radius.controlSm','paddingX':'space.8','gap':'space.9','meta':'color.text.secondary','bgHover':'color.state.rowHover'}
 COMP['breadcrumb']['iconSize']='size.iconXs'
 COMP['fileList'].update({'headerBg':'color.surface.card','columnGap':'space.16','nameMinWidth':'size.tableNameMinWidth'})
 COMP['progress'].update({'heightMeter':'size.meterHeight','meterFill':'color.accent.default','meterWarnAt':'size.meterWarnRatio','meterCritAt':'size.meterCriticalRatio','fillError':'color.danger.default'})

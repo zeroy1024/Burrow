@@ -61,14 +61,12 @@ func (a *app) settingsSidebar(c *ui.Context, shown float32) {
 			locales.MessageSearchSettings(), locales.MessageSearchSettings())
 		categories := settingsCategories()
 		navList := ui.Column(c).Key("settings-nav-list").FillWidth().Padding(t.C.Catalog.ListPaddingY, t.C.Catalog.ListPaddingX).Gap(t.C.Catalog.RowGap)
-		navLayout := navList.LayoutBounds()
-		staticPill := navLayout.W <= 0 || navLayout.H <= 0
 		items := make([]ui.Element, len(categories))
 		navList.Children(func() {
 			for index, category := range categories {
 				items[index] = uikit.SettingsNavItem(c, uikit.SettingsNavItemProps{
 					Key: category.id, Label: category.label, Icon: category.icon,
-					Selected: a.settingsCategory == index, StaticPill: staticPill,
+					Selected: a.settingsCategory == index,
 				}).OnClick(func() { a.selectSettingsCategory(index) })
 			}
 		})

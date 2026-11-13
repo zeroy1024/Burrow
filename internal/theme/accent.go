@@ -28,7 +28,19 @@ func WithAccent(t *Theme, c color.NRGBA) *Theme {
 	s.Color.Accent.Subtle = Mix(s.Color.Surface.Card, c, mix)
 	s.Color.Text.Accent = Mix(c, textBase, .15)
 	s.Color.Text.AccentStrong = Mix(c, textBase, .25)
-	s.Color.State.SelectedAccent = s.Color.Accent.Subtle
+
+	// Default blue has its own selection pair. Other accents keep their derived colors.
+	switch {
+	case c != s.Color.AccentChoices.Blue:
+		s.Color.State.SelectedAccent = s.Color.Accent.Subtle
+		s.Color.Text.SelectedAccent = s.Color.Text.AccentStrong
+	case t.IsDark:
+		s.Color.State.SelectedAccent = Palette.DarkTint.BlueSelection
+		s.Color.Text.SelectedAccent = Palette.DarkTint.BlueSelectionText
+	default:
+		s.Color.State.SelectedAccent = Palette.Blue.N90
+		s.Color.Text.SelectedAccent = Palette.Blue.N700
+	}
 
 	// Shadows are slices, so copy the affected layers before recoloring them.
 	s.Shadow.FocusRing = recolorShadow(s.Shadow.FocusRing, c)
