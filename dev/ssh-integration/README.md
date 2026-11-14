@@ -36,6 +36,8 @@ FTP uses a separate vsftpd container with init. Its control port and 64 passive 
 
 Use `python3 -B scripts/ssh-integration-server.py --ftps` for explicit FTPS and append `--implicit` for implicit FTPS. Temporary CA, server certificate with loopback SANs, and metadata stay in the fixture directory. TLS verification and data-channel session reuse remain enabled. See [MCP integration](../mcp-integration/README.md) for real HTTP, native controls, and recovery.
 
+Gateway fixtures start with `python3 -B scripts/ssh-integration-server.py --gateways`: beside the same SSH fixture it runs an SSH jump host, a SOCKS5 proxy that requires a username and password ([dev/gateway-integration](../gateway-integration/)), and a WireGuard peer. Each maps only its own port to loopback and carries the label `dev.burrow.gateway=<SSH container name>`. Routes end at the SSH fixture's Docker bridge address, which the host cannot reach directly, so a successful connection shows the traffic went through the gateway. The SOCKS5 password is copied into the container as a file; WireGuard keys are generated inside a container, server and client configurations are stored `0600` in the fixture directory, and metadata is written to `gateway-server.json`. The WireGuard container needs `NET_ADMIN`; it prefers the kernel module and falls back to the userspace implementation.
+
 Current launchers and tests use `BURROW_*` variables and `dev.burrow.integration` fixtures. Start fresh fixtures after updating from an older checkout; historical validation records keep their original paths.
 
 ## Transport validation
@@ -50,6 +52,8 @@ It also covers independent Shell/SFTP channels sharing one connection, final-ref
 
 File security checks cover local source/destination directories replaced by out-of-tree links during read/write/cleanup, final-file replacement, and actual SFTP OPEN requests carrying exclusive creation and `0600` atomically. Old parts with `0644`, `0400`, or `0000` are restricted before resume writes while retaining confirmed contents. Local file tests do not need Docker; SFTP security tests use the real fixture.
 
+With the gateway fixtures running, the same command also covers reaching the bridge target through the SSH jump host, SOCKS5, and SOCKS5 behind the jump host, checking the path by the client address the target server saw; a wrong SOCKS5 password is rejected and the jump host stays usable after the target refuses a connection; the WireGuard handshake, reading the SSH banner through the tunnel, AllowedIPs and non-TCP limits, rejection of unknown keys and stale credential revisions, no dialing after close, and no connection left on the server after a stream and its tunnel close back to back. Server status collection is checked on the Ubuntu fixture for system facts, CPU, memory, load, processes, network rates and root disk usage, and a canceled reading is never used to compute a rate.
+
 Docker tests use the `integration` build tag. Ordinary `go test ./...` does not connect to them; untagged SDK lifecycle tests use local in-process SSH services only. Docker targets must be local. If the build cache is unwritable, set `GOCACHE=/private/tmp/burrow-go-cache`.
 
 ## Native window validation
@@ -60,6 +64,7 @@ python3 -B -u scripts/ssh-integration-ui.py
 python3 -B -u scripts/ssh-integration-ui.py --concurrent-split
 python3 -B -u scripts/ssh-integration-ui.py --file-protocols
 python3 -B -u scripts/ssh-integration-ui.py --core-e2e
+python3 -B -u scripts/ssh-integration-ui.py --coverage
 ```
 
 A Go overlay enables the pinned MyGo automation plugin and redirects configuration only in temporary builds. It does not change `HOME`, release builds, or existing Burrow settings. A copied SDK is referenced through a separate modfile without changing global module caches or project dependencies. Data, SQLite loading, local defaults, caches, and logs are isolated. A test credential provider stores migration sources in `0600` files. The overlay performs one-time migration with fixture passphrases, then uses real Vault ciphertext/version checks. These tests do not cover macOS Keychain integration.
@@ -81,6 +86,19 @@ Default mode also checks independent add/edit/delete in both catalogs, SQLite sc
 - Real FTP pause/resume/cancel/partial cleanup and independent task views for two tabs of the same site.
 - Pausing the controlled FTP container so refresh replies arrive while a file row is held; sources remain until release and cancelled drops create no transfer. The container is unpaused whether assertions pass or fail.
 - Normal shutdown and restart of the same isolated app/config, offline task ownership restoration, unchanged confirmed offsets, explicit resume, actual content, and partial cleanup.
+
+`--coverage` needs the FTP and gateway fixtures and likewise drives only production forms, menus, keyboard and pointer input; scenarios live in [scripts/ssh_e2e_coverage.py](../../scripts/ssh_e2e_coverage.py). Repeat `--scenario name` to run a subset; final acceptance runs without it. It covers:
+
+- `gateways`: creating SOCKS5, SSH and WireGuard gateways and a two-hop SOCKS5 behind the SSH jump host on the gateway page, connecting hosts assigned to them, and checking the source address with the remote `SSH_CONNECTION`; success and rejection of the gateway self-test; only unreferenced gateways can be deleted; a site made with the quick add to SFTP action from a gateway host browses the bridge-only server; the application default exit applies to hosts that follow it.
+- `monitoring`: host name, kernel, core count, OS version, memory and disk readings, process count and CPU/network rates in the server status panel, with host name and others compared to the container's actual values.
+- `file_operations`: for SFTP and FTP each, searching the current folder, rename, new folder, delete, the skip / keep both / overwrite choices on a name conflict, and retrying an upload that failed on an unreadable directory; results are checked against the actual server files.
+- `catalog_management`: creating, renaming and deleting a group, host search, and dragging a host into another group and back.
+- `terminal_workspace`: terminal and remote PTY size after hiding the sidebar, tab shortcuts, close confirmation and reopening a closed tab, the failed state after the server ends a session and reconnecting with earlier output kept.
+- `key_management`: generating a managed key, adding its public key to the fixture and connecting a new key-authenticated host without a credential prompt.
+- `settings`: after switching to English the navigation and gateway page show no Chinese controls, and it switches back; dark theme and accent, terminal scheme and cursor, and the name-conflict policy are saved; after rebinding the terminal-mode shortcut the old chord stops working and the new one works.
+- `application_lock`: a mismatched confirmation does not enable it; once enabled a restart stays on the unlock form, rejects a wrong password, opens the workspace on the right one, and is removed with the current password.
+
+After a normal quit the same isolated configuration is restarted to check that saved gateways, routes and vault credentials still connect and that appearance and shortcut settings persist, then default shortcuts are restored. Before quitting, the application must have released every SSH connection itself, including those made through the WireGuard tunnel. This mode does not cover the system keychain, the tray, installing in-app updates, terminal scroll position and clipboard, or visual acceptance; the AI session view is covered by [MCP integration](../mcp-integration/README.md).
 
 Core/file modes require `BURROW_FTP_ADDRESS`. Each core run uses independent directories in both containers. The launcher checks every native process's exit record, race log, and released SSH/FTP connections, writing `native-run-*/result.json`. Partial failure cannot be recorded as success.
 

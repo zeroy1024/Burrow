@@ -272,6 +272,25 @@ class Suite:
         if self.full.call("ssh_exec", dict(connection_id=ssh["id"], command="printf alive"))["stdout"] != "alive":
             raise RuntimeError("SSH timeout damaged the shared MCP transport")
         self.case("SSH timeout cancels only its channel and transport remains usable")
+        self.agent_view()
+
+    def agent_view(self):
+        # The application mirrors agent operations in a background read-only tab.
+        driver = self.driver
+        driver.click("SSH", "tab")
+        tab = driver.wait("AI session tab", lambda: next((node for node in driver.nodes() if node.get("role") == "tab"
+                          and node.get("label", "").startswith("AI · ")), None))
+        driver.call("act", dict(id=tab["id"], action="press"))
+
+        def mirrored():
+            labels = [node.get("label", "") for node in driver.nodes()]
+            transcript = next((label for label in labels if "输入 printf 'seven'; exit 7 输出 seven" in label), "")
+            return ("退出码 7" in transcript and "输出 MCP-SSH-OK diagnostic" in transcript
+                    and "已超时" in transcript and "输入 sleep 10" in transcript
+                    and any(label.startswith("AI 会话 · 只读 由 integration-full 操作") for label in labels))
+        driver.wait("agent commands, output, exit codes and the read-only notice in the AI session", mirrored)
+        driver.click("MCP", "tab")
+        self.case("AI session tab mirrors agent commands, output, exit codes and timeouts read-only")
 
     def cancellation(self):
         for protocol in ("2026-07-28", "2025-06-18"):

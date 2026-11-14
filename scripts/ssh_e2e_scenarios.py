@@ -465,12 +465,14 @@ def run_core_recovered(driver, checkpoint):
 
 
 def _pane_press(driver, label, remote=True):
-    pane = _file(driver)["RemoteBounds" if remote else "LocalBounds"]
-    controls = [node for node in _nodes(driver, label, ("button",))
-                if pane["x"] <= _center(node)[0] < pane["x"] + pane["width"]
-                and pane["y"] <= _center(node)[1] < pane["y"] + pane["height"]]
-    _check(len(controls) == 1, "expected one pane control: " + label)
-    x, y = _center(controls[0])
+    def located():
+        # Pane bounds and its toolbar settle a frame apart after a listing changes.
+        pane = _file(driver)["RemoteBounds" if remote else "LocalBounds"]
+        controls = [node for node in _nodes(driver, label, ("button",))
+                    if pane["x"] <= _center(node)[0] < pane["x"] + pane["width"]
+                    and pane["y"] <= _center(node)[1] < pane["y"] + pane["height"]]
+        return controls if len(controls) == 1 else None
+    x, y = _center(driver.wait("one pane control: " + label, located)[0])
     driver.input(dict(type="click", x=x, y=y))
 
 

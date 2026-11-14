@@ -6,6 +6,10 @@ uv = "0.13.6"
 description = "构建当前平台产物，可用 --platform 指定 macOS/Windows/Linux"
 run = "uv run --script scripts/build.py"
 
+[tasks.gate]
+description = "推送前 E2E 门禁，可追加 protocol/native/mcp/all 选择层级"
+run = "python3 -B scripts/gate.py"
+
 [tasks.i18n]
 description = "生成语言资源并检查中英文完整性"
 run = ["go tool mygo generate", "go tool mygo i18n check", "python3 scripts/i18n.py"]

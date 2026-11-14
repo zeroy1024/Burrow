@@ -36,6 +36,8 @@ FTP 使用独立的 vsftpd 容器和 init 进程托管，控制端口及 64 个�
 
 显式和隐式 FTPS 分别运行 `python3 -B scripts/ssh-integration-server.py --ftps` 与 `python3 -B scripts/ssh-integration-server.py --ftps --implicit`。临时 CA、带回环地址 SAN 的服务器证书及连接元数据保存在同一夹具目录；TLS 校验和数据通道会话复用保持启用。MCP 的真实 HTTP、原生控制和任务恢复联调见 [MCP 联调说明](../mcp-integration/README.zh.md)。
 
+连接网关夹具运行 `python3 -B scripts/ssh-integration-server.py --gateways`：在同一 SSH 夹具旁启动一台 SSH 跳板、一个要求用户名密码的 SOCKS5 代理（[dev/gateway-integration](../gateway-integration/)）和一个 WireGuard 对端。三者只把各自端口映射到回环地址，带 `dev.burrow.gateway=<SSH 容器名>` 标签。路由终点是 SSH 夹具的 Docker 网桥地址，本机不能直连，因此连接成功即说明流量经过了网关。SOCKS5 密码以文件形式复制进容器；WireGuard 密钥在容器内生成，服务端与客户端配置以 `0600` 保存在夹具目录，元数据写入 `gateway-server.json`。WireGuard 容器需要 `NET_ADMIN`，优先使用内核模块，否则回退到用户态实现。
+
 当前启动器和测试使用 `BURROW_*` 变量与 `dev.burrow.integration` 夹具。从旧版本更新后需重新创建夹具；历史验证记录保留原始路径。
 
 ## 传输层验证
@@ -50,6 +52,8 @@ mise exec -- go test -race -tags=integration ./... -count=1 -timeout=180s
 
 文件安全回归还覆盖本地源和目标目录被替换为树外链接后的读写与清理、最终文件替换，以及真实 SFTP OPEN 请求原子携带排他创建和 `0600`。旧 part 的 `0644`、`0400`、`0000` 权限在续传写入前收紧，且保留已确认内容。本地文件回归不需要 Docker；SFTP 安全用例使用同一真实服务。
 
+启动网关夹具后，同一命令还覆盖：经 SSH 跳板、SOCKS5 及「SOCKS5 经跳板」两跳到达网桥目标，并以目标服务器看到的来源地址核对路径；错误的 SOCKS5 密码被拒绝，目标拒绝连接后跳板仍可用；WireGuard 隧道的握手、经隧道读取 SSH 标识、AllowedIPs 与非 TCP 网络限制、未知密钥与过期凭据版本拒绝、关闭后不可再拨号，以及连接与隧道相继关闭后服务器端不残留该连接。服务器状态采集在 Ubuntu 夹具上核对系统信息、CPU、内存、负载、进程、网络速率和根盘用量，并确认取消的一次采样不会被用来计算速率。
+
 这些测试使用 `integration` build tag，普通 `go test ./...` 不会连接 Docker 服务器；不带标签的 SDK 生命周期测试仅使用进程内创建的本地 SSH 服务。Docker 目标必须是本机地址。Go 构建缓存不可写时，可为命令设置 `GOCACHE=/private/tmp/burrow-go-cache`。
 
 ## 原生窗口验证
@@ -60,6 +64,7 @@ python3 -B -u scripts/ssh-integration-ui.py
 python3 -B -u scripts/ssh-integration-ui.py --concurrent-split
 python3 -B -u scripts/ssh-integration-ui.py --file-protocols
 python3 -B -u scripts/ssh-integration-ui.py --core-e2e
+python3 -B -u scripts/ssh-integration-ui.py --coverage
 ```
 
 脚本通过 Go overlay 启用固定 MyGo 版本的 automation 插件，只在临时构建中将应用配置路径指向独立目录；不修改 `HOME`、正式构建或现有 Burrow 配置。固定 SDK 复制到测试临时目录后通过独立 modfile 引用，不修改全局模块缓存或项目依赖。用户数据、SQLite 配置加载路径、本地默认目录、缓存和日志均隔离。测试专用凭据 provider 以 `0600` 文件保存迁移来源。隔离 overlay 使用夹具口令完成一次性迁移，之后通过真实 Vault、密文表和版本校验读取凭据；这些测试不覆盖 macOS 钥匙串集成。
@@ -81,6 +86,19 @@ python3 -B -u scripts/ssh-integration-ui.py --core-e2e
 - 真实 FTP 下载的暂停、继续、取消和部分文件清理，同一保存站点的两个标签分别显示和管理任务。
 - 暂停受控 FTP 容器，使刷新应答在按住文件行时到达；释放前保留源，取消的 Drop 不产生传输。无论断言是否通过，都会解除本用例的容器暂停。
 - 正常退出后启动同一个测试应用、复用同一隔离配置，检查任务按原标签离线恢复、确认偏移不变、显式继续后的实际内容和部分文件清理。
+
+`--coverage` 需要 FTP 与网关夹具，同样只通过生产界面的表单、菜单、键盘和指针驱动，场景在 [scripts/ssh_e2e_coverage.py](../../scripts/ssh_e2e_coverage.py)。可用 `--scenario 名称` 重复指定只运行其中几项；最终验收不带该参数。它覆盖：
+
+- `gateways`：在网关页新建 SOCKS5、SSH、WireGuard 网关及「SOCKS5 经 SSH 跳板」两跳，为主机指定网关后连接，并以远端 `SSH_CONNECTION` 核对来源地址；网关自测的成功与拒绝；仅未被引用的网关可删除；由网关主机「快捷添加到 SFTP」得到的站点可浏览仅网桥可达的服务器；应用默认出口对「跟随默认」主机生效。
+- `monitoring`：服务器状态面板显示的主机名、内核、核数、系统版本、内存与磁盘读数、进程数及 CPU/网络速率，主机名等与容器内实际值比对。
+- `file_operations`：SFTP 与 FTP 各一轮当前目录搜索、重命名、新建文件夹、删除，重名时的跳过、保留两者、覆盖，以及向无权限目录上传失败后的重试；结果以服务器上的实际文件核对。
+- `catalog_management`：分组新建、改名、删除，主机搜索，把主机拖入另一分组再拖回。
+- `terminal_workspace`：收起侧栏后终端与远端 PTY 尺寸同步、标签切换快捷键、关闭确认与重新打开已关闭标签、服务器端结束会话后的失败状态与重新连接，并保留此前输出。
+- `key_management`：生成托管密钥，将其公钥加入夹具后新建私钥认证主机，无需输入凭据即可连接。
+- `settings`：切换英文后导航与网关页不再出现中文控件并可切回；深色主题与强调色、终端配色与光标、同名冲突策略写入配置；重绑「终端模式」快捷键后旧组合失效、新组合生效。
+- `application_lock`：确认密码不一致时不启用，启用后重启停留在解锁界面，错误密码被拒绝、正确密码进入工作区，并以当前密码关闭。
+
+应用正常退出后以同一隔离配置重启，再核对：已保存的网关、路由与 Vault 凭据仍可连接，外观与快捷键设置保持，随后恢复默认快捷键。退出前要求应用已自行释放全部 SSH 连接，包括经 WireGuard 隧道建立的连接。该模式不覆盖系统钥匙串、托盘、应用内更新安装、终端滚动位置与剪贴板和视觉验收；AI 会话视图由 [MCP 联调](../mcp-integration/README.zh.md)覆盖。
 
 核心模式和文件模式均需要 `BURROW_FTP_ADDRESS`。每轮核心模式在两个容器内使用独立目录，可以重跑而不复用上轮目标文件。启动器分别检查每次原生进程的退出记录、race 日志以及 SSH / FTP 连接释放，并在该次运行的 `native-run-*/result.json` 写入结果；中途失败不能记为通过。
 

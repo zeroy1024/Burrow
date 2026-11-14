@@ -31,6 +31,8 @@ Production UI stays unchanged. The native overlay supplies isolated SQLite data,
 
 Coverage includes first SSH trust; output/exit status; timeout and HTTP-disconnect cancellation for new/old MCP versions; no PTY/terminal initial command; command/file policies and historical snapshots; all four file protocols, overwrite and directory transfers; task discovery after disconnecting before decoding an ID; native pause/resume, queued/running cancellation, cleanup after source directory loss; key disable/revoke, grant reduction, cross-key isolation; service stop/start; audit failure blocking new execution while preserving cancellation; and offline recovery, manual resume, and content verification after normal quit or forced crash.
 
+After the basic SSH cases it also switches to the SSH page and checks that the read-only AI session tab opened in the background lists the agent's commands, output, exit codes and timeouts, with the name of the key operating it.
+
 Each run writes `mcp-native-run-*/report.json` under the fixture directory. Failure retains phase logs and read-only node/model diagnostics. Build success, app startup, or partial scenario success does not establish complete integration. `--reuse-run` is only for investigating a known issue in an already isolated config; final full acceptance requires fresh data. `--scenario lifecycle` narrows lifecycle reproductions.
 
 `--scenario recovery` checks normal/forced-crash recovery separately. Its report names the selected scenario and does not establish others.

@@ -182,7 +182,7 @@ GOOS=windows GOARCH=amd64 mise exec -- go vet ./...
 
 ## 协议与原生 E2E
 
-[dev/ssh-integration](../dev/ssh-integration/) 和 [dev/ftp-integration](../dev/ftp-integration/) 提供 Docker 夹具，启动入口为 [scripts/ssh-integration-server.py](../scripts/ssh-integration-server.py)。它们使用本机随机端口和临时凭据，不应连接现有私有站点。
+[dev/ssh-integration](../dev/ssh-integration/)、[dev/ftp-integration](../dev/ftp-integration/) 和 [dev/gateway-integration](../dev/gateway-integration/) 提供 Docker 夹具，启动入口为 [scripts/ssh-integration-server.py](../scripts/ssh-integration-server.py)。它们使用本机随机端口和临时凭据，不应连接现有私有站点。
 
 配置夹具输出的 `BURROW_TEST_ADDRESS`、`BURROW_TEST_DIR` 和需要的 `BURROW_FTP_ADDRESS` 后，协议测试入口为：
 
@@ -190,7 +190,9 @@ GOOS=windows GOARCH=amd64 mise exec -- go vet ./...
 mise exec -- go test -race -tags=integration ./... -count=1 -timeout=180s
 ```
 
-原生驱动入口为 `python3 -B -u scripts/ssh-integration-ui.py`，提供 `--concurrent-split`、`--file-protocols` 和 `--core-e2e`。需要已解锁且可获得键盘焦点的 macOS 图形会话；与 SDK Docker 测试分开运行，避免连接计数互相干扰。
+推送前门禁的统一入口为 `mise run gate`（[scripts/gate.py](../scripts/gate.py)）：默认运行协议集成层，可追加 `native`、`mcp` 或 `all`。每层自行启动 SSH/FTP/FTPS 与连接网关夹具、导出环境变量，并在结束后移除本轮容器；集成用例被跳过时失败。`native` 与 `mcp` 层先构建应用包，再运行下述原生驱动的全部模式。何时必须运行见 [AGENTS.md](../AGENTS.md)。
+
+原生驱动入口为 `python3 -B -u scripts/ssh-integration-ui.py`，提供 `--concurrent-split`、`--file-protocols`、`--core-e2e` 和 `--coverage`。需要已解锁且可获得键盘焦点的 macOS 图形会话；与 SDK Docker 测试分开运行，避免连接计数互相干扰。
 
 参数、隔离目录、覆盖断言和夹具停止方式统一维护在[联调与原生 E2E](../dev/ssh-integration/README.zh.md)。
 

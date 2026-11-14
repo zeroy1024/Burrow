@@ -153,7 +153,7 @@ func dockerIntegrationSnapshot() {
         SSHGroups, FileGroups []dockerGroupInfo
         Prompts, Tabs, FileTabs, Section, ActiveSection, CatalogVersion, Transfers, ClosedTabs int
         DraggedFileSession, PaneDragKind, PaneDragPhase int
-        LocalOpen, ActiveRemote, DragActive, FileDragActive, PaneDragActive, SettingsOpen bool
+        LocalOpen, ActiveRemote, DragActive, FileDragActive, PaneDragActive, SettingsOpen, Busy bool
         FileDragPendingDirectory, FileDragPendingDisconnect, FileDragCancelRequested bool
         FileDragEntryPaths []string
         SettingsRecording, CatalogError, Locale, AppName string
@@ -167,6 +167,7 @@ func dockerIntegrationSnapshot() {
       SSHGroups:dockerIntegrationGroups(a, sectionSSH), FileGroups:dockerIntegrationGroups(a, sectionFiles)}
     if err := a.catalogConfig.loadErr; err != nil { out.CatalogError = err.Error() }
     out.CatalogVersion = 1 // Store.Open has validated the schema version.
+    out.Busy = a.interactionBlocked() || a.savingSession() || a.siteDeletion != nil
     for _, tab := range a.tabs {
         for _, s := range tab.root.sessions() {
             item := sessionInfo{ID:s.id, Host:int(s.host), State:int(s.state),
@@ -285,7 +286,8 @@ func dockerIntegrationMenu(items []*mygo.MenuItem) []*mygo.MenuItem {
             {Label:"Delete catalog fixture", Click:func(*mygo.MenuItem,*mygo.Window){
                 if a:=dockerIntegrationApp; a!=nil {
                     for _, group := range a.catalogGroups() { if len(group.hosts)>0 {
-                        a.page().draft = hostDraft{id:group.hosts[0], deleting:true, files:a.section==sectionFiles}
+                        h := a.hosts[group.hosts[0]]
+                        a.page().draft = hostDraft{id:group.hosts[0], name:h.name, deleting:true, deleteProfileID:h.session.ID, files:a.section==sectionFiles}
                         a.page().addHostOpen = true
                         break
                     } }
@@ -731,7 +733,13 @@ class Driver:
         node = self.wait("field " + label, lambda: self.node(label, "textField"))
         self.call("act", dict(id=node["id"], action="setValue", text=value))
 
+    def settled(self):
+        # Catalog writes finish asynchronously; the application drops shortcuts
+        # and rejects further catalog changes until they do.
+        self.wait("application accepts input", lambda: not self.snapshot()["Busy"])
+
     def page(self, label, section):
+        self.settled()
         self.key(("Cmd+Alt+1", "Cmd+Alt+2")[section])
         self.wait("selected page " + label, lambda: self.snapshot()["Section"] == section)
 
@@ -914,13 +922,26 @@ class Driver:
                 [dict(group, Hosts=[identities[index] for index in group["Hosts"] or []]) for group in groups])
 
     def add_catalog_record(self, name):
+        self.settled()
         self.menu("Create catalog record")
         host, port = os.environ["BURROW_TEST_ADDRESS"].rsplit(":", 1)
-        for label, value in (("名称", name), ("主机", host.strip("[]")), ("用户名", "burrow"), ("端口", port)):
-            self.fill(label, value)
+        fields = (("名称", name), ("主机", host.strip("[]")), ("用户名", "burrow"), ("端口", port))
+
+        def filled():
+            # The opening form can replace a value set while it initializes;
+            # an incomplete form is not saved and reports nothing.
+            complete = True
+            for label, value in fields:
+                node = self.node(label, "textField")
+                if node is None or node.get("value", "") != value:
+                    self.fill(label, value)
+                    complete = False
+            return complete
+        self.wait("catalog form values", filled)
         self.click("仅保存")
 
     def delete_catalog_fixture(self):
+        self.settled()
         self.menu("Delete catalog fixture")
         def button():
             return next((n for n in self.nodes() if n.get("role") == "button" and n.get("label") == "删除"), None)
@@ -936,18 +957,19 @@ class Driver:
         before_files = self.profiles(1)
         before_file_catalog = self.catalog_state(1)
         before_ssh = self.profiles(0)
+        original = next(p for p in before_ssh if p["Name"] == "Docker Password")
         self.add_catalog_record("Docker SSH Only")
         self.wait("saved SSH-only record", lambda: len(self.profiles(0)) == len(before_ssh) + 1)
         if self.catalog_state(1) != before_file_catalog:
             raise RuntimeError("adding an SSH host changed the file catalog")
+        self.settled()
         self.menu("Edit catalog fixture")
         self.fill("名称", "Docker SSH Renamed")
         self.fill("主机", "127.0.0.2")
         self.click("保存")
-        self.wait("saved SSH edit", lambda: next(p for p in self.profiles(0) if p["ID"] == 0)["Name"] == "Docker SSH Renamed")
+        self.wait("saved SSH edit", lambda: next(p for p in self.profiles(0) if p["UUID"] == original["UUID"])["Name"] == "Docker SSH Renamed")
         if self.catalog_state(1) != before_file_catalog:
             raise RuntimeError("editing an SSH host changed the file catalog")
-        original = next(p for p in before_ssh if p["ID"] == 0)
         if any(s["Name"] != original["Name"] or s["Address"] != original["Address"] for s in self.sessions()):
             raise RuntimeError("editing a catalog record changed an already connected session identity")
         self.delete_catalog_fixture()
@@ -963,6 +985,7 @@ class Driver:
         self.add_catalog_record("Docker File Only")
         self.wait("saved file-only record", lambda: len(self.profiles(1)) == len(before_files) + 1)
         file_uuid = before_files[0]["UUID"]
+        self.settled()
         self.menu("Edit catalog fixture")
         self.fill("名称", "Docker File Renamed")
         self.click("保存")
@@ -997,9 +1020,11 @@ class Driver:
     def focus_terminal(self, host="Docker Password", session_id=None):
         target = self.focused() if session_id is None else next(s for s in self.sessions() if s["ID"] == session_id)
         expected = host + " SSH 终端 #" + str(target["ID"]) if target else ""
-        candidates = [n for n in self.nodes() if n.get("label") == expected and "focus" in n.get("actions", [])]
-        if not candidates:
+        if not target:
             raise RuntimeError("terminal focus target missing")
+        # The terminal appears a frame after the session reports connected.
+        candidates = self.wait("terminal focus target", lambda: [
+            n for n in self.nodes() if n.get("label") == expected and "focus" in n.get("actions", [])])
         self.call("act", dict(id=candidates[-1]["id"], action="focus"))
         self.wait("terminal focus identity", lambda: (self.focused() or {}).get("ID") == target["ID"])
 
@@ -1262,6 +1287,8 @@ def main():
     modes.add_argument("--file-protocols", action="store_true", help="run only the SFTP/FTP native UI checks")
     modes.add_argument("--concurrent-split", action="store_true", help="run only simultaneous shared-shell requests")
     modes.add_argument("--core-e2e", action="store_true", help="run real UI transfers, drag lifecycle and restart recovery")
+    modes.add_argument("--coverage", action="store_true", help="run gateways, monitoring, file operations, settings and catalog management")
+    parser.add_argument("--scenario", action="append", help="with --coverage: run only the named scenario; repeatable")
     args = parser.parse_args()
     repo = Path(__file__).resolve().parents[1]
     task_dir = Path(os.environ["BURROW_TEST_DIR"]).resolve()
@@ -1290,21 +1317,32 @@ def main():
     shutil.copy2(binary, launch_binary)
     subprocess.run(["codesign", "--force", "--deep", "--sign", "-", str(bundle)],
                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
-    mode = "core-e2e" if args.core_e2e else "file-protocols" if args.file_protocols else "concurrent-split" if args.concurrent_split else "terminal"
+    mode = "coverage" if args.coverage else "core-e2e" if args.core_e2e else "file-protocols" if args.file_protocols else "concurrent-split" if args.concurrent_split else "terminal"
     report = dict(mode=mode, status="failed", phases=[], configuration=str(config_root), bundle=str(bundle))
     print("Native test bundle: " + str(bundle), flush=True)
     try:
         with isolated_agent(task_dir) as agent_socket:
             env["SSH_AUTH_SOCK"] = agent_socket
             recovery = None
-            for phase in range(1, 3 if args.core_e2e else 2):
-                with native_window(repo, bundle, env, config_root, run_dir, phase) as driver:
+            for phase in range(1, 3 if args.core_e2e or args.coverage else 2):
+                # The second coverage phase starts locked, before the catalog is shown.
+                # A locked application starts on the unlock form, before the catalog.
+                locked = bool(args.coverage and phase == 2 and recovery.get("locked"))
+                with native_window(repo, bundle, env, config_root, run_dir, phase,
+                                   ready_label="解锁密码" if locked else "Docker Password",
+                                   ready_role="textField" if locked else "listItem") as driver:
                     if args.core_e2e:
                         from ssh_e2e_scenarios import run_core, run_core_recovered
                         if phase == 1:
                             recovery = run_core(driver)
                         else:
                             run_core_recovered(driver, recovery)
+                    elif args.coverage:
+                        from ssh_e2e_coverage import run_coverage, run_coverage_restarted
+                        if phase == 1:
+                            recovery = run_coverage(driver, args.scenario)
+                        else:
+                            run_coverage_restarted(driver, recovery)
                     elif args.file_protocols:
                         driver.run_file_protocols()
                     elif args.concurrent_split:
@@ -1312,7 +1350,7 @@ def main():
                     else:
                         driver.run()
                 driver.wait("SSH transports released after application exit", lambda: driver.server_connections()[1] == 0, timeout=5)
-                if args.file_protocols or args.core_e2e:
+                if args.file_protocols or args.core_e2e or args.coverage:
                     ftp_fixture = json.loads((task_dir / "ftp-server.json").read_text())
                     driver.wait("FTP transport released after application exit",
                                 lambda: driver.established_connections(ftp_fixture["container"], 21) == 0, timeout=5)
