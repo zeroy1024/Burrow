@@ -2,7 +2,7 @@
   "name": "Burrow",
   "slug": "burrow",
   "identifier": "dev.burrow.app",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "icon": "assets/icon.png",
   "out": "build",
   "resources": [

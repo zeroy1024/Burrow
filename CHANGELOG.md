@@ -4,6 +4,8 @@ Every released version has a `## <version> - <date>` section, English first, the
 
 ## Unreleased
 
+## 0.1.10 - 2026-11-14
+
 - Add the GitHub repository address to **Settings → About**, with buttons to open it in the default browser and copy the address.
 - Show a confirmation after copying the project address or app version in **Settings → About**.
 - Refine interface animations with smoother spring motion for dialogs, sidebars, drawers, segmented tabs, and switches, plus smooth transitions when switching main sections, settings categories, dropdowns, menus, and server monitor meters.
