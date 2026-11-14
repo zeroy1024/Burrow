@@ -16,6 +16,7 @@ Every released version has a `## <version> - <date>` section, English first, the
 - Use the accent color for the selected icon in the gateway type and file site protocol pickers, and the same gray for all unselected icons.
 - Keep the sliding selection visible over hover and press highlights in segmented controls, the main navigation, and the settings sidebar.
 - Keep the selected item in the light theme's main navigation visible over the translucent window background on macOS.
+- Close connections made through a WireGuard gateway on the server as well when their tab closes or the app quits, instead of sometimes leaving the server's side open.
 
 **简体中文**
 
@@ -31,6 +32,7 @@ Every released version has a `## <version> - <date>` section, English first, the
 - 统一网关类型和文件站点协议选择器的图标配色，选中项使用强调色，未选中项使用同一种灰色。
 - 修复分段控件、主导航和设置侧栏切换时，悬停或按下底色遮挡滑动选中块的问题。
 - 修复 macOS 浅色主题下，主导航选中底色容易与半透明窗口背景融为一体的问题。
+- 经 WireGuard 网关建立的连接在关闭标签或退出应用时，服务器端也会同步关闭，不再偶尔残留。
 
 ## 0.1.9 - 2026-11-13
 

@@ -6,10 +6,12 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/netip"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/zeroy1024/Burrow/internal/locales"
@@ -18,12 +20,58 @@ import (
 	"golang.zx2c4.com/wireguard/tun/netstack"
 )
 
+// closeGrace bounds how long a closed stream waits for its peer to close.
+const closeGrace = 2 * time.Second
+
 type Tunnel struct {
 	device *device.Device
 	net    *netstack.Net
 	config Config
 	peer   *device.Peer
 	stop   func() bool
+
+	shut    sync.Once
+	mu      sync.Mutex
+	closing int // streams closed locally whose peer has not closed yet
+	settled *sync.Cond
+}
+
+// stream is a connection inside the tunnel. netstack sends its FIN after
+// Close returns; a device closed in between would drop it and leave the
+// remote side of the connection open.
+type stream struct {
+	net.Conn
+	tunnel *Tunnel
+	once   sync.Once
+	err    error
+}
+
+// Close ends the caller's use at once and lets the tunnel outlive the stream
+// until the peer has closed too, or closeGrace has passed.
+func (s *stream) Close() error {
+	s.once.Do(func() {
+		half, ok := s.Conn.(interface{ CloseWrite() error })
+		if !ok || half.CloseWrite() != nil {
+			s.err = s.Conn.Close()
+			return
+		}
+		t := s.tunnel
+		t.mu.Lock()
+		t.closing++
+		t.mu.Unlock()
+		// Wake readers blocked in the caller; only the drain reads from here on.
+		s.Conn.SetReadDeadline(time.Unix(1, 0))
+		go func() {
+			s.Conn.SetReadDeadline(time.Now().Add(closeGrace))
+			io.Copy(io.Discard, s.Conn)
+			s.Conn.Close()
+			t.mu.Lock()
+			t.closing--
+			t.settled.Broadcast()
+			t.mu.Unlock()
+		}()
+	})
+	return s.err
 }
 
 func Open(ctx context.Context, config Config, credential Credential) (*Tunnel, error) {
@@ -108,7 +156,8 @@ func Open(ctx context.Context, config Config, credential Credential) (*Tunnel, e
 	var publicKey device.NoisePublicKey
 	copy(publicKey[:], peer)
 	t := &Tunnel{device: wg, net: network, config: config, peer: wg.LookupPeer(publicKey)}
-	t.stop = context.AfterFunc(ctx, wg.Close)
+	t.settled = sync.NewCond(&t.mu)
+	t.stop = context.AfterFunc(ctx, t.shutdown)
 	return t, nil
 }
 
@@ -116,7 +165,24 @@ func (t *Tunnel) Done() <-chan struct{} { return t.device.Wait() }
 
 func (t *Tunnel) Close() {
 	t.stop()
-	t.device.Close()
+	t.shutdown()
+}
+
+// shutdown closes the device once streams closed before it have reached
+// their peers. Streams still open are cut off with the device.
+func (t *Tunnel) shutdown() {
+	t.shut.Do(func() {
+		t.mu.Lock()
+		for t.closing > 0 {
+			t.settled.Wait()
+		}
+		t.mu.Unlock()
+		// Device.Close closes the netstack TUN while packets are still being
+		// received; a late segment for a finished stream then makes the stack
+		// answer into the closed TUN, which panics. Stop receiving first.
+		t.device.Down()
+		t.device.Close()
+	})
 }
 
 func (t *Tunnel) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
@@ -149,7 +215,7 @@ func (t *Tunnel) DialContext(ctx context.Context, network, address string) (net.
 		connection, err := t.net.DialContext(attempt, network, net.JoinHostPort(ip.String(), port))
 		cancel()
 		if err == nil {
-			return connection, nil
+			return &stream{Conn: connection, tunnel: t}, nil
 		}
 		failures = append(failures, err)
 	}
