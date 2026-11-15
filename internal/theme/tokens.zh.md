@@ -9,8 +9,8 @@
 | 层 | 数量 | 说明 |
 |---|---|---|
 | palette（primitives） | 298 | 原始色值与刻度，其中 58 个为推导值（derived） |
-| semantic（每个主题一份） | 514 | Light = 当前设计；Dark 覆盖其中 120 个（全部 derived） |
-| component | 1126 | 只引用 semantic；换主题时自动跟随 |
+| semantic（每个主题一份） | 515 | Light = 当前设计；Dark 覆盖其中 120 个（全部 derived） |
+| component | 1127 | 只引用 semantic；换主题时自动跟随 |
 
 ## 1. 三层结构与引用规则
 
@@ -781,6 +781,7 @@ siderItem.nameColor             ← component，只能引用 semantic
 | `size.paneMinRemote` | 420px | ＝ |  |
 | `size.popover` | 384px | ＝ |  |
 | `size.trayPanel` | 300px | ＝ | **derived** 菜单栏面板宽度 |
+| `size.traySessionListMaxHeight` | 180px | ＝ | **derived** 菜单栏面板会话列表最大高度 |
 | `size.capsuleBarWidth` | 32px | ＝ |  |
 | `size.capsuleBarHeight` | 3px | ＝ |  |
 | `size.dockHeader` | 42px | ＝ |  |
@@ -2387,6 +2388,7 @@ siderItem.nameColor             ← component，只能引用 semantic
 | token | 引用 | Light 值 | 说明 |
 |---|---|---|---|
 | `trayPanel.width` | `{size.trayPanel}` | 300px | 菜单栏面板宽度 |
+| `trayPanel.sessionListMaxHeight` | `{size.traySessionListMaxHeight}` | 180px | 菜单栏面板会话列表最大高度 |
 
 ### latency
 | token | 引用 | Light 值 | 说明 |

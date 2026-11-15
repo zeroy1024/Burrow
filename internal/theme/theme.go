@@ -884,6 +884,7 @@ type Sizes struct {
 	PaneMinRemote            float32
 	Popover                  float32
 	TrayPanel                float32 // 菜单栏面板宽度 [derived]
+	TraySessionListMaxHeight float32 // 菜单栏面板会话列表最大高度 [derived]
 	CapsuleBarWidth          float32
 	CapsuleBarHeight         float32
 	DockHeader               float32
@@ -2558,7 +2559,8 @@ type PopoverTokens struct {
 
 // TrayPanelTokens groups tokens.
 type TrayPanelTokens struct {
-	Width float32 // ← size.trayPanel
+	Width                float32 // ← size.trayPanel
+	SessionListMaxHeight float32 // ← size.traySessionListMaxHeight
 }
 
 // LatencyTokens groups tokens.
@@ -3435,6 +3437,7 @@ func lightSemantic() Semantic {
 			PaneMinRemote:            Palette.Size.N420,
 			Popover:                  Palette.Size.N384,
 			TrayPanel:                Palette.Size.N300,
+			TraySessionListMaxHeight: Palette.Size.N180,
 			CapsuleBarWidth:          Palette.Size.N32,
 			CapsuleBarHeight:         Palette.Size.N3,
 			DockHeader:               Palette.Size.N42,
@@ -5037,7 +5040,8 @@ func buildComponents(s *Semantic) Components {
 			Shadow:  s.Shadow.Lift,
 		},
 		TrayPanel: TrayPanelTokens{
-			Width: s.Size.TrayPanel,
+			Width:                s.Size.TrayPanel,
+			SessionListMaxHeight: s.Size.TraySessionListMaxHeight,
 		},
 		Latency: LatencyTokens{
 			WarnMs: s.Size.LatencyWarn,

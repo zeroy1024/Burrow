@@ -9,8 +9,8 @@ Design sources: `ssh-v6.html`, `common.css`, `parts/split_style.css`, `focus.py`
 | Layer | Count | Purpose |
 |---|---|---|
 | palette (primitives) | 298 | Literal colors/scales, including 58 derived values |
-| semantic (per theme) | 514 | Light follows the design; Dark has 120 derived overrides |
-| component | 1126 | Semantic references only; follows the current theme |
+| semantic (per theme) | 515 | Light follows the design; Dark has 120 derived overrides |
+| component | 1127 | Semantic references only; follows the current theme |
 
 ## 1. Layers and reference rules
 
@@ -781,6 +781,7 @@ siderItem.nameColor             <- component, references semantics only
 | `size.paneMinRemote` | 420px | ＝ |  |
 | `size.popover` | 384px | ＝ |  |
 | `size.trayPanel` | 300px | ＝ | **derived** Menu bar panel width |
+| `size.traySessionListMaxHeight` | 180px | ＝ | **derived** Maximum height of each session list in the menu bar panel |
 | `size.capsuleBarWidth` | 32px | ＝ |  |
 | `size.capsuleBarHeight` | 3px | ＝ |  |
 | `size.dockHeader` | 42px | ＝ |  |
@@ -2387,6 +2388,7 @@ References and resolved Light values; Dark follows the corresponding semantic va
 | token | Reference | Light value | Description |
 |---|---|---|---|
 | `trayPanel.width` | `{size.trayPanel}` | 300px | Menu bar panel width |
+| `trayPanel.sessionListMaxHeight` | `{size.traySessionListMaxHeight}` | 180px | Maximum height of each session list in the menu bar panel |
 
 ### latency
 | token | Reference | Light value | Description |

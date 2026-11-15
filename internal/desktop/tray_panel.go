@@ -68,10 +68,7 @@ func (a *app) trayPanelView(c *ui.Context) {
 		Background(uikit.Color(p.Bg)).Label("Burrow").Children(func() {
 		a.trayPanelMCP(c)
 		a.trayPanelAgents(c)
-		if len(sessions) > 0 {
-			uikit.Divider(c)
-			a.trayPanelSessionList(c, sessions)
-		}
+		a.trayPanelSessionList(c, sessions)
 		a.trayPanelTransfers(c)
 		uikit.Divider(c)
 		a.trayPanelActions(c)
@@ -166,12 +163,7 @@ func (a *app) trayPanelAgents(c *ui.Context) {
 		return left.session.id - right.session.id
 	})
 	t := theme.Current()
-	uikit.Divider(c)
-	ui.Row(c).FillWidth().Padding(t.Space.N8, t.Space.N14, t.Space.N4, t.Space.N14).AlignItems(ui.Center).Children(func() {
-		uikit.Text(c, locales.TrayAgentSessions(), uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneSecondary}).Grow(1)
-		uikit.Count(c, len(views), uikit.CountProps{})
-	})
-	ui.Column(c).FillWidth().Padding(0, t.Space.N6, t.Space.N6, t.Space.N6).Children(func() {
+	trayPanelList(c.Key("tray-agent-sessions"), locales.TrayAgentSessions(), len(views)).Children(func() {
 		for _, view := range views {
 			session, h := view.session, view.session.endpoint
 			row := uikit.ListRow(c, uikit.ListRowProps{
@@ -234,12 +226,11 @@ func (a *app) trayPanelSessions() []trayPanelSession {
 }
 
 func (a *app) trayPanelSessionList(c *ui.Context, sessions []trayPanelSession) {
+	if len(sessions) == 0 {
+		return
+	}
 	t := theme.Current()
-	ui.Row(c).FillWidth().Padding(t.Space.N8, t.Space.N14, t.Space.N4, t.Space.N14).AlignItems(ui.Center).Children(func() {
-		uikit.Text(c, locales.TrayActiveSessions(), uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneSecondary}).Grow(1)
-		uikit.Count(c, len(sessions), uikit.CountProps{})
-	})
-	ui.Column(c).FillWidth().Padding(0, t.Space.N6, t.Space.N6, t.Space.N6).Children(func() {
+	trayPanelList(c.Key("tray-active-sessions"), locales.TrayActiveSessions(), len(sessions)).Children(func() {
 		for _, item := range sessions {
 			session, h := item.session, item.session.endpoint
 			row := uikit.ListRow(c, uikit.ListRowProps{
@@ -260,6 +251,33 @@ func (a *app) trayPanelSessionList(c *ui.Context, sessions []trayPanelSession) {
 			}
 		}
 	})
+}
+
+func trayPanelList(c *ui.Context, title string, count int) ui.Element {
+	t := theme.Current()
+	section := ui.Column(c).FillWidth()
+	var viewport ui.Element
+	var scroll *ui.ScrollState
+	section.Children(func() {
+		uikit.Divider(c)
+		header := ui.Row(c).FillWidth().Padding(t.Space.N8, t.Space.N14, t.Space.N4, t.Space.N14).AlignItems(ui.Center)
+		header.Children(func() {
+			uikit.Text(c, title, uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneSecondary}).Grow(1)
+			uikit.Count(c, count, uikit.CountProps{})
+		})
+		viewport = ui.Scroll(c).FillWidth().MinHeight(0).MaxHeight(t.C.TrayPanel.SessionListMaxHeight).
+			Padding(0, t.Space.N6).Margin(0, 0, t.Space.N6, 0)
+		scroll = ui.Local(viewport, "tray-session-scroll", func() ui.ScrollState { return ui.ScrollState{} })
+		viewport.TrackScroll(scroll)
+	})
+	uikit.Scrollbars(
+		c,
+		section,
+		viewport,
+		scroll,
+		uikit.ScrollbarProps{Label: title + locales.MessageScrollbar()},
+	)
+	return viewport
 }
 
 func (a *app) openSessionFromTray(tab *workspaceTab, session *remoteSession) {

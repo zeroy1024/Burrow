@@ -4,6 +4,12 @@ Every released version has a `## <version> - <date>` section, English first, the
 
 ## Unreleased
 
+- Keep MCP controls and quick actions visible in the tray panel by letting long AI and active session lists scroll independently.
+
+**简体中文**
+
+- 托盘面板中的 AI 会话和活动会话列表过长时可独立滚动，顶部 MCP 控制和底部快捷操作保持可见。
+
 ## 0.1.10 - 2026-11-14
 
 - Add the GitHub repository address to **Settings → About**, with buttons to open it in the default browser and copy the address.
