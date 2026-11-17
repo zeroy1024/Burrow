@@ -65,6 +65,7 @@ python3 -B -u scripts/ssh-integration-ui.py --concurrent-split
 python3 -B -u scripts/ssh-integration-ui.py --file-protocols
 python3 -B -u scripts/ssh-integration-ui.py --core-e2e
 python3 -B -u scripts/ssh-integration-ui.py --coverage
+python3 -B -u scripts/ssh-integration-ui.py --migration
 ```
 
 A Go overlay enables the pinned MyGo automation plugin and redirects configuration only in temporary builds. It does not change `HOME`, release builds, or existing Burrow settings. A copied SDK is referenced through a separate modfile without changing global module caches or project dependencies. Data, SQLite loading, local defaults, caches, and logs are isolated. A test credential provider stores migration sources in `0600` files. The overlay performs one-time migration with fixture passphrases, then uses real Vault ciphertext/version checks. These tests do not cover macOS Keychain integration.
@@ -99,6 +100,8 @@ Default mode also checks independent add/edit/delete in both catalogs, SQLite sc
 - `application_lock`: a mismatched confirmation does not enable it; once enabled a restart stays on the unlock form, rejects a wrong password, opens the workspace on the right one, and is removed with the current password.
 
 After a normal quit the same isolated configuration is restarted to check that saved gateways, routes and vault credentials still connect and that appearance and shortcut settings persist, then default shortcuts are restored. Before quitting, the application must have released every SSH connection itself, including those made through the WireGuard tunnel. This mode does not cover the system keychain, the tray, installing in-app updates, terminal scroll position and clipboard, or visual acceptance; the AI session view is covered by [MCP integration](../mcp-integration/README.md).
+
+`--migration` exports and imports an encrypted package from Settings using two isolated configurations. It checks both version warnings and verifies that a wrong password or cancelled replacement leaves the destination data available. After confirming replacement, it waits for the app to restart itself and verifies the prior data backup, app and updater settings, and an SSH connection using migrated credentials and host trust. The harness supplies fixture paths to the system file pickers. Go integration tests also cover both unlock modes, damaged packages, and rollback on startup failure.
 
 Core/file modes require `BURROW_FTP_ADDRESS`. Each core run uses independent directories in both containers. The launcher checks every native process's exit record, race log, and released SSH/FTP connections, writing `native-run-*/result.json`. Partial failure cannot be recorded as success.
 

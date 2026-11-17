@@ -65,6 +65,7 @@ python3 -B -u scripts/ssh-integration-ui.py --concurrent-split
 python3 -B -u scripts/ssh-integration-ui.py --file-protocols
 python3 -B -u scripts/ssh-integration-ui.py --core-e2e
 python3 -B -u scripts/ssh-integration-ui.py --coverage
+python3 -B -u scripts/ssh-integration-ui.py --migration
 ```
 
 脚本通过 Go overlay 启用固定 MyGo 版本的 automation 插件，只在临时构建中将应用配置路径指向独立目录；不修改 `HOME`、正式构建或现有 Burrow 配置。固定 SDK 复制到测试临时目录后通过独立 modfile 引用，不修改全局模块缓存或项目依赖。用户数据、SQLite 配置加载路径、本地默认目录、缓存和日志均隔离。测试专用凭据 provider 以 `0600` 文件保存迁移来源。隔离 overlay 使用夹具口令完成一次性迁移，之后通过真实 Vault、密文表和版本校验读取凭据；这些测试不覆盖 macOS 钥匙串集成。
@@ -99,6 +100,8 @@ python3 -B -u scripts/ssh-integration-ui.py --coverage
 - `application_lock`：确认密码不一致时不启用，启用后重启停留在解锁界面，错误密码被拒绝、正确密码进入工作区，并以当前密码关闭。
 
 应用正常退出后以同一隔离配置重启，再核对：已保存的网关、路由与 Vault 凭据仍可连接，外观与快捷键设置保持，随后恢复默认快捷键。退出前要求应用已自行释放全部 SSH 连接，包括经 WireGuard 隧道建立的连接。该模式不覆盖系统钥匙串、托盘、应用内更新安装、终端滚动位置与剪贴板和视觉验收；AI 会话视图由 [MCP 联调](../mcp-integration/README.zh.md)覆盖。
+
+`--migration` 使用两套隔离配置，从设置导出并导入加密迁移包。检查高低版本提示、错误密码和取消覆盖后目标数据仍可用。确认覆盖后等待应用自行重启，验证原目录副本、应用和更新设置，以及使用迁移后的密码和主机信任连接 SSH 夹具。系统文件选择器只注入临时文件路径，其余迁移操作由原生界面驱动。Go 集成测试另覆盖两种解锁模式、损坏包和启动失败回滚。
 
 核心模式和文件模式均需要 `BURROW_FTP_ADDRESS`。每轮核心模式在两个容器内使用独立目录，可以重跑而不复用上轮目标文件。启动器分别检查每次原生进程的退出记录、race 日志以及 SSH / FTP 连接释放，并在该次运行的 `native-run-*/result.json` 写入结果；中途失败不能记为通过。
 

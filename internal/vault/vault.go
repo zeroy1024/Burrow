@@ -183,6 +183,30 @@ func (m *Manager) Get(ctx context.Context, id string) ([]byte, error) {
 	return decrypt(m.snapshot.Header, m.key, item)
 }
 
+// VerifyItems authenticates every credential in an immutable import snapshot.
+func (m *Manager) VerifyItems(ctx context.Context) error {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	if len(m.key) != 32 {
+		return ErrLocked
+	}
+	snapshot, err := m.db.ReadVault(ctx)
+	if err != nil {
+		return err
+	}
+	for _, item := range snapshot.Items {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		secret, err := decrypt(snapshot.Header, m.key, item)
+		clear(secret)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (m *Manager) Prepare(items []PlainItem, deleted []string) (*store.VaultChanges, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()

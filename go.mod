@@ -5,12 +5,14 @@ go 1.27.3
 tool github.com/egoist/mygo/cmd/mygo
 
 require (
+	filippo.io/age v1.3.2
 	github.com/Microsoft/go-winio v0.6.4
 	github.com/egoist/mygo v0.7.3
 	github.com/egoist/mygo/burrow-terminal v0.0.0
 	github.com/modelcontextprotocol/go-sdk v1.8.0
 	github.com/pkg/sftp v1.13.12
 	golang.org/x/crypto v0.58.0
+	golang.org/x/mod v0.42.0
 	golang.org/x/net v0.60.0
 	golang.org/x/sys v0.49.0
 	golang.org/x/text v0.43.0
@@ -20,6 +22,7 @@ require (
 )
 
 require (
+	filippo.io/hpke v0.4.0 // indirect
 	github.com/dustin/go-humanize v1.1.0 // indirect
 	github.com/ebitengine/purego v0.11.1 // indirect
 	github.com/go-text/typesetting v0.3.5 // indirect

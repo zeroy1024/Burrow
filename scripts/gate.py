@@ -105,7 +105,7 @@ def native():
     require_macos("native")
     build_template()
     with fixtures(("ftp", "gateways")) as env:
-        for mode in ([], ["--concurrent-split"], ["--file-protocols"], ["--core-e2e"], ["--coverage"]):
+        for mode in ([], ["--concurrent-split"], ["--file-protocols"], ["--core-e2e"], ["--coverage"], ["--migration"]):
             subprocess.run([sys.executable, "-B", "-u", str(REPO / "scripts/ssh-integration-ui.py"), *mode],
                            cwd=REPO, env=env, check=True)
 

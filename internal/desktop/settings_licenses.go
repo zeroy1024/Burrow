@@ -39,6 +39,9 @@ var goTextLicense string
 //go:embed licenses/x-crypto.txt
 var cryptoLicense string
 
+//go:embed licenses/age.txt
+var ageLicense string
+
 //go:embed licenses/go-winio.txt
 var winioLicense string
 
@@ -85,7 +88,8 @@ func dependencyNotices() []struct{ name, license, text string } {
 		{locales.MessageMcpGoSdkAndRuntimeDependencies(), "Apache-2.0 / MIT / BSD-3-Clause", mcpLicense},
 		{"Lucide Icons " + uikit.LucideVersion, "ISC / MIT", uikit.LucideLicense},
 		{locales.MessageSimpleIconsOperatingSystemLogos(), "CC0-1.0", simpleIconsLicense},
-		{"golang.org/x/crypto/ssh", "BSD-3-Clause", cryptoLicense},
+		{"age", "BSD-3-Clause", ageLicense},
+		{"golang.org/x/crypto / x/mod / filippo.io/hpke", "BSD-3-Clause", cryptoLicense},
 		{"go-winio", "MIT", winioLicense},
 		{"PureGo", "Apache-2.0", puregoLicense},
 		{"go-text/typesetting", "Unlicense / BSD-3-Clause", goTextLicense},

@@ -86,9 +86,13 @@ Unknown hosts require fingerprint confirmation. No database transaction is held 
 
 ## Legacy formats and backups
 
+To move to another device, export an encrypted package from **Settings → General → Device migration**. It contains the data, credentials, and settings in SQLite, along with update preferences. Install the same Burrow version on the new device and enter the package password when importing. If the source required an app unlock password, enter it to verify the credentials. The imported app keeps the source unlock mode.
+
+Burrow checks the package version, database, and credentials before asking to replace the current data. It switches the data on restart and restores the original data if the switch is interrupted or the new database fails to open. After a successful import the previous data is kept under `migration-backup-*/previous/` inside the data directory. Managed private keys travel with the credentials. Move system SSH agent identities, local files, and transfer staging files separately. Check local paths, MCP directory grants, and the MCP listener address after moving. If the receiving operating system cannot read native absolute paths in saved transfer records, Burrow reports the error before replacing the data.
+
 The new model does not read, migrate, or dual-write old `sessions.json`, `prefs.json`, `files.json`, `terminal.json`, `transfers.json`, `catalog.json`, `themes/`, or `known_hosts`. Existing files remain untouched and require reconfiguration in the new version. There is no automatic legacy-format fallback.
 
-After migration to file automatic unlock, quit normally before copying the entire data directory, including `vault-keys/`. Password-mode backups require their app password. A not-yet-migrated Keychain-backed vault still needs its original Keychain key or a paired Vault backup. Do not copy a live `burrow.db` while ignoring WAL. Store’s `Backup` uses SQLite `VACUUM INTO` for a consistent standalone database; there is currently no backup UI.
+When manually backing up data with automatic unlock, quit normally before copying the entire data directory, including `vault-keys/`. Password-mode backups require their app password. A not-yet-migrated Keychain-backed vault still needs its original Keychain key or a paired Vault backup. Do not copy a live `burrow.db` while ignoring WAL. Store’s `Backup` uses SQLite `VACUUM INTO` for a consistent standalone database.
 
 Database backups include encrypted credentials and managed private keys. With startup unlock off, Vault's `Backup` creates an independent file unlock key and rewraps backup metadata while preserving credential versions and generations. The backup can be restored without the original Mac's Keychain. Password-mode backups require the password used when the backup was created. An unlocked session creates backups from its in-memory data key without rereading the original Keychain item. Store's `Backup` alone creates only the database.
 

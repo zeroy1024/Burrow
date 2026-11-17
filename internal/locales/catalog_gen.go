@@ -34,6 +34,330 @@ type Messages struct{ locale string }
 // source language.
 func In(locale string) Messages { return Messages{locale} }
 
+// MigrationTitle says "设备迁移"
+// in the language the app shows.
+func MigrationTitle() string { return In(i18n.Locale()).MigrationTitle() }
+
+// MigrationTitle says "设备迁移"
+// in the language of msgs.
+func (msgs Messages) MigrationTitle() string {
+	return Catalog.Format(msgs.locale, "migrationTitle", nil)
+}
+
+// MigrationExport says "导出迁移包…"
+// in the language the app shows.
+func MigrationExport() string { return In(i18n.Locale()).MigrationExport() }
+
+// MigrationExport says "导出迁移包…"
+// in the language of msgs.
+func (msgs Messages) MigrationExport() string {
+	return Catalog.Format(msgs.locale, "migrationExport", nil)
+}
+
+// MigrationImport says "导入迁移包…"
+// in the language the app shows.
+func MigrationImport() string { return In(i18n.Locale()).MigrationImport() }
+
+// MigrationImport says "导入迁移包…"
+// in the language of msgs.
+func (msgs Messages) MigrationImport() string {
+	return Catalog.Format(msgs.locale, "migrationImport", nil)
+}
+
+// MigrationExportDescription says "加密导出已保存的数据、凭据与设置。"
+// in the language the app shows.
+func MigrationExportDescription() string { return In(i18n.Locale()).MigrationExportDescription() }
+
+// MigrationExportDescription says "加密导出已保存的数据、凭据与设置。"
+// in the language of msgs.
+func (msgs Messages) MigrationExportDescription() string {
+	return Catalog.Format(msgs.locale, "migrationExportDescription", nil)
+}
+
+// MigrationImportDescription says "从相同版本的 Burrow 恢复数据。"
+// in the language the app shows.
+func MigrationImportDescription() string { return In(i18n.Locale()).MigrationImportDescription() }
+
+// MigrationImportDescription says "从相同版本的 Burrow 恢复数据。"
+// in the language of msgs.
+func (msgs Messages) MigrationImportDescription() string {
+	return Catalog.Format(msgs.locale, "migrationImportDescription", nil)
+}
+
+// MigrationFileType says "Burrow 迁移包"
+// in the language the app shows.
+func MigrationFileType() string { return In(i18n.Locale()).MigrationFileType() }
+
+// MigrationFileType says "Burrow 迁移包"
+// in the language of msgs.
+func (msgs Messages) MigrationFileType() string {
+	return Catalog.Format(msgs.locale, "migrationFileType", nil)
+}
+
+// MigrationContinue says "继续"
+// in the language the app shows.
+func MigrationContinue() string { return In(i18n.Locale()).MigrationContinue() }
+
+// MigrationContinue says "继续"
+// in the language of msgs.
+func (msgs Messages) MigrationContinue() string {
+	return Catalog.Format(msgs.locale, "migrationContinue", nil)
+}
+
+// MigrationPasswordAdvice says "请设置并保管迁移包密码。新设备导入时需要此密码。"
+// in the language the app shows.
+func MigrationPasswordAdvice() string { return In(i18n.Locale()).MigrationPasswordAdvice() }
+
+// MigrationPasswordAdvice says "请设置并保管迁移包密码。新设备导入时需要此密码。"
+// in the language of msgs.
+func (msgs Messages) MigrationPasswordAdvice() string {
+	return Catalog.Format(msgs.locale, "migrationPasswordAdvice", nil)
+}
+
+// MigrationPackagePassword says "迁移包密码"
+// in the language the app shows.
+func MigrationPackagePassword() string { return In(i18n.Locale()).MigrationPackagePassword() }
+
+// MigrationPackagePassword says "迁移包密码"
+// in the language of msgs.
+func (msgs Messages) MigrationPackagePassword() string {
+	return Catalog.Format(msgs.locale, "migrationPackagePassword", nil)
+}
+
+// MigrationPasswordLength says "迁移包密码须为 12 至 128 个字符。"
+// in the language the app shows.
+func MigrationPasswordLength() string { return In(i18n.Locale()).MigrationPasswordLength() }
+
+// MigrationPasswordLength says "迁移包密码须为 12 至 128 个字符。"
+// in the language of msgs.
+func (msgs Messages) MigrationPasswordLength() string {
+	return Catalog.Format(msgs.locale, "migrationPasswordLength", nil)
+}
+
+// MigrationPasswordsDiffer says "两次输入的迁移包密码不一致。"
+// in the language the app shows.
+func MigrationPasswordsDiffer() string { return In(i18n.Locale()).MigrationPasswordsDiffer() }
+
+// MigrationPasswordsDiffer says "两次输入的迁移包密码不一致。"
+// in the language of msgs.
+func (msgs Messages) MigrationPasswordsDiffer() string {
+	return Catalog.Format(msgs.locale, "migrationPasswordsDiffer", nil)
+}
+
+// MigrationPasswordRequired says "请输入密码。"
+// in the language the app shows.
+func MigrationPasswordRequired() string { return In(i18n.Locale()).MigrationPasswordRequired() }
+
+// MigrationPasswordRequired says "请输入密码。"
+// in the language of msgs.
+func (msgs Messages) MigrationPasswordRequired() string {
+	return Catalog.Format(msgs.locale, "migrationPasswordRequired", nil)
+}
+
+// MigrationSourceUnlockPassword says "来源设备的应用解锁密码"
+// in the language the app shows.
+func MigrationSourceUnlockPassword() string { return In(i18n.Locale()).MigrationSourceUnlockPassword() }
+
+// MigrationSourceUnlockPassword says "来源设备的应用解锁密码"
+// in the language of msgs.
+func (msgs Messages) MigrationSourceUnlockPassword() string {
+	return Catalog.Format(msgs.locale, "migrationSourceUnlockPassword", nil)
+}
+
+// MigrationSourceUnlockDescription says "此迁移包保留了原有的应用解锁方式。请输入来源设备的应用解锁密码以验证凭据。"
+// in the language the app shows.
+func MigrationSourceUnlockDescription() string {
+	return In(i18n.Locale()).MigrationSourceUnlockDescription()
+}
+
+// MigrationSourceUnlockDescription says "此迁移包保留了原有的应用解锁方式。请输入来源设备的应用解锁密码以验证凭据。"
+// in the language of msgs.
+func (msgs Messages) MigrationSourceUnlockDescription() string {
+	return Catalog.Format(msgs.locale, "migrationSourceUnlockDescription", nil)
+}
+
+// MigrationReplaceTitle says "替换当前设备的数据？"
+// in the language the app shows.
+func MigrationReplaceTitle() string { return In(i18n.Locale()).MigrationReplaceTitle() }
+
+// MigrationReplaceTitle says "替换当前设备的数据？"
+// in the language of msgs.
+func (msgs Messages) MigrationReplaceTitle() string {
+	return Catalog.Format(msgs.locale, "migrationReplaceTitle", nil)
+}
+
+// MigrationReplaceDescription says "Burrow …"
+// in the language the app shows.
+func MigrationReplaceDescription() string { return In(i18n.Locale()).MigrationReplaceDescription() }
+
+// MigrationReplaceDescription says "Burrow …"
+// in the language of msgs.
+func (msgs Messages) MigrationReplaceDescription() string {
+	return Catalog.Format(msgs.locale, "migrationReplaceDescription", nil)
+}
+
+// MigrationReplaceAction says "替换并重启"
+// in the language the app shows.
+func MigrationReplaceAction() string { return In(i18n.Locale()).MigrationReplaceAction() }
+
+// MigrationReplaceAction says "替换并重启"
+// in the language of msgs.
+func (msgs Messages) MigrationReplaceAction() string {
+	return Catalog.Format(msgs.locale, "migrationReplaceAction", nil)
+}
+
+// MigrationUpgradeRequired says "当前版本为 %s。请升级到导出时使用的 Burrow %s，再导入此迁移包。"
+// in the language the app shows.
+func MigrationUpgradeRequired() string { return In(i18n.Locale()).MigrationUpgradeRequired() }
+
+// MigrationUpgradeRequired says "当前版本为 %s。请升级到导出时使用的 Burrow %s，再导入此迁移包。"
+// in the language of msgs.
+func (msgs Messages) MigrationUpgradeRequired() string {
+	return Catalog.Format(msgs.locale, "migrationUpgradeRequired", nil)
+}
+
+// MigrationVersionUnsupported says "当前 Burrow %s 不支持导入由 %s 导出的迁移包。"
+// in the language the app shows.
+func MigrationVersionUnsupported() string { return In(i18n.Locale()).MigrationVersionUnsupported() }
+
+// MigrationVersionUnsupported says "当前 Burrow %s 不支持导入由 %s 导出的迁移包。"
+// in the language of msgs.
+func (msgs Messages) MigrationVersionUnsupported() string {
+	return Catalog.Format(msgs.locale, "migrationVersionUnsupported", nil)
+}
+
+// MigrationVersionUnknown says "设备迁移需要带应用版本号的 Burrow 构建。"
+// in the language the app shows.
+func MigrationVersionUnknown() string { return In(i18n.Locale()).MigrationVersionUnknown() }
+
+// MigrationVersionUnknown says "设备迁移需要带应用版本号的 Burrow 构建。"
+// in the language of msgs.
+func (msgs Messages) MigrationVersionUnknown() string {
+	return Catalog.Format(msgs.locale, "migrationVersionUnknown", nil)
+}
+
+// MigrationPackageInvalid says "迁移包损坏或格式不受支持。"
+// in the language the app shows.
+func MigrationPackageInvalid() string { return In(i18n.Locale()).MigrationPackageInvalid() }
+
+// MigrationPackageInvalid says "迁移包损坏或格式不受支持。"
+// in the language of msgs.
+func (msgs Messages) MigrationPackageInvalid() string {
+	return Catalog.Format(msgs.locale, "migrationPackageInvalid", nil)
+}
+
+// MigrationDecryptFailed says "无法解密迁移包。请检查迁移包密码及文件是否完整。"
+// in the language the app shows.
+func MigrationDecryptFailed() string { return In(i18n.Locale()).MigrationDecryptFailed() }
+
+// MigrationDecryptFailed says "无法解密迁移包。请检查迁移包密码及文件是否完整。"
+// in the language of msgs.
+func (msgs Messages) MigrationDecryptFailed() string {
+	return Catalog.Format(msgs.locale, "migrationDecryptFailed", nil)
+}
+
+// MigrationSourceUnlockFailed says "来源设备的应用解锁密码不正确。"
+// in the language the app shows.
+func MigrationSourceUnlockFailed() string { return In(i18n.Locale()).MigrationSourceUnlockFailed() }
+
+// MigrationSourceUnlockFailed says "来源设备的应用解锁密码不正确。"
+// in the language of msgs.
+func (msgs Messages) MigrationSourceUnlockFailed() string {
+	return Catalog.Format(msgs.locale, "migrationSourceUnlockFailed", nil)
+}
+
+// MigrationExported says "迁移包已导出"
+// in the language the app shows.
+func MigrationExported() string { return In(i18n.Locale()).MigrationExported() }
+
+// MigrationExported says "迁移包已导出"
+// in the language of msgs.
+func (msgs Messages) MigrationExported() string {
+	return Catalog.Format(msgs.locale, "migrationExported", nil)
+}
+
+// MigrationImported says "迁移数据已导入"
+// in the language the app shows.
+func MigrationImported() string { return In(i18n.Locale()).MigrationImported() }
+
+// MigrationImported says "迁移数据已导入"
+// in the language of msgs.
+func (msgs Messages) MigrationImported() string {
+	return Catalog.Format(msgs.locale, "migrationImported", nil)
+}
+
+// MigrationBackupLocation says "原数据副本位于 %s"
+// in the language the app shows.
+func MigrationBackupLocation() string { return In(i18n.Locale()).MigrationBackupLocation() }
+
+// MigrationBackupLocation says "原数据副本位于 %s"
+// in the language of msgs.
+func (msgs Messages) MigrationBackupLocation() string {
+	return Catalog.Format(msgs.locale, "migrationBackupLocation", nil)
+}
+
+// MigrationBackupSyncFailed says "原数据副本位于 %s，但无法确认目录已同步：%v"
+// in the language the app shows.
+func MigrationBackupSyncFailed() string { return In(i18n.Locale()).MigrationBackupSyncFailed() }
+
+// MigrationBackupSyncFailed says "原数据副本位于 %s，但无法确认目录已同步：%v"
+// in the language of msgs.
+func (msgs Messages) MigrationBackupSyncFailed() string {
+	return Catalog.Format(msgs.locale, "migrationBackupSyncFailed", nil)
+}
+
+// MigrationRolledBack says "迁移未完成，保留了此设备的数据"
+// in the language the app shows.
+func MigrationRolledBack() string { return In(i18n.Locale()).MigrationRolledBack() }
+
+// MigrationRolledBack says "迁移未完成，保留了此设备的数据"
+// in the language of msgs.
+func (msgs Messages) MigrationRolledBack() string {
+	return Catalog.Format(msgs.locale, "migrationRolledBack", nil)
+}
+
+// MigrationCleanupFailed says "无法清理迁移暂存数据"
+// in the language the app shows.
+func MigrationCleanupFailed() string { return In(i18n.Locale()).MigrationCleanupFailed() }
+
+// MigrationCleanupFailed says "无法清理迁移暂存数据"
+// in the language of msgs.
+func (msgs Messages) MigrationCleanupFailed() string {
+	return Catalog.Format(msgs.locale, "migrationCleanupFailed", nil)
+}
+
+// MigrationTransferHistoryInvalid says "此设备无法读取迁移包中的传输记录：%w"
+// in the language the app shows.
+func MigrationTransferHistoryInvalid() string {
+	return In(i18n.Locale()).MigrationTransferHistoryInvalid()
+}
+
+// MigrationTransferHistoryInvalid says "此设备无法读取迁移包中的传输记录：%w"
+// in the language of msgs.
+func (msgs Messages) MigrationTransferHistoryInvalid() string {
+	return Catalog.Format(msgs.locale, "migrationTransferHistoryInvalid", nil)
+}
+
+// MigrationScheduleFailed says "无法准备迁移重启"
+// in the language the app shows.
+func MigrationScheduleFailed() string { return In(i18n.Locale()).MigrationScheduleFailed() }
+
+// MigrationScheduleFailed says "无法准备迁移重启"
+// in the language of msgs.
+func (msgs Messages) MigrationScheduleFailed() string {
+	return Catalog.Format(msgs.locale, "migrationScheduleFailed", nil)
+}
+
+// MigrationChooseNewName says "请为迁移包选择一个新文件名。"
+// in the language the app shows.
+func MigrationChooseNewName() string { return In(i18n.Locale()).MigrationChooseNewName() }
+
+// MigrationChooseNewName says "请为迁移包选择一个新文件名。"
+// in the language of msgs.
+func (msgs Messages) MigrationChooseNewName() string {
+	return Catalog.Format(msgs.locale, "migrationChooseNewName", nil)
+}
+
 // TcpKeepalive says "TCP 保活"
 // in the language the app shows.
 func TcpKeepalive() string { return In(i18n.Locale()).TcpKeepalive() }

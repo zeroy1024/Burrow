@@ -263,19 +263,23 @@ func snapshotTransferNode(node *transferNode) *storedTransferNode {
 	return stored
 }
 
-func (a *app) restoreTransfers() (err error) {
-	q := &a.transfers
-	defer func() { q.storeErr = err }()
+func (a *app) readSavedTransfers() (*storedTransferQueue, error) {
 	data, err := a.store.ReadTransfers(a.ctx)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	decoded, err := decodeTransfers(data)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	saved := *decoded
-	if err := validateTransferQueue(&saved); err != nil {
+	return decoded, validateTransferQueue(decoded)
+}
+
+func (a *app) restoreTransfers() (err error) {
+	q := &a.transfers
+	defer func() { q.storeErr = err }()
+	saved, err := a.readSavedTransfers()
+	if err != nil {
 		return err
 	}
 	groups := map[int]*sshConnectionGroup{}

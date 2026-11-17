@@ -4,10 +4,12 @@ Every released version has a `## <version> - <date>` section, English first, the
 
 ## Unreleased
 
+- Export an encrypted migration package and import it on another device running the same Burrow version to restore saved data, credentials, and settings.
 - Keep MCP controls and quick actions visible in the tray panel by letting long AI and active session lists scroll independently.
 
 **简体中文**
 
+- 支持导出加密迁移包，并在运行相同 Burrow 版本的新设备上恢复已保存的数据、凭据和设置。
 - 托盘面板中的 AI 会话和活动会话列表过长时可独立滚动，顶部 MCP 控制和底部快捷操作保持可见。
 
 ## 0.1.10 - 2026-11-14

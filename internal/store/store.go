@@ -35,7 +35,17 @@ type Store struct {
 	lock *os.File
 }
 
+const (
+	applicationID = 0x42525731 // BRW1
+	schemaVersion = 5
+)
+
 func Open(ctx context.Context, name string) (*Store, error) {
+	return OpenPrepared(ctx, name, nil)
+}
+
+// OpenPrepared runs prepare with the database lock held, before opening SQLite.
+func OpenPrepared(ctx context.Context, name string, prepare func() error) (*Store, error) {
 	if err := localfs.MkdirAll(filepath.Dir(name), 0700); err != nil {
 		return nil, err
 	}
@@ -56,6 +66,11 @@ func Open(ctx context.Context, name string) (*Store, error) {
 			lock.Close()
 		}
 	}()
+	if prepare != nil {
+		if err := prepare(); err != nil {
+			return nil, err
+		}
+	}
 	file, err := localfs.OpenFile(name, os.O_CREATE|os.O_RDWR, 0600)
 	if err != nil {
 		return nil, err
@@ -64,11 +79,7 @@ func Open(ctx context.Context, name string) (*Store, error) {
 		return nil, err
 	}
 	// URI escaping prevents a filename containing ? or # from becoming options.
-	path := filepath.ToSlash(name)
-	if !strings.HasPrefix(path, "/") {
-		path = "/" + path
-	}
-	dsn := (&url.URL{Scheme: "file", Path: path}).String() +
+	dsn := sqliteURI(name) +
 		"?_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)&_pragma=synchronous(FULL)&_pragma=busy_timeout(5000)"
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
@@ -86,13 +97,13 @@ func Open(ctx context.Context, name string) (*Store, error) {
 	if err := db.QueryRowContext(ctx, "PRAGMA application_id").Scan(&originalApplication); err != nil {
 		return nil, errors.Join(err, db.Close())
 	}
-	if originalVersion >= 1 && originalVersion <= 3 && originalApplication == 0x42525731 {
+	if originalVersion >= 1 && originalVersion <= 3 && originalApplication == applicationID {
 		backup := name + ".before-vault-" + time.Now().UTC().Format("20060102T150405.000000000") + ".bak"
 		if err := s.Backup(ctx, backup); err != nil {
 			return nil, errors.Join(fmt.Errorf("backup before vault upgrade: %w", err), db.Close())
 		}
 	}
-	if originalVersion == 4 && originalApplication == 0x42525731 {
+	if originalVersion == 4 && originalApplication == applicationID {
 		backup := name + ".before-gateways-" + time.Now().UTC().Format("20060102T150405.000000000") + ".bak"
 		if err := s.Backup(ctx, backup); err != nil {
 			return nil, errors.Join(fmt.Errorf("backup before gateway upgrade: %w", err), db.Close())
@@ -103,6 +114,14 @@ func Open(ctx context.Context, name string) (*Store, error) {
 	}
 	opened = true
 	return s, nil
+}
+
+func sqliteURI(name string) string {
+	path := filepath.ToSlash(name)
+	if !strings.HasPrefix(path, "/") {
+		path = "/" + path
+	}
+	return (&url.URL{Scheme: "file", Path: path}).String()
 }
 
 func (s *Store) initialize(ctx context.Context) error {
@@ -118,7 +137,6 @@ func (s *Store) initialize(ctx context.Context) error {
 	if err := tx.QueryRowContext(ctx, "PRAGMA application_id").Scan(&application); err != nil {
 		return err
 	}
-	const applicationID = 0x42525731 // BRW1
 	fresh := version == 0 && application == 0
 	if version == 0 && application == 0 {
 		var tables int
@@ -132,7 +150,7 @@ func (s *Store) initialize(ctx context.Context) error {
 			return fmt.Errorf("create database schema: %w", err)
 		}
 		version = 1
-	} else if (version < 1 || version > 5) || application != applicationID {
+	} else if (version < 1 || version > schemaVersion) || application != applicationID {
 		return fmt.Errorf("unsupported Burrow database schema %d (application %x)", version, application)
 	}
 	if version == 1 {
@@ -168,7 +186,13 @@ func (s *Store) initialize(ctx context.Context) error {
 	return tx.Commit()
 }
 
-func (s *Store) Close() error { return errors.Join(s.db.Close(), s.lock.Close()) }
+func (s *Store) Close() error {
+	err := s.db.Close()
+	if s.lock != nil {
+		err = errors.Join(err, s.lock.Close())
+	}
+	return err
+}
 
 // Backup creates a consistent standalone database, including committed WAL
 // contents. SQLite refuses to overwrite a nonempty destination.

@@ -383,7 +383,7 @@ func (a *app) openSettingsFromMenu() {
 func (a *app) windowDialogOpen() bool {
 	return a.page().addHostOpen || a.page().groupDialogOpen || a.files.dialog != nil ||
 		a.files.conflict != nil || a.credentials.draft != nil || a.closeRequest != nil ||
-		a.closeFileRequest != nil || a.closePaneRequest != nil
+		a.closeFileRequest != nil || a.closePaneRequest != nil || a.migrationDraft != nil
 }
 
 func (a *app) requestCloseTab(index int) {

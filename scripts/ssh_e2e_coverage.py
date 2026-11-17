@@ -37,7 +37,7 @@ def _section(driver, label):
                 lambda: any("checked" in node.get("states", []) for node in _nodes(driver, label, ("tab",))))
 
 
-def _add_ssh_host(driver, name, address, port, gateway=None, password=None):
+def _add_ssh_host(driver, name, address, port, gateway=None, password=None, group=None):
     _section(driver, "SSH")
     before = len(driver.profiles(0))
     _press(driver, "添加", ("menuButton",))
@@ -49,6 +49,8 @@ def _add_ssh_host(driver, name, address, port, gateway=None, password=None):
         _fill(driver, "密码", password)
     if gateway:
         _choose(driver, "连接网关", gateway)
+    if group:
+        _fill(driver, "分组", group)
     _press(driver, "仅保存")
     driver.wait("saved SSH host " + name, lambda: len(driver.profiles(0)) == before + 1
                 and not _nodes(driver, "新建 SSH 会话", ("dialog",)))
@@ -516,7 +518,8 @@ def key_management(driver):
 def _preferences(driver):
     path = driver.config_root / "Burrow/burrow.db"
     with sqlite3.connect("file:" + str(path) + "?mode=ro", uri=True) as db:
-        return json.loads(db.execute("SELECT value FROM settings WHERE key='preferences'").fetchone()[0])
+        row = db.execute("SELECT value FROM settings WHERE key='preferences'").fetchone()
+        return json.loads(row[0]) if row else {}
 
 
 def _checked(driver, label, role):

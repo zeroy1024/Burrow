@@ -81,6 +81,29 @@ func dockerIntegrationConfigDir() (string, error) {
     return path, nil
 }
 
+// Native file pickers are outside MyGo's automation tree. Only the selected
+// path is injected; the migration form, encryption, and restore are unchanged.
+func dockerIntegrationMigrationPath() (string, error) {
+    root, err := dockerIntegrationConfigDir()
+    if err != nil { return "", err }
+    path, err := os.ReadFile(filepath.Join(root, "migration-selection"))
+    if err != nil { return "", err }
+    relative, err := filepath.Rel(os.Getenv("BURROW_TEST_DIR"), string(path))
+    if err != nil || !filepath.IsAbs(string(path)) || !filepath.IsLocal(relative) {
+        return "", errors.New("migration picker must use a fixture path")
+    }
+    return string(path), nil
+}
+
+func dockerIntegrationMigrationSave(mygo.SaveDialogOptions) (string, error) {
+    return dockerIntegrationMigrationPath()
+}
+
+func dockerIntegrationMigrationOpen(mygo.OpenDialogOptions) ([]string, error) {
+    path, err := dockerIntegrationMigrationPath()
+    return []string{path}, err
+}
+
 type dockerBounds struct {
     X float32 `json:"x"`
     Y float32 `json:"y"`
@@ -316,7 +339,7 @@ def ensure_unlocked():
         raise RuntimeError("Mac is locked; unlock the Mac before running native UI integration")
 
 
-def prepare(repo, task_dir, address):
+def prepare(repo, task_dir, address, migration=False):
     host, port = address.rsplit(":", 1)
     if host not in ("127.0.0.1", "localhost", "[::1]"):
         raise RuntimeError("the UI fixture must use a loopback address")
@@ -386,6 +409,12 @@ def prepare(repo, task_dir, address):
         "func (a *app) view(c *ui.Context) {",
         "func (a *app) view(c *ui.Context) {\n dockerIntegrationApp = a\n dockerIntegrationContext = c"))
     mapping[str(original)] = str(replacement)
+    if migration:
+        original = repo / "internal/desktop/migration.go"
+        replacement = overlay_dir / "migration.go"
+        content = replace_once(original.read_text(), "mygo.Dialog.Open(", "dockerIntegrationMigrationOpen(")
+        replacement.write_text(replace_once(content, "mygo.Dialog.Save(", "dockerIntegrationMigrationSave("))
+        mapping[str(original)] = str(replacement)
     original = repo / "internal/desktop/data_paths.go"
     replacement = overlay_dir / "data_paths.go"
     replacement.write_text('''package desktop
@@ -452,6 +481,18 @@ func legacyCredentialStore() mygo.SecretsModule {return mygo.Secrets.Service("de
     modfile += "\nreplace github.com/egoist/mygo => " + json.dumps(str(mygo_dir)) + "\n"
     (overlay_dir / "integration.mod").write_text(modfile)
     shutil.copyfile(repo / "go.sum", overlay_dir / "integration.sum")
+    if migration:
+        # Launch Services does not have the isolated paths from the first
+        # `open --env` invocation. Forward only this run's fixture variables.
+        original = mygo_dir / "updater.go"
+        replacement = overlay_dir / "mygo-migration-relaunch.go"
+        replacement.write_text(replace_once(original.read_text(), 'args := []string{"-n", bundle}', '''log := os.Getenv("BURROW_INTEGRATION_RELAUNCH_LOG")
+    args := []string{"-n", "--stdout", log, "--stderr", log}
+    for _, key := range []string{"BURROW_INTEGRATION_CONFIG", "BURROW_TEST_DIR", "MYGO_AUTOMATION", "SSH_AUTH_SOCK"} {
+        args = append(args, "--env", key+"="+os.Getenv(key))
+    }
+    args = append(args, bundle)'''))
+        mapping[str(original)] = str(replacement)
     # The fixed automation plugin formats keys on its socket goroutine. Pointer
     # keys must expose identity, not race with layout or reveal pane contents.
     original = mygo_dir / "plugins/automation/protocol.go"
@@ -1208,21 +1249,31 @@ class Driver:
 
 
 @contextmanager
-def native_window(repo, bundle, env, config_root, run_dir, phase, ready_label="Docker Password", ready_role="listItem", expect_crash=False):
+def native_window(repo, bundle, env, config_root, run_dir, phase, ready_label="Docker Password", ready_role="listItem",
+                  expect_crash=False, relaunched_from=None):
     log_path = run_dir / ("native-app-" + str(phase) + ".log")
     status_path = config_root / "app-exit-status"
+    pid_path = config_root / "app.pid"
     status_path.write_text("pending")
     launch = ["/usr/bin/open", "-n", "-W", "-a", str(bundle), "--stdout", str(log_path), "--stderr", str(log_path)]
-    for key in ("BURROW_INTEGRATION_CONFIG", "MYGO_AUTOMATION", "BURROW_TEST_DIR", "SSH_AUTH_SOCK"):
-        launch += ["--env", key + "=" + env[key]]
-    with log_path.open("w") as log:
-        app = subprocess.Popen(launch, cwd=repo, env=env, stdout=log, stderr=log)
+    for key in ("BURROW_INTEGRATION_CONFIG", "MYGO_AUTOMATION", "BURROW_TEST_DIR", "SSH_AUTH_SOCK",
+                "BURROW_INTEGRATION_RELAUNCH_LOG"):
+        if key in env:
+            launch += ["--env", key + "=" + env[key]]
+    # For an app-initiated restart, attach to the new PID instead of launching
+    # a second instance from the test. The child owns the existing log.
+    with log_path.open("a" if relaunched_from is not None else "w") as log:
+        app = None if relaunched_from is not None else subprocess.Popen(
+            launch, cwd=repo, env=env, stdout=log, stderr=log)
         try:
             end = time.monotonic() + 30
             connection = None
             while time.monotonic() < end:
-                if app.poll() is not None:
+                if app is not None and app.poll() is not None:
                     raise RuntimeError("native integration application exited before connecting; log: " + str(log_path))
+                if app is None and integration_pid(pid_path) in (None, relaunched_from):
+                    time.sleep(0.05)
+                    continue
                 try:
                     connection = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
                     connection.settimeout(20)
@@ -1257,27 +1308,49 @@ def native_window(repo, bundle, env, config_root, run_dir, phase, ready_label="D
                     raise
                 finally:
                     driver.reader.close()
-            exit_code = app.wait(timeout=15)
+            if app is None:
+                driver.wait("restarted application exited",
+                            lambda: not integration_process(pid_path, bundle), timeout=15)
+                exit_code = None  # Launch Services owns the child; check its exit marker below.
+            else:
+                exit_code = app.wait(timeout=15)
             if expect_crash:
                 if status_path.read_text() == "ok":
                     raise RuntimeError("expected crash completed as a normal shutdown")
-            elif exit_code != 0 or status_path.read_text() != "ok":
+            elif exit_code not in (None, 0) or status_path.read_text() != "ok":
                 raise RuntimeError("native application did not complete cleanly; log: " + str(log_path))
             if "WARNING: DATA RACE" in log_path.read_text():
                 raise RuntimeError("Go race detector reported a native integration race; log: " + str(log_path))
         finally:
-            if app.poll() is None:
-                pid_path = config_root / "app.pid"
-                if pid_path.exists():
-                    pid = int(pid_path.read_text())
-                    process = subprocess.run(["ps", "-p", str(pid), "-o", "command="], text=True, capture_output=True)
-                    if str(bundle) in process.stdout:
+            if app is None or app.poll() is None:
+                pid = integration_process(pid_path, bundle)
+                if pid is not None and pid != relaunched_from:
+                    try:
                         os.kill(pid, signal.SIGTERM)
+                    except ProcessLookupError:
+                        pass
+            if app is not None and app.poll() is None:
                 try:
                     app.wait(timeout=5)
                 except subprocess.TimeoutExpired:
                     app.terminate()
                     app.wait(timeout=5)
+
+
+def integration_pid(path):
+    try:
+        return int(path.read_text())
+    except (FileNotFoundError, ValueError):
+        # The restarted process may still be writing its PID.
+        return None
+
+
+def integration_process(pid_path, bundle):
+    pid = integration_pid(pid_path)
+    if pid is None:
+        return None
+    process = subprocess.run(["ps", "-p", str(pid), "-o", "command="], text=True, capture_output=True)
+    return pid if str(bundle) in process.stdout else None
 
 
 def main():
@@ -1288,13 +1361,14 @@ def main():
     modes.add_argument("--concurrent-split", action="store_true", help="run only simultaneous shared-shell requests")
     modes.add_argument("--core-e2e", action="store_true", help="run real UI transfers, drag lifecycle and restart recovery")
     modes.add_argument("--coverage", action="store_true", help="run gateways, monitoring, file operations, settings and catalog management")
+    modes.add_argument("--migration", action="store_true", help="run device migration between isolated configurations")
     parser.add_argument("--scenario", action="append", help="with --coverage: run only the named scenario; repeatable")
     args = parser.parse_args()
     repo = Path(__file__).resolve().parents[1]
     task_dir = Path(os.environ["BURROW_TEST_DIR"]).resolve()
     if not args.prepare_only:
         ensure_unlocked()
-    overlay, config_root = prepare(repo, task_dir, os.environ["BURROW_TEST_ADDRESS"])
+    overlay, config_root = prepare(repo, task_dir, os.environ["BURROW_TEST_ADDRESS"], migration=args.migration)
     if args.prepare_only:
         print(overlay)
         return
@@ -1317,14 +1391,19 @@ def main():
     shutil.copy2(binary, launch_binary)
     subprocess.run(["codesign", "--force", "--deep", "--sign", "-", str(bundle)],
                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
-    mode = "coverage" if args.coverage else "core-e2e" if args.core_e2e else "file-protocols" if args.file_protocols else "concurrent-split" if args.concurrent_split else "terminal"
+    mode = ("migration" if args.migration else "coverage" if args.coverage else "core-e2e" if args.core_e2e else
+            "file-protocols" if args.file_protocols else "concurrent-split" if args.concurrent_split else "terminal")
     report = dict(mode=mode, status="failed", phases=[], configuration=str(config_root), bundle=str(bundle))
     print("Native test bundle: " + str(bundle), flush=True)
     try:
         with isolated_agent(task_dir) as agent_socket:
             env["SSH_AUTH_SOCK"] = agent_socket
+            if args.migration:
+                from ssh_e2e_migration import run_migration
+                run_migration(native_window, integration_process, repo, bundle, env, config_root, run_dir, report)
             recovery = None
-            for phase in range(1, 3 if args.core_e2e or args.coverage else 2):
+            phases = () if args.migration else (1, 2) if args.core_e2e or args.coverage else (1,)
+            for phase in phases:
                 # The second coverage phase starts locked, before the catalog is shown.
                 # A locked application starts on the unlock form, before the catalog.
                 locked = bool(args.coverage and phase == 2 and recovery.get("locked"))

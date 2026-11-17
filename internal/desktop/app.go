@@ -3,7 +3,7 @@ package desktop
 import (
 	"context"
 	"errors"
-	"path/filepath"
+	"os"
 	"runtime"
 	"slices"
 	"sync"
@@ -11,6 +11,7 @@ import (
 
 	"github.com/zeroy1024/Burrow/internal/locales"
 	"github.com/zeroy1024/Burrow/internal/localfs"
+	"github.com/zeroy1024/Burrow/internal/migration"
 	"github.com/zeroy1024/Burrow/internal/store"
 	"github.com/zeroy1024/Burrow/internal/termtheme"
 	"github.com/zeroy1024/Burrow/internal/theme"
@@ -80,6 +81,10 @@ type app struct {
 	siteDeletion           *siteDeletion
 	workspaceSave          workspaceSaveState
 	quitReady, quitPending bool
+	migrationDraft         *migrationDraft
+	migrationStage         string
+	migrationRestart       bool
+	migrationNotice        *uikit.ToastProps
 	terminalCapture        terminalCaptureState
 	terminalPreviews       map[*remoteSession]*terminalPreview
 	monitors               map[*sshConnectionGroup]*monitorState
@@ -246,14 +251,17 @@ func Run() (runErr error) {
 		return locales.Errorf(locales.MessageLoadNativeTerminal, err)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	db, err := store.Open(ctx, filepath.Join(directory, "burrow.db"))
+	data, err := openDesktopData(ctx, directory)
 	if err != nil {
 		cancel()
 		return locales.Errorf(locales.MessageOpenAppDatabase, err)
 	}
 
-	a := &app{ctx: ctx, cancel: cancel, store: db, dataDirectory: directory, tabs: []*workspaceTab{}, statusFactsOpen: true}
-	defer func() {
+	a := &app{
+		ctx: ctx, cancel: cancel, store: data.db, vault: data.vault, dataDirectory: directory,
+		tabs: []*workspaceTab{}, statusFactsOpen: true, migrationNotice: data.notice,
+	}
+	finish := sync.OnceFunc(func() {
 		a.cancel()
 		if a.mcpBackend != nil && a.mcpBackend.service != nil {
 			runErr = errors.Join(runErr, a.mcpBackend.service.Close())
@@ -263,8 +271,15 @@ func Run() (runErr error) {
 			a.vault.Close()
 		}
 		a.clearSecurityInputs()
+		if a.migrationDraft != nil && a.migrationDraft.stage != "" {
+			runErr = errors.Join(runErr, os.RemoveAll(a.migrationDraft.stage))
+		}
+		if a.migrationStage != "" {
+			runErr = errors.Join(runErr, os.RemoveAll(a.migrationStage))
+		}
 		runErr = errors.Join(runErr, a.finishPersistence())
-	}()
+	})
+	defer finish()
 	a.persistence = newPersistenceWorker(func() *mygo.Window { return a.window })
 	for i := range a.pages {
 		a.pages[i].sidebarWidth = theme.Current().C.Sider.Width
@@ -275,9 +290,8 @@ func Run() (runErr error) {
 	}
 	a.applyUpdatePreferences()
 	mygo.Use(updatewindow.Plugin)
-	a.vault, err = vault.OpenWithKeyStore(ctx, db, directory, legacyUnlockKeys())
-	if err != nil {
-		a.security.errorText = locales.ErrorText(err)
+	if data.vaultErr != nil {
+		a.security.errorText = locales.ErrorText(data.vaultErr)
 		a.security.status = "blocked"
 	} else {
 		a.security.migration = a.vault.State() == "pending_migration"
@@ -364,7 +378,7 @@ func Run() (runErr error) {
 			a.cancel()
 			return
 		}
-		if a.security.changing {
+		if a.security.changing || a.migrationDraft != nil && a.migrationDraft.busy {
 			e.PreventDefault()
 			return
 		}
@@ -374,6 +388,7 @@ func Run() (runErr error) {
 		}
 		if a.mcpBusy() || a.credentials.busy || a.terminal.importing || a.savingSession() || a.catalogSaving || a.files.dialog != nil && a.files.dialog.busy {
 			a.resetQuitAttempt()
+			a.discardRequestedMigration()
 			e.PreventDefault()
 			a.files.notice = &uikit.ToastProps{ID: "work-before-quit", Tone: uikit.ToneWarning, Title: locales.Deferred(
 				locales.MessageAFileOrCredentialOperationIsInProgressWaitForItToFinish,
@@ -391,6 +406,7 @@ func Run() (runErr error) {
 			a.persistBeforeClose(func(err error) {
 				if err != nil {
 					a.quitPending = false
+					a.discardRequestedMigration()
 					a.persistenceNotice(locales.MessageUnableToSaveBeforeQuitting, err)
 					a.showMainWindow()
 					return
@@ -398,6 +414,7 @@ func Run() (runErr error) {
 				a.stopMCPForQuit(func(err error) {
 					if err != nil {
 						a.quitPending = false
+						a.discardRequestedMigration()
 						a.persistenceNotice(locales.MessageUnableToStopTheMcpService, err)
 						a.showMainWindow()
 						return
@@ -405,12 +422,31 @@ func Run() (runErr error) {
 					a.prepareTransferQuit(func(err error) {
 						a.quitPending = false
 						if err != nil {
+							a.discardRequestedMigration()
 							a.persistenceNotice(locales.MessageUnableToSaveTransferHistory, err)
 							a.showMainWindow()
 							return
 						}
+						if a.migrationStage != "" {
+							if err := migration.Schedule(a.dataDirectory, a.migrationStage); err != nil {
+								a.resetQuitAttempt()
+								a.discardRequestedMigration()
+								a.startMCPBackend()
+								a.persistenceNotice(locales.MigrationScheduleFailed, err)
+								a.showMainWindow()
+								return
+							}
+							a.migrationStage = ""
+							a.migrationRestart = true
+						}
 						a.quitReady = true
-						a.window.Update(func() { mygo.App.Quit() })
+						a.window.Update(func() {
+							if a.migrationRestart {
+								mygo.App.Relaunch()
+							} else {
+								mygo.App.Quit()
+							}
+						})
 					})
 				})
 			})
@@ -429,7 +465,15 @@ func Run() (runErr error) {
 		a.closeConnections()
 	})
 	defer stopShutdown()
-	return mygo.App.Run()
+	// MyGo relaunches before Run returns. Release the database lock first.
+	stopFinish := mygo.App.OnQuit(func() {
+		if a.migrationRestart {
+			finish()
+		}
+	})
+	defer stopFinish()
+	appErr := mygo.App.Run()
+	return errors.Join(runErr, appErr)
 }
 
 func (a *app) view(c *ui.Context) {
@@ -561,6 +605,7 @@ func (a *app) view(c *ui.Context) {
 	a.sshDialogs(c)
 	a.credentialDialogs(c)
 	a.applicationSecurityDialog(c)
+	a.migrationDialog(c)
 	a.closeTabDialog(c)
 	if a.files.drag != nil && !a.files.dragSeen {
 		drag := a.files.drag
@@ -579,6 +624,10 @@ func (a *app) view(c *ui.Context) {
 	if a.files.notice != nil {
 		uikit.Toast(c, *a.files.notice)
 		a.files.notice = nil
+	}
+	if a.migrationNotice != nil {
+		uikit.Toast(c, *a.migrationNotice)
+		a.migrationNotice = nil
 	}
 	uikit.ToastViewport(c, uikit.MotionOverride(a.reduceMotion(c)))
 	if a.interactionBlocked() {
