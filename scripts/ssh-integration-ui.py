@@ -1289,9 +1289,9 @@ def native_window(repo, bundle, env, config_root, run_dir, phase, ready_label="D
                 driver = Driver(connection, Path(env["BURROW_TEST_DIR"]), config_root)
                 try:
                     driver.wait("native window", lambda: driver.call("windows").get("windows"))
-                    driver.wait("native view", lambda: driver.node(ready_label, ready_role))
                     driver.menu("Focus window")
                     driver.wait("focused native window", lambda: any(w.get("focused") for w in driver.call("windows").get("windows", [])))
+                    driver.wait("native view", lambda: driver.node(ready_label, ready_role), timeout=45)
                     yield driver
                 except Exception:
                     # Preserve labels and read-only state, never text-field values.
