@@ -4,6 +4,8 @@ Every released version has a `## <version> - <date>` section, English first, the
 
 ## Unreleased
 
+## 0.1.11 - 2026-11-17
+
 - Export an encrypted migration package and import it on another device running the same Burrow version to restore saved data, credentials, and settings.
 - Keep MCP controls and quick actions visible in the tray panel by letting long AI and active session lists scroll independently.
 
