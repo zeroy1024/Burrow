@@ -36,6 +36,8 @@ def _theme(driver, label, value):
 def _migration_settings(driver):
     _settings_page(driver, "通用")
     _fill(driver, "搜索设置", "迁移")
+    driver.window_focused()
+    driver.call("idle", dict(timeout=5000))
 
 
 def _banner(driver, text):
