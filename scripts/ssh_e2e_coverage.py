@@ -333,6 +333,7 @@ def _file_operations(driver, site, container, home):
         _pane_press(driver, "搜索当前文件夹")
     _fill(driver, "搜索当前文件夹", "b.t")
     driver.wait("search hides non-matching rows", lambda: _remote_rows(driver) == {"b.txt"})
+    driver.call("idle", dict(timeout=5000))
     _press(driver, "清除搜索")
     driver.wait("cleared search restores rows",
                 lambda: _remote_rows(driver) == {"a.txt", "b.txt", "same.txt", "locked"})
