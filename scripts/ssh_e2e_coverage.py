@@ -28,6 +28,7 @@ def _fixture(driver):
 def _choose(driver, label, option, role="popUpButton"):
     _press(driver, label, (role,))
     _press(driver, option, ("listItem", "menuItem"))
+    driver.call("idle", dict(timeout=5000))
 
 
 def _section(driver, label):
