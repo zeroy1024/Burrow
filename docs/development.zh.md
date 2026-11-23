@@ -190,7 +190,7 @@ GOOS=windows GOARCH=amd64 mise exec -- go vet ./...
 mise exec -- go test -race -tags=integration ./... -count=1 -timeout=180s
 ```
 
-推送前门禁的统一入口为 `mise run gate`（[scripts/gate.py](../scripts/gate.py)）：默认运行协议集成层，可追加 `native`、`mcp` 或 `all`。每层自行启动 SSH/FTP/FTPS 与连接网关夹具、导出环境变量，并在结束后移除本轮容器；集成用例被跳过时失败。`native` 与 `mcp` 层先构建应用包，再运行下述原生驱动的全部模式。何时必须运行见 [AGENTS.md](../AGENTS.md)。
+推送前门禁的统一入口为 `mise run gate`（[scripts/gate.py](../scripts/gate.py)）：默认运行协议集成层，可追加 `native`、`mcp` 或 `all`。每层自行启动 SSH/FTP/FTPS 与连接网关夹具、导出环境变量，并在结束后移除本轮容器；集成用例被跳过时失败。`native` 与 `mcp` 层在临时目录构建临时签名的应用模板，再运行下述原生驱动的全部模式。何时必须运行见 [AGENTS.md](../AGENTS.md)。
 
 原生驱动入口为 `python3 -B -u scripts/ssh-integration-ui.py`，提供 `--concurrent-split`、`--file-protocols`、`--core-e2e`、`--coverage` 和 `--migration`。需要已解锁且可获得键盘焦点的 macOS 图形会话；与 SDK Docker 测试分开运行，避免连接计数互相干扰。
 

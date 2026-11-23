@@ -1356,6 +1356,7 @@ def integration_process(pid_path, bundle):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--prepare-only", action="store_true")
+    parser.add_argument("--template", type=Path, help="existing Burrow.app resource template; defaults to the repository build")
     modes = parser.add_mutually_exclusive_group()
     modes.add_argument("--file-protocols", action="store_true", help="run only the SFTP/FTP native UI checks")
     modes.add_argument("--concurrent-split", action="store_true", help="run only simultaneous shared-shell requests")
@@ -1381,7 +1382,7 @@ def main():
     # AppKit needs a proper bundle to register/focus a native window reliably.
     # Reuse only the packaging resources; the executable is the overlay build.
     bundle = run_dir / "Burrow Integration.app"
-    shutil.copytree(repo / "build/darwin-arm64/Burrow.app", bundle)
+    shutil.copytree(args.template or repo / "build/darwin-arm64/Burrow.app", bundle)
     info_path = bundle / "Contents/Info.plist"
     info = plistlib.loads(info_path.read_bytes())
     info["CFBundleIdentifier"] += ".integration." + str(os.getpid())

@@ -13,6 +13,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 import time
 
 
@@ -97,24 +98,30 @@ def require_macos(layer):
         raise RuntimeError(layer + " layer drives a native macOS window and cannot run on " + sys.platform)
 
 
+@contextmanager
 def build_template():
-    subprocess.run(["go", "tool", "mygo", "build", "-skip-dmg"], cwd=REPO, check=True)
+    env = os.environ.copy()
+    env.pop("MYGO_UPDATER_PRIVATE_KEY", None)
+    with tempfile.TemporaryDirectory(prefix="burrow-gate-template-") as directory:
+        subprocess.run(["go", "tool", "mygo", "build", "-skip-dmg", "-sign", "-", "-o", directory],
+                       cwd=REPO, env=env, check=True)
+        yield str(Path(directory) / "darwin-arm64/Burrow.app")
 
 
 def native():
     require_macos("native")
-    build_template()
-    with fixtures(("ftp", "gateways")) as env:
+    with build_template() as template, fixtures(("ftp", "gateways")) as env:
         for mode in ([], ["--concurrent-split"], ["--file-protocols"], ["--core-e2e"], ["--coverage"], ["--migration"]):
-            subprocess.run([sys.executable, "-B", "-u", str(REPO / "scripts/ssh-integration-ui.py"), *mode],
+            subprocess.run([sys.executable, "-B", "-u", str(REPO / "scripts/ssh-integration-ui.py"),
+                            "--template", template, *mode],
                            cwd=REPO, env=env, check=True)
 
 
 def mcp():
     require_macos("mcp")
-    build_template()
-    with fixtures(("ftp", "ftps", "ftps_implicit")) as env:
-        subprocess.run([sys.executable, "-B", "-u", str(REPO / "scripts/mcp-integration-ui.py")],
+    with build_template() as template, fixtures(("ftp", "ftps", "ftps_implicit")) as env:
+        subprocess.run([sys.executable, "-B", "-u", str(REPO / "scripts/mcp-integration-ui.py"),
+                        "--template", template],
                        cwd=REPO, env=env, check=True)
 
 

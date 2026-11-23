@@ -190,7 +190,7 @@ After setting fixture-provided `BURROW_TEST_ADDRESS`, `BURROW_TEST_DIR`, and, wh
 mise exec -- go test -race -tags=integration ./... -count=1 -timeout=180s
 ```
 
-The pre-push gate has one entry point, `mise run gate` ([scripts/gate.py](../scripts/gate.py)). It runs the protocol integration layer by default; append `native`, `mcp`, or `all` for the others. Each layer starts its own SSH/FTP/FTPS and gateway fixtures, exports the environment variables, and removes that run's containers afterwards; a skipped integration test fails the gate. The `native` and `mcp` layers build the app bundle first, then run every mode of the native drivers below. [AGENTS.md](../AGENTS.md) states when each layer is required.
+The pre-push gate has one entry point, `mise run gate` ([scripts/gate.py](../scripts/gate.py)). It runs the protocol integration layer by default; append `native`, `mcp`, or `all` for the others. Each layer starts its own SSH/FTP/FTPS and gateway fixtures, exports the environment variables, and removes that run's containers afterwards; a skipped integration test fails the gate. The `native` and `mcp` layers build an ad-hoc signed app template in a temporary directory, then run every mode of the native drivers below. [AGENTS.md](../AGENTS.md) states when each layer is required.
 
 The native driver is `python3 -B -u scripts/ssh-integration-ui.py`, with `--concurrent-split`, `--file-protocols`, `--core-e2e`, `--coverage`, and `--migration`. It requires an unlocked macOS graphical session that can receive keyboard focus. Run separately from SDK Docker tests so connection counters do not interfere.
 
