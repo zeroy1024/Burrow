@@ -781,6 +781,8 @@ class Driver:
 
     def page(self, label, section):
         self.settled()
+        # A catalog write can finish while its dialog still owns keyboard input.
+        self.call("idle", dict(timeout=5000))
         self.key(("Cmd+Alt+1", "Cmd+Alt+2")[section])
         self.wait("selected page " + label, lambda: self.snapshot()["Section"] == section)
 

@@ -510,6 +510,7 @@ def _browse_home(driver, name):
     _press(driver, "取消")
     driver.wait("folder dialog dismissed", lambda:
                 not _nodes(driver, "新建文件夹", ("dialog",)))
+    driver.call("idle", dict(timeout=5000))
     before = driver.snapshot()["Transfers"]
     was_open = driver.snapshot()["LocalOpen"]
     driver.key("Cmd+Shift+L")
