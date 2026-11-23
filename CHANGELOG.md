@@ -4,6 +4,12 @@ Every released version has a `## <version> - <date>` section, English first, the
 
 ## Unreleased
 
+- Keep collecting SSH server metrics while the app is in the background, and show gaps when sampling is interrupted.
+
+**简体中文**
+
+- 应用退到后台时继续采集 SSH 服务器指标，并在趋势图上显示断采缺口。
+
 ## 0.1.11 - 2026-11-17
 
 - Export an encrypted migration package and import it on another device running the same Burrow version to restore saved data, credentials, and settings.

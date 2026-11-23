@@ -87,7 +87,6 @@ type app struct {
 	migrationNotice        *uikit.ToastProps
 	terminalCapture        terminalCaptureState
 	terminalPreviews       map[*remoteSession]*terminalPreview
-	monitors               map[*sshConnectionGroup]*monitorState
 	agents                 map[string]*agentView
 	hostFacts              hostFactsState
 	ctx                    context.Context
@@ -461,7 +460,6 @@ func Run() (runErr error) {
 	stopShutdown := mygo.App.OnWillQuit(func(*mygo.QuitEvent) {
 		a.destroyTray()
 		a.clearTerminalPreviews()
-		a.stopMonitors()
 		a.closeConnections()
 	})
 	defer stopShutdown()
@@ -524,7 +522,6 @@ func (a *app) view(c *ui.Context) {
 	a.enforceScrollback()
 	a.tickTransfers(c)
 	a.updateSSHLatency(c)
-	a.updateMonitor(c)
 	a.tickPreferences(c)
 	a.tickFilePreferences(c)
 	a.tickWorkspace(c)

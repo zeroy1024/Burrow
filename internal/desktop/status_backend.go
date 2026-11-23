@@ -10,51 +10,59 @@ import (
 	"github.com/zeroy1024/Burrow/internal/hostinfo"
 	"github.com/zeroy1024/Burrow/internal/locales"
 	"github.com/zeroy1024/Burrow/internal/sshclient"
+	"github.com/zeroy1024/Burrow/internal/uikit"
 
 	"github.com/egoist/mygo/ui"
 )
 
 const (
-	monitorInterval     = 2 * time.Second
-	monitorDiskInterval = 10 * time.Second
-	// monitorSamples is the trend window: about two minutes at monitorInterval.
-	monitorSamples = 60
+	monitorInterval      = 2 * time.Second
+	monitorDiskInterval  = 10 * time.Second
+	monitorSampleTimeout = 5 * time.Second
+	monitorGap           = monitorInterval + monitorSampleTimeout
+	monitorWindow        = 2 * time.Minute
 )
 
-// monitorHistory keeps recent rates for the trend charts: CPU in percent,
-// network in bytes per second. A sample without a value adds nothing.
-type monitorHistory struct{ cpu, down, up []float64 }
+type monitorHistory struct{ cpu, down, up []uikit.SparklinePoint }
 
-func (h *monitorHistory) add(metrics hostinfo.Metrics) {
-	h.cpu = appendMonitorSample(h.cpu, metrics.CPU)
-	h.down = appendMonitorSample(h.down, metrics.Down)
-	h.up = appendMonitorSample(h.up, metrics.Up)
+func (h *monitorHistory) add(at time.Time, metrics hostinfo.Metrics) {
+	h.cpu = appendMonitorSample(h.cpu, at, metrics.CPU)
+	h.down = appendMonitorSample(h.down, at, metrics.Down)
+	h.up = appendMonitorSample(h.up, at, metrics.Up)
 }
 
-func appendMonitorSample(samples []float64, value *float64) []float64 {
-	if value == nil {
-		return samples
+func appendMonitorSample(samples []uikit.SparklinePoint, at time.Time, value *float64) []uikit.SparklinePoint {
+	if len(samples) > 0 && at.Before(samples[len(samples)-1].At) {
+		samples = nil
 	}
-	samples = append(samples, *value)
-	if len(samples) > monitorSamples {
-		samples = append([]float64(nil), samples[len(samples)-monitorSamples:]...)
+	return append(monitorWindowSamples(samples, at), uikit.SparklinePoint{At: at, Value: value})
+}
+
+func monitorWindowSamples(samples []uikit.SparklinePoint, now time.Time) []uikit.SparklinePoint {
+	start := now.Add(-monitorWindow)
+	for len(samples) > 0 && samples[0].At.Before(start) {
+		samples = samples[1:]
 	}
 	return samples
 }
 
-// monitorState samples one SSH transport for as long as a connected terminal
-// uses it, so the panel and the pane footers show what was already collected.
+func (h monitorHistory) window(now time.Time) monitorHistory {
+	return monitorHistory{
+		cpu:  monitorWindowSamples(h.cpu, now),
+		down: monitorWindowSamples(h.down, now),
+		up:   monitorWindowSamples(h.up, now),
+	}
+}
+
+// The window thread owns the published readings. The worker owns the rate baseline.
 type monitorState struct {
-	connection *sshclient.Connection
-	ctx        context.Context
-	cancel     context.CancelFunc
-	// sampler belongs to connection and keeps its counter baseline; platform
-	// is what it was created for.
+	connection      *sshclient.Connection
+	terminals       int
+	cancel          context.CancelFunc
+	ctx             context.Context
 	sampler         hostinfo.Sampler
 	platform        hostinfo.Platform
 	unsupported     bool
-	pending         bool
-	next            time.Time
 	metrics         *hostinfo.Metrics
 	history         monitorHistory
 	errorText       locales.Text
@@ -69,148 +77,159 @@ type monitorState struct {
 
 // sessionMonitor returns the samples of the session's current transport.
 func (a *app) sessionMonitor(session *remoteSession) *monitorState {
-	group := session.connection
-	if group == nil {
-		return nil
-	}
-	if m := a.monitors[group]; m != nil && m.connection == group.connection {
-		return m
+	if run := session.ssh; run != nil {
+		if m := run.monitor; m != nil && m.connection == session.connection.connection {
+			return m
+		}
 	}
 	return nil
 }
 
-func (a *app) stopMonitors() {
-	for group, m := range a.monitors {
-		m.cancel()
-		delete(a.monitors, group)
+func (a *app) attachMonitor(group *sshConnectionGroup) *monitorState {
+	m := group.monitor
+	if m == nil || m.connection != group.connection {
+		if m != nil {
+			m.cancel()
+		}
+		ctx, cancel := context.WithCancel(group.ctx)
+		m = &monitorState{connection: group.connection, ctx: ctx, cancel: cancel}
+		group.monitor = m
 	}
+	m.terminals++
+	a.startMonitor(group)
+	return m
 }
 
-// Samples belong to the actual transport, not to a terminal or the panel:
-// every connection with a connected terminal is sampled whether or not the
-// panel is open, and its samples are kept until that transport ends.
-func (a *app) updateMonitor(c *ui.Context) {
-	if a.ctx.Err() != nil {
+func (run *sshRuntime) stopMonitor() {
+	m := run.monitor
+	if m == nil {
 		return
 	}
-	live := map[*sshConnectionGroup]bool{}
-	for _, tab := range a.tabs {
-		for _, session := range tab.root.sessions() {
-			group := session.connection
-			if session.closing || session.state != connected || session.ssh == nil || session.ssh.conn == nil ||
-				group == nil || group.connection == nil || live[group] {
-				continue
-			}
-			live[group] = true
-			m := a.monitors[group]
-			if m == nil || m.connection != group.connection {
-				if m != nil {
-					m.cancel()
-				}
-				m = &monitorState{connection: group.connection}
-				m.ctx, m.cancel = context.WithCancel(a.ctx)
-				if a.monitors == nil {
-					a.monitors = map[*sshConnectionGroup]*monitorState{}
-				}
-				a.monitors[group] = m
-			}
-			a.sampleMonitor(c, group, m)
-		}
+	run.monitor = nil
+	m.terminals--
+	if m.terminals > 0 {
+		return
 	}
-	for group, m := range a.monitors {
-		if m.connection != group.connection {
-			m.cancel()
-			delete(a.monitors, group)
-		}
+	m.cancel()
+	if group := run.request.group; group.monitor == m {
+		group.monitor = nil
 	}
 }
 
-func (a *app) sampleMonitor(c *ui.Context, group *sshConnectionGroup, m *monitorState) {
-	if m.sampler == nil {
-		platform, known := a.groupPlatform(group)
-		if !known {
-			// The first connection to a host waits for platform detection.
-			if !group.facts.pending && !group.facts.errorText.Empty() {
-				m.errorText = group.facts.errorText
+func (a *app) startMonitor(group *sshConnectionGroup) {
+	m := group.monitor
+	if m == nil || m.sampler != nil {
+		return
+	}
+	if m.connection != group.connection || m.ctx.Err() != nil {
+		return
+	}
+	platform, known := a.groupPlatform(group)
+	if !known {
+		if !group.facts.pending {
+			m.errorText = group.facts.errorText
+		}
+		return
+	}
+	m.platform = platform
+	m.sampler = hostinfo.For(platform).NewSampler(sshHostRunner{m.connection})
+	a.sshWorkers.Go(func() { a.runMonitor(m.ctx, m) })
+}
+
+func (a *app) runMonitor(ctx context.Context, m *monitorState) {
+	timer := time.NewTimer(0)
+	defer timer.Stop()
+	var lastSuccess time.Time
+	for ctx.Err() == nil {
+		select {
+		case <-ctx.Done():
+			return
+		case <-m.connection.Done():
+			return
+		case <-timer.C:
+		}
+		// Use wall time here because the monotonic clock may stop during sleep.
+		started := time.Now().Round(0)
+		metrics, err := readMonitor(ctx, m)
+		at := time.Now().Round(0)
+		if err == nil && (at.Sub(started) > monitorSampleTimeout || at.Before(started)) {
+			// A suspended request may have read either side of the interruption.
+			m.sampler.Reset()
+			timer.Reset(0)
+			continue
+		}
+		if err == nil {
+			if monitorInterrupted(lastSuccess, at) {
+				// This reading becomes the baseline for the next one.
+				metrics.CPU, metrics.Down, metrics.Up, metrics.Top = nil, nil, nil, nil
 			}
+			lastSuccess = at
+		}
+		a.window.Update(func() { a.publishMonitor(ctx, m, at, metrics, err) })
+		if errors.Is(err, hostinfo.ErrUnsupported) {
 			return
 		}
-		m.sampler, m.platform = hostinfo.For(platform).NewSampler(sshHostRunner{m.connection}), platform
+		timer.Reset(monitorInterval)
 	}
-	a.updateMonitorSample(c, m)
-	a.updateMonitorDisk(c, m)
 }
 
-func (a *app) updateMonitorSample(c *ui.Context, m *monitorState) {
-	if m.pending || m.unsupported {
-		return
-	}
-	if remaining := m.next.Sub(c.Now()); remaining > 0 {
-		c.After(remaining)
-		return
-	}
-	// Sampling stops while no frame is built, as for a hidden window. A trend
-	// resumed after its whole window has passed would join unrelated periods.
-	if !m.updatedAt.IsZero() && c.Now().Sub(m.updatedAt) > monitorSamples*monitorInterval {
-		m.history = monitorHistory{}
-	}
-	connection, sampler, lifetime := m.connection, m.sampler, m.ctx
-	release, err := connection.Retain()
+func monitorInterrupted(last, now time.Time) bool {
+	elapsed := now.Sub(last)
+	return !last.IsZero() && (elapsed > monitorGap || elapsed < 0)
+}
+
+func readMonitor(ctx context.Context, m *monitorState) (hostinfo.Metrics, error) {
+	release, err := m.connection.Retain()
 	if err != nil {
-		m.metrics, m.history = nil, monitorHistory{}
-		m.errorText = locales.ErrorText(err)
-		m.next = c.Now().Add(monitorInterval)
-		c.After(monitorInterval)
+		return hostinfo.Metrics{}, err
+	}
+	defer release()
+	ctx, cancel := context.WithTimeout(ctx, monitorSampleTimeout)
+	defer cancel()
+	return m.sampler.Sample(ctx)
+}
+
+func (a *app) publishMonitor(ctx context.Context, m *monitorState, at time.Time, metrics hostinfo.Metrics, err error) {
+	if ctx.Err() != nil {
 		return
 	}
-	ctx, cancel := context.WithTimeout(lifetime, 5*time.Second)
-	m.pending = true
-	a.sshWorkers.Go(func() {
-		defer release()
-		defer cancel()
-		metrics, err := sampler.Sample(ctx)
-		a.window.Update(func() {
-			if lifetime.Err() != nil {
-				return
-			}
-			m.pending = false
-			m.next = time.Now().Add(monitorInterval)
-			if errors.Is(err, hostinfo.ErrUnsupported) {
-				m.unsupported, m.metrics, m.history = true, nil, monitorHistory{}
-				return
-			}
-			if err != nil {
-				m.metrics, m.history = nil, monitorHistory{}
-				m.errorText = locales.ErrorText(err)
-				return
-			}
-			m.metrics = &metrics
-			m.errorText, m.updatedAt = locales.Text{}, time.Now()
-			m.history.add(metrics)
-		})
-	})
+	if errors.Is(err, hostinfo.ErrUnsupported) {
+		m.unsupported = true
+		return
+	}
+	m.history.add(at, metrics)
+	if err != nil {
+		m.errorText = locales.ErrorText(err)
+		return
+	}
+	m.metrics = &metrics
+	m.errorText, m.updatedAt = locales.Text{}, at
+	a.updateMonitorDisk(ctx, m, metrics.DiskKey)
+}
+
+func (m *monitorState) isFresh(c *ui.Context) bool {
+	if m.metrics == nil || !m.errorText.Empty() {
+		return false
+	}
+	age := c.Now().Round(0).Sub(m.updatedAt)
+	if age < 0 || age >= monitorGap {
+		return false
+	}
+	c.After(monitorGap - age)
+	return true
 }
 
 // Filesystem space changes slowly. Its separate, short-lived channel and
 // deadline cannot erase samples or close a browser/transfer subsystem.
-func (a *app) updateMonitorDisk(c *ui.Context, m *monitorState) {
-	if m.metrics == nil || m.metrics.DiskKey == "" {
-		m.diskStats = nil
-		return
-	}
-	key := m.metrics.DiskKey
+func (a *app) updateMonitorDisk(lifetime context.Context, m *monitorState, key string) {
 	if m.diskIdentity != key {
 		m.diskIdentity, m.diskStats, m.diskError = key, nil, ""
 		m.diskNext, m.diskUnsupported = time.Time{}, false
 	}
-	if m.diskPending || m.diskUnsupported {
+	if key == "" || m.diskPending || m.diskUnsupported || time.Now().Before(m.diskNext) {
 		return
 	}
-	if remaining := m.diskNext.Sub(c.Now()); remaining > 0 {
-		c.After(remaining)
-		return
-	}
-	sampler, lifetime := m.sampler, m.ctx
+	sampler := m.sampler
 	ctx, cancel := context.WithTimeout(lifetime, 3*time.Second)
 	m.diskPending = true
 	a.sshWorkers.Go(func() {

@@ -11288,6 +11288,16 @@ func (msgs Messages) MessageLive() string {
 	return Catalog.Format(msgs.locale, "messageLive", nil)
 }
 
+// MessageLastCollected says "上次采集"
+// in the language the app shows.
+func MessageLastCollected() string { return In(i18n.Locale()).MessageLastCollected() }
+
+// MessageLastCollected says "上次采集"
+// in the language of msgs.
+func (msgs Messages) MessageLastCollected() string {
+	return Catalog.Format(msgs.locale, "messageLastCollected", nil)
+}
+
 // MessageMountInformation says "挂载信息"
 // in the language the app shows.
 func MessageMountInformation() string { return In(i18n.Locale()).MessageMountInformation() }

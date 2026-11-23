@@ -67,11 +67,11 @@ SOCKS proxies, SSH jump hosts, and the built-in WireGuard network stack display 
 
 **SSH health check** is separately opt-in: zero (the default, including old profiles) sends no requests. A positive interval enables an OpenSSH-style global request only after receive inactivity. Incoming SSH traffic resets the failure count; three observed idle check intervals without data end the transport. At most one request remains pending, even if the server ignores it. Enable this only for compatible servers; an unsupported request can itself cause some servers to disconnect. There are no vendor-specific exceptions.
 
-Main metrics sample roughly every two seconds with a five-second Exec timeout and at most one request in flight; actual intervals include collection time. Root capacity samples roughly every ten seconds with an independent three-second timeout. Hidden windows and non-SSH pages do not start new latency samples. Monitoring keeps sampling on other pages; sampling pauses whenever the app builds no frames, and a trend resumed after more than its two-minute window starts over.
+Main metrics sample roughly every two seconds with a five-second Exec timeout and at most one request in flight; actual intervals include collection time. Root capacity samples roughly every ten seconds with an independent three-second timeout. Hidden windows and non-SSH pages do not start new latency samples. Server metrics follow the SSH connection and continue while the window is hidden, minimized, or showing another page. Collection stops when the last terminal on the connection closes, the connection ends, or the app quits.
 
 ## Panel presentation
 
-The panel follows the focused terminal. Its top card shows session name, OS icon, and system name. Status dots distinguish live, collecting, failed collection, connecting, failed connection, disconnected, and unmonitored states. Live status pulses with each sample; failures and partial unavailability show reasons below the card. Offline sessions retain only host facts, with an Enter-to-reconnect hint when applicable. Metrics without values use skeletons: shimmer before the first sample or while waiting for a second rate sample; static after failures, unsupported metrics, or reduced motion.
+The panel follows the focused terminal. Its top card shows session name, OS icon, and system name. Status dots distinguish live, last collected, collecting, failed collection, connecting, failed connection, disconnected, and unmonitored states. Live status pulses with each sample; failures and partial unavailability show reasons below the card. Offline sessions retain only host facts, with an Enter-to-reconnect hint when applicable. Metrics without values use skeletons: shimmer before the first sample or while waiting for a second rate sample; static after failures, unsupported metrics, or reduced motion.
 
 - CPU shows 1/5/15-minute load beside utilization; one-minute load above core count uses a warning color. The trend axis chooses 5, 10, 25, 50, or 100% from the peak; scale and peak appear below.
 - Memory/disk use percentages and themed bars, warning at 70% and danger at 90%. Identical disk device/filesystem names display once.
@@ -79,7 +79,7 @@ The panel follows the focused terminal. Its top card shows session name, OS icon
 - Top-process row backgrounds reflect one-core utilization; rows rounding to 0.0% use secondary text.
 - Host facts can collapse while the heading retains uptime.
 
-CPU/network trends retain the latest 60 valid samples per connection, roughly two minutes, which is the whole chart. Hiding the panel, switching terminals, or switching pages preserves them; collection failure or the end of the connection clears them.
+CPU and network trends plot readings from the last two minutes at their sample times. Sleep and failed collection leave gaps. CPU, network, and process rates resume after two fresh readings. The panel labels stale values “Last collected,” and pane footers display `—` until a fresh reading arrives.
 
 A connected terminal's pane footer shows latency, then the latest CPU and memory percentages and download/upload rates, each as an icon followed by its value. They appear together as soon as the terminal connects, with `—` until a value is available, and are hidden while it is not connected; hosts without monitoring support show latency only. Panes narrower than 560 px omit the network rates, and panes narrower than 380 px omit all four metrics.
 

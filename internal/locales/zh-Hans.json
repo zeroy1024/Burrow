@@ -1065,6 +1065,7 @@
   "messageMonitoringMetricsAreCurrentlyAvailableOnlyForLinuxBasicInformationIsStillAvailable": "目前只有 Linux 提供监控指标，基础信息仍可查看",
   "messageCollecting": "采集中",
   "messageLive": "实时",
+  "messageLastCollected": "上次采集",
   "messageMountInformation": "挂载信息",
   "messageCollectionFailed": "采集失败",
   "messageMemory": "内存",

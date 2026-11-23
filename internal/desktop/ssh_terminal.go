@@ -109,6 +109,7 @@ func (a *app) attachSSH(session *remoteSession, run *sshRuntime) {
 		OnExit: func(int) {
 			err := run.conn.Wait()
 			a.window.Update(func() {
+				run.stopMonitor()
 				if session.terminal == nil || session.terminal.view != view {
 					return
 				}
@@ -149,6 +150,7 @@ func (a *app) attachSSH(session *remoteSession, run *sshRuntime) {
 	session.focusPending = a.sshSessionFocused(session)
 	session.output, session.state = nil, connected
 	a.startSSHHostFacts(session.connection)
+	run.monitor = a.attachMonitor(session.connection)
 	if a.sshSessionFocused(session) {
 		session.focus.Focus()
 	}

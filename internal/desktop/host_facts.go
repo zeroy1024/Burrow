@@ -215,9 +215,10 @@ func (a *app) startSSHHostFacts(group *sshConnectionGroup) {
 			if err != nil {
 				group.facts.errorText = locales.ErrorText(err)
 				a.persistenceNotice(locales.MessageUnableToRetrieveHostInformation2, err)
-				return
+			} else {
+				a.rememberHostFacts(key, facts)
 			}
-			a.rememberHostFacts(key, facts)
+			a.startMonitor(group)
 		})
 	})
 }

@@ -31,6 +31,8 @@ type linuxSampler struct {
 	previous *linuxSample
 }
 
+func (s *linuxSampler) Reset() { s.previous = nil }
+
 func (s *linuxSampler) Sample(ctx context.Context) (Metrics, error) {
 	output, err := s.r.Exec(ctx, monitorCommand)
 	var sample linuxSample
@@ -38,7 +40,7 @@ func (s *linuxSampler) Sample(ctx context.Context) (Metrics, error) {
 		sample, err = parseMonitorSample(string(output))
 	}
 	if err != nil {
-		s.previous = nil
+		s.Reset()
 		return Metrics{}, err
 	}
 	completeMonitorRates(&sample, s.previous)

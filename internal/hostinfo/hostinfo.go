@@ -104,6 +104,8 @@ type Collector interface {
 type Sampler interface {
 	// Sample takes one reading. Calls must not overlap.
 	Sample(ctx context.Context) (Metrics, error)
+	// Reset drops the rate baseline between readings after an interruption.
+	Reset()
 	// Disk reads root file-system usage for the root a sample identified by
 	// Metrics.DiskKey. It keeps no sampler state and may run alongside Sample.
 	Disk(ctx context.Context, key string) (Usage, error)
@@ -219,6 +221,7 @@ func (unsupported) NewSampler(Runner) Sampler { return unsupportedSampler{} }
 type unsupportedSampler struct{}
 
 func (unsupportedSampler) Sample(context.Context) (Metrics, error) { return Metrics{}, ErrUnsupported }
+func (unsupportedSampler) Reset()                                  {}
 func (unsupportedSampler) Disk(context.Context, string) (Usage, error) {
 	return Usage{}, ErrUnsupported
 }

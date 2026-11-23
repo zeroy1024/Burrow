@@ -31,6 +31,7 @@ type sshConnectionGroup struct {
 	opening    *sshConnectionRequest
 	latency    sshLatencyState
 	facts      hostFactsProbe
+	monitor    *monitorState
 }
 
 type sshConnectionRequest struct {
@@ -49,6 +50,7 @@ type sshRuntime struct {
 	cancel  context.CancelFunc
 	conn    *sshclient.Conn
 	request *sshConnectionRequest
+	monitor *monitorState
 }
 
 func (a *app) newSSHGroup(endpoint host) *sshConnectionGroup {
@@ -118,6 +120,7 @@ func (a *app) startSSHSession(session *remoteSession, refresh bool) {
 		onError := func(err error) {
 			a.window.Update(func() {
 				if session.ssh == run && ctx.Err() == nil && session.state != connectionFailed {
+					run.stopMonitor()
 					session.state = connectionFailed
 					showSSHMessage(session, err.Error())
 					showReconnectHint(session, false)
@@ -358,6 +361,7 @@ func cancelSSHRequest(request *sshConnectionRequest) {
 func stopSSH(session *remoteSession) {
 	if run := session.ssh; run != nil {
 		session.ssh = nil
+		run.stopMonitor()
 		run.cancel()
 		cancelSSHRequest(run.request)
 		if run.conn != nil {

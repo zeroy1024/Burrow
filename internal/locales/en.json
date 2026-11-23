@@ -1065,6 +1065,7 @@
   "messageMonitoringMetricsAreCurrentlyAvailableOnlyForLinuxBasicInformationIsStillAvailable": "Monitoring metrics are currently available only for Linux. Basic information is still available.",
   "messageCollecting": "Collecting",
   "messageLive": "Live",
+  "messageLastCollected": "Last collected",
   "messageMountInformation": "Mount information",
   "messageCollectionFailed": "Collection failed",
   "messageMemory": "Memory",

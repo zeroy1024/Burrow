@@ -74,10 +74,16 @@ func (a *app) serverStatus(c *ui.Context) {
 				reduced := a.reduceMotion(c)
 				shimmer, diskShimmer := func(string) bool { return !reduced }, !reduced
 				if m != nil {
+					history = m.history.window(c.Now().Round(0))
 					if m.metrics != nil {
-						metrics, history = *m.metrics, m.history
+						metrics = *m.metrics
 						live = statusLive{label: locales.MessageLive(), ink: t.Color.Success.Default, halo: t.Color.Success.Halo}
-						if !reduced {
+						fresh := m.isFresh(c)
+						if !fresh {
+							live = statusLive{
+								label: locales.MessageLastCollected(), ink: t.Color.Warning.Default, halo: t.Color.Warning.Halo,
+							}
+						} else if !reduced {
 							live.beat = m.updatedAt
 						}
 						if stats := m.diskStats; stats != nil && m.diskIdentity == metrics.DiskKey {
@@ -85,7 +91,7 @@ func (a *app) serverStatus(c *ui.Context) {
 							percent := float64(diskUsed) / float64(diskTotal) * 100
 							disk = &percent
 						}
-						shimmer = func(item string) bool { return !reduced && !slices.Contains(metrics.Unavailable, item) }
+						shimmer = func(item string) bool { return fresh && !reduced && !slices.Contains(metrics.Unavailable, item) }
 						diskShimmer = shimmer(locales.MessageMountInformation()) && m.diskError == ""
 					} else if !m.errorText.Empty() {
 						live = statusLive{label: locales.MessageCollectionFailed(), ink: t.Color.Danger.Default, halo: t.Color.Danger.Tint14}
@@ -123,7 +129,7 @@ func (a *app) paneReadings(c *ui.Context, session *remoteSession, surface *theme
 			return
 		}
 		metrics := hostinfo.Metrics{}
-		if m != nil && m.metrics != nil {
+		if m != nil && m.isFresh(c) {
 			metrics = *m.metrics
 		}
 		percent := func(value *float64) string {
@@ -311,7 +317,7 @@ func statusSkeleton(p *ui.Painter, r ui.Rect, shimmer bool) {
 	p.AnimationFrameRate(30)
 }
 
-func statusCPU(c *ui.Context, metrics hostinfo.Metrics, samples []float64, sampled, shimmer bool) {
+func statusCPU(c *ui.Context, metrics hostinfo.Metrics, samples []uikit.SparklinePoint, sampled, shimmer bool) {
 	t := theme.Current()
 	cores := "—"
 	if metrics.Cores > 0 {
@@ -337,16 +343,17 @@ func statusCPU(c *ui.Context, metrics hostinfo.Metrics, samples []float64, sampl
 				uikit.Text(c, load, uikit.TextProps{Style: uikit.TextCaption, Tone: tone, Mono: true}).SingleLine()
 			})
 		})
-		if len(samples) == 0 {
+		peak, hasSamples := monitorPeak(samples)
+		if !hasSamples {
 			statusPlaceholder(c, t.C.Stats.ChartHeight, shimmer)
 			if sampled && metrics.CPU == nil {
 				statusCaption(c, locales.MessageTwoSamplesAreRequiredToEstablishABaseline())
 			}
 			return
 		}
-		scale, peak := statusCPUScale(samples)
+		scale := statusCPUScale(peak)
 		uikit.Sparkline(c, samples, uikit.SparklineProps{
-			Height: t.C.Stats.ChartHeight, Max: scale, Slots: monitorSamples, Grid: true, Label: locales.MessageCpuUsageTrend(),
+			Height: t.C.Stats.ChartHeight, Max: scale, Window: monitorWindow, Grid: true, Label: locales.MessageCpuUsageTrend(),
 		})
 		ui.Row(c).FillWidth().Gap(t.Space.N8).Children(func() {
 			statusCaption(c, fmt.Sprintf(locales.MessageAboutMinutes(), scale))
@@ -358,16 +365,23 @@ func statusCPU(c *ui.Context, metrics hostinfo.Metrics, samples []float64, sampl
 
 // statusCPUScale picks the chart's top from a few steps above the peak, so a
 // lightly loaded host still shows its variation; the caption names the step.
-func statusCPUScale(samples []float64) (scale, peak float64) {
-	for _, value := range samples {
-		peak = max(peak, value)
-	}
+func statusCPUScale(peak float64) float64 {
 	for _, step := range []float64{5, 10, 25, 50} {
 		if peak*1.25 <= step {
-			return step, peak
+			return step
 		}
 	}
-	return 100, peak
+	return 100
+}
+
+func monitorPeak(samples []uikit.SparklinePoint) (peak float64, hasSamples bool) {
+	for _, sample := range samples {
+		if sample.Value != nil {
+			peak = max(peak, *sample.Value)
+			hasSamples = true
+		}
+	}
+	return peak, hasSamples
 }
 
 // statusLoad lists the 1, 5 and 15 minute loads; high reports a 1-minute
@@ -454,13 +468,9 @@ func statusFilesystem(metrics hostinfo.Metrics) string {
 func statusNetwork(c *ui.Context, metrics hostinfo.Metrics, history monitorHistory, shimmer bool) {
 	t := theme.Current()
 	// Both directions share one scale so their heights compare.
-	var top float64
-	for _, value := range history.down {
-		top = max(top, value)
-	}
-	for _, value := range history.up {
-		top = max(top, value)
-	}
+	downPeak, _ := monitorPeak(history.down)
+	upPeak, _ := monitorPeak(history.up)
+	top := max(downPeak, upPeak)
 	ui.Column(c).Gap(t.Space.N8).Children(func() {
 		statusHeading(c, locales.MessageNetwork(), locales.MessageDefaultRouteInterface())
 		ui.Row(c).FillWidth().Gap(t.Space.N10).Children(func() {
@@ -470,19 +480,22 @@ func statusNetwork(c *ui.Context, metrics hostinfo.Metrics, history monitorHisto
 	})
 }
 
-func statusRate(c *ui.Context, label string, value *float64, samples []float64, top float64, shimmer bool) {
+func statusRate(c *ui.Context, label string, value *float64, samples []uikit.SparklinePoint, top float64, shimmer bool) {
 	t := theme.Current()
 	ui.Column(c).Grow(1).Basis(0).MinWidth(0).Gap(t.Space.N3).Children(func() {
 		uikit.Text(c, label, uikit.TextProps{Style: uikit.TextCaption, Tone: uikit.ToneSecondary}).SingleLine()
 		if value == nil {
 			statusFigure(c, "—", "", t.Font.Size.Title, 0, t.Font.Weight.Semibold, uikit.ToneTertiary)
+		} else {
+			number, unit := monitorRate(*value)
+			statusFigure(c, number, " "+unit, t.Font.Size.Title, t.Font.Size.Caption2, t.Font.Weight.Semibold, uikit.ToneNeutral)
+		}
+		if _, hasSamples := monitorPeak(samples); !hasSamples {
 			statusPlaceholder(c, t.C.Stats.NetChartHeight, shimmer)
 			return
 		}
-		number, unit := monitorRate(*value)
-		statusFigure(c, number, " "+unit, t.Font.Size.Title, t.Font.Size.Caption2, t.Font.Weight.Semibold, uikit.ToneNeutral)
 		uikit.Sparkline(c, samples, uikit.SparklineProps{
-			Height: t.C.Stats.NetChartHeight, Max: top, Slots: monitorSamples, Label: label + locales.MessageTrend(),
+			Height: t.C.Stats.NetChartHeight, Max: top, Window: monitorWindow, Label: label + locales.MessageTrend(),
 		})
 	})
 }
