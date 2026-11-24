@@ -34,11 +34,11 @@
 ## Features
 
 - **SSH workspace**: tabs, grouped splits, movable and maximizable panes. Splits in one session share an SSH connection while each Shell runs independently. Supports passwords, plain and encrypted private keys, and SSH agent.
-- **[SSH port forwarding](docs/session-settings.md#ssh-port-forwarding)** (unreleased): set up local TCP forwards and SOCKS5 proxies with configurable listening addresses. Manage rules from the SSH title bar, with active rules tied to their SSH connection.
+- **[SSH port forwarding](docs/session-settings.md#ssh-port-forwarding)**: set up local TCP forwards and SOCKS5 proxies with configurable listening addresses. Manage rules from the SSH title bar, with active rules tied to their SSH connection.
 - **Connection gateways**: manage SSH / SOCKS5 / [WireGuard](docs/wireguard.md) exits and multihop routes for terminals, file transfers, and MCP. Set an app default or choose a gateway per connection.
 - **Two-pane file management**: browse and transfer between local and remote directories over SFTP, FTP, and explicit or implicit FTPS. Search, create, rename, delete, and resolve name conflicts.
 - **Transfer queue**: upload and download files or directories with concurrency, pause, resume, cancellation, and retry. Tasks are isolated by file tab and can be restored offline after quitting.
-- **Server monitoring**: inspect Linux CPU, memory, network, processes, and host information. Root disk capacity is available when the server provides the required SFTP capabilities. In development builds, sampling continues in the background while the SSH connection is active, and trend charts mark sampling gaps.
+- **Server monitoring**: inspect Linux CPU, memory, network, processes, and host information. Root disk capacity is available when the server provides the required SFTP capabilities. Sampling continues in the background while the SSH connection is active, and trend charts mark sampling gaps.
 - **Local MCP service**: expose authorized SSH and file operations to trusted clients over Streamable HTTP, with access keys, connection and capability grants, interception policies, operation auditing, and a live read-only view of each agent's commands and output.
 - **English and Chinese UI**: choose English, Simplified Chinese, or the system language. App-owned menus, dialogs, queued notifications, and accessibility labels follow language changes; dates and times use the app language and system regional formats. User content and remote output retain their original text.
 - **Personal settings**: light and dark appearance, terminal colors, fonts, cursor, and shortcuts. Vault encrypts passwords, managed private keys, and saved key passphrases.

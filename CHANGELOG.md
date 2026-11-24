@@ -4,6 +4,8 @@ Every released version has a `## <version> - <date>` section, English first, the
 
 ## Unreleased
 
+## 0.1.12 - 2026-11-24
+
 - Keep collecting SSH server metrics while the app is in the background, and show gaps when sampling is interrupted.
 - Open the SSH port forwarding dock from the title bar to manage local TCP forwards and SOCKS5 proxies with configurable listen addresses alongside server monitoring.
 - Show a confirmation after copying an address from the SSH port forwarding dock.
