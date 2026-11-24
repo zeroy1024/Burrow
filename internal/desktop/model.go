@@ -39,8 +39,8 @@ type workspaceTab struct {
 	maximized          bool
 	frame              ui.Handle
 	zoomFrom, zoomMix  float32
-	zoomStarted        time.Time
-	zoomPending        bool
+	zoomPane           *remoteSession
+	zoomBounds         ui.Rect
 	layoutDuration     time.Duration
 	layoutPending      bool
 	layoutUntil        time.Time

@@ -21,7 +21,7 @@ func TestTerminalPaneCardCompositesChromeBeforeClipping(t *testing.T) {
 						ui.Box(c).Fill().Radius(radius).Background(background)
 						return
 					}
-					card := TerminalPaneCard(c, radius, colors)
+					card := TerminalPaneCard(c, radius, colors, true)
 					card.Children(func() {
 						ScrollFade(c, EdgeBottom, ScrollFadeProps{
 							Height: 24, Background: background, Translucent: translucent,
@@ -62,7 +62,7 @@ func TestTerminalPaneFocusKeepsSplitGapClear(t *testing.T) {
 					props := PaneProps{Surface: surface, Multiple: true, Focused: index == active}
 					pane := Pane(c, props).Absolute().Top(top).Left(float32(left+index*(width+gap))).Size(width, height)
 					pane.Children(func() {
-						card := TerminalPaneCard(c, surface.C.Pane.Radius, colors)
+						card := TerminalPaneCard(c, surface.C.Pane.Radius, colors, true)
 						StylePaneFocus(pane, card, props)
 					})
 				}

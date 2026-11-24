@@ -11,6 +11,7 @@ Every released version has a `## <version> - <date>` section, English first, the
 - Smooth the rounded edges around Shell panes with and without translucency, and remove their decorative inner outline.
 - Keep the header, terminal background, and status bar the same color when a split Shell pane loses focus.
 - Draw the Shell focus ring inside the pane so split resize handles have equal space on both sides.
+- Expand and restore split Shell panes from their current visible position with the same smooth transition as sidebars and bottom docks.
 
 **简体中文**
 
@@ -21,6 +22,7 @@ Every released version has a `## <version> - <date>` section, English first, the
 - 改善 Shell 面板在开启和关闭半透明时的圆角锯齿感，并移除装饰性内描边。
 - 分屏中的 Shell 失去焦点时，标题栏、正文和状态栏的默认底色保持一致。
 - 将 Shell 焦点边框移到窗格内侧，让分屏拖拽柄两侧的间距保持一致。
+- 分屏 Shell 从窗格当前显示的位置展开和还原，动效与侧栏和底栏折叠一致。
 
 ## 0.1.11 - 2026-11-17
 

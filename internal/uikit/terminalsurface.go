@@ -16,13 +16,19 @@ func ResolveTerminalColors(scheme *termtheme.Scheme, source termtheme.Background
 		Foreground: scheme.Foreground, Selection: scheme.SelectionBg, SelectionForeground: scheme.SelectionFg}
 }
 
-func TerminalPaneCard(c *ui.Context, radius float32, colors TerminalColors) ui.Element {
+func TerminalPaneCard(c *ui.Context, radius float32, colors TerminalColors, composite bool) ui.Element {
 	frame := ui.Box(c).Key("card-frame").Absolute().Top(0).Right(0).Bottom(0).Left(0).Radius(radius).Clip()
 	var card ui.Element
 	frame.Children(func() {
-		// Composite the background and chrome before applying the frame's rounded edge.
-		card = ui.Column(c).Key("card").Fill().Background(Color(colors.Background)).
-			TextColor(Color(colors.Foreground)).SelectionColor(Color(colors.Selection)).Clip().Cache()
+		card = ui.Column(c).Key("card").Fill().
+			TextColor(Color(colors.Foreground)).SelectionColor(Color(colors.Selection)).Clip()
+		if composite {
+			// Composite the background and chrome before applying the frame's rounded edge.
+			card.Background(Color(colors.Background)).Cache()
+		} else {
+			// The frame can change size without reallocating a pane-sized texture.
+			frame.Background(Color(colors.Background))
+		}
 	})
 	return card
 }

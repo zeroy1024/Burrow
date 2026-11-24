@@ -1163,7 +1163,6 @@ type MotionDuration struct {
 	LiveBeat          time.Duration // 实时状态点每次采样的跳动
 	AgentRing         time.Duration // AI 会话描边渐变旋转一周
 	FrameInterval     time.Duration
-	Zoom              time.Duration
 	PaneEnter         time.Duration
 	PaneClose         time.Duration
 	DividerFade       time.Duration
@@ -1186,7 +1185,6 @@ type MotionDuration struct {
 // MotionEasing groups tokens.
 type MotionEasing struct {
 	Out    Bezier
-	Pane   Bezier
 	Search Bezier
 	In     Bezier
 }
@@ -1196,7 +1194,6 @@ type MotionSpring struct {
 	Displace Spring // 让位（≈ Snappy, 220ms）
 	Drop     Spring // 落位
 	Smooth   Spring // 取消 / 平滑（ui.Smooth）
-	Zoom     Spring
 	Content  Spring // 数字内容变化
 }
 
@@ -1897,14 +1894,12 @@ type DesktopTokens struct {
 	PaneCloseScale       float32       // ← opacity.paneCloseScale
 	DropEdgeRatio        float32       // ← opacity.dropEdgeRatio
 	FrameInterval        time.Duration // ← motion.duration.frameInterval
-	ZoomDuration         time.Duration // ← motion.duration.zoom
+	ZoomDuration         time.Duration // ← motion.spring.smooth.duration
 	PaneEnterDuration    time.Duration // ← motion.duration.paneEnter
 	PaneCloseDuration    time.Duration // ← motion.duration.paneClose
 	DividerFadeDuration  time.Duration // ← motion.duration.dividerFade
 	SidebarDuration      time.Duration // ← motion.duration.sidebar
 	InstantDuration      time.Duration // ← motion.duration.instantNonzero
-	ZoomSpring           Spring        // ← motion.spring.zoom
-	MotionEasing         Bezier        // ← motion.easing.pane
 	DividerHandleColor   color.NRGBA   // ← color.status.dividerHandle
 	DividerHandleRadius  float32       // ← size.focusRing
 	TrafficLightX        float32       // ← space.12
@@ -3683,7 +3678,6 @@ func lightSemantic() Semantic {
 				LiveBeat:          900 * time.Millisecond,
 				AgentRing:         6000 * time.Millisecond,
 				FrameInterval:     16 * time.Millisecond,
-				Zoom:              240 * time.Millisecond,
 				PaneEnter:         220 * time.Millisecond,
 				PaneClose:         160 * time.Millisecond,
 				DividerFade:       120 * time.Millisecond,
@@ -3704,7 +3698,6 @@ func lightSemantic() Semantic {
 			},
 			Easing: MotionEasing{
 				Out:    Palette.Easing.EaseOut,
-				Pane:   Bezier{0.2, 0.8, 0.2, 1},
 				Search: Palette.Easing.InOut,
 				In:     Bezier{0.42, 0, 1, 1},
 			},
@@ -3712,7 +3705,6 @@ func lightSemantic() Semantic {
 				Displace: Palette.Spring.Snappy,
 				Drop:     Palette.Spring.Drop,
 				Smooth:   Palette.Spring.Smooth,
-				Zoom:     Spring{Duration: 240 * time.Millisecond, Bounce: 0},
 				Content:  Palette.Spring.Content,
 			},
 			Drag: MotionDrag{
@@ -4456,14 +4448,12 @@ func buildComponents(s *Semantic) Components {
 			PaneCloseScale:       s.Opacity.PaneCloseScale,
 			DropEdgeRatio:        s.Opacity.DropEdgeRatio,
 			FrameInterval:        s.Motion.Duration.FrameInterval,
-			ZoomDuration:         s.Motion.Duration.Zoom,
+			ZoomDuration:         s.Motion.Spring.Smooth.Duration,
 			PaneEnterDuration:    s.Motion.Duration.PaneEnter,
 			PaneCloseDuration:    s.Motion.Duration.PaneClose,
 			DividerFadeDuration:  s.Motion.Duration.DividerFade,
 			SidebarDuration:      s.Motion.Duration.Sidebar,
 			InstantDuration:      s.Motion.Duration.InstantNonzero,
-			ZoomSpring:           s.Motion.Spring.Zoom,
-			MotionEasing:         s.Motion.Easing.Pane,
 			DividerHandleColor:   s.Color.Status.DividerHandle,
 			DividerHandleRadius:  s.Size.FocusRing,
 			TrafficLightX:        s.Space.N12,

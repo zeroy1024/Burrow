@@ -62,27 +62,36 @@ func (a *app) terminals(c *ui.Context, size ui.Point) {
 	panes, splits := []panePlacement{}, []splitPlacement{}
 	a.terminalCellWidth()
 	tab.root.placements(bounds, &panes, &splits)
-	a.zoomProgress(c, tab)
+	zoomProgress := a.zoomProgress(c, area, tab)
+	if tab.maximized || tab.zoomMix > 0 {
+		area.Clip()
+	}
 	targets := make([]ui.Element, len(panes))
 	// Text selection can change focus during a pane build. Keep this frame's
 	// sibling order stable so that each session is built exactly once.
 	focusedSession := tab.focused
+	for i := range panes {
+		placement := &panes[i]
+		session := placement.session
+		session.layoutRect = placement.rect
+		if session == focusedSession && tab.maximized {
+			placement.rect = bounds
+		}
+		if session == tab.zoomPane {
+			placement.rect = interpolatePaneBounds(tab.zoomBounds, placement.rect, zoomProgress)
+		}
+	}
 	area.Children(func() {
 		// Stable siblings let layout transitions follow sessions across arbitrary tree edits.
 		for i, placement := range panes {
-			placement.session.layoutRect = placement.rect
 			if placement.session != focusedSession && !placement.session.closeMaximized {
 				targets[i] = a.terminalPane(c, tab, placement)
 			}
 		}
 		for i, placement := range panes {
-			if placement.session != focusedSession {
-				continue
+			if placement.session == focusedSession {
+				targets[i] = a.terminalPane(c, tab, placement)
 			}
-			if tab.maximized {
-				placement.rect = ui.Rect{W: bounds.W, H: bounds.H}
-			}
-			targets[i] = a.terminalPane(c, tab, placement)
 		}
 		for _, placement := range panes {
 			if placement.session.closeMaximized {
@@ -165,7 +174,11 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 	}
 	a.paneMotion(c, pane, tab, session)
 	_, catalogActive, _ := a.catalogHostTransfer()
-	layoutMoving := tab.workspaceResizedAt.Equal(c.Now()) || pane.Transitioning() || c.Now().Before(tab.layoutUntil)
+	focused := tab.focused == session
+	transitioning := pane.Transitioning() || c.Now().Before(tab.layoutUntil)
+	animatingBounds := session == tab.zoomPane || focused && tab.layoutDuration == t.C.Desktop.ZoomDuration &&
+		(tab.layoutPending || transitioning) && !a.reduceMotion(c)
+	layoutMoving := tab.workspaceResizedAt.Equal(c.Now()) || transitioning || animatingBounds
 	frozen := !session.revealing && (a.drag != nil || catalogActive || a.resizing != nil || layoutMoving)
 	if session.contentWidth == 0 || !frozen {
 		if session.contentWidth != rect.W || session.contentHeight != rect.H {
@@ -183,7 +196,6 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 	}
 
 	scroll := &session.scroll
-	focused := tab.focused == session
 	opacity := float32(1)
 	if !focused {
 		opacity = 1 - tab.zoomMix
@@ -205,21 +217,75 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 	})
 	hovered := paneSurface.Hovered()
 	appearance := uikit.PaneVisualStyle(pane, focused, hovered, multiple, surface)
+	translucent := a.translucencyEnabled(c)
 	var card ui.Element
 	paneSurface.Children(func() {
-		card = uikit.TerminalPaneCard(c, p.Radius, colors)
+		card = uikit.TerminalPaneCard(c, p.Radius, colors, !animatingBounds)
 		uikit.StylePaneFocus(paneSurface, card, paneProps)
 		card.Children(func() {
-			if session.terminal != nil {
-				output := a.sshTerminalView(c.Key("live-output"), session).
-					Absolute().Left(0).Top(topPadding).Width(session.contentWidth).
-					Height(max(1, session.contentHeight-topPadding-bottomPadding)).Opacity(appearance.Opacity)
-				a.recordTerminalCapture(c, session, output, card, topPadding, bottomPadding)
-				if appearance.Saturation != 1 {
-					output.Effect(terminalSaturation.Effect(shader.Options{Uniforms: map[string]any{"Saturation": appearance.Saturation}}))
+			body := ui.Box(c).Key("terminal-body").Absolute().Top(0).Left(0).Right(0).Bottom(0).PassThrough()
+			if animatingBounds {
+				body.Bottom(status.HeightPane).Clip()
+			}
+			body.Children(func() {
+				if session.terminal != nil {
+					output := a.sshTerminalView(c.Key("live-output"), session).
+						Absolute().Left(0).Top(topPadding).Width(session.contentWidth).
+						Height(max(1, session.contentHeight-topPadding-bottomPadding)).Opacity(appearance.Opacity)
+					if animatingBounds {
+						output.Cache()
+					}
+					a.recordTerminalCapture(c, session, output, card, topPadding, bottomPadding)
+					if appearance.Saturation != 1 {
+						output.Effect(terminalSaturation.Effect(shader.Options{Uniforms: map[string]any{"Saturation": appearance.Saturation}}))
+					}
+				} else {
+					// Scrollbars decorates this same scroll node without replacing its handle.
+					output := ui.Scroll(c.Key("output")).Fill().MinWidth(0).MinHeight(0).
+						Bind(&session.focus).Focusable().FocusRing(false).
+						TrackScroll(&scroll.offset).Padding(
+						topPadding,
+						p.ContentSide,
+						bottomPadding,
+						p.ContentSide,
+					).Font(strings.Join(prefs.FontFamily, ", ")).FontSize(prefs.FontSize).
+						TextColor(uikit.Color(colors.Foreground)).SelectionColor(uikit.Color(colors.Selection)).
+						Opacity(appearance.Opacity).Cache().
+						OnClick(func() { a.focusSession(tab, session) })
+					if animatingBounds {
+						output.Absolute().Top(0).Left(0).Size(session.contentWidth, session.contentHeight)
+					}
+					if session.focusPending {
+						if a.sshSessionFocused(session) {
+							output.Focus()
+						}
+						session.focusPending = false
+					}
+					if appearance.Saturation != 1 {
+						output.Effect(terminalSaturation.Effect(shader.Options{
+							Uniforms: map[string]any{"Saturation": appearance.Saturation},
+						}))
+					}
+					output.Children(func() {
+						if session.agent != nil {
+							a.agentCards(c, session, s, colors.Foreground)
+						} else {
+							a.terminalLines(c, session, focused)
+						}
+					})
+					// The scrollbar owns the node's input handler, so Enter rides on its hook.
+					terminalScrollbar(c, card, output, scroll, terminalBackground, func(ev ui.InputEvent) bool {
+						if ev.Kind != ui.InputKeyDown || ev.Key != ui.KeyEnter || ev.Mods != 0 || !session.awaitingConnect() {
+							return false
+						}
+						a.connectSession(session)
+						return true
+					})
 				}
+			})
+			if session.terminal != nil {
 				var backdropOptions nativeterm.ViewportBackdropOptions
-				if a.translucencyEnabled(c) {
+				if translucent && !animatingBounds {
 					backdropOptions.Bottom, backdropOptions.Gap = status.HeightPane, contentGap
 					if headed {
 						backdropOptions.Top = p.HeaderHeight
@@ -230,50 +296,13 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 				if appearance.Saturation != 1 {
 					backdrop.Effect(terminalSaturation.Effect(shader.Options{Uniforms: map[string]any{"Saturation": appearance.Saturation}}))
 				}
-			} else {
-				// Scrollbars decorates this same scroll node without replacing its handle.
-				output := ui.Scroll(c.Key("output")).Fill().MinWidth(0).MinHeight(0).
-					Bind(&session.focus).Focusable().FocusRing(false).
-					TrackScroll(&scroll.offset).Padding(
-					topPadding,
-					p.ContentSide,
-					bottomPadding,
-					p.ContentSide,
-				).Font(strings.Join(prefs.FontFamily, ", ")).FontSize(prefs.FontSize).
-					TextColor(uikit.Color(colors.Foreground)).SelectionColor(uikit.Color(colors.Selection)).
-					Opacity(appearance.Opacity).Cache().
-					OnClick(func() { a.focusSession(tab, session) })
-				if session.focusPending {
-					if a.sshSessionFocused(session) {
-						output.Focus()
-					}
-					session.focusPending = false
-				}
-				if appearance.Saturation != 1 {
-					output.Effect(terminalSaturation.Effect(shader.Options{
-						Uniforms: map[string]any{"Saturation": appearance.Saturation},
-					}))
-				}
-				output.Children(func() {
-					if session.agent != nil {
-						a.agentCards(c, session, s, colors.Foreground)
-					} else {
-						a.terminalLines(c, session, focused)
-					}
-				})
-				// The scrollbar owns the node's input handler, so Enter rides on its hook.
-				terminalScrollbar(c, card, output, scroll, terminalBackground, func(ev ui.InputEvent) bool {
-					if ev.Kind != ui.InputKeyDown || ev.Key != ui.KeyEnter || ev.Mods != 0 || !session.awaitingConnect() {
-						return false
-					}
-					a.connectSession(session)
-					return true
-				})
 			}
-			if headed {
-				a.terminalScrollEdge(c, p.HeaderHeight, false, background)
+			if !animatingBounds {
+				if headed {
+					a.terminalScrollEdge(c, p.HeaderHeight, false, background)
+				}
+				a.terminalScrollEdge(c, status.HeightPane, true, background)
 			}
-			a.terminalScrollEdge(c, status.HeightPane, true, background)
 			var header ui.Element
 			if multiple {
 				// A shared drag ancestor lets the title and bell keep their own hover targets.
@@ -340,7 +369,7 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 					}).Absolute().Top(0).Left(p.ActionWidth+p.ActionGap).Size(p.ActionWidth, p.ActionHeight)
 					keyboardFocus = keyboardFocus || expand.FocusVisible()
 					expand.OnClick(func() {
-						a.togglePaneZoom(tab, session)
+						a.togglePaneZoom(c, tab, session)
 					})
 					close := uikit.PaneIconButton(c, locales.MessageClosePane2()+h.name, closeIcon, surface, uikit.PaneIconButtonProps{
 						Shortcut: closeShortcut,

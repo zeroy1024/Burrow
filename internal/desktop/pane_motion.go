@@ -76,6 +76,13 @@ func (a *app) markPaneLayout(tab *workspaceTab, duration time.Duration) {
 	tab.layoutDuration, tab.layoutPending = duration, true
 }
 
+func visiblePaneBounds(c *ui.Context, session *remoteSession, workspace ui.Rect) ui.Rect {
+	visible := session.frame.Bounds(c)
+	visible.X -= workspace.X
+	visible.Y -= workspace.Y
+	return visible
+}
+
 func (a *app) enforcePaneMinimum(c *ui.Context) {
 	t := theme.Current()
 	if a.window == nil {
@@ -123,39 +130,52 @@ func (a *app) setPaneZoom(tab *workspaceTab, maximized bool) {
 	if tab.maximized == maximized {
 		return
 	}
-	tab.maximized, tab.zoomFrom, tab.zoomPending = maximized, tab.zoomMix, true
+	tab.maximized, tab.zoomFrom, tab.zoomPane = maximized, tab.zoomMix, nil
 	a.markPaneLayout(tab, t.C.Desktop.ZoomDuration)
 }
 
-func (a *app) togglePaneZoom(tab *workspaceTab, session *remoteSession) {
+func (a *app) togglePaneZoom(c *ui.Context, tab *workspaceTab, session *remoteSession) {
+	visible := visiblePaneBounds(c, session, a.workArea.Bounds(c))
 	a.focusSession(tab, session)
 	a.setPaneZoom(tab, !tab.maximized)
+	if visible.W > 0 && visible.H > 0 {
+		tab.zoomPane, tab.zoomBounds = session, visible
+	}
 }
 
-func (a *app) zoomProgress(c *ui.Context, tab *workspaceTab) float32 {
-	t := theme.Current()
-	if tab.zoomPending {
-		tab.zoomStarted, tab.zoomPending = c.Now(), false
-	}
+func (a *app) zoomProgress(c *ui.Context, area ui.Element, tab *workspaceTab) float32 {
+	const motion = "pane-zoom"
 	target := float32(0)
 	if tab.maximized {
 		target = 1
 	}
-	if a.reduceMotion(c) {
-		tab.zoomStarted = time.Time{}
+	owner := ui.Local(area, "pane-zoom-tab", func() int { return -1 })
+	focusChanged := tab.zoomPane != nil && tab.zoomPane != tab.focused
+	if *owner != tab.id || a.reduceMotion(c) || focusChanged {
+		*owner = tab.id
+		tab.zoomMix, tab.zoomPane = area.Jump(motion, target), nil
+		return 1
 	}
-	if tab.zoomStarted.IsZero() {
-		tab.zoomMix = target
-		return tab.zoomMix
+	animation := ui.Animation{Spring: uikit.Spring(theme.Current().Motion.Spring.Smooth)}
+	tab.zoomMix = min(max(area.AnimateTo(motion, target, a.positionAnimation(animation)), 0), 1)
+	if area.Settled(motion) {
+		tab.zoomPane = nil
+		return 1
 	}
-	progress := min(1, float32(c.Now().Sub(tab.zoomStarted))/float32(t.C.Desktop.ZoomDuration))
-	curve := t.C.Desktop.MotionEasing
-	progress = ui.CubicBezier(curve[0], curve[1], curve[2], curve[3])(progress)
-	tab.zoomMix = tab.zoomFrom + (target-tab.zoomFrom)*progress
-	if progress < 1 {
-		c.AnimationFrame()
+	span := target - tab.zoomFrom
+	if span == 0 {
+		return 1
 	}
-	return tab.zoomMix
+	return min(max((tab.zoomMix-tab.zoomFrom)/span, 0), 1)
+}
+
+func interpolatePaneBounds(from, to ui.Rect, fraction float32) ui.Rect {
+	return ui.Rect{
+		X: from.X + (to.X-from.X)*fraction,
+		Y: from.Y + (to.Y-from.Y)*fraction,
+		W: max(1, from.W+(to.W-from.W)*fraction),
+		H: max(1, from.H+(to.H-from.H)*fraction),
+	}
 }
 
 func (a *app) paneMotion(c *ui.Context, pane ui.Element, tab *workspaceTab, session *remoteSession) {
@@ -166,7 +186,10 @@ func (a *app) paneMotion(c *ui.Context, pane ui.Element, tab *workspaceTab, sess
 	}
 	animation := ui.Animation{Spring: uikit.Spring(t.C.ReorderMotion.PaneDisplace)}
 	if tab.layoutDuration == t.C.Desktop.ZoomDuration {
-		animation = ui.Animation{Spring: uikit.Spring(t.C.Desktop.ZoomSpring)}
+		spring := uikit.Spring(t.Motion.Spring.Smooth)
+		// Settle at subpixel distance so the terminal can adopt its final grid promptly.
+		spring.Precision = .5
+		animation = ui.Animation{Spring: spring}
 	}
 	animation = a.positionAnimation(animation)
 	transition := ui.ElementTransition{Position: true, Size: true, Animation: &animation}
@@ -175,7 +198,7 @@ func (a *app) paneMotion(c *ui.Context, pane ui.Element, tab *workspaceTab, sess
 		transition.Animation = &instant
 	}
 	// The workspace already animates its size; a second spring would lag behind it.
-	if !session.revealing && !tab.workspaceResizedAt.Equal(c.Now()) {
+	if session != tab.zoomPane && !session.revealing && !tab.workspaceResizedAt.Equal(c.Now()) {
 		pane.Transition(transition)
 	}
 	if tab.maximized && tab.focused != session && tab.zoomMix >= 1 {
