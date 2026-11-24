@@ -347,6 +347,7 @@ const (
 type forwardDialog struct {
 	action     forwardDialogAction
 	modal      uikit.ModalController
+	scroll     ui.ScrollState
 	state      *sshForwardState
 	endpoint   host
 	row        *forwardRow
@@ -398,19 +399,26 @@ func (a *app) sshForwardDialog(c *ui.Context) {
 			title, action = locales.ForwardEdit(), locales.CommonSave()
 		}
 	}
+	p := theme.Current().C.Modal
 	open, submitted := true, false
-	result := uikit.Modal(c.Key("ssh-forward-dialog").Key(d), &open, uikit.ModalProps{
-		Title: title, Width: theme.Current().C.Modal.GenerateWidth, Controller: &d.modal,
+	props := uikit.ModalProps{
+		Title: title, Width: p.GenerateWidth, Controller: &d.modal,
 		Disabled: d.busy, Motion: uikit.MotionOverride(a.reduceMotion(c)),
 		Footer: func(parts uikit.ModalParts) {
 			uikit.ModalFooter(c).Justify(ui.End).Children(func() {
-				uikit.Button(c, locales.CommonCancel(), uikit.ButtonProps{Disabled: d.busy}).OnClick(parts.RequestDismiss)
-				submitted = uikit.Button(c, action, uikit.ButtonProps{Variant: variant, Disabled: d.busy}).Clicked()
+				uikit.Button(c, locales.CommonCancel(), uikit.ButtonProps{Variant: uikit.ButtonPlain, Disabled: d.busy}).
+					Padding(0, p.ButtonPaddingX).OnClick(parts.RequestDismiss)
+				submitted = uikit.Button(c, action, uikit.ButtonProps{Variant: variant, Disabled: d.busy}).
+					Padding(0, p.ButtonPaddingX).Shrink(0).Clicked()
 			})
 		},
-	}, func(uikit.ModalParts) {
-		uikit.ModalBody(c).Children(func() {
-			uikit.Text(c, d.endpoint.name, uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneSecondary})
+	}
+	if d.action == forwardEdit {
+		props.Width = p.Width
+		props.Header = func(uikit.ModalParts) { forwardRuleHeader(c, title, d.endpoint.name) }
+	}
+	result := uikit.Modal(c.Key("ssh-forward-dialog").Key(d), &open, props, func(parts uikit.ModalParts) {
+		fields := func() {
 			if d.action == forwardDelete {
 				uikit.Text(c, d.row.rule.title(), uikit.TextProps{})
 			} else {
@@ -419,6 +427,14 @@ func (a *app) sshForwardDialog(c *ui.Context) {
 			if !d.err.Empty() {
 				uikit.FieldMessage(c, d.err.String(), uikit.FieldMessageProps{Tone: uikit.ToneDanger})
 			}
+		}
+		if d.action == forwardEdit {
+			a.forwardRuleForm(c, d, parts, fields)
+			return
+		}
+		uikit.ModalBody(c).Children(func() {
+			uikit.Text(c, d.endpoint.name, uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneSecondary})
+			fields()
 		})
 	})
 	if (submitted || result.Submit && d.action != forwardDelete) && !d.busy && !result.Closing && !result.Dismissed {
@@ -429,33 +445,81 @@ func (a *app) sshForwardDialog(c *ui.Context) {
 	}
 }
 
+func forwardRuleHeader(c *ui.Context, title, hostName string) {
+	t := theme.Current()
+	p := t.C.Modal
+	ui.Row(c).FillWidth().Shrink(0).Padding(p.HeaderPaddingTop, p.HeaderPaddingRight, p.HeaderPaddingBottom, p.HeaderPaddingLeft).
+		Gap(p.HeaderGap).AlignItems(ui.Center).Children(func() {
+		uikit.IconTile(c, uikit.IconTileProps{Size: uikit.SizeLg}, func() {
+			uikit.Icon(c, routeIcon, uikit.IconProps{}).TextColor(uikit.Color(t.Color.Text.Strong))
+		})
+		ui.Column(c).Grow(1).MinWidth(0).Gap(t.Space.N2).PaddingEnd(t.C.IconButton.Size).Children(func() {
+			uikit.Text(c, title, uikit.TextProps{Style: uikit.TextTitle}).SingleLine().Ellipsis("…")
+			uikit.Text(c, hostName, uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneTertiary}).SingleLine().Ellipsis("…")
+		})
+	})
+}
+
+func (a *app) forwardRuleForm(c *ui.Context, d *forwardDialog, parts uikit.ModalParts, fields func()) {
+	t := theme.Current()
+	p := t.C.Modal
+	headerHeight := p.HeaderPaddingTop + p.IconTile + p.HeaderPaddingBottom
+	footerHeight := p.FooterPaddingTop + t.C.Button.Height + p.FooterPaddingBottom
+	scroller := ui.Scroll(c).Key("forward-form-scroll").FillWidth().MinHeight(0).Shrink(1).
+		MaxHeight(parts.Bounds.MaxHeight - headerHeight - footerHeight).TrackScroll(&d.scroll).Children(func() {
+		ui.Column(c).FillWidth().Shrink(0).Padding(0, p.BodyPaddingX, t.Space.N8, p.BodyPaddingX).Children(func() {
+			uikit.Segmented(
+				c.Key("forward-kind"),
+				&d.kind,
+				[]uikit.SegItem{
+					{Label: locales.ForwardLocal(), IconSVG: routeIcon},
+					{Label: locales.ForwardSOCKS(), IconSVG: globeIcon},
+				},
+				uikit.SegmentedProps{
+					Label: locales.ForwardType(), Fill: true, Cards: true, SelectedIconTone: uikit.ToneAccent,
+					Motion: uikit.MotionOverride(a.reduceMotion(c)),
+				},
+			).Disabled(d.busy)
+		})
+		uikit.FormSection(c, "", fields).Padding(t.Space.N8, p.BodyPaddingX, t.Space.N16, p.BodyPaddingX)
+	})
+	uikit.Scrollbars(
+		c,
+		parts.Panel,
+		scroller,
+		&d.scroll,
+		uikit.ScrollbarProps{Label: locales.ForwardTitle()},
+	)
+}
+
 func (a *app) forwardFields(c *ui.Context, d *forwardDialog) {
 	motion := uikit.MotionOverride(a.reduceMotion(c))
-	field := func(key, label string, value *string, mono bool) {
-		uikit.FormRow(c.Key(key), label, uikit.FormRowProps{}, func() ui.Element {
-			return uikit.Input(c, value, uikit.InputProps{Label: label, Mono: mono, Disabled: d.busy})
+	field := func(key, label string, value *string, mono bool) uikit.FormRowParts {
+		return uikit.FormRow(c, label, uikit.FormRowProps{Key: key}, func() ui.Element {
+			return uikit.Input(c, value, uikit.InputProps{Label: label, Mono: mono, Disabled: d.busy}).FillWidth().MinWidth(0)
 		})
 	}
 	if d.action == forwardEdit {
-		uikit.Segmented(c, &d.kind, uikit.SegmentItems([]string{locales.ForwardLocal(), locales.ForwardSOCKS()}),
-			uikit.SegmentedProps{Fill: true, Label: locales.ForwardType(), Motion: motion}).Disabled(d.busy)
 		field("forward-name", locales.CommonName(), &d.name, false)
-		field("forward-listen", locales.ForwardListenHost(), &d.listen, true)
-		field("forward-local", locales.ForwardLocalPort(), &d.port, true)
+		listener := field("forward-listen", locales.ForwardListenHost(), &d.listen, true)
 		if ip, err := parseForwardListenIP(d.listen); err == nil && !ip.IsLoopback() {
 			hint := locales.ForwardNonLoopbackHelp()
 			if d.kind == 1 {
 				hint = locales.ForwardSOCKSNonLoopbackHelp()
 			}
-			uikit.FieldMessage(c, hint, uikit.FieldMessageProps{Tone: uikit.ToneWarning})
+			listener.Body.Children(func() { uikit.FieldMessage(c, hint, uikit.FieldMessageProps{Tone: uikit.ToneWarning}) })
 		}
+		field("forward-local", locales.ForwardLocalPort(), &d.port, true)
 	}
 	if d.action == forwardTest || d.kind == 0 {
 		field("forward-target", locales.ForwardTargetHost(), &d.target, true)
 		field("forward-target-port", locales.ForwardTargetPort(), &d.targetPort, true)
 	}
 	if d.action == forwardEdit && d.canSave {
-		uikit.Checkbox(c, &d.saved, locales.ForwardSaveHost(), uikit.CheckProps{Disabled: d.busy || a.catalogSaving, Motion: motion})
+		row := theme.Current().C.FormRow
+		ui.Box(c).FillWidth().PaddingStart(row.LabelWidth + row.LabelGap).Children(func() {
+			uikit.Checkbox(c, &d.saved, locales.ForwardSaveHost(), uikit.CheckProps{Disabled: d.busy || a.catalogSaving, Motion: motion})
+		})
 	}
 }
 
