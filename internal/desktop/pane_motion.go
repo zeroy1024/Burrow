@@ -2,6 +2,7 @@ package desktop
 
 import (
 	"math"
+	"slices"
 	"time"
 
 	"github.com/zeroy1024/Burrow/internal/locales"
@@ -74,6 +75,80 @@ func (a *app) updatePaneClosures(c *ui.Context) {
 
 func (a *app) markPaneLayout(tab *workspaceTab, duration time.Duration) {
 	tab.layoutDuration, tab.layoutPending = duration, true
+}
+
+type paneRelayout struct {
+	pending   bool
+	entering  []*remoteSession
+	focusFrom *remoteSession
+	from      map[*remoteSession]ui.Rect
+}
+
+func (a *app) startPaneRelayout(tab *workspaceTab, entering *remoteSession) {
+	if a.currentTab() != tab || a.activeSection() != sectionSSH {
+		return
+	}
+	a.resizing = nil
+	tab.relayout.pending = true
+	if entering != nil {
+		tab.relayout.entering = append(tab.relayout.entering, entering)
+		tab.relayout.focusFrom = tab.focused
+	}
+}
+
+func (a *app) finishPaneRelayout(c *ui.Context, tab *workspaceTab) {
+	relayout := tab.relayout
+	tab.relayout = paneRelayout{}
+	var focus *remoteSession
+	for _, session := range relayout.entering {
+		if !session.closing && tab.root.find(session) != nil {
+			session.splitFadeStarted = c.Now()
+			focus = session
+		}
+	}
+	if focus != nil && tab.focused == relayout.focusFrom {
+		a.focusSession(tab, focus)
+	}
+}
+
+func (a *app) paneRelayoutProgress(c *ui.Context, area ui.Element, tab *workspaceTab, panes []panePlacement) float32 {
+	const motion = "pane-relayout"
+	relayout := &tab.relayout
+	owner := ui.Local(area, "pane-relayout-tab", func() int { return -1 })
+	if *owner != tab.id {
+		*owner = tab.id
+		if !relayout.pending {
+			a.finishPaneRelayout(c, tab)
+		}
+	}
+	if a.reduceMotion(c) || slices.Contains(relayout.entering, tab.focused) {
+		a.finishPaneRelayout(c, tab)
+		return 1
+	}
+	if relayout.pending {
+		workspace := a.workArea.Bounds(c)
+		relayout.from = make(map[*remoteSession]ui.Rect, len(panes))
+		for _, placement := range panes {
+			session := placement.session
+			visible := visiblePaneBounds(c, session, workspace)
+			if !session.closing && visible.W > 0 && visible.H > 0 && visible != placement.rect {
+				relayout.from[session] = visible
+			}
+		}
+		relayout.pending = false
+		area.Jump(motion, 0)
+	}
+	if len(relayout.from) == 0 {
+		a.finishPaneRelayout(c, tab)
+		return 1
+	}
+	animation := ui.Animation{Spring: uikit.Spring(theme.Current().Motion.Spring.Smooth)}
+	progress := area.AnimateTo(motion, 1, a.positionAnimation(animation))
+	if area.Settled(motion) {
+		a.finishPaneRelayout(c, tab)
+		return 1
+	}
+	return min(max(progress, 0), 1)
 }
 
 func visiblePaneBounds(c *ui.Context, session *remoteSession, workspace ui.Rect) ui.Rect {
@@ -178,8 +253,9 @@ func interpolatePaneBounds(from, to ui.Rect, fraction float32) ui.Rect {
 	}
 }
 
-func (a *app) paneMotion(c *ui.Context, pane ui.Element, tab *workspaceTab, session *remoteSession) {
+func (a *app) paneMotion(c *ui.Context, pane ui.Element, tab *workspaceTab, placement panePlacement) {
 	t := theme.Current()
+	session := placement.session
 	reduced := a.reduceMotion(c)
 	if reduced {
 		session.revealing = false
@@ -198,7 +274,7 @@ func (a *app) paneMotion(c *ui.Context, pane ui.Element, tab *workspaceTab, sess
 		transition.Animation = &instant
 	}
 	// The workspace already animates its size; a second spring would lag behind it.
-	if session != tab.zoomPane && !session.revealing && !tab.workspaceResizedAt.Equal(c.Now()) {
+	if !placement.resizing && session != tab.zoomPane && !session.revealing && !tab.workspaceResizedAt.Equal(c.Now()) {
 		pane.Transition(transition)
 	}
 	if tab.maximized && tab.focused != session && tab.zoomMix >= 1 {

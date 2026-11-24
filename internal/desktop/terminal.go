@@ -5,6 +5,7 @@ import (
 	"math"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/zeroy1024/Burrow/internal/locales"
 	"github.com/zeroy1024/Burrow/internal/theme"
@@ -63,6 +64,7 @@ func (a *app) terminals(c *ui.Context, size ui.Point) {
 	a.terminalCellWidth()
 	tab.root.placements(bounds, &panes, &splits)
 	zoomProgress := a.zoomProgress(c, area, tab)
+	relayoutProgress := a.paneRelayoutProgress(c, area, tab, panes)
 	if tab.maximized || tab.zoomMix > 0 {
 		area.Clip()
 	}
@@ -79,6 +81,9 @@ func (a *app) terminals(c *ui.Context, size ui.Point) {
 		}
 		if session == tab.zoomPane {
 			placement.rect = interpolatePaneBounds(tab.zoomBounds, placement.rect, zoomProgress)
+		} else if from, moving := tab.relayout.from[session]; moving {
+			placement.resizing = true
+			placement.rect = interpolatePaneBounds(from, placement.rect, relayoutProgress)
 		}
 	}
 	area.Children(func() {
@@ -99,7 +104,7 @@ func (a *app) terminals(c *ui.Context, size ui.Point) {
 				a.terminalPane(c, tab, placement)
 			}
 		}
-		if !tab.maximized && tab.zoomMix == 0 {
+		if !tab.maximized && tab.zoomMix == 0 && len(tab.relayout.from) == 0 {
 			for _, split := range splits {
 				a.terminalDivider(c, split)
 			}
@@ -108,7 +113,8 @@ func (a *app) terminals(c *ui.Context, size ui.Point) {
 		_, catalogActive, _ := a.catalogHostTransfer()
 		if a.drag != nil && a.drag.phase == dragActive || catalogActive {
 			for i, placement := range panes {
-				if placement.session.closing || tab.maximized && placement.session != tab.focused {
+				if placement.session.closing || slices.Contains(tab.relayout.entering, placement.session) ||
+					tab.maximized && placement.session != tab.focused {
 					continue
 				}
 				targets[i].Children(func() {
@@ -172,11 +178,14 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 	if session.closing {
 		return pane
 	}
-	a.paneMotion(c, pane, tab, session)
+	if slices.Contains(tab.relayout.entering, session) {
+		return pane.Hidden(true)
+	}
+	a.paneMotion(c, pane, tab, placement)
 	_, catalogActive, _ := a.catalogHostTransfer()
 	focused := tab.focused == session
 	transitioning := pane.Transitioning() || c.Now().Before(tab.layoutUntil)
-	animatingBounds := session == tab.zoomPane || focused && tab.layoutDuration == t.C.Desktop.ZoomDuration &&
+	animatingBounds := placement.resizing || session == tab.zoomPane || focused && tab.layoutDuration == t.C.Desktop.ZoomDuration &&
 		(tab.layoutPending || transitioning) && !a.reduceMotion(c)
 	layoutMoving := tab.workspaceResizedAt.Equal(c.Now()) || transitioning || animatingBounds
 	frozen := !session.revealing && (a.drag != nil || catalogActive || a.resizing != nil || layoutMoving)
@@ -199,6 +208,16 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 	opacity := float32(1)
 	if !focused {
 		opacity = 1 - tab.zoomMix
+	}
+	if !session.splitFadeStarted.IsZero() {
+		reveal := t.C.PaneReveal
+		progress := min(1, float32(c.Now().Sub(session.splitFadeStarted))/float32(reveal.Duration))
+		if progress < 1 {
+			opacity *= uikit.Easing(reveal.Easing)(progress)
+			c.AnimationFrame()
+		} else {
+			session.splitFadeStarted = time.Time{}
+		}
 	}
 	exit := ui.Motion{}
 	if !a.reduceMotion(c) {

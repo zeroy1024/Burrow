@@ -17,8 +17,9 @@ type terminalLayout struct {
 }
 
 type panePlacement struct {
-	session *remoteSession
-	rect    ui.Rect
+	session  *remoteSession
+	rect     ui.Rect
+	resizing bool
 }
 
 type splitPlacement struct {

@@ -41,6 +41,7 @@ type workspaceTab struct {
 	zoomFrom, zoomMix  float32
 	zoomPane           *remoteSession
 	zoomBounds         ui.Rect
+	relayout           paneRelayout
 	layoutDuration     time.Duration
 	layoutPending      bool
 	layoutUntil        time.Time
@@ -90,6 +91,7 @@ type remoteSession struct {
 	closeStarted                time.Time
 	revealing                   bool
 	revealStarted               time.Time
+	splitFadeStarted            time.Time
 }
 
 func demoHosts() []host {
@@ -328,9 +330,12 @@ func (a *app) splitSession(session *remoteSession, stacked bool) {
 	child := a.newShellSession(session.host, session.endpoint, session.temporary, session.connection)
 	node := tab.root.find(session)
 	node.insert(child, zone)
+	if tab.focused != session {
+		a.focusSession(tab, session)
+	}
+	a.startPaneRelayout(tab, child)
 	startPaneReveal(child)
 	a.markPaneLayout(tab, theme.Current().C.PaneReveal.Duration)
-	a.focusSession(tab, child)
 	a.setPaneZoom(tab, false)
 }
 
@@ -379,6 +384,7 @@ func (a *app) focusRemainingPane(tab *workspaceTab) {
 func (a *app) removePane(tab *workspaceTab, session *remoteSession) {
 	releaseSSH(session)
 	tab.root = tab.root.remove(session)
+	a.startPaneRelayout(tab, nil)
 	if tab.focused == session {
 		a.focusRemainingPane(tab)
 		a.setPaneZoom(tab, false)
