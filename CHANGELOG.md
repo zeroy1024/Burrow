@@ -13,6 +13,7 @@ Every released version has a `## <version> - <date>` section, English first, the
 - Draw the Shell focus ring inside the pane so split resize handles have equal space on both sides.
 - Expand and restore split Shell panes from their current visible position with the same smooth transition as sidebars and bottom docks.
 - Retract the original Shell pane before the new pane fades in and receives focus. Expand the remaining panes after a closed pane fades out.
+- Keep the far edge of the original Shell pane anchored when another pane is dragged to its side within a tab.
 
 **简体中文**
 
@@ -25,6 +26,7 @@ Every released version has a `## <version> - <date>` section, English first, the
 - 将 Shell 焦点边框移到窗格内侧，让分屏拖拽柄两侧的间距保持一致。
 - 分屏 Shell 从窗格当前显示的位置展开和还原，动效与侧栏和底栏折叠一致。
 - 分栏时原有 Shell 窗格先平滑收回，新窗格随后淡入并获得焦点。关闭的窗格淡出后，其余窗格平滑展开填满空位。
+- 在同一标签内把 Shell 拖到另一窗格边缘时，原窗格固定远边并平滑收回让位。
 
 ## 0.1.11 - 2026-11-17
 

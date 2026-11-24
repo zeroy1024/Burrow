@@ -1,6 +1,7 @@
 package desktop
 
 import (
+	"math"
 	"testing"
 	"time"
 
@@ -91,5 +92,63 @@ func TestTerminalPaneRelayoutAnimatesSurvivor(t *testing.T) {
 	tt.Advance(560 * time.Millisecond)
 	if shown != full {
 		t.Fatalf("survivor settled at %v, want %v", shown, full)
+	}
+}
+
+func TestTerminalPaneDropKeepsTargetFarEdgeAnchored(t *testing.T) {
+	a := &app{prefs: appPreferences{ReduceMotion: "off"}}
+	a.terminal.prefs = termtheme.DefaultPrefs()
+	top := a.newDisconnectedSession(0, host{name: "Top", port: 22}, false, nil)
+	middle := a.newDisconnectedSession(1, host{name: "Middle", port: 22}, false, nil)
+	bottom := a.newDisconnectedSession(2, host{name: "Bottom", port: 22}, false, nil)
+	tab := &workspaceTab{
+		root: &terminalLayout{
+			first: &terminalLayout{
+				first: &terminalLayout{session: top}, second: &terminalLayout{session: middle}, stacked: true, ratio: .5,
+			},
+			second: &terminalLayout{session: bottom}, stacked: true, ratio: 2.0 / 3,
+		},
+		focused: middle,
+	}
+	a.tabs = []*workspaceTab{tab}
+	workspace := ui.Point{X: 660, Y: 600}
+	var targetBounds, movedBounds ui.Rect
+	var drop bool
+	tt := ui.NewTester(func(c *ui.Context) {
+		if drop {
+			drop = false
+			source := paneTransfer{session: middle, tab: tab}
+			plan, ok := a.planPaneDrop(c, top, source, dropLeft)
+			if !ok || plan.zone != dropLeft {
+				t.Fatal("left edge drop did not create the requested split")
+			}
+			a.dockSession(tab, top, source, plan)
+		}
+		a.beginWorkspaceFrame(c)
+		root := ui.Column(c).Fill()
+		root.Children(func() { a.terminals(c, workspace) })
+		root.DrawOver(func(_ *ui.Painter, _ ui.Rect) {
+			targetBounds, movedBounds = top.frame.Bounds(c), middle.frame.Bounds(c)
+		})
+	}, 660, 600)
+	tt.Advance(32 * time.Millisecond)
+	start := targetBounds
+	drop = true
+	tt.Frame()
+	if targetBounds != start || movedBounds.W != 0 {
+		t.Fatalf("drop jumped before retraction: target=%v moved=%v start=%v", targetBounds, movedBounds, start)
+	}
+	for range 5 {
+		tt.Advance(16 * time.Millisecond)
+		if math.Abs(float64(targetBounds.X+targetBounds.W-(start.X+start.W))) > .1 || movedBounds.W != 0 {
+			t.Fatalf("target lost its right anchor or revealed the moved pane early: target=%v moved=%v", targetBounds, movedBounds)
+		}
+	}
+	if targetBounds.X <= start.X || targetBounds.W >= start.W || tab.focused != top {
+		t.Fatalf("target did not retract in place with focus: %v", targetBounds)
+	}
+	tt.Advance(650 * time.Millisecond)
+	if gap := targetBounds.X - (movedBounds.X + movedBounds.W); gap != theme.Current().C.Pane.Gap || tab.focused != middle {
+		t.Fatalf("drop did not settle in the left slot: target=%v moved=%v", targetBounds, movedBounds)
 	}
 }

@@ -652,6 +652,7 @@ func (a *app) dockSession(tab *workspaceTab, target *remoteSession, value any, p
 	t := theme.Current()
 	zone := plan.zone
 	var session *remoteSession
+	var localReorder bool
 	switch source := value.(type) {
 	case hostDrag:
 		session = a.newSession(source.id)
@@ -665,6 +666,7 @@ func (a *app) dockSession(tab *workspaceTab, target *remoteSession, value any, p
 			}
 		} else {
 			if source.tab == tab {
+				localReorder = !source.fromTab
 				tab.root = plan.remaining
 			} else {
 				source.tab.root = source.tab.root.remove(session)
@@ -679,7 +681,12 @@ func (a *app) dockSession(tab *workspaceTab, target *remoteSession, value any, p
 			tab.root.find(target).insert(session, zone)
 		}
 	}
-	a.focusSession(tab, session)
+	if localReorder {
+		a.focusSession(tab, target)
+		a.startPaneRelayout(tab, session)
+	} else {
+		a.focusSession(tab, session)
+	}
 	a.setPaneZoom(tab, false)
 	a.markPaneLayout(tab, t.C.ReorderMotion.PaneDrop.Duration)
 	startPaneReveal(session)

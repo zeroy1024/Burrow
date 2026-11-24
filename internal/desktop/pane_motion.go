@@ -130,8 +130,11 @@ func (a *app) paneRelayoutProgress(c *ui.Context, area ui.Element, tab *workspac
 		relayout.from = make(map[*remoteSession]ui.Rect, len(panes))
 		for _, placement := range panes {
 			session := placement.session
+			if session.closing || slices.Contains(relayout.entering, session) {
+				continue
+			}
 			visible := visiblePaneBounds(c, session, workspace)
-			if !session.closing && visible.W > 0 && visible.H > 0 && visible != placement.rect {
+			if visible.W > 0 && visible.H > 0 && visible != placement.rect {
 				relayout.from[session] = visible
 			}
 		}
