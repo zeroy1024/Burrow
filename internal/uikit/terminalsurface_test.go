@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/egoist/mygo/ui"
+	"github.com/zeroy1024/Burrow/internal/theme"
 )
 
 func TestTerminalPaneCardCompositesChromeBeforeClipping(t *testing.T) {
@@ -41,6 +42,40 @@ func TestTerminalPaneCardCompositesChromeBeforeClipping(t *testing.T) {
 						translucent, x, y, got.RGBAAt(x, y), reference.RGBAAt(x, y))
 				}
 			}
+		}
+	}
+}
+
+func TestTerminalPaneFocusKeepsSplitGapClear(t *testing.T) {
+	const scale = 2
+	const left, top, width, height, gap = 4, 4, 32, 40, 8
+	surface := theme.Dark()
+	colors := TerminalColors{Background: color.NRGBA{R: 30, G: 30, B: 46, A: 255}}
+	window := color.NRGBA{R: 232, G: 230, B: 230, A: 255}
+	ring := color.RGBA(surface.C.PaneFocus.RingFocused[0].Color)
+	gapStart, gapEnd := (left+width)*scale, (left+width+gap)*scale
+	y := (top + height/2) * scale
+	for active := range 2 {
+		got := ui.Render(func(c *ui.Context) {
+			ui.Box(c).Fill().Background(Color(window)).Children(func() {
+				for index := range 2 {
+					props := PaneProps{Surface: surface, Multiple: true, Focused: index == active}
+					pane := Pane(c, props).Absolute().Top(top).Left(float32(left+index*(width+gap))).Size(width, height)
+					pane.Children(func() {
+						card := TerminalPaneCard(c, surface.C.Pane.Radius, colors)
+						StylePaneFocus(pane, card, props)
+					})
+				}
+			})
+		}, 80, 48, scale)
+		for x := gapStart; x < gapEnd; x++ {
+			if pixel := got.RGBAAt(x, y); pixel != color.RGBA(window) {
+				t.Fatalf("focused pane %d paints into the divider gap at x=%d: %v", active, x, pixel)
+			}
+		}
+		edge := [2]int{gapStart - 1, gapEnd}[active]
+		if pixel := got.RGBAAt(edge, y); pixel != ring {
+			t.Errorf("focused pane %d inner edge = %v, want %v", active, pixel, ring)
 		}
 	}
 }

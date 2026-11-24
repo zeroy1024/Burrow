@@ -193,12 +193,14 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 		exit.Scale = t.C.Desktop.PaneCloseScale
 	}
 	exitAnimation := uikit.Tween(t.C.Desktop.PaneCloseDuration)
+	paneProps := uikit.PaneProps{
+		Key: "surface", Label: h.name + locales.MessageSshTerminal(), Surface: surface,
+		Focused: focused, Multiple: multiple, Lifted: a.lifted(session),
+	}
 	var paneSurface ui.Element
 	pane.Children(func() {
-		paneSurface = uikit.Pane(c, uikit.PaneProps{
-			Key: "surface", Label: h.name + locales.MessageSshTerminal(), Surface: surface,
-			Focused: focused, Multiple: multiple, Lifted: a.lifted(session),
-		}).Fill().Opacity(opacity).Transition(ui.ElementTransition{Colors: true, Animation: &exitAnimation, Exit: &exit}).
+		paneSurface = uikit.Pane(c, paneProps).Fill().Opacity(opacity).
+			Transition(ui.ElementTransition{Colors: true, Animation: &exitAnimation, Exit: &exit}).
 			OnClick(func() { a.focusSession(tab, session) })
 	})
 	hovered := paneSurface.Hovered()
@@ -206,6 +208,7 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 	var card ui.Element
 	paneSurface.Children(func() {
 		card = uikit.TerminalPaneCard(c, p.Radius, colors)
+		uikit.StylePaneFocus(paneSurface, card, paneProps)
 		card.Children(func() {
 			if session.terminal != nil {
 				output := a.sshTerminalView(c.Key("live-output"), session).

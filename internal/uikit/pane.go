@@ -52,8 +52,6 @@ func Pane(c *ui.Context, props PaneProps, slots ...PaneSlots) ui.Element {
 		root.DrawOver(func(p *ui.Painter, rect ui.Rect) {
 			p.Stroke(rect, ink, t.C.Card.Radius, width)
 		})
-	} else if !props.Lifted {
-		StylePaneFocus(root, props.Focused, props.Multiple, t)
 	}
 	if len(slots) != 0 {
 		root.Column().Children(func() {
@@ -323,20 +321,34 @@ func PaneHairline(c *ui.Context, surface *theme.Theme) ui.Element {
 	return Shadow(hairline, p.Outline)
 }
 
-func StylePaneFocus(pane ui.Element, focused, multiple bool, surface *theme.Theme) {
-	p := surface.C.PaneFocus
+func StylePaneFocus(pane, card ui.Element, props PaneProps) {
+	if props.Lifted {
+		return
+	}
+	p := props.Surface.C.PaneFocus
 	focusTarget, hoverTarget := float32(0), float32(0)
-	if multiple && focused {
+	if props.Multiple && props.Focused {
 		focusTarget = 1
 	}
-	if multiple && !focused && pane.Hovered() {
+	if props.Multiple && !props.Focused && pane.Hovered() {
 		hoverTarget = 1
 	}
 	focus := Visual(pane, "focus-ring", focusTarget, p.Transition)
 	hover := Visual(pane, "hover-ring", hoverTarget, p.Transition)
-	if !multiple {
+	if !props.Multiple {
 		return
 	}
 	ShadowOpacity(pane, p.RingHover, hover)
-	ShadowOpacity(pane, p.RingFocused, focus)
+	if focus > 0 {
+		ring := p.RingFocused[0]
+		ink := Color(ring.Color).Alpha(focus)
+		card.DrawOver(func(p *ui.Painter, rect ui.Rect) {
+			p.Stroke(
+				rect,
+				ink,
+				props.Surface.C.Pane.Radius,
+				ring.Spread,
+			)
+		})
+	}
 }
