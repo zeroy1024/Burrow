@@ -48,6 +48,9 @@ func TestTerminalPaneRelayoutAnimatesSurvivor(t *testing.T) {
 			}
 		})
 	}, 660, 416)
+	// Sample geometry in DIPs without rasterizing a full-size image under -race.
+	const scale = .5
+	tt.SetScale(scale)
 	tt.Advance(32 * time.Millisecond)
 	full := shown
 	split = true
@@ -63,7 +66,7 @@ func TestTerminalPaneRelayoutAnimatesSurvivor(t *testing.T) {
 	if bottomShown.H != 0 || tab.focused != top {
 		t.Fatalf("new pane was visible or focused during retraction: %v, focused pane %d", bottomShown, tab.focused.id)
 	}
-	const sampleX, sampleY = 530, 365
+	const sampleX, sampleY = int(530 * scale), int(364 * scale)
 	empty := tt.Image().RGBAAt(sampleX, sampleY)
 	for i := 0; i < 36 && bottomShown.H == 0; i++ {
 		tt.Advance(16 * time.Millisecond)
@@ -131,6 +134,7 @@ func TestTerminalPaneDropKeepsTargetFarEdgeAnchored(t *testing.T) {
 			targetBounds, movedBounds = top.frame.Bounds(c), middle.frame.Bounds(c)
 		})
 	}, 660, 600)
+	tt.SetScale(.5)
 	tt.Advance(32 * time.Millisecond)
 	start := targetBounds
 	drop = true

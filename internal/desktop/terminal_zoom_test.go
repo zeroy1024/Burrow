@@ -48,6 +48,7 @@ func TestTerminalPaneZoomSurvivesWorkspaceResize(t *testing.T) {
 		root.Children(func() { a.terminals(c, workspace) })
 		root.DrawOver(func(_ *ui.Painter, _ ui.Rect) { shown = left.frame.Bounds(c) })
 	}, 660, 400)
+	tt.SetScale(.5)
 	tt.Advance(32 * time.Millisecond)
 	start := shown
 	zoomAndResize = true
