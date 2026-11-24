@@ -1071,6 +1071,17 @@ class Driver:
         self.call("act", dict(id=candidates[-1]["id"], action="focus"))
         self.wait("terminal focus identity", lambda: (self.focused() or {}).get("ID") == target["ID"])
 
+    def wait_terminal_focus(self, session_id, host="Docker Password"):
+        label = host + " SSH 终端 #" + str(session_id)
+
+        def focused():
+            tree = self.call("tree")
+            return any(n.get("label") == label and str(n["id"]) == str(tree.get("focus"))
+                       for n in tree.get("nodes", []))
+
+        # The shell can connect while the original pane is still retracting.
+        self.wait("automatic keyboard focus after split reveal", focused)
+
     def command(self, command):
         self.text(command)
         self.key("Enter")
@@ -1170,15 +1181,7 @@ class Driver:
             raise RuntimeError("splitting created another TCP connection or repeated authentication")
         print("PASS native UI: split reuses one TCP connection and authentication")
         new_id = max(s["ID"] for s in split_sessions)
-        new_terminal_label = "Docker Password SSH 终端 #" + str(new_id)
-
-        def new_terminal_focused():
-            tree = self.call("tree")
-            return any(n.get("label") == new_terminal_label and str(n["id"]) == str(tree.get("focus"))
-                       for n in tree.get("nodes", []))
-
-        # The shell can connect while the original pane is still retracting.
-        self.wait("automatic keyboard focus after split reveal", new_terminal_focused)
+        self.wait_terminal_focus(new_id)
         default_marker = "BURROW_DEFAULT_SPLIT_" + str(self.counter)
         self.command("printf '\\n%s\\n' " + default_marker)
         def default_target():

@@ -288,6 +288,8 @@ def _ssh_lifecycle(driver):
         items if len(items := driver.sessions()) == 2 and
         all(item["State"] == CONNECTED for item in items) else None)
     _check(len({item["Connection"] for item in shells}) == 1, "split did not share its transport")
+    new = next(item for item in shells if item["ID"] != original["ID"])
+    driver.wait_terminal_focus(new["ID"])
     driver.command("printf '\\nCORE_E2E_NEW_%s\\n' \"${CORE_E2E_VALUE-unset}\"")
     driver.output("\nCORE_E2E_NEW_unset\n")
     closes = _nodes(driver, "关闭窗格 Docker Password", ("button",))
