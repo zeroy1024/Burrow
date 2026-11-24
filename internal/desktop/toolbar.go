@@ -75,6 +75,7 @@ func (a *app) titleBar(c *ui.Context, shown float32) {
 			a.selectTab(tabs.Select)
 		}
 		uikit.TitleBarActions(c).Children(func() {
+			a.forwardToggle(c)
 			uikit.IconButton(c, activityIcon, uikit.IconButtonProps{Key: locales.MessageServerMonitoring(), Label: locales.MessageServerMonitoring(), Variant: uikit.IconOnWindow,
 				On: &a.statusVisible, Disabled: a.activeSection() == sectionSettings}).Expanded(a.statusVisible)
 		})

@@ -393,6 +393,7 @@ func cloneHostEndpoint(endpoint host) host {
 	if options := endpoint.session.SSH; options != nil {
 		copy := *options
 		copy.Env = slices.Clone(options.Env)
+		copy.Forwards = slices.Clone(options.Forwards)
 		endpoint.session.SSH = &copy
 	}
 	if options := endpoint.session.Files; options != nil {

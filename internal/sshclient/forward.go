@@ -2,29 +2,33 @@ package sshclient
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
 	"sync"
+	"time"
 )
 
 // A local pipe gives the SSH channel independent deadlines and lets Close
 // unblock local I/O even when the remote server does not acknowledge channel
 // close. The parent joins the bounded bridge workers on transport shutdown.
 type tunnelConn struct {
-	net.Conn
-	bridge net.Conn
-	remote net.Conn
-	lease  *lease
-	cancel context.CancelFunc
-	once   sync.Once
+	reader, writer          net.Conn
+	bridgeRead, bridgeWrite net.Conn
+	remote                  net.Conn
+	lease                   *lease
+	cancel                  context.CancelFunc
+	once                    sync.Once
 }
 
 func (t *tunnelConn) abort() {
 	t.once.Do(func() {
 		t.cancel()
-		t.Conn.Close()
-		t.bridge.Close()
+		t.reader.Close()
+		t.writer.Close()
+		t.bridgeRead.Close()
+		t.bridgeWrite.Close()
 		t.lease.owner.workers.Go(func() { t.remote.Close() })
 	})
 }
@@ -38,6 +42,38 @@ func (t *tunnelConn) Close() error {
 func (t *tunnelConn) LocalAddr() net.Addr { return t.remote.LocalAddr() }
 
 func (t *tunnelConn) RemoteAddr() net.Addr { return t.remote.RemoteAddr() }
+
+func (t *tunnelConn) Read(b []byte) (int, error)  { return t.reader.Read(b) }
+func (t *tunnelConn) Write(b []byte) (int, error) { return t.writer.Write(b) }
+func (t *tunnelConn) CloseWrite() error           { return t.writer.Close() }
+
+func (t *tunnelConn) SetDeadline(at time.Time) error {
+	return errors.Join(t.SetReadDeadline(at), t.SetWriteDeadline(at))
+}
+
+func (t *tunnelConn) SetReadDeadline(at time.Time) error  { return t.reader.SetReadDeadline(at) }
+func (t *tunnelConn) SetWriteDeadline(at time.Time) error { return t.writer.SetWriteDeadline(at) }
+
+func (t *tunnelConn) relay() {
+	defer t.Close()
+	var sender sync.WaitGroup
+	sender.Go(func() {
+		if _, err := io.Copy(t.remote, t.bridgeRead); err != nil {
+			t.Close()
+			return
+		}
+		// An SSH TCP connection embeds its channel and supports EOF independently of Close.
+		if err := t.remote.(interface{ CloseWrite() error }).CloseWrite(); err != nil {
+			t.Close()
+		}
+	})
+	if _, err := io.Copy(t.bridgeWrite, t.remote); err != nil {
+		t.Close()
+	} else {
+		t.bridgeWrite.Close()
+	}
+	sender.Wait()
+}
 
 // DialContext opens a TCP connection from the remote host for a jump-host
 // handshake. Its context bounds establishment, as net.Dialer does; Close owns
@@ -71,21 +107,18 @@ func (c *Connection) DialContext(ctx context.Context, network, address string) (
 		conn, err := c.client.Dial(network, address)
 		var tunnel *tunnelConn
 		if err == nil {
-			local, bridge := net.Pipe()
-			tunnel = &tunnelConn{Conn: local, bridge: bridge, remote: conn, lease: l, cancel: cancel}
+			// A separate pipe per direction preserves TCP half-closes while keeping local deadlines.
+			reader, bridgeWrite := net.Pipe()
+			bridgeRead, writer := net.Pipe()
+			tunnel = &tunnelConn{
+				reader: reader, writer: writer, bridgeRead: bridgeRead, bridgeWrite: bridgeWrite,
+				remote: conn, lease: l, cancel: cancel,
+			}
 			if !l.bind(tunnel.abort) {
 				tunnel.abort()
 				tunnel, err = nil, ErrClosed
 			} else {
-				opened := tunnel
-				c.workers.Go(func() {
-					defer opened.Close()
-					_, _ = io.Copy(opened.bridge, opened.remote)
-				})
-				c.workers.Go(func() {
-					defer opened.Close()
-					_, _ = io.Copy(opened.remote, opened.bridge)
-				})
+				c.workers.Go(tunnel.relay)
 			}
 		} else {
 			err = fmt.Errorf("open SSH tunnel: %w", err)

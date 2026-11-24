@@ -5,10 +5,16 @@ Every released version has a `## <version> - <date>` section, English first, the
 ## Unreleased
 
 - Keep collecting SSH server metrics while the app is in the background, and show gaps when sampling is interrupted.
+- Open the SSH port forwarding dock from the title bar to manage local TCP forwards and SOCKS5 proxies with configurable listen addresses alongside server monitoring.
+- Show a confirmation after copying an address from the SSH port forwarding dock.
+- Drag the top edge of the SSH port forwarding dock to resize it, or double-click the handle to reset its height.
 
 **简体中文**
 
 - 应用退到后台时继续采集 SSH 服务器指标，并在趋势图上显示断采缺口。
+- 从 SSH 标题栏打开端口转发底栏，管理监听地址可设置的本地 TCP 转发和 SOCKS5 代理，同时查看服务器状态。
+- 在 SSH 端口转发底栏复制地址后显示成功提示。
+- 拖动 SSH 端口转发底栏的上沿可调整高度，双击拖拽柄可恢复默认高度。
 
 ## 0.1.11 - 2026-11-17
 

@@ -404,6 +404,7 @@ func (a *app) draftHost(d *hostDraft) host {
 	if d.auth == "anonymous" {
 		h.user = "anonymous"
 	}
+	previousSSH := h.session.SSH
 	h.session.SSH, h.session.Files = nil, nil
 	if d.files {
 		h.session.Files = &fileOptions{RemoteDir: d.remoteDir, LocalDir: d.localDir, Encoding: d.encoding}
@@ -418,6 +419,9 @@ func (a *app) draftHost(d *hostDraft) host {
 			env = append(env, d.envInput)
 		}
 		h.session.SSH = &sshOptions{KeepAlive: keepalive, HealthCheck: healthCheck, InitCommand: d.initCommand, TermScheme: d.termScheme, Env: env, Platform: d.platform}
+		if previousSSH != nil {
+			h.session.SSH.Forwards = previousSSH.Forwards
+		}
 	}
 	return h
 }

@@ -44,6 +44,7 @@ func sshHostSnapshot(h host) host {
 	if h.session.SSH != nil {
 		options := *h.session.SSH
 		options.Env = slices.Clone(options.Env)
+		options.Forwards = slices.Clone(options.Forwards)
 		h.session.SSH = &options
 	}
 	if h.session.Files != nil {

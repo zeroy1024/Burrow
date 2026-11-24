@@ -37,7 +37,8 @@ type sshOptions struct {
 	TermScheme  string   `json:"termScheme,omitempty"`
 	Env         []string `json:"env,omitempty"`
 	// Platform pins the remote system; empty detects it on connect.
-	Platform string `json:"platform,omitempty"`
+	Platform string           `json:"platform,omitempty"`
+	Forwards []sshForwardRule `json:"forwards,omitempty"`
 }
 
 type fileOptions struct {
@@ -253,6 +254,9 @@ func validateSessionProfile(h host, byID map[string]host, keyIDs map[string]bool
 		}
 		if !validPlatformOverride(options.Platform) {
 			return errors.New("invalid remote platform")
+		}
+		if err := validateForwardRules(options.Forwards); err != nil {
+			return err
 		}
 	}
 	if h.session.GatewayRoute != nil {

@@ -116,6 +116,7 @@ type app struct {
 	tabScroll          ui.ScrollState
 	tabPress           ui.Point
 	statusVisible      bool
+	forwardUI          forwardPanel
 	window             *mygo.Window
 	tray               trayState
 	quitMenu           *mygo.MenuItem
@@ -600,6 +601,7 @@ func (a *app) view(c *ui.Context) {
 	}
 	a.gatewayDialog(c)
 	a.sshDialogs(c)
+	a.sshForwardDialog(c)
 	a.credentialDialogs(c)
 	a.applicationSecurityDialog(c)
 	a.migrationDialog(c)
@@ -728,10 +730,11 @@ func (a *app) workspace(c *ui.Context, shown float32) {
 		// Both cards and the terminal use this frame's sidebar/monitor progress.
 		sidebarWidth := (a.page().sidebarWidth + t.C.Window.Gutter) * shown
 		statusWidth := (t.Size.StatsPanel + t.C.Window.Gutter) * statusShown
-		a.terminals(c, ui.Point{
+		size := ui.Point{
 			X: width - t.C.Rail.Width - t.C.Window.Gutter - sidebarWidth - statusWidth,
 			Y: height - max(t.C.Titlebar.Height, c.TitleBar().Height) - t.C.Window.Gutter,
-		})
+		}
+		a.sshWorkspace(c, size)
 		status := uikit.Card(c).Key("status").Width(t.Size.StatsPanel * statusShown).Shrink(0).
 			MarginStart(t.C.Window.Gutter * statusShown).Hidden(statusShown == 0 && statusOpacity == 0)
 		if !a.statusVisible {

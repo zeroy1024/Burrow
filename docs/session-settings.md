@@ -12,6 +12,14 @@ SSH and File Transfer maintain their own entries, groups, order, and collapsed s
 
 When deleting a saved host or site, the confirmation lists related transfers with their source (manual or MCP), filename, state, and errors, and offers **View tasks**. For unfinished tasks, **Cancel tasks and delete** waits for workers to stop, temporary files to be cleaned up, and the queue to be saved before deleting the entry and its credential. Failure keeps the entry and shows the reason so the user can retry. Completed records do not block deletion; transferred files and MCP audit history remain. New transfers for that entry are refused during deletion. Association uses stable session IDs, so removing another entry or changing list positions cannot match the wrong session. Successful deletion closes associated saved sessions and removes their closed-tab recovery entries. References still prevent deletion of dependencies such as SSH hosts used by gateways or managed keys in use. Other saved entries with the same name or address remain independent.
 
+## SSH port forwarding
+
+Open **Port forwarding** from the SSH title bar to manage the current connection's rules. The dock is hidden by default and can open alongside server monitoring. Terminal panes that share one SSH connection also share its forwarding rules.
+
+Local forwarding connects one local port to a fixed destination. The SOCKS5 proxy accepts TCP destinations chosen by the application and passes hostnames to the SSH side. Both let you set a local IPv4 or IPv6 listen address and a port from 1024 to 65535. New rules prefill `127.0.0.1`, and existing rules with no address use that default. `0.0.0.0` binds all IPv4 interfaces, and `::` binds all IPv6 interfaces. For wildcard listeners, clients connect to a reachable address of the local machine. The SOCKS5 proxy uses no client authentication. The destination test checks whether the current SSH connection can open a TCP channel to the target.
+
+Hiding the dock, changing pages, or moving Burrow to the tray keeps forwarding active while SSH stays connected. Stopping a rule closes its listener and active streams. A disconnect, closure of the last terminal on the connection, or quitting Burrow also stops forwarding. Select **Save to this host** to start the rule manually after reconnecting. Temporary rules expire with their connection.
+
 ## Connection gateways
 
 **Gateways** is a separate page below File Transfer in the app rail, rather than a Settings category. It manages SSH / SOCKS5 / WireGuard gateways and the app default. The header shows the default exit and its resolved route; the sidebar groups gateways by type, and the detail pane shows the selected route, configuration, and references.

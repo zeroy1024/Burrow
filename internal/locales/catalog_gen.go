@@ -34,6 +34,406 @@ type Messages struct{ locale string }
 // source language.
 func In(locale string) Messages { return Messages{locale} }
 
+// ForwardTitle says "端口转发"
+// in the language the app shows.
+func ForwardTitle() string { return In(i18n.Locale()).ForwardTitle() }
+
+// ForwardTitle says "端口转发"
+// in the language of msgs.
+func (msgs Messages) ForwardTitle() string {
+	return Catalog.Format(msgs.locale, "forwardTitle", nil)
+}
+
+// ForwardActiveCount says "%d 条运行"
+// in the language the app shows.
+func ForwardActiveCount() string { return In(i18n.Locale()).ForwardActiveCount() }
+
+// ForwardActiveCount says "%d 条运行"
+// in the language of msgs.
+func (msgs Messages) ForwardActiveCount() string {
+	return Catalog.Format(msgs.locale, "forwardActiveCount", nil)
+}
+
+// ForwardLocal says "本地转发"
+// in the language the app shows.
+func ForwardLocal() string { return In(i18n.Locale()).ForwardLocal() }
+
+// ForwardLocal says "本地转发"
+// in the language of msgs.
+func (msgs Messages) ForwardLocal() string {
+	return Catalog.Format(msgs.locale, "forwardLocal", nil)
+}
+
+// ForwardSOCKS says "SOCKS5 代理"
+// in the language the app shows.
+func ForwardSOCKS() string { return In(i18n.Locale()).ForwardSOCKS() }
+
+// ForwardSOCKS says "SOCKS5 代理"
+// in the language of msgs.
+func (msgs Messages) ForwardSOCKS() string {
+	return Catalog.Format(msgs.locale, "forwardSOCKS", nil)
+}
+
+// ForwardType says "转发类型"
+// in the language the app shows.
+func ForwardType() string { return In(i18n.Locale()).ForwardType() }
+
+// ForwardType says "转发类型"
+// in the language of msgs.
+func (msgs Messages) ForwardType() string {
+	return Catalog.Format(msgs.locale, "forwardType", nil)
+}
+
+// ForwardTemporary says "临时"
+// in the language the app shows.
+func ForwardTemporary() string { return In(i18n.Locale()).ForwardTemporary() }
+
+// ForwardTemporary says "临时"
+// in the language of msgs.
+func (msgs Messages) ForwardTemporary() string {
+	return Catalog.Format(msgs.locale, "forwardTemporary", nil)
+}
+
+// ForwardNew says "新建转发规则"
+// in the language the app shows.
+func ForwardNew() string { return In(i18n.Locale()).ForwardNew() }
+
+// ForwardNew says "新建转发规则"
+// in the language of msgs.
+func (msgs Messages) ForwardNew() string {
+	return Catalog.Format(msgs.locale, "forwardNew", nil)
+}
+
+// ForwardHide says "隐藏端口转发底栏"
+// in the language the app shows.
+func ForwardHide() string { return In(i18n.Locale()).ForwardHide() }
+
+// ForwardHide says "隐藏端口转发底栏"
+// in the language of msgs.
+func (msgs Messages) ForwardHide() string {
+	return Catalog.Format(msgs.locale, "forwardHide", nil)
+}
+
+// ForwardResize says "调整端口转发底栏高度"
+// in the language the app shows.
+func ForwardResize() string { return In(i18n.Locale()).ForwardResize() }
+
+// ForwardResize says "调整端口转发底栏高度"
+// in the language of msgs.
+func (msgs Messages) ForwardResize() string {
+	return Catalog.Format(msgs.locale, "forwardResize", nil)
+}
+
+// ForwardEmpty says "当前连接暂无转发规则"
+// in the language the app shows.
+func ForwardEmpty() string { return In(i18n.Locale()).ForwardEmpty() }
+
+// ForwardEmpty says "当前连接暂无转发规则"
+// in the language of msgs.
+func (msgs Messages) ForwardEmpty() string {
+	return Catalog.Format(msgs.locale, "forwardEmpty", nil)
+}
+
+// ForwardListening says "监听中"
+// in the language the app shows.
+func ForwardListening() string { return In(i18n.Locale()).ForwardListening() }
+
+// ForwardListening says "监听中"
+// in the language of msgs.
+func (msgs Messages) ForwardListening() string {
+	return Catalog.Format(msgs.locale, "forwardListening", nil)
+}
+
+// ForwardStopped says "已停止"
+// in the language the app shows.
+func ForwardStopped() string { return In(i18n.Locale()).ForwardStopped() }
+
+// ForwardStopped says "已停止"
+// in the language of msgs.
+func (msgs Messages) ForwardStopped() string {
+	return Catalog.Format(msgs.locale, "forwardStopped", nil)
+}
+
+// ForwardFailed says "启动失败"
+// in the language the app shows.
+func ForwardFailed() string { return In(i18n.Locale()).ForwardFailed() }
+
+// ForwardFailed says "启动失败"
+// in the language of msgs.
+func (msgs Messages) ForwardFailed() string {
+	return Catalog.Format(msgs.locale, "forwardFailed", nil)
+}
+
+// ForwardClientDestination says "由应用指定目标"
+// in the language the app shows.
+func ForwardClientDestination() string { return In(i18n.Locale()).ForwardClientDestination() }
+
+// ForwardClientDestination says "由应用指定目标"
+// in the language of msgs.
+func (msgs Messages) ForwardClientDestination() string {
+	return Catalog.Format(msgs.locale, "forwardClientDestination", nil)
+}
+
+// ForwardCopyAddress says "复制转发地址"
+// in the language the app shows.
+func ForwardCopyAddress() string { return In(i18n.Locale()).ForwardCopyAddress() }
+
+// ForwardCopyAddress says "复制转发地址"
+// in the language of msgs.
+func (msgs Messages) ForwardCopyAddress() string {
+	return Catalog.Format(msgs.locale, "forwardCopyAddress", nil)
+}
+
+// ForwardTestTarget says "测试目标"
+// in the language the app shows.
+func ForwardTestTarget() string { return In(i18n.Locale()).ForwardTestTarget() }
+
+// ForwardTestTarget says "测试目标"
+// in the language of msgs.
+func (msgs Messages) ForwardTestTarget() string {
+	return Catalog.Format(msgs.locale, "forwardTestTarget", nil)
+}
+
+// ForwardTest says "测试"
+// in the language the app shows.
+func ForwardTest() string { return In(i18n.Locale()).ForwardTest() }
+
+// ForwardTest says "测试"
+// in the language of msgs.
+func (msgs Messages) ForwardTest() string {
+	return Catalog.Format(msgs.locale, "forwardTest", nil)
+}
+
+// ForwardTesting says "正在测试目标…"
+// in the language the app shows.
+func ForwardTesting() string { return In(i18n.Locale()).ForwardTesting() }
+
+// ForwardTesting says "正在测试目标…"
+// in the language of msgs.
+func (msgs Messages) ForwardTesting() string {
+	return Catalog.Format(msgs.locale, "forwardTesting", nil)
+}
+
+// ForwardTargetReachable says "目标可达"
+// in the language the app shows.
+func ForwardTargetReachable() string { return In(i18n.Locale()).ForwardTargetReachable() }
+
+// ForwardTargetReachable says "目标可达"
+// in the language of msgs.
+func (msgs Messages) ForwardTargetReachable() string {
+	return Catalog.Format(msgs.locale, "forwardTargetReachable", nil)
+}
+
+// ForwardTargetFailed says "无法连接目标。%v"
+// in the language the app shows.
+func ForwardTargetFailed() string { return In(i18n.Locale()).ForwardTargetFailed() }
+
+// ForwardTargetFailed says "无法连接目标。%v"
+// in the language of msgs.
+func (msgs Messages) ForwardTargetFailed() string {
+	return Catalog.Format(msgs.locale, "forwardTargetFailed", nil)
+}
+
+// ForwardListenFailed says "无法监听本机端口。%v"
+// in the language the app shows.
+func ForwardListenFailed() string { return In(i18n.Locale()).ForwardListenFailed() }
+
+// ForwardListenFailed says "无法监听本机端口。%v"
+// in the language of msgs.
+func (msgs Messages) ForwardListenFailed() string {
+	return Catalog.Format(msgs.locale, "forwardListenFailed", nil)
+}
+
+// ForwardRuleOptions says "转发规则操作"
+// in the language the app shows.
+func ForwardRuleOptions() string { return In(i18n.Locale()).ForwardRuleOptions() }
+
+// ForwardRuleOptions says "转发规则操作"
+// in the language of msgs.
+func (msgs Messages) ForwardRuleOptions() string {
+	return Catalog.Format(msgs.locale, "forwardRuleOptions", nil)
+}
+
+// ForwardEdit says "编辑转发规则"
+// in the language the app shows.
+func ForwardEdit() string { return In(i18n.Locale()).ForwardEdit() }
+
+// ForwardEdit says "编辑转发规则"
+// in the language of msgs.
+func (msgs Messages) ForwardEdit() string {
+	return Catalog.Format(msgs.locale, "forwardEdit", nil)
+}
+
+// ForwardDelete says "删除转发规则"
+// in the language the app shows.
+func ForwardDelete() string { return In(i18n.Locale()).ForwardDelete() }
+
+// ForwardDelete says "删除转发规则"
+// in the language of msgs.
+func (msgs Messages) ForwardDelete() string {
+	return Catalog.Format(msgs.locale, "forwardDelete", nil)
+}
+
+// ForwardDeleteConfirm says "删除此转发规则？"
+// in the language the app shows.
+func ForwardDeleteConfirm() string { return In(i18n.Locale()).ForwardDeleteConfirm() }
+
+// ForwardDeleteConfirm says "删除此转发规则？"
+// in the language of msgs.
+func (msgs Messages) ForwardDeleteConfirm() string {
+	return Catalog.Format(msgs.locale, "forwardDeleteConfirm", nil)
+}
+
+// ForwardStart says "启动转发"
+// in the language the app shows.
+func ForwardStart() string { return In(i18n.Locale()).ForwardStart() }
+
+// ForwardStart says "启动转发"
+// in the language of msgs.
+func (msgs Messages) ForwardStart() string {
+	return Catalog.Format(msgs.locale, "forwardStart", nil)
+}
+
+// ForwardStop says "停止转发"
+// in the language the app shows.
+func ForwardStop() string { return In(i18n.Locale()).ForwardStop() }
+
+// ForwardStop says "停止转发"
+// in the language of msgs.
+func (msgs Messages) ForwardStop() string {
+	return Catalog.Format(msgs.locale, "forwardStop", nil)
+}
+
+// ForwardLocalPort says "本机端口"
+// in the language the app shows.
+func ForwardLocalPort() string { return In(i18n.Locale()).ForwardLocalPort() }
+
+// ForwardLocalPort says "本机端口"
+// in the language of msgs.
+func (msgs Messages) ForwardLocalPort() string {
+	return Catalog.Format(msgs.locale, "forwardLocalPort", nil)
+}
+
+// ForwardTargetHost says "目标主机"
+// in the language the app shows.
+func ForwardTargetHost() string { return In(i18n.Locale()).ForwardTargetHost() }
+
+// ForwardTargetHost says "目标主机"
+// in the language of msgs.
+func (msgs Messages) ForwardTargetHost() string {
+	return Catalog.Format(msgs.locale, "forwardTargetHost", nil)
+}
+
+// ForwardTargetPort says "目标端口"
+// in the language the app shows.
+func ForwardTargetPort() string { return In(i18n.Locale()).ForwardTargetPort() }
+
+// ForwardTargetPort says "目标端口"
+// in the language of msgs.
+func (msgs Messages) ForwardTargetPort() string {
+	return Catalog.Format(msgs.locale, "forwardTargetPort", nil)
+}
+
+// ForwardListenHost says "监听地址"
+// in the language the app shows.
+func ForwardListenHost() string { return In(i18n.Locale()).ForwardListenHost() }
+
+// ForwardListenHost says "监听地址"
+// in the language of msgs.
+func (msgs Messages) ForwardListenHost() string {
+	return Catalog.Format(msgs.locale, "forwardListenHost", nil)
+}
+
+// ForwardInvalidListenHost says "请输入本机 IPv4 或 IPv6 地址。"
+// in the language the app shows.
+func ForwardInvalidListenHost() string { return In(i18n.Locale()).ForwardInvalidListenHost() }
+
+// ForwardInvalidListenHost says "请输入本机 IPv4 或 IPv6 地址。"
+// in the language of msgs.
+func (msgs Messages) ForwardInvalidListenHost() string {
+	return Catalog.Format(msgs.locale, "forwardInvalidListenHost", nil)
+}
+
+// ForwardNonLoopbackHelp says "能访问此地址的设备也可使用此转发。"
+// in the language the app shows.
+func ForwardNonLoopbackHelp() string { return In(i18n.Locale()).ForwardNonLoopbackHelp() }
+
+// ForwardNonLoopbackHelp says "能访问此地址的设备也可使用此转发。"
+// in the language of msgs.
+func (msgs Messages) ForwardNonLoopbackHelp() string {
+	return Catalog.Format(msgs.locale, "forwardNonLoopbackHelp", nil)
+}
+
+// ForwardSOCKSNonLoopbackHelp says "能访问此地址的设备也可使用此代理。SOCKS5 无客户端认证。"
+// in the language the app shows.
+func ForwardSOCKSNonLoopbackHelp() string { return In(i18n.Locale()).ForwardSOCKSNonLoopbackHelp() }
+
+// ForwardSOCKSNonLoopbackHelp says "能访问此地址的设备也可使用此代理。SOCKS5 无客户端认证。"
+// in the language of msgs.
+func (msgs Messages) ForwardSOCKSNonLoopbackHelp() string {
+	return Catalog.Format(msgs.locale, "forwardSOCKSNonLoopbackHelp", nil)
+}
+
+// ForwardSaveHost says "保存到此主机"
+// in the language the app shows.
+func ForwardSaveHost() string { return In(i18n.Locale()).ForwardSaveHost() }
+
+// ForwardSaveHost says "保存到此主机"
+// in the language of msgs.
+func (msgs Messages) ForwardSaveHost() string {
+	return Catalog.Format(msgs.locale, "forwardSaveHost", nil)
+}
+
+// ForwardInvalidLocalPort says "本机端口须为 1024 至 65535。"
+// in the language the app shows.
+func ForwardInvalidLocalPort() string { return In(i18n.Locale()).ForwardInvalidLocalPort() }
+
+// ForwardInvalidLocalPort says "本机端口须为 1024 至 65535。"
+// in the language of msgs.
+func (msgs Messages) ForwardInvalidLocalPort() string {
+	return Catalog.Format(msgs.locale, "forwardInvalidLocalPort", nil)
+}
+
+// ForwardInvalidTarget says "请输入目标主机名或 IP 地址，以及 1 至 65535 的目标端口。"
+// in the language the app shows.
+func ForwardInvalidTarget() string { return In(i18n.Locale()).ForwardInvalidTarget() }
+
+// ForwardInvalidTarget says "请输入目标主机名或 IP 地址，以及 1 至 65535 的目标端口。"
+// in the language of msgs.
+func (msgs Messages) ForwardInvalidTarget() string {
+	return Catalog.Format(msgs.locale, "forwardInvalidTarget", nil)
+}
+
+// ForwardSavedHostChanged says "主机资料已变化。请重新连接后再保存转发规则。"
+// in the language the app shows.
+func ForwardSavedHostChanged() string { return In(i18n.Locale()).ForwardSavedHostChanged() }
+
+// ForwardSavedHostChanged says "主机资料已变化。请重新连接后再保存转发规则。"
+// in the language of msgs.
+func (msgs Messages) ForwardSavedHostChanged() string {
+	return Catalog.Format(msgs.locale, "forwardSavedHostChanged", nil)
+}
+
+// ForwardSavedRuleChanged says "已保存的转发规则已变化。请重新连接以加载新规则。"
+// in the language the app shows.
+func ForwardSavedRuleChanged() string { return In(i18n.Locale()).ForwardSavedRuleChanged() }
+
+// ForwardSavedRuleChanged says "已保存的转发规则已变化。请重新连接以加载新规则。"
+// in the language of msgs.
+func (msgs Messages) ForwardSavedRuleChanged() string {
+	return Catalog.Format(msgs.locale, "forwardSavedRuleChanged", nil)
+}
+
+// ForwardNeedsSSH says "请先连接 SSH。"
+// in the language the app shows.
+func ForwardNeedsSSH() string { return In(i18n.Locale()).ForwardNeedsSSH() }
+
+// ForwardNeedsSSH says "请先连接 SSH。"
+// in the language of msgs.
+func (msgs Messages) ForwardNeedsSSH() string {
+	return Catalog.Format(msgs.locale, "forwardNeedsSSH", nil)
+}
+
 // MigrationTitle says "设备迁移"
 // in the language the app shows.
 func MigrationTitle() string { return In(i18n.Locale()).MigrationTitle() }

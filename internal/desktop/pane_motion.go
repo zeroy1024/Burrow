@@ -100,6 +100,9 @@ func (a *app) enforcePaneMinimum(c *ui.Context) {
 	if active == sectionSSH && a.statusVisible {
 		width += t.Size.StatsPanel + t.C.Window.Gutter
 	}
+	if active == sectionSSH && a.forwardUI.visible && a.forwardSession() != nil {
+		minimum.Y += forwardMinimumHeight() + t.C.Window.Gutter
+	}
 	size := [2]int{
 		max(int(t.C.Desktop.WindowMinWidth), int(math.Ceil(float64(width)))),
 		max(int(t.C.Desktop.WindowMinHeight), int(minimum.Y+t.C.Titlebar.Height+t.C.Window.Gutter)),
