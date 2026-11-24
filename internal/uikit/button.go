@@ -134,19 +134,21 @@ func styleIconButton(e ui.Element, t *theme.Theme, variant IconVariant, on bool)
 		hover = Color(t.Color.State.OnWindow)
 		if runtime.GOOS == "windows" {
 			hover, pressed = Color(t.C.Desktop.RailHover), Color(t.C.Desktop.RailPressed)
-			if on {
-				bg, ink = Color(t.Color.Accent.Tint10), Color(t.Color.Accent.Default)
-				pressed = Color(t.Color.Accent.Tint15)
-			}
 		}
+		if on {
+			bg, ink = Color(t.Color.Accent.Tint10), Color(t.Color.Text.AccentStrong)
+			hover, pressed = Color(t.Color.Accent.Tint28), Color(t.Color.Accent.Tint35)
+		}
+	} else if on {
+		hover = bg
 	}
 	if !e.IsDisabled() {
 		switch {
 		case e.Pressed():
 			bg = pressed
 		case e.Hovered():
+			bg = hover
 			if !on {
-				bg = hover
 				ink = Color(p.IconHover)
 			}
 		}
