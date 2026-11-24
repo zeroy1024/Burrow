@@ -1169,15 +1169,23 @@ class Driver:
         if self.server_connections() != connections_before_split:
             raise RuntimeError("splitting created another TCP connection or repeated authentication")
         print("PASS native UI: split reuses one TCP connection and authentication")
+        new_id = max(s["ID"] for s in split_sessions)
+        new_terminal_label = "Docker Password SSH 终端 #" + str(new_id)
+
+        def new_terminal_focused():
+            tree = self.call("tree")
+            return any(n.get("label") == new_terminal_label and str(n["id"]) == str(tree.get("focus"))
+                       for n in tree.get("nodes", []))
+
+        # The shell can connect while the original pane is still retracting.
+        self.wait("automatic keyboard focus after split reveal", new_terminal_focused)
         default_marker = "BURROW_DEFAULT_SPLIT_" + str(self.counter)
         self.command("printf '\\n%s\\n' " + default_marker)
         def default_target():
             sessions = self.sessions()
             return sessions if any("\n" + default_marker + "\n" in s["Text"] for s in sessions) else None
         default_sessions = self.wait("default split keyboard target", default_target)
-        new_id = max(s["ID"] for s in split_sessions)
-        if ([s["ID"] for s in split_sessions if s["Focused"]] != [new_id]
-                or [s["ID"] for s in default_sessions if s["Focused"]] != [new_id]
+        if ([s["ID"] for s in default_sessions if s["Focused"]] != [new_id]
                 or [s["ID"] for s in default_sessions if "\n" + default_marker + "\n" in s["Text"]] != [new_id]):
             raise RuntimeError("new split did not own the default keyboard focus")
         print("PASS native UI: new split owns default keyboard focus")
@@ -1205,6 +1213,7 @@ class Driver:
         if self.server_connections() != connections_before_split:
             raise RuntimeError("closing one pane changed the surviving shared transport")
         self.focus_terminal()
+        self.call("idle", dict(timeout=5000))
         self.check_grid()
         self.command("printf '\\n%s\\n' BURROW_BEFORE_RECONNECT")
         self.output("\nBURROW_BEFORE_RECONNECT\n")
