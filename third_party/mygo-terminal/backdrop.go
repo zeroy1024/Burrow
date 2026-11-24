@@ -81,7 +81,7 @@ func (v *view) paintBackdrop(p *ui.Painter, band ui.Rect, origin ui.Point) {
 	ox := (float32(math.Round(float64(origin.X*s))) + float32(v.ox)) / s
 	oy := (float32(math.Round(float64(origin.Y*s))) + float32(v.oy)) / s
 	base := float32(v.baseline) / s
-	p.Fill(band, color(v.colors.Background), 0)
+	v.paintBackground(p, band)
 	v.drawImages(
 		p,
 		belowBackground,

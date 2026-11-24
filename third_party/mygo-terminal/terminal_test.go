@@ -2737,12 +2737,14 @@ func TestTransparentProgramBackground(t *testing.T) {
 	}
 	defer term.Close()
 	tt := ui.NewTester(func(c *ui.Context) {
-		ui.Box(c).Fill().Background(ui.RGB(0, 0, 255)).Children(func() { View(c, term).Fill() })
+		ui.Box(c).Fill().Background(ui.RGB(0, 0, 255)).Children(func() {
+			View(c, term).Absolute().Top(0).Left(0).Right(0).Height(150)
+			ViewportBackdrop(c, term, ViewportBackdropOptions{Bottom: 50}).Absolute().Fill()
+		})
 	}, 400, 200)
-	at := func() ui.Color {
-		c := tt.Image().RGBAAt(int(300*term.v.scale), int(150*term.v.scale))
-		return ui.RGB(c.R, c.G, c.B)
-	}
+	term.Feed([]byte(strings.Repeat("line\r\n", 40)))
+	tt.Frame()
+	tt.Wheel(100, 100, 0, -hostNotch())
 	red, blue := ui.RGB(255, 0, 0), ui.RGB(0, 0, 255)
 	for _, c := range []struct {
 		label, out string
@@ -2754,8 +2756,15 @@ func TestTransparentProgramBackground(t *testing.T) {
 	} {
 		term.Feed([]byte(c.out))
 		tt.Frame()
-		if got := at(); got != c.want {
-			t.Errorf("%s: the background is %v, want %v", c.label, got, c.want)
+		if len(term.v.edgeRows) == 0 {
+			t.Fatal("missing scrollback rows behind the footer")
+		}
+		frame := tt.Image()
+		for _, y := range []float32{100, 180} {
+			pixel := frame.RGBAAt(int(300*term.v.scale), int(y*term.v.scale))
+			if got := ui.RGB(pixel.R, pixel.G, pixel.B); got != c.want {
+				t.Errorf("%s: background at y=%g is %v, want %v", c.label, y, got, c.want)
+			}
 		}
 	}
 }

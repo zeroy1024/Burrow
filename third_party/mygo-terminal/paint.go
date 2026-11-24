@@ -511,6 +511,13 @@ func (v *view) shape(text string, variant int, scale float32) []ui.Glyph {
 	return g
 }
 
+// A transparent terminal still draws a background a program set (OSC 11).
+func (v *view) paintBackground(p *ui.Painter, rect ui.Rect) {
+	if !v.t.opts.Transparent || v.colors.Background != rgb(v.theme.Background) {
+		p.Fill(rect, color(v.colors.Background), 0)
+	}
+}
+
 // draw draws the rows and the cursor.
 func (v *view) draw(p *ui.Painter, r ui.Rect) {
 	s := v.scale
@@ -519,11 +526,7 @@ func (v *view) draw(p *ui.Painter, r ui.Rect) {
 	ox := (float32(math.Round(float64(r.X*s))) + float32(v.ox)) / s
 	oy := (float32(math.Round(float64(r.Y*s))) + float32(v.oy)) / s
 	base := float32(v.baseline) / s
-	// A transparent terminal still draws a background a program set (OSC
-	// 11), as Ghostty shows it.
-	if !v.t.opts.Transparent || v.colors.Background != rgb(v.theme.Background) {
-		p.Fill(r, color(v.colors.Background), 0)
-	}
+	v.paintBackground(p, r)
 	if v.t.opts.PaddingColor != PaddingBackground {
 		v.extendPadding(p, r, ox, oy, cw, ch)
 	}

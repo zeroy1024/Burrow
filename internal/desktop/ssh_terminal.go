@@ -97,6 +97,7 @@ func (a *app) attachSSH(session *remoteSession, run *sshRuntime) {
 		Columns: columns, Rows: rows,
 		Conn: transport, Font: a.sshFont(), Theme: a.sshColors(session),
 		Cursor: nativeterm.CursorStyle(prefs.CursorShape), NoBlink: !blink, ScrollbackLines: scrollbackLines,
+		Transparent:      true,
 		Padding:          nativeterm.Padding{X: theme.Current().C.Pane.ContentSide, Y: -1},
 		NoClipboardWrite: true, ClipboardRead: nativeterm.ClipboardDeny,
 		OnBell: func() {
