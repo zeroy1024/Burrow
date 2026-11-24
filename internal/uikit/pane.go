@@ -67,14 +67,6 @@ func Pane(c *ui.Context, props PaneProps, slots ...PaneSlots) ui.Element {
 	return root
 }
 
-func StylePaneCard(card ui.Element, surface *theme.Theme, background ui.Color, paintRadius float32) ui.Element {
-	return card.Column().Key("card").Absolute().Top(0).Right(0).Bottom(0).Left(0).
-		Radius(surface.C.Pane.Radius).Background(background).Clip().Draw(func(p *ui.Painter, r ui.Rect) {
-		// Absolute children paint after scroll content; the backdrop belongs here.
-		p.Fill(r, background, paintRadius)
-	})
-}
-
 type PaneAppearance struct {
 	Opacity, Saturation, FooterOpacity float32
 	TitleColor, LoginColor             ui.Color

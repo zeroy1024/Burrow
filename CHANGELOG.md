@@ -8,6 +8,7 @@ Every released version has a `## <version> - <date>` section, English first, the
 - Open the SSH port forwarding dock from the title bar to manage local TCP forwards and SOCKS5 proxies with configurable listen addresses alongside server monitoring.
 - Show a confirmation after copying an address from the SSH port forwarding dock.
 - Drag the top edge of the SSH port forwarding dock to resize it, or double-click the handle to reset its height.
+- Smooth the rounded edges around Shell panes with and without translucency, and remove their decorative inner outline.
 
 **简体中文**
 
@@ -15,6 +16,7 @@ Every released version has a `## <version> - <date>` section, English first, the
 - 从 SSH 标题栏打开端口转发底栏，管理监听地址可设置的本地 TCP 转发和 SOCKS5 代理，同时查看服务器状态。
 - 在 SSH 端口转发底栏复制地址后显示成功提示。
 - 拖动 SSH 端口转发底栏的上沿可调整高度，双击拖拽柄可恢复默认高度。
+- 改善 Shell 面板在开启和关闭半透明时的圆角锯齿感，并移除装饰性内描边。
 
 ## 0.1.11 - 2026-11-17
 

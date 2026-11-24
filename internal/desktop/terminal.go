@@ -203,10 +203,9 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 	})
 	hovered := paneSurface.Hovered()
 	appearance := uikit.PaneVisualStyle(pane, focused, hovered, multiple, surface)
-	var card, hairline ui.Element
+	var card ui.Element
 	paneSurface.Children(func() {
-		card = uikit.TerminalSurface(c, s, prefs.Background, func() {})
-		uikit.StylePaneCard(card, surface, background, t.C.Pane.Radius)
+		card = uikit.TerminalPaneCard(c, p.Radius, colors)
 		card.Children(func() {
 			if session.terminal != nil {
 				output := a.sshTerminalView(c.Key("live-output"), session).
@@ -216,7 +215,7 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 				if appearance.Saturation != 1 {
 					output.Effect(terminalSaturation.Effect(shader.Options{Uniforms: map[string]any{"Saturation": appearance.Saturation}}))
 				}
-				backdropOptions := nativeterm.ViewportBackdropOptions{Radius: p.Radius}
+				var backdropOptions nativeterm.ViewportBackdropOptions
 				if a.translucencyEnabled(c) {
 					backdropOptions.Bottom, backdropOptions.Gap = status.HeightPane, contentGap
 					if headed {
@@ -372,8 +371,8 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 				}
 			})
 		})
-		hairline = uikit.PaneHairline(c, surface)
 		if agent := session.agent; agent != nil {
+			uikit.PaneHairline(c, surface)
 			// The outline turns only while the agent has an operation under way.
 			uikit.AgentRing(c, t.C.Pane.Radius, len(agent.running) > 0 && !a.reduceMotion(c)).Opacity(appearance.Opacity)
 			uikit.AgentChip(c, locales.AgentSessionLabel(), fmt.Sprintf("%s@%s:%d", h.user, h.address, h.port), p.HeaderHeight, surface)
@@ -382,7 +381,6 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 	paneReveal(c, card, session)
 	if a.lifted(session) {
 		card.Opacity(0)
-		hairline.Opacity(0)
 		uikit.StylePanePlaceholder(paneSurface)
 	}
 	a.paneDrop(c, pane, session, true)

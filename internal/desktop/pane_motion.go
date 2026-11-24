@@ -207,8 +207,7 @@ func paneReveal(c *ui.Context, card ui.Element, session *remoteSession) {
 				return
 			}
 			blur := reveal.Blur * (1 - uikit.Easing(reveal.Easing)(progress))
-			radius := t.C.Pane.Radius
-			glass.Blur{Radius: blur}.PaintMaterial(p, rect, [4]float32{radius, radius, radius, radius})
+			glass.Blur{Radius: blur}.PaintMaterial(p, rect, [4]float32{})
 			p.AnimationFrame()
 		})
 	})

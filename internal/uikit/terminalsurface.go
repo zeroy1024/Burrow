@@ -16,11 +16,15 @@ func ResolveTerminalColors(scheme *termtheme.Scheme, source termtheme.Background
 		Foreground: scheme.Foreground, Selection: scheme.SelectionBg, SelectionForeground: scheme.SelectionFg}
 }
 
-// TerminalSurface receives the session's scheme explicitly; another pane can
-// use a different scheme without installing a window-wide theme.
-func TerminalSurface(c *ui.Context, scheme *termtheme.Scheme, source termtheme.BackgroundSource, body func()) ui.Element {
-	colors := ResolveTerminalColors(scheme, source)
-	return ui.Box(c).Background(Color(colors.Background)).TextColor(Color(colors.Foreground)).SelectionColor(Color(colors.Selection)).Children(body)
+func TerminalPaneCard(c *ui.Context, radius float32, colors TerminalColors) ui.Element {
+	frame := ui.Box(c).Key("card-frame").Absolute().Top(0).Right(0).Bottom(0).Left(0).Radius(radius).Clip()
+	var card ui.Element
+	frame.Children(func() {
+		// Composite the background and chrome before applying the frame's rounded edge.
+		card = ui.Column(c).Key("card").Fill().Background(Color(colors.Background)).
+			TextColor(Color(colors.Foreground)).SelectionColor(Color(colors.Selection)).Clip().Cache()
+	})
+	return card
 }
 
 // TerminalChrome adapts neutral chrome to the rendered terminal background.
