@@ -9,18 +9,16 @@ import (
 
 	"github.com/zeroy1024/Burrow/internal/hostinfo"
 	"github.com/zeroy1024/Burrow/internal/locales"
-	"github.com/zeroy1024/Burrow/internal/sshclient"
+	sshsession "github.com/zeroy1024/Burrow/internal/session"
 	"github.com/zeroy1024/Burrow/internal/uikit"
 
 	"github.com/egoist/mygo/ui"
 )
 
 const (
-	monitorInterval      = 2 * time.Second
-	monitorDiskInterval  = 10 * time.Second
-	monitorSampleTimeout = 5 * time.Second
-	monitorGap           = monitorInterval + monitorSampleTimeout
-	monitorWindow        = 2 * time.Minute
+	monitorDiskInterval = 10 * time.Second
+	monitorGap          = sshsession.MonitorGap
+	monitorWindow       = 2 * time.Minute
 )
 
 type monitorHistory struct{ cpu, down, up []uikit.SparklinePoint }
@@ -56,10 +54,7 @@ func (h monitorHistory) window(now time.Time) monitorHistory {
 
 // The window thread owns the published readings. The worker owns the rate baseline.
 type monitorState struct {
-	connection      *sshclient.Connection
-	terminals       int
-	cancel          context.CancelFunc
-	ctx             context.Context
+	*sshsession.ShellServices
 	sampler         hostinfo.Sampler
 	platform        hostinfo.Platform
 	unsupported     bool
@@ -78,42 +73,21 @@ type monitorState struct {
 // sessionMonitor returns the samples of the session's current transport.
 func (a *app) sessionMonitor(session *remoteSession) *monitorState {
 	if run := session.ssh; run != nil {
-		if m := run.monitor; m != nil && m.connection == session.connection.connection {
+		if m := run.monitor; m != nil && m.Connection() == session.connection.transport.Connection() {
 			return m
 		}
 	}
 	return nil
 }
 
-func (a *app) attachMonitor(group *sshConnectionGroup) *monitorState {
+func (a *app) attachMonitor(group *sshConnectionGroup, services *sshsession.ShellServices) *monitorState {
 	m := group.monitor
-	if m == nil || m.connection != group.connection {
-		if m != nil {
-			m.cancel()
-		}
-		ctx, cancel := context.WithCancel(group.ctx)
-		m = &monitorState{connection: group.connection, ctx: ctx, cancel: cancel}
+	if m == nil || m.ShellServices != services {
+		m = &monitorState{ShellServices: services}
 		group.monitor = m
 	}
-	m.terminals++
 	a.startMonitor(group)
 	return m
-}
-
-func (run *sshRuntime) stopMonitor() {
-	m := run.monitor
-	if m == nil {
-		return
-	}
-	run.monitor = nil
-	m.terminals--
-	if m.terminals > 0 {
-		return
-	}
-	m.cancel()
-	if group := run.request.group; group.monitor == m {
-		group.monitor = nil
-	}
 }
 
 func (a *app) startMonitor(group *sshConnectionGroup) {
@@ -121,7 +95,7 @@ func (a *app) startMonitor(group *sshConnectionGroup) {
 	if m == nil || m.sampler != nil {
 		return
 	}
-	if m.connection != group.connection || m.ctx.Err() != nil {
+	if m.Connection() != group.transport.Connection() || m.Context().Err() != nil {
 		return
 	}
 	platform, known := a.groupPlatform(group)
@@ -132,61 +106,12 @@ func (a *app) startMonitor(group *sshConnectionGroup) {
 		return
 	}
 	m.platform = platform
-	m.sampler = hostinfo.For(platform).NewSampler(sshHostRunner{m.connection})
-	a.sshWorkers.Go(func() { a.runMonitor(m.ctx, m) })
-}
-
-func (a *app) runMonitor(ctx context.Context, m *monitorState) {
-	timer := time.NewTimer(0)
-	defer timer.Stop()
-	var lastSuccess time.Time
-	for ctx.Err() == nil {
-		select {
-		case <-ctx.Done():
-			return
-		case <-m.connection.Done():
-			return
-		case <-timer.C:
-		}
-		// Use wall time here because the monotonic clock may stop during sleep.
-		started := time.Now().Round(0)
-		metrics, err := readMonitor(ctx, m)
-		at := time.Now().Round(0)
-		if err == nil && (at.Sub(started) > monitorSampleTimeout || at.Before(started)) {
-			// A suspended request may have read either side of the interruption.
-			m.sampler.Reset()
-			timer.Reset(0)
-			continue
-		}
-		if err == nil {
-			if monitorInterrupted(lastSuccess, at) {
-				// This reading becomes the baseline for the next one.
-				metrics.CPU, metrics.Down, metrics.Up, metrics.Top = nil, nil, nil, nil
-			}
-			lastSuccess = at
-		}
-		a.window.Update(func() { a.publishMonitor(ctx, m, at, metrics, err) })
-		if errors.Is(err, hostinfo.ErrUnsupported) {
-			return
-		}
-		timer.Reset(monitorInterval)
-	}
-}
-
-func monitorInterrupted(last, now time.Time) bool {
-	elapsed := now.Sub(last)
-	return !last.IsZero() && (elapsed > monitorGap || elapsed < 0)
-}
-
-func readMonitor(ctx context.Context, m *monitorState) (hostinfo.Metrics, error) {
-	release, err := m.connection.Retain()
-	if err != nil {
-		return hostinfo.Metrics{}, err
-	}
-	defer release()
-	ctx, cancel := context.WithTimeout(ctx, monitorSampleTimeout)
-	defer cancel()
-	return m.sampler.Sample(ctx)
+	m.sampler = hostinfo.For(platform).NewSampler(sshHostRunner{m.Connection()})
+	a.sshWorkers.Go(func() {
+		m.Monitor(m.sampler, func(at time.Time, metrics hostinfo.Metrics, err error) {
+			a.window.Update(func() { a.publishMonitor(m.Context(), m, at, metrics, err) })
+		})
+	})
 }
 
 func (a *app) publishMonitor(ctx context.Context, m *monitorState, at time.Time, metrics hostinfo.Metrics, err error) {

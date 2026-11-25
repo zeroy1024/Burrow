@@ -192,7 +192,7 @@ func (a *app) rememberHostFacts(key string, facts hostinfo.Facts) {
 // A split reuses its transport's probe. Shell creation has priority; callers
 // start this only after the first terminal has attached successfully.
 func (a *app) startSSHHostFacts(group *sshConnectionGroup) {
-	connection := group.connection
+	connection := group.transport.Connection()
 	if group.facts.connection == connection {
 		return
 	}
@@ -202,13 +202,13 @@ func (a *app) startSSHHostFacts(group *sshConnectionGroup) {
 		group.facts.pending, group.facts.errorText = false, locales.ErrorText(err)
 		return
 	}
-	lifetime := group.ctx
-	key, generation, platform := hostFactsKey(group.plan), group.generation, sshPlatform(group.endpoint)
+	lifetime := group.transport.Lifetime()
+	key, generation, platform := hostFactsKey(group.plan), group.transport.Generation(), sshPlatform(group.endpoint)
 	a.sshWorkers.Go(func() {
 		defer release()
 		facts, err := hostinfo.Collect(lifetime, sshHostRunner{connection}, connection.ServerVersion(), platform)
 		a.window.Update(func() {
-			if group.generation != generation || group.connection != connection || lifetime.Err() != nil {
+			if group.transport.Generation() != generation || group.transport.Connection() != connection || lifetime.Err() != nil {
 				return
 			}
 			group.facts.pending = false

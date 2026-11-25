@@ -15,6 +15,7 @@ import (
 	"github.com/zeroy1024/Burrow/internal/fileclient"
 	"github.com/zeroy1024/Burrow/internal/locales"
 	"github.com/zeroy1024/Burrow/internal/mcpserver"
+	sshsession "github.com/zeroy1024/Burrow/internal/session"
 	"github.com/zeroy1024/Burrow/internal/sshclient"
 	"github.com/zeroy1024/Burrow/internal/store"
 	"github.com/zeroy1024/Burrow/internal/wggateway"
@@ -211,18 +212,17 @@ func (b *mcpDesktop) Exec(ctx context.Context, c mcpserver.Connection, command s
 		if !b.a.businessReady() {
 			return false, errAppUnavailable
 		}
-		request := &sshConnectionRequest{ctx: ctx, group: c.Runtime.(*fileSession).connection}
-		request.mcpOperationID, request.mcpTaskID = mcpserver.OperationID(ctx)
-		request.failed = func(err error) { ready <- result{err: err} }
-		request.ready = func(connection *sshclient.Connection) {
+		request := &sshsession.Request{Context: ctx}
+		request.Failed = func(err error) { ready <- result{err: err} }
+		request.Ready = func(connection *sshclient.Connection) {
 			b.a.sshWorkers.Go(func() {
 				output, err := connection.ExecObserved(ctx, command, observe)
 				ready <- result{output, err}
-				b.a.window.Update(func() { b.a.completeSSHRequest(request) })
+				b.a.window.Update(func() { request.Complete() })
 			})
 		}
-		context.AfterFunc(ctx, func() { b.a.window.Update(func() { cancelSSHRequest(request) }) })
-		b.a.acquireSSH(request)
+		context.AfterFunc(ctx, func() { b.a.window.Update(func() { request.Cancel() }) })
+		b.a.acquireSSH(c.Runtime.(*fileSession).connection, request)
 		return true, nil
 	})
 	if err != nil {

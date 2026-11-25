@@ -27,6 +27,7 @@ import (
 	"github.com/zeroy1024/Burrow/internal/locales"
 	"github.com/zeroy1024/Burrow/internal/localfs"
 	"github.com/zeroy1024/Burrow/internal/mcpserver"
+	sshsession "github.com/zeroy1024/Burrow/internal/session"
 
 	"golang.org/x/text/cases"
 	"golang.org/x/text/unicode/norm"
@@ -50,7 +51,7 @@ type transferRun struct {
 	journal        func() error
 	ctx            context.Context
 	cancel         context.CancelFunc
-	request        *sshConnectionRequest
+	request        *sshsession.Request
 	ready          chan transferClientResult
 	bytes          atomic.Int64
 	written        atomic.Int64
@@ -359,7 +360,7 @@ func (a *app) finishTransfer(task *transferTask, run *transferRun, cleanup bool,
 	}
 	task.run = nil
 	run.cancel()
-	cancelSSHRequest(run.request)
+	run.request.Cancel()
 	task.speed = 0
 	if cleanup {
 		if err == nil {
@@ -423,7 +424,7 @@ func (a *app) pauseTransfer(task *transferTask) {
 	a.transfers.displaySpeed = a.transfers.summary().speed
 	if task.run != nil {
 		task.run.cancel()
-		cancelSSHRequest(task.run.request)
+		task.run.request.Cancel()
 	}
 	a.advanceTransferConflicts()
 	a.persistTransfers()
@@ -460,7 +461,7 @@ func (a *app) cancelTransfer(task *transferTask) {
 	task.removeRequested, task.failureNotice = true, false
 	if task.run != nil {
 		task.run.cancel()
-		cancelSSHRequest(task.run.request)
+		task.run.request.Cancel()
 	} else if task.job == nil || len(task.job.temporary) == 0 {
 		a.transfers.tasks = slices.DeleteFunc(a.transfers.tasks, func(candidate *transferTask) bool { return candidate == task })
 	} else {

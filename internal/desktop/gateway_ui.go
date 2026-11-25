@@ -324,7 +324,7 @@ func (a *app) gatewayRuntimeReferences(id string) []gatewayRef {
 	}
 	if a.mcpBackend != nil {
 		for _, session := range a.mcpBackend.sessions {
-			if session.connection != nil && (session.connection.connection != nil || session.connection.connecting) {
+			if session.connection != nil && (session.connection.transport.Connection() != nil || session.connection.transport.Connecting()) {
 				files = append(files, session)
 			}
 		}

@@ -14,6 +14,7 @@ import (
 	"github.com/zeroy1024/Burrow/internal/fileclient"
 	"github.com/zeroy1024/Burrow/internal/locales"
 	"github.com/zeroy1024/Burrow/internal/mcpserver"
+	sshsession "github.com/zeroy1024/Burrow/internal/session"
 	"github.com/zeroy1024/Burrow/internal/sshclient"
 	"github.com/zeroy1024/Burrow/internal/uikit"
 	"github.com/zeroy1024/Burrow/internal/vault"
@@ -29,7 +30,7 @@ type fileRuntime struct {
 	ctx        context.Context
 	cancel     context.CancelFunc
 	client     fileclient.Client
-	request    *sshConnectionRequest
+	request    *sshsession.Request
 	listing    bool
 	sequence   int
 	navigation fileNavigation
@@ -40,7 +41,7 @@ type fileRuntime struct {
 // Each browser and transfer gets its own FTP control connection or SFTP
 // subsystem. The group's transport is shared, but canceling a consumer is not.
 // This entry point and its completion callback run on the UI thread.
-func (a *app) openFileClient(ctx context.Context, session *fileSession, complete func(fileclient.Client, error)) *sshConnectionRequest {
+func (a *app) openFileClient(ctx context.Context, session *fileSession, complete func(fileclient.Client, error)) *sshsession.Request {
 	if !a.businessReady() {
 		complete(nil, errAppUnavailable)
 		return nil
@@ -50,7 +51,7 @@ func (a *app) openFileClient(ctx context.Context, session *fileSession, complete
 		complete(nil, session.gatewayErr)
 		return nil
 	}
-	var request *sshConnectionRequest
+	var request *sshsession.Request
 	finished := false
 	finish := func(client fileclient.Client, err error) {
 		if finished {
@@ -60,7 +61,7 @@ func (a *app) openFileClient(ctx context.Context, session *fileSession, complete
 			return
 		}
 		finished = true
-		a.completeSSHRequest(request)
+		request.Complete()
 		if ctx.Err() != nil {
 			if client != nil {
 				a.sshWorkers.Go(func() { client.Close() })
@@ -88,7 +89,7 @@ func (a *app) openFileClient(ctx context.Context, session *fileSession, complete
 		a.window.Update(func() { finish(client, err) })
 	}
 	context.AfterFunc(ctx, func() {
-		a.window.Update(func() { cancelSSHRequest(request); finish(nil, ctx.Err()) })
+		a.window.Update(func() { request.Cancel(); finish(nil, ctx.Err()) })
 	})
 	if h.protocol == "ftp" {
 		plan, planErr := a.captureSSHPlan(h)
@@ -166,9 +167,8 @@ func (a *app) openFileClient(ctx context.Context, session *fileSession, complete
 		})
 		return nil
 	}
-	request = &sshConnectionRequest{ctx: ctx, group: session.connection, failed: func(err error) { finish(nil, err) }}
-	request.mcpOperationID, request.mcpTaskID = mcpserver.OperationID(ctx)
-	request.ready = func(connection *sshclient.Connection) {
+	request = &sshsession.Request{Context: ctx, Failed: func(err error) { finish(nil, err) }}
+	request.Ready = func(connection *sshclient.Connection) {
 		encoding := "UTF-8"
 		if h.session.Files != nil {
 			encoding = h.session.Files.Encoding
@@ -209,7 +209,7 @@ func (a *app) openFileClient(ctx context.Context, session *fileSession, complete
 			deliver(client, err, cancelClient)
 		})
 	}
-	a.acquireSSH(request)
+	a.acquireSSH(session.connection, request)
 	return request
 }
 
@@ -335,7 +335,7 @@ func (a *app) disconnectFileSession(session *fileSession) {
 	if run := session.runtime; run != nil {
 		session.runtime = nil
 		run.cancel()
-		cancelSSHRequest(run.request)
+		run.request.Cancel()
 	}
 	session.state, session.errorText, session.remote.loading = disconnected, locales.Text{}, false
 }

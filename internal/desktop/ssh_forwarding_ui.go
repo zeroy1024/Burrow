@@ -529,7 +529,7 @@ func (a *app) submitForwardDialog(d *forwardDialog) {
 		a.commitForwardDialog(d, nil)
 		return
 	}
-	if d.state == nil || d.state.ctx.Err() != nil {
+	if d.state == nil || d.state.Context().Err() != nil {
 		d.err = locales.Deferred(locales.ForwardNeedsSSH)
 		return
 	}
@@ -588,7 +588,7 @@ func (a *app) commitForwardDialog(d *forwardDialog, rule *sshForwardRule) {
 			return
 		}
 		d.modal.Close()
-		if d.state == nil || d.state.ctx.Err() != nil {
+		if d.state == nil || d.state.Context().Err() != nil {
 			return
 		}
 		if d.row != nil {

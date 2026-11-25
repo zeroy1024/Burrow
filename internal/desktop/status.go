@@ -182,7 +182,7 @@ func (a *app) statusHostFacts(session *remoteSession) (*hostinfo.Facts, string) 
 		if value, ok := a.hostFacts.values[hostFactsKey(group.plan)]; ok && group.planErr == nil {
 			facts = &value
 		}
-		pending = group.facts.pending && group.connection != nil && group.facts.connection == group.connection
+		pending = group.facts.pending && group.transport.Connection() != nil && group.facts.connection == group.transport.Connection()
 		errorText = group.facts.errorText.String()
 	}
 	message := ""

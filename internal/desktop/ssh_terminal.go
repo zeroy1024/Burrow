@@ -67,7 +67,7 @@ func (a *app) attachSSH(session *remoteSession, run *sshRuntime) {
 	}
 	var outputPending atomic.Bool
 	transport := &sshTerminalConn{
-		Conn: run.conn, reader: io.MultiReader(bytes.NewReader(history), run.conn),
+		Conn: run.Stream(), reader: io.MultiReader(bytes.NewReader(history), run.Stream()),
 		activity: func() {
 			// Collapse bursts of output into one UI notification per pending frame.
 			if !outputPending.CompareAndSwap(false, true) {
@@ -75,14 +75,14 @@ func (a *app) attachSSH(session *remoteSession, run *sshRuntime) {
 			}
 			a.window.Update(func() {
 				outputPending.Store(false)
-				if session.ssh == run && run.ctx.Err() == nil && !a.sshSessionFocused(session) {
+				if session.ssh == run && run.Context().Err() == nil && !a.sshSessionFocused(session) {
 					session.hasNewOutput = true
 				}
 			})
 		},
 		resized: func(columns, rows int) {
 			a.window.Update(func() {
-				if session.ssh == run && run.ctx.Err() == nil {
+				if session.ssh == run && run.Context().Err() == nil {
 					session.columns, session.rows = columns, rows
 				}
 			})
@@ -91,7 +91,7 @@ func (a *app) attachSSH(session *remoteSession, run *sshRuntime) {
 	prefs := a.terminal.prefs
 	blink := prefs.CursorBlink
 	scrollbackLines := a.prefs.ScrollbackLines
-	columns, rows := run.conn.Size()
+	columns, rows := run.Stream().Size()
 	var view *nativeterm.Terminal
 	view, err := nativeterm.New(nativeterm.Options{
 		Columns: columns, Rows: rows,
@@ -102,22 +102,21 @@ func (a *app) attachSSH(session *remoteSession, run *sshRuntime) {
 		NoClipboardWrite: true, ClipboardRead: nativeterm.ClipboardDeny,
 		OnBell: func() {
 			a.window.Update(func() {
-				if session.ssh == run && run.ctx.Err() == nil && !a.sshSessionFocused(session) {
+				if session.ssh == run && run.Context().Err() == nil && !a.sshSessionFocused(session) {
 					session.hasBell = true
 				}
 			})
 		},
 		OnExit: func(int) {
-			err := run.conn.Wait()
+			err := run.Stream().Wait()
 			a.window.Update(func() {
-				run.stopMonitor()
-				run.stopForwards()
+				run.detachServices()
 				if session.terminal == nil || session.terminal.view != view {
 					return
 				}
 				// The terminal has just written [Disconnected]; a message, if any, follows it.
 				afterMessage := false
-				if session.ssh == run && run.ctx.Err() == nil && session.state != connectionFailed {
+				if session.ssh == run && run.Context().Err() == nil && session.state != connectionFailed {
 					session.state = disconnected
 					if err != nil {
 						session.state, afterMessage = connectionFailed, true
@@ -139,8 +138,8 @@ func (a *app) attachSSH(session *remoteSession, run *sshRuntime) {
 		},
 	})
 	if err != nil {
-		run.cancel()
-		run.conn.Close()
+		run.detachServices()
+		run.Close()
 		session.state = connectionFailed
 		showSSHMessage(session, locales.MessageUnableToStartTerminal()+err.Error())
 		return
@@ -152,8 +151,8 @@ func (a *app) attachSSH(session *remoteSession, run *sshRuntime) {
 	session.focusPending = a.sshSessionFocused(session)
 	session.output, session.state = nil, connected
 	a.startSSHHostFacts(session.connection)
-	run.monitor = a.attachMonitor(session.connection)
-	run.forwarding = a.attachForwards(session)
+	run.monitor = a.attachMonitor(session.connection, run.Services())
+	run.forwarding = a.attachForwards(session, run.Services())
 	if a.sshSessionFocused(session) {
 		session.focus.Focus()
 	}

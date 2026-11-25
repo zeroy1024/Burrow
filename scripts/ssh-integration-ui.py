@@ -199,22 +199,22 @@ func dockerIntegrationSnapshot() {
                 Name:s.endpoint.name, Address:s.endpoint.address}
             item.OpeningSession = -1
             if s.connection != nil {
-                item.Connection, item.Generation = s.connection.id, s.connection.generation
-                item.QueueLength = len(s.connection.queue)
+                item.Connection, item.Generation = s.connection.id, s.connection.transport.Generation()
+                item.QueueLength = s.connection.transport.QueueLength()
             }
             if s.ssh != nil {
-                item.ShellReturned = s.ssh.conn != nil
-                item.RunCanceled = s.ssh.ctx.Err() != nil
+                item.ShellReturned = s.ssh.Stream() != nil
+                item.RunCanceled = s.ssh.Context().Err() != nil
             }
             if s.connection != nil {
-                if owner := s.connection.connection; owner != nil {
+                if owner := s.connection.transport.Connection(); owner != nil {
                     item.OwnerPresent = true
                     select { case <-owner.Done(): item.OwnerDone = true; default: }
                 }
-                if opening := s.connection.opening; opening != nil {
+                if opening := s.connection.transport.Opening(); opening != nil {
                     for _, otherTab := range a.tabs {
                         for _, other := range otherTab.root.sessions() {
-                            if other.ssh != nil && other.ssh.request == opening { item.OpeningSession = other.id }
+                            if other.ssh != nil && &other.ssh.Request == opening { item.OpeningSession = other.id }
                         }
                     }
                 }
@@ -238,7 +238,7 @@ func dockerIntegrationSnapshot() {
             RemoteSelection:remote.Selection, LocalSelection:local.Selection,
             RemoteBounds:remote.Bounds, LocalBounds:local.Bounds}
         if !s.errorText.Empty() { item.Error = s.errorText.String() }
-        if s.connection != nil { item.Connection, item.Generation = s.connection.id, s.connection.generation }
+        if s.connection != nil { item.Connection, item.Generation = s.connection.id, s.connection.transport.Generation() }
         out.FileSessions = append(out.FileSessions, item)
     }
     for _, task := range a.transfers.tasks {

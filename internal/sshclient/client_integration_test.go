@@ -19,6 +19,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/zeroy1024/Burrow/internal/fileclient"
+	"github.com/zeroy1024/Burrow/internal/session"
 	"github.com/zeroy1024/Burrow/internal/sshclient"
 	"github.com/zeroy1024/Burrow/internal/store"
 
@@ -445,6 +447,92 @@ func TestSSHIntegrationSharedConnection(t *testing.T) {
 		t.Fatal(err)
 	}
 	waitConnection(t, connection)
+}
+
+func TestSSHIntegrationShellServicesWithSFTP(t *testing.T) {
+	cfg := sshFixture(t).config
+	ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
+	defer cancel()
+	updates := make(chan func(), 16)
+	post := func(f func()) { updates <- f }
+	until := func(done func() bool) {
+		t.Helper()
+		for !done() {
+			select {
+			case update := <-updates:
+				update()
+			case <-ctx.Done():
+				t.Fatal(ctx.Err())
+			}
+		}
+	}
+
+	var group session.Group
+	first, second := session.NewShell(ctx), session.NewShell(ctx)
+	for _, shell := range []*session.Shell{first, second} {
+		defer shell.Close()
+		shell.Request.Failed = func(err error) { t.Fatalf("opening shell: %v", err) }
+		shell.Request.Ready = func(conn *sshclient.Connection) {
+			go shell.Open(conn, sshclient.ShellOptions{Columns: 80, Rows: 24}, post, func() {
+				go io.Copy(io.Discard, shell.Stream())
+			})
+		}
+	}
+	dial := group.Acquire(ctx, &first.Request)
+	if dial == nil || group.Acquire(ctx, &second.Request) != nil {
+		t.Fatal("two shells must share one authentication attempt")
+	}
+	withdrawn := session.NewShell(ctx)
+	withdrawn.Request.Ready = func(*sshclient.Connection) { t.Fatal("canceled waiter opened a channel") }
+	withdrawn.Request.Failed = func(err error) { t.Fatalf("canceled waiter received an error: %v", err) }
+	if group.Acquire(ctx, &withdrawn.Request) != nil {
+		t.Fatal("unexpected second dial")
+	}
+	withdrawn.Close()
+	go dial.Run(func(ctx context.Context) (*sshclient.Connection, error) { return sshclient.Dial(ctx, cfg) }, post)
+	until(func() bool { return first.Stream() != nil && second.Stream() != nil })
+	services := first.Services()
+	if services == nil || services != second.Services() || first.Stream() == second.Stream() {
+		t.Fatal("expected independent shells sharing one service lifetime")
+	}
+
+	files, err := fileclient.NewSFTP(ctx, group.Connection())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer files.Close()
+	socket, err := net.ListenTCP("tcp4", &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	bind := socket.Addr().(*net.TCPAddr).AddrPort()
+	socket.Close()
+	forward, err := services.Listen(bind, "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	first.Close()
+	if services.Context().Err() != nil || forward.Context().Err() != nil {
+		t.Fatal("closing one shell stopped a sibling's services")
+	}
+	// A remote exit must release services even without a terminal view.
+	if _, err := io.WriteString(second.Stream(), "exit\n"); err != nil {
+		t.Fatal(err)
+	}
+	until(func() bool { return second.Services() == nil })
+	if services.Context().Err() == nil || forward.Context().Err() == nil {
+		t.Fatal("shell services survived the final shell")
+	}
+	if err := forward.Wait(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := files.ReadDir(ctx, "."); err != nil {
+		t.Fatalf("SFTP after last shell exit: %v", err)
+	}
+	if err := files.Close(); err != nil {
+		t.Fatal(err)
+	}
+	until(func() bool { return group.Connection() == nil })
 }
 
 func TestSSHIntegrationRetainedIntent(t *testing.T) {

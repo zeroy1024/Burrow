@@ -106,7 +106,7 @@ func (a *app) prepareTransferQuit(done func(error)) {
 		}
 		if task.run != nil {
 			task.run.cancel()
-			cancelSSHRequest(task.run.request)
+			task.run.request.Cancel()
 		}
 	}
 	q.displaySpeed = 0
