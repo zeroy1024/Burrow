@@ -32,8 +32,8 @@ func (a *app) updateSSHLatency(c *ui.Context) {
 		return
 	}
 	var sessions []*remoteSession
-	for _, session := range tab.root.sessions() {
-		if !tab.maximized || session == tab.focused {
+	for _, session := range tab.Root.Sessions() {
+		if !tab.Maximized || session == tab.Focused {
 			sessions = append(sessions, session)
 		}
 	}

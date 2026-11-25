@@ -163,7 +163,7 @@ func (a *app) readCatalog() error {
 		if err != nil {
 			return err
 		}
-		if err := validateStoredWorkspace(saved, a.hosts, a.keys); err != nil {
+		if err := validateStoredWorkspace(saved, a.keys); err != nil {
 			return err
 		}
 		a.savedWorkspace = saved
@@ -212,7 +212,7 @@ func (a *app) catalogSnapshotData() (store.Catalog, error) {
 		return c, errors.New("every profile must belong to exactly one group")
 	}
 	saved := a.workspaceSnapshot()
-	if err := validateStoredWorkspace(saved, a.hosts, a.keys); err != nil {
+	if err := validateStoredWorkspace(saved, a.keys); err != nil {
 		return c, err
 	}
 	w, err := encodeWorkspace(saved)

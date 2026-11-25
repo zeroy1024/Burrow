@@ -2,6 +2,7 @@ package desktop
 
 import (
 	"bytes"
+	"github.com/zeroy1024/Burrow/internal/workspace"
 	"math"
 	"slices"
 	"strings"
@@ -256,8 +257,8 @@ func (a *app) createAgentSession(view *agentView, event mcpserver.Activity) {
 func (a *app) showAgentSession(view *agentView) *workspaceTab {
 	a.closedTabs = slices.DeleteFunc(a.closedTabs, func(closed closedWorkspaceTab) bool { return closed.agent == view })
 	a.nextTab++
-	tab := &workspaceTab{id: a.nextTab, root: &terminalLayout{session: view.session}, focused: view.session}
-	a.tabs = append(a.tabs, tab)
+	tab := &workspaceTab{id: a.nextTab, paneTab: workspace.NewTab(view.session)}
+	a.tabs.Items = append(a.tabs.Items, tab)
 	// A tab drag puts back the order it started with when it ends.
 	if d := a.drag; d != nil && d.kind == dragTab {
 		d.order = append(d.order, tab)
@@ -284,9 +285,9 @@ func (a *app) agentViewFor(keyID, connectionID string) *agentView {
 
 // revealAgentSession brings the record's tab to the front, opening it if closed.
 func (a *app) revealAgentSession(view *agentView) {
-	index := slices.IndexFunc(a.tabs, func(tab *workspaceTab) bool { return tab.focused == view.session })
+	index := slices.IndexFunc(a.tabs.Items, func(tab *workspaceTab) bool { return tab.Focused == view.session })
 	if index < 0 {
-		index = slices.Index(a.tabs, a.showAgentSession(view))
+		index = slices.Index(a.tabs.Items, a.showAgentSession(view))
 	}
 	a.switchSection(sectionSSH)
 	a.activateTab(index)

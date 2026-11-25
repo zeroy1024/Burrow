@@ -42,7 +42,7 @@ func (a *app) beginWorkspaceFrame(c *ui.Context) {
 		}
 	}
 	reduced := a.reduceMotion(c)
-	for _, tab := range a.tabs {
+	for _, tab := range a.tabs.Items {
 		if reduced {
 			tab.layoutUntil, tab.layoutPending = time.Time{}, false
 			continue
@@ -55,8 +55,8 @@ func (a *app) beginWorkspaceFrame(c *ui.Context) {
 
 func (a *app) updatePaneClosures(c *ui.Context) {
 	t := theme.Current()
-	for _, tab := range a.tabs {
-		for _, session := range tab.root.sessions() {
+	for _, tab := range a.tabs.Items {
+		for _, session := range tab.Root.Sessions() {
 			if !session.closing {
 				continue
 			}
@@ -92,7 +92,7 @@ func (a *app) startPaneRelayout(tab *workspaceTab, entering *remoteSession) {
 	tab.relayout.pending = true
 	if entering != nil {
 		tab.relayout.entering = append(tab.relayout.entering, entering)
-		tab.relayout.focusFrom = tab.focused
+		tab.relayout.focusFrom = tab.Focused
 	}
 }
 
@@ -101,12 +101,12 @@ func (a *app) finishPaneRelayout(c *ui.Context, tab *workspaceTab) {
 	tab.relayout = paneRelayout{}
 	var focus *remoteSession
 	for _, session := range relayout.entering {
-		if !session.closing && tab.root.find(session) != nil {
+		if !session.closing && tab.Root.Find(session) != nil {
 			session.splitFadeStarted = c.Now()
 			focus = session
 		}
 	}
-	if focus != nil && tab.focused == relayout.focusFrom {
+	if focus != nil && tab.Focused == relayout.focusFrom {
 		a.focusSession(tab, focus)
 	}
 }
@@ -121,7 +121,7 @@ func (a *app) paneRelayoutProgress(c *ui.Context, area ui.Element, tab *workspac
 			a.finishPaneRelayout(c, tab)
 		}
 	}
-	if a.reduceMotion(c) || slices.Contains(relayout.entering, tab.focused) {
+	if a.reduceMotion(c) || slices.Contains(relayout.entering, tab.Focused) {
 		a.finishPaneRelayout(c, tab)
 		return 1
 	}
@@ -175,11 +175,11 @@ func (a *app) enforcePaneMinimum(c *ui.Context) {
 		}
 	} else if active == sectionSSH {
 		if tab := a.currentTab(); tab != nil {
-			minimum = tab.root.minimum()
+			minimum = minimumLayoutSize(tab.Root)
 		}
 	}
 	width := minimum.X + t.C.Rail.Width + t.C.Window.Gutter
-	if active.hasCatalog() && !a.page().sidebarCollapsed {
+	if active.HasCatalog() && !a.page().sidebarCollapsed {
 		width += a.page().sidebarWidth + t.C.Window.Gutter
 	}
 	if active == sectionSSH && a.statusVisible {
@@ -205,17 +205,17 @@ func (a *app) enforcePaneMinimum(c *ui.Context) {
 
 func (a *app) setPaneZoom(tab *workspaceTab, maximized bool) {
 	t := theme.Current()
-	if tab.maximized == maximized {
+	if tab.Maximized == maximized {
 		return
 	}
-	tab.maximized, tab.zoomFrom, tab.zoomPane = maximized, tab.zoomMix, nil
+	tab.Maximized, tab.zoomFrom, tab.zoomPane = maximized, tab.zoomMix, nil
 	a.markPaneLayout(tab, t.C.Desktop.ZoomDuration)
 }
 
 func (a *app) togglePaneZoom(c *ui.Context, tab *workspaceTab, session *remoteSession) {
 	visible := visiblePaneBounds(c, session, a.workArea.Bounds(c))
 	a.focusSession(tab, session)
-	a.setPaneZoom(tab, !tab.maximized)
+	a.setPaneZoom(tab, !tab.Maximized)
 	if visible.W > 0 && visible.H > 0 {
 		tab.zoomPane, tab.zoomBounds = session, visible
 	}
@@ -224,11 +224,11 @@ func (a *app) togglePaneZoom(c *ui.Context, tab *workspaceTab, session *remoteSe
 func (a *app) zoomProgress(c *ui.Context, area ui.Element, tab *workspaceTab) float32 {
 	const motion = "pane-zoom"
 	target := float32(0)
-	if tab.maximized {
+	if tab.Maximized {
 		target = 1
 	}
 	owner := ui.Local(area, "pane-zoom-tab", func() int { return -1 })
-	focusChanged := tab.zoomPane != nil && tab.zoomPane != tab.focused
+	focusChanged := tab.zoomPane != nil && tab.zoomPane != tab.Focused
 	if *owner != tab.id || a.reduceMotion(c) || focusChanged {
 		*owner = tab.id
 		tab.zoomMix, tab.zoomPane = area.Jump(motion, target), nil
@@ -280,7 +280,7 @@ func (a *app) paneMotion(c *ui.Context, pane ui.Element, tab *workspaceTab, plac
 	if !placement.resizing && session != tab.zoomPane && !session.revealing && !tab.workspaceResizedAt.Equal(c.Now()) {
 		pane.Transition(transition)
 	}
-	if tab.maximized && tab.focused != session && tab.zoomMix >= 1 {
+	if tab.Maximized && tab.Focused != session && tab.zoomMix >= 1 {
 		pane.Hidden(true)
 	}
 }
@@ -321,22 +321,22 @@ func (a *app) terminalDivider(c *ui.Context, split splitPlacement) {
 	edge := ui.Box(c).Key(node).Absolute().Left(r.X).Top(r.Y).Size(r.W, r.H).
 		Center().Focusable().FocusRing(false).Role(ui.RoleSplitter).Label(locales.MessageResizeTerminalPanes())
 	axis, delta := split.parent.W-t.C.Pane.Gap, float32(0)
-	firstMin, secondMin := node.first.minimum().X, node.second.minimum().X
+	firstMin, secondMin := minimumLayoutSize(node.First).X, minimumLayoutSize(node.Second).X
 	firstSize := r.X - split.parent.X
 	edge.Cursor(ui.CursorResizeEW)
 	dx, dy, held := edge.Dragged()
-	if node.stacked {
+	if node.Stacked {
 		edge.Cursor(ui.CursorResizeNS)
 		axis, delta = split.parent.H-t.C.Pane.Gap, dy
 		firstSize = r.Y - split.parent.Y
-		firstMin, secondMin = node.first.minimum().Y, node.second.minimum().Y
+		firstMin, secondMin = minimumLayoutSize(node.First).Y, minimumLayoutSize(node.Second).Y
 	} else {
 		delta = dx
 	}
 	if held {
 		a.resizing = node
 		if delta != 0 {
-			node.ratio = min(max((firstSize+delta)/axis, firstMin/axis), 1-secondMin/axis)
+			node.Ratio = min(max((firstSize+delta)/axis, firstMin/axis), 1-secondMin/axis)
 		}
 	} else if a.resizing == node {
 		a.resizing = nil
@@ -351,7 +351,7 @@ func (a *app) terminalDivider(c *ui.Context, split splitPlacement) {
 		edge.Transition(ui.ElementTransition{Position: true, Size: true, Animation: &animation})
 	}
 	if edge.DoubleClicked() {
-		node.ratio = .5
+		node.Ratio = .5
 		a.markPaneLayout(a.currentTab(), t.C.Desktop.PaneEnterDuration)
 	}
 	if edge.Focused() {
@@ -363,7 +363,7 @@ func (a *app) terminalDivider(c *ui.Context, split splitPlacement) {
 			direction = 1
 		}
 		if direction != 0 {
-			node.ratio = min(max(node.ratio+direction*t.C.Desktop.DividerKeyboardStep/axis, firstMin/axis), 1-secondMin/axis)
+			node.Ratio = min(max(node.Ratio+direction*t.C.Desktop.DividerKeyboardStep/axis, firstMin/axis), 1-secondMin/axis)
 			a.markPaneLayout(a.currentTab(), t.C.Desktop.PaneEnterDuration)
 		}
 	}
@@ -371,5 +371,5 @@ func (a *app) terminalDivider(c *ui.Context, split splitPlacement) {
 	if edge.Hovered() || held || edge.FocusVisible() {
 		target = 1
 	}
-	edge.Children(func() { uikit.SplitterHandle(c, edge, target, held, node.stacked) })
+	edge.Children(func() { uikit.SplitterHandle(c, edge, target, held, node.Stacked) })
 }

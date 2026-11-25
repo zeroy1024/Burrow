@@ -180,7 +180,7 @@ func dockerIntegrationSnapshot() {
         FileDragPendingDirectory, FileDragPendingDisconnect, FileDragCancelRequested bool
         FileDragEntryPaths []string
         SettingsRecording, CatalogError, Locale, AppName string
-    }{Prompts: len(a.sshPrompts), Tabs: len(a.tabs), FileTabs:len(a.fileSessions), Section:int(a.section),
+    }{Prompts: len(a.sshPrompts), Tabs: len(a.tabs.Items), FileTabs:len(a.fileSessions), Section:int(a.section),
       ActiveSection:int(a.activeSection()), Transfers:len(a.transfers.tasks), LocalOpen:a.files.localOpen,
       ActiveRemote:a.files.activeRemote, ClosedTabs:len(a.closedTabs), SettingsOpen:a.settingsUI.open,
       Locale:mygo.App.Locale(), AppName:mygo.App.Name(),
@@ -191,11 +191,11 @@ func dockerIntegrationSnapshot() {
     if err := a.catalogConfig.loadErr; err != nil { out.CatalogError = err.Error() }
     out.CatalogVersion = 1 // Store.Open has validated the schema version.
     out.Busy = a.interactionBlocked() || a.savingSession() || a.siteDeletion != nil
-    for _, tab := range a.tabs {
-        for _, s := range tab.root.sessions() {
+    for _, tab := range a.tabs.Items {
+        for _, s := range tab.Root.Sessions() {
             item := sessionInfo{ID:s.id, Host:int(s.host), State:int(s.state),
                 Columns:s.columns, Rows:s.rows,
-                Focused:tab == a.currentTab() && tab.focused == s, Closing:s.closing,
+                Focused:tab == a.currentTab() && tab.Focused == s, Closing:s.closing,
                 Name:s.endpoint.name, Address:s.endpoint.address}
             item.OpeningSession = -1
             if s.connection != nil {
@@ -212,8 +212,8 @@ func dockerIntegrationSnapshot() {
                     select { case <-owner.Done(): item.OwnerDone = true; default: }
                 }
                 if opening := s.connection.transport.Opening(); opening != nil {
-                    for _, otherTab := range a.tabs {
-                        for _, other := range otherTab.root.sessions() {
+                    for _, otherTab := range a.tabs.Items {
+                        for _, other := range otherTab.Root.Sessions() {
                             if other.ssh != nil && &other.ssh.Request == opening { item.OpeningSession = other.id }
                         }
                     }
@@ -281,17 +281,17 @@ func dockerIntegrationMenu(items []*mygo.MenuItem) []*mygo.MenuItem {
                 if a:=dockerIntegrationApp; a!=nil { a.window.Show(); mygo.App.Focus(); a.window.Focus() }
             }},
             {Label:"Disconnect", Click:func(*mygo.MenuItem,*mygo.Window){
-                a:=dockerIntegrationApp; if a!=nil && a.currentTab()!=nil { disconnectSession(a.currentTab().focused); a.window.Invalidate() }
+                a:=dockerIntegrationApp; if a!=nil && a.currentTab()!=nil { disconnectSession(a.currentTab().Focused); a.window.Invalidate() }
             }},
             {Label:"Reconnect", Click:func(*mygo.MenuItem,*mygo.Window){
-                a:=dockerIntegrationApp; if a!=nil && a.currentTab()!=nil { a.connectSession(a.currentTab().focused); a.window.Invalidate() }
+                a:=dockerIntegrationApp; if a!=nil && a.currentTab()!=nil { a.connectSession(a.currentTab().Focused); a.window.Invalidate() }
             }},
             {Label:"Large window", Click:func(*mygo.MenuItem,*mygo.Window){
                 if a:=dockerIntegrationApp; a!=nil { a.window.SetContentSize(1560,900) }
             }},
             {Label:"Split source twice", Click:func(*mygo.MenuItem,*mygo.Window){
                 if a:=dockerIntegrationApp; a!=nil && a.currentTab()!=nil {
-                    source:=a.currentTab().focused
+                    source:=a.currentTab().Focused
                     a.splitSession(source,false)
                     a.splitSession(source,true)
                     a.window.Invalidate()

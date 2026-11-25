@@ -59,7 +59,7 @@ func (a *app) terminalCapturePressed(c *ui.Context) bool {
 func (a *app) terminalCaptureVisible(session *remoteSession) bool {
 	tab := a.currentTab()
 	return session != nil && !session.closing && session.terminal != nil && a.activeSection() == sectionSSH &&
-		tab != nil && tab.root.find(session) != nil && (!tab.maximized || tab.focused == session)
+		tab != nil && tab.Root.Find(session) != nil && (!tab.Maximized || tab.Focused == session)
 }
 
 func (a *app) recordTerminalCapture(c *ui.Context, session *remoteSession, output, card ui.Element, top, bottom float32) {
@@ -169,7 +169,7 @@ func (a *app) captureTerminalTabPress(ev ui.InputEvent) {
 	r := s.tabHandle
 	session := s.tabSource
 	tab := a.currentTab()
-	if tab == nil || tab.focused != session || x < r.X || y < r.Y || x >= r.X+r.W || y >= r.Y+r.H {
+	if tab == nil || tab.Focused != session || x < r.X || y < r.Y || x >= r.X+r.W || y >= r.Y+r.H {
 		session = nil
 	}
 	a.captureTerminalPress(session, true)

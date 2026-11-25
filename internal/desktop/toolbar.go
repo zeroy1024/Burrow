@@ -34,7 +34,7 @@ func (a *app) titleBar(c *ui.Context, shown float32) {
 			},
 			BuildTabs: func(list ui.Element) {
 				var pendingAction func()
-				for i, tab := range a.tabs {
+				for i, tab := range a.tabs.Items {
 					if action := a.tabButton(c, list, i, tab); action != nil {
 						pendingAction = action
 					}
@@ -85,7 +85,7 @@ func (a *app) titleBar(c *ui.Context, shown float32) {
 func (a *app) tabButton(c *ui.Context, list ui.Element, index int, tab *workspaceTab) func() {
 	t := theme.Current()
 	var pendingAction func()
-	session := tab.focused
+	session := tab.Focused
 	h := session.endpoint
 	hint := fmt.Sprintf("%s@%s:%d", h.user, h.address, h.port)
 	switch session.state {
@@ -100,22 +100,22 @@ func (a *app) tabButton(c *ui.Context, list ui.Element, index int, tab *workspac
 		hint = fmt.Sprintf(locales.AgentSessionOperatedBy(), agent.keyName) + " · " + hint
 	}
 	props := uikit.SessionTabProps{
-		Key: tab.id, Title: title, Hint: hint, Selected: a.activeTab == index,
+		Key: tab.id, Title: title, Hint: hint, Selected: a.tabs.Active == index,
 		State: connectionIndicatorState(session.state), Handle: &tab.frame,
 		ReduceMotion: a.reduceMotion(c), PositionAnimation: a.positionAnimation(ui.Animation{Spring: uikit.Spring(t.C.ReorderMotion.TabDisplace)}),
-		Extra: tab.root.count() - 1, CloseLabel: locales.MessageCloseTab2() + h.name, DragLabel: locales.MessageDragTab() + h.name, CloseIcon: closeIcon,
+		Extra: tab.Root.Count() - 1, CloseLabel: locales.MessageCloseTab2() + h.name, DragLabel: locales.MessageDragTab() + h.name, CloseIcon: closeIcon,
 	}
 	button := uikit.SessionTab(c, props)
-	input := uikit.SessionTabInput(c, list, button, index, len(a.tabs))
+	input := uikit.SessionTabInput(c, list, button, index, len(a.tabs.Items))
 	if input.Select >= 0 {
 		a.selectTab(input.Select)
 	}
 	if input.Close {
-		pendingAction = func() { a.requestCloseTab(slices.Index(a.tabs, tab)) }
+		pendingAction = func() { a.requestCloseTab(slices.Index(a.tabs.Items, tab)) }
 	}
-	button.OnClick(func() { a.activateTab(slices.Index(a.tabs, tab)) })
+	button.OnClick(func() { a.activateTab(slices.Index(a.tabs.Items, tab)) })
 	menu := []uikit.MenuEntry{}
-	if tab.root.count() > 1 {
+	if tab.Root.Count() > 1 {
 		menu = append(menu, uikit.MenuEntry{
 			ID: "ungroup", Label: locales.MessageUngroupSessions(), Icon: uikit.IconGrid,
 			Disabled: a.drag != nil || !tab.canSeparateSessions(), OnChoose: func() {
@@ -148,14 +148,14 @@ func (a *app) tabButton(c *ui.Context, list ui.Element, index int, tab *workspac
 	}
 	menu = append(menu, uikit.MenuEntry{
 		ID: "close", Label: locales.MessageCloseTab(), Icon: uikit.IconClose, Danger: true,
-		OnChoose: func() { pendingAction = func() { a.requestCloseTab(slices.Index(a.tabs, tab)) } },
+		OnChoose: func() { pendingAction = func() { a.requestCloseTab(slices.Index(a.tabs.Items, tab)) } },
 	})
 	button.Children(func() {
 		props.State = connectionIndicatorState(session.state)
 		parts := uikit.SessionTabContents(c, button, props)
-		parts.Close.OnClick(func() { a.requestCloseTab(slices.Index(a.tabs, tab)) })
-		parts.DragHandle.OnClick(func() { a.activateTab(slices.Index(a.tabs, tab)) })
-		a.paneDragHandle(c, parts.DragHandle, paneTransfer{tab: tab, session: tab.focused, fromTab: true})
+		parts.Close.OnClick(func() { a.requestCloseTab(slices.Index(a.tabs.Items, tab)) })
+		parts.DragHandle.OnClick(func() { a.activateTab(slices.Index(a.tabs.Items, tab)) })
+		a.paneDragHandle(c, parts.DragHandle, paneTransfer{tab: tab, session: tab.Focused, fromTab: true})
 		uikit.ContextMenuOn(
 			c,
 			button,

@@ -206,8 +206,8 @@ type trayPanelSession struct {
 func (a *app) trayPanelSessions() []trayPanelSession {
 	var list []trayPanelSession
 	seen := map[any]bool{}
-	for _, tab := range a.tabs {
-		for _, session := range tab.root.sessions() {
+	for _, tab := range a.tabs.Items {
+		for _, session := range tab.Root.Sessions() {
 			if session.agent != nil || session.closing || session.state == disconnected {
 				continue
 			}
@@ -288,7 +288,7 @@ func (a *app) openSessionFromTray(tab *workspaceTab, session *remoteSession) {
 	}
 	focus := func() {
 		// A drag that finishes first may have reordered or closed the tab.
-		index := slices.Index(a.tabs, tab)
+		index := slices.Index(a.tabs.Items, tab)
 		if index < 0 || session.closing {
 			return
 		}

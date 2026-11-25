@@ -2,6 +2,7 @@ package desktop
 
 import (
 	"fmt"
+	"github.com/zeroy1024/Burrow/internal/workspace"
 	"runtime"
 	"slices"
 
@@ -92,7 +93,7 @@ func (a *app) appShortcuts(c *ui.Context) {
 			action()
 		}
 	}
-	count, index := len(a.tabs), a.activeTab
+	count, index := len(a.tabs.Items), a.tabs.Active
 	if a.section == sectionFiles {
 		count, index = len(a.fileSessions), a.activeFile
 	}
@@ -103,12 +104,12 @@ func (a *app) appShortcuts(c *ui.Context) {
 		if a.section == sectionFiles {
 			a.activateFileTab(next)
 		} else {
-			tab := a.tabs[next]
-			run(func() { a.activateTab(slices.Index(a.tabs, tab)) })
+			tab := a.tabs.Items[next]
+			run(func() { a.activateTab(slices.Index(a.tabs.Items, tab)) })
 		}
 	}
 	// These keys always navigate tabs, even when the current tab is split.
-	if !a.settingsUI.open && a.section.hasCatalog() && count > 0 {
+	if !a.settingsUI.open && a.section.HasCatalog() && count > 0 {
 		if c.Shortcut(ui.Ctrl|ui.Shift, ui.KeyTab) {
 			a.cycleTab(-1)
 			return
@@ -169,9 +170,9 @@ func (a *app) appShortcuts(c *ui.Context) {
 	selectTarget := selectTab
 	targetCount, targetIndex := count, index
 	if a.section == sectionSSH {
-		if tab := a.currentTab(); tab != nil && tab.root.count() > 1 {
-			sessions := tab.root.sessions()
-			targetCount, targetIndex = len(sessions), slices.Index(sessions, tab.focused)
+		if tab := a.currentTab(); tab != nil && tab.Root.Count() > 1 {
+			sessions := tab.Root.Sessions()
+			targetCount, targetIndex = len(sessions), slices.Index(sessions, tab.Focused)
 			selectTarget = func(next int) {
 				if next < 0 || next >= len(sessions) {
 					return
@@ -199,11 +200,11 @@ func (a *app) appShortcuts(c *ui.Context) {
 	if count > 0 && a.actionPressed(c, "tab.close") {
 		if a.section == sectionFiles {
 			a.requestCloseFileTab(a.activeFile)
-		} else if tab := a.currentTab(); tab.root.count() > 1 {
-			session := tab.focused
+		} else if tab := a.currentTab(); tab.Root.Count() > 1 {
+			session := tab.Focused
 			run(func() { a.requestClosePane(tab, session) })
 		} else {
-			a.requestCloseTab(a.activeTab)
+			a.requestCloseTab(a.tabs.Active)
 		}
 	}
 	if a.actionPressed(c, "host.search") {
@@ -229,8 +230,8 @@ func (a *app) appShortcuts(c *ui.Context) {
 			} else {
 				session := a.newShellSession(closed.host, closed.endpoint, closed.temporary, closed.connection)
 				a.nextTab++
-				a.tabs = append(a.tabs, &workspaceTab{id: a.nextTab, root: &terminalLayout{session: session}, focused: session})
-				a.activateTab(len(a.tabs) - 1)
+				a.tabs.Items = append(a.tabs.Items, &workspaceTab{id: a.nextTab, paneTab: workspace.NewTab(session)})
+				a.activateTab(len(a.tabs.Items) - 1)
 			}
 		})
 	}
@@ -240,8 +241,8 @@ func (a *app) appShortcuts(c *ui.Context) {
 			if session := a.currentFileSession(); session != nil && session.state != connected && session.state != connecting {
 				a.reconnectFileSession(session)
 			}
-		} else if tab := a.currentTab(); a.section == sectionSSH && tab != nil && tab.focused.awaitingConnect() {
-			session := tab.focused
+		} else if tab := a.currentTab(); a.section == sectionSSH && tab != nil && tab.Focused.awaitingConnect() {
+			session := tab.Focused
 			run(func() { a.connectSession(session) })
 		}
 	}
@@ -250,16 +251,16 @@ func (a *app) appShortcuts(c *ui.Context) {
 	}
 	if a.section == sectionSSH && a.actionPressed(c, "pane.split") && a.currentTab() != nil {
 		tab := a.currentTab()
-		session := tab.focused
+		session := tab.Focused
 		run(func() {
 			bounds := session.layoutRect
-			a.splitSession(session, tab.root.count() > 1 && bounds.H > bounds.W)
+			a.splitSession(session, tab.Root.Count() > 1 && bounds.H > bounds.W)
 		})
 	}
 }
 
 func (a *app) cycleTab(direction int) {
-	count, index := len(a.tabs), a.activeTab
+	count, index := len(a.tabs.Items), a.tabs.Active
 	if a.section == sectionFiles {
 		count, index = len(a.fileSessions), a.activeFile
 	}
@@ -271,8 +272,8 @@ func (a *app) cycleTab(direction int) {
 		a.activateFileTab(next)
 		return
 	}
-	tab := a.tabs[next]
-	action := func() { a.activateTab(slices.Index(a.tabs, tab)) }
+	tab := a.tabs.Items[next]
+	action := func() { a.activateTab(slices.Index(a.tabs.Items, tab)) }
 	if !a.deferWorkspaceDragAction(action) {
 		action()
 	}
@@ -387,17 +388,17 @@ func (a *app) windowDialogOpen() bool {
 }
 
 func (a *app) requestCloseTab(index int) {
-	tab := a.tabs[index]
-	if a.deferWorkspaceDragAction(func() { a.requestCloseTab(slices.Index(a.tabs, tab)) }) {
+	tab := a.tabs.Items[index]
+	if a.deferWorkspaceDragAction(func() { a.requestCloseTab(slices.Index(a.tabs.Items, tab)) }) {
 		return
 	}
-	if a.prefs.ConfirmCloseActive && slices.ContainsFunc(tab.root.sessions(), func(s *remoteSession) bool {
+	if a.prefs.ConfirmCloseActive && slices.ContainsFunc(tab.Root.Sessions(), func(s *remoteSession) bool {
 		return s.agent == nil && (s.state == connected || s.state == connecting)
 	}) {
 		a.closeRequest, a.closeFileRequest, a.closePaneRequest = tab, nil, nil
 		return
 	}
-	agent := tab.focused.agent != nil
+	agent := tab.Focused.agent != nil
 	a.closeTab(index)
 	// Dismissing an agent's record is not the user closing their last session.
 	if !agent {
@@ -452,7 +453,7 @@ func (a *app) closeTabDialog(c *ui.Context) {
 		tabRequest := a.closeRequest
 		a.closeRequest, a.closeFileRequest, a.closePaneRequest = nil, nil, nil
 		if paneRequest != nil {
-			if slices.Contains(a.tabs, paneRequest.tab) {
+			if slices.Contains(a.tabs.Items, paneRequest.tab) {
 				a.closePane(paneRequest.tab, paneRequest.session)
 			}
 		} else if fileRequest != nil {
@@ -461,7 +462,7 @@ func (a *app) closeTabDialog(c *ui.Context) {
 				a.closeFileSession(index)
 				a.afterLastTabClosed()
 			}
-		} else if index := slices.Index(a.tabs, tabRequest); index >= 0 {
+		} else if index := slices.Index(a.tabs.Items, tabRequest); index >= 0 {
 			a.closeTab(index)
 			a.afterLastTabClosed()
 		}
@@ -475,8 +476,8 @@ func (a *app) closeTabDialog(c *ui.Context) {
 func (a *app) afterLastTabClosed() {
 	// Records of agents open by themselves and do not keep the window.
 	count := len(a.fileSessions)
-	for _, tab := range a.tabs {
-		if tab.focused.agent == nil {
+	for _, tab := range a.tabs.Items {
+		if tab.Focused.agent == nil {
 			count++
 		}
 	}

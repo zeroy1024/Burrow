@@ -361,20 +361,20 @@ func (a *app) deleteFileSite(id hostID, done func(error)) {
 				session.host--
 			}
 		}
-		for i := len(a.tabs) - 1; i >= 0; i-- {
-			tab := a.tabs[i]
-			for _, session := range tab.root.sessions() {
+		for i := len(a.tabs.Items) - 1; i >= 0; i-- {
+			tab := a.tabs.Items[i]
+			for _, session := range tab.Root.Sessions() {
 				if !session.temporary && session.endpoint.session.ID == deleted.session.ID {
 					releaseSSH(session)
-					tab.root = tab.root.remove(session)
-					if tab.focused == session && tab.root != nil {
-						tab.focused = tab.root.firstSession()
+					tab.Root = tab.Root.Remove(session)
+					if tab.Focused == session && tab.Root != nil {
+						tab.Focused = tab.Root.FirstSession()
 					}
 				} else if session.host > id {
 					session.host--
 				}
 			}
-			if tab.root == nil {
+			if tab.Root == nil {
 				a.closeTab(i)
 			}
 		}

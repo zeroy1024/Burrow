@@ -36,12 +36,12 @@ func (a *app) terminals(c *ui.Context, size ui.Point) {
 		if dropped {
 			a.pendingDock = func() {
 				a.openHost(source.id)
-				startPaneReveal(a.currentTab().focused)
+				startPaneReveal(a.currentTab().Focused)
 				if catalogDropped {
 					a.page().catalogDrag.externalDrop = true
 				}
 				if a.drag != nil {
-					a.drag.session, a.drag.phase = a.currentTab().focused, dragLanded
+					a.drag.session, a.drag.phase = a.currentTab().Focused, dragLanded
 				}
 			}
 		}
@@ -52,7 +52,7 @@ func (a *app) terminals(c *ui.Context, size ui.Point) {
 		})
 		return
 	}
-	minimum := tab.root.minimum()
+	minimum := minimumLayoutSize(tab.Root)
 	area.MinWidth(minimum.X).MinHeight(minimum.Y)
 	size.X, size.Y = max(size.X, minimum.X), max(size.Y, minimum.Y)
 	if tab.workspaceSize != size {
@@ -62,21 +62,21 @@ func (a *app) terminals(c *ui.Context, size ui.Point) {
 	bounds := ui.Rect{W: size.X, H: size.Y}
 	panes, splits := []panePlacement{}, []splitPlacement{}
 	a.terminalCellWidth()
-	tab.root.placements(bounds, &panes, &splits)
+	placeLayout(tab.Root, bounds, &panes, &splits)
 	zoomProgress := a.zoomProgress(c, area, tab)
 	relayoutProgress := a.paneRelayoutProgress(c, area, tab, panes)
-	if tab.maximized || tab.zoomMix > 0 {
+	if tab.Maximized || tab.zoomMix > 0 {
 		area.Clip()
 	}
 	targets := make([]ui.Element, len(panes))
 	// Text selection can change focus during a pane build. Keep this frame's
 	// sibling order stable so that each session is built exactly once.
-	focusedSession := tab.focused
+	focusedSession := tab.Focused
 	for i := range panes {
 		placement := &panes[i]
 		session := placement.session
 		session.layoutRect = placement.rect
-		if session == focusedSession && tab.maximized {
+		if session == focusedSession && tab.Maximized {
 			placement.rect = bounds
 		}
 		if session == tab.zoomPane {
@@ -104,7 +104,7 @@ func (a *app) terminals(c *ui.Context, size ui.Point) {
 				a.terminalPane(c, tab, placement)
 			}
 		}
-		if !tab.maximized && tab.zoomMix == 0 && len(tab.relayout.from) == 0 {
+		if !tab.Maximized && tab.zoomMix == 0 && len(tab.relayout.from) == 0 {
 			for _, split := range splits {
 				a.terminalDivider(c, split)
 			}
@@ -114,7 +114,7 @@ func (a *app) terminals(c *ui.Context, size ui.Point) {
 		if a.drag != nil && a.drag.phase == dragActive || catalogActive {
 			for i, placement := range panes {
 				if placement.session.closing || slices.Contains(tab.relayout.entering, placement.session) ||
-					tab.maximized && placement.session != tab.focused {
+					tab.Maximized && placement.session != tab.Focused {
 					continue
 				}
 				targets[i].Children(func() {
@@ -161,7 +161,7 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 	p, f, status := surface.C.Pane, surface.C.PaneFocus, surface.C.StatusBar
 	session, rect := placement.session, placement.rect
 	h := session.endpoint
-	count := tab.root.count()
+	count := tab.Root.Count()
 	multiple := count > 1
 	contentGap := p.ContentSide
 	topPadding := contentGap
@@ -183,7 +183,7 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 	}
 	a.paneMotion(c, pane, tab, placement)
 	_, catalogActive, _ := a.catalogHostTransfer()
-	focused := tab.focused == session
+	focused := tab.Focused == session
 	transitioning := pane.Transitioning() || c.Now().Before(tab.layoutUntil)
 	animatingBounds := placement.resizing || session == tab.zoomPane || focused && tab.layoutDuration == t.C.Desktop.ZoomDuration &&
 		(tab.layoutPending || transitioning) && !a.reduceMotion(c)
@@ -338,7 +338,7 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 						content.Opacity(0)
 					}
 					content.Children(func() {
-						number := slices.Index(tab.root.sessions(), session) + 1
+						number := slices.Index(tab.Root.Sessions(), session) + 1
 						binding := a.shortcutBinding(fmt.Sprintf("tab.select.%d", number))
 						uikit.PaneShortcut(c, shortcutDisplay(binding), focused, surface).Hidden(binding == "")
 						uikit.Tip(c, uikit.PaneTitle(c, h.name, appearance, surface), fmt.Sprintf("%s · %s@%s:%d", h.name, h.user, h.address, h.port))
@@ -379,7 +379,7 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 				split.OnClick(func() { a.splitSession(session, stacked) })
 				if multiple {
 					icon, label := expandIcon, locales.MessageMaximizePane()
-					if tab.maximized {
+					if tab.Maximized {
 						icon, label = restoreIcon, locales.MessageRestorePane()
 					}
 					animation := uikit.Anim(c, t.C.IconButton.Transition, uikit.MotionOverride(a.reduceMotion(c)))

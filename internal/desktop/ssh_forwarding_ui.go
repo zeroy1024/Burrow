@@ -26,8 +26,8 @@ type forwardPanel struct {
 }
 
 func (a *app) forwardSession() *remoteSession {
-	if tab := a.currentTab(); tab != nil && tab.focused.agent == nil && !tab.focused.closing {
-		return tab.focused
+	if tab := a.currentTab(); tab != nil && tab.Focused.agent == nil && !tab.Focused.closing {
+		return tab.Focused
 	}
 	return nil
 }
@@ -93,7 +93,7 @@ func (a *app) sshWorkspace(c *ui.Context, size ui.Point) {
 	open := session != nil && a.forwardUI.visible
 	minimum := float32(0)
 	if tab := a.currentTab(); tab != nil {
-		minimum = tab.root.minimum().Y
+		minimum = minimumLayoutSize(tab.Root).Y
 	}
 	gutter := t.C.Window.Gutter
 	available := max(0, size.Y-minimum)

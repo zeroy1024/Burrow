@@ -42,7 +42,7 @@ func (a *app) serverStatus(c *ui.Context) {
 			).Margin(t.Space.N14, -t.Space.N2, t.Space.N14, -t.Space.N2)
 			return
 		}
-		session := tab.focused
+		session := tab.Focused
 		facts, factsMessage := a.statusHostFacts(session)
 		m := a.sessionMonitor(session)
 		ui.Column(c).Gap(t.C.Stats.SectionGap).Children(func() {

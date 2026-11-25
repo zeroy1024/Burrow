@@ -552,8 +552,8 @@ func (a *app) draftOpenTabs(d *hostDraft) int {
 		return 0
 	}
 	n := 0
-	for _, tab := range a.tabs {
-		if slices.ContainsFunc(tab.root.sessions(), func(s *remoteSession) bool { return s.host == d.id }) {
+	for _, tab := range a.tabs.Items {
+		if slices.ContainsFunc(tab.Root.Sessions(), func(s *remoteSession) bool { return s.host == d.id }) {
 			n++
 		}
 	}

@@ -168,8 +168,8 @@ func (a *app) closeConnections() {
 		a.closeLocalFiles(session)
 		session.ftpSecret = ""
 	}
-	for _, tab := range a.tabs {
-		for _, session := range tab.root.sessions() {
+	for _, tab := range a.tabs.Items {
+		for _, session := range tab.Root.Sessions() {
 			releaseSSH(session)
 		}
 	}

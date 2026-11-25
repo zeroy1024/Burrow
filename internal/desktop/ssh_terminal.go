@@ -160,7 +160,7 @@ func (a *app) attachSSH(session *remoteSession, run *sshRuntime) {
 
 func (a *app) sshSessionFocused(session *remoteSession) bool {
 	tab := a.currentTab()
-	return a.activeSection() == sectionSSH && tab != nil && tab.focused == session
+	return a.activeSection() == sectionSSH && tab != nil && tab.Focused == session
 }
 
 func (a *app) sshFont() nativeterm.Font {
@@ -224,8 +224,8 @@ func (a *app) sshTerminalView(c *ui.Context, session *remoteSession) ui.Element 
 	}
 	if output.Focused() {
 		tab := a.currentTab()
-		if tab.focused != session && !tab.focused.focusPending {
-			tab.focused = session
+		if tab.Focused != session && !tab.Focused.focusPending {
+			tab.Focused = session
 			session.hasNewOutput, session.hasBell = false, false
 			c.AnimationFrame()
 		}

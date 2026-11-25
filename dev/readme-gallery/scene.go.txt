@@ -168,14 +168,14 @@ func (a *app) galleryTerminals() {
 		"atlas-2026-11-05.dump  latest.dump",
 	})
 	staging := newSession(4)
-	a.tabs = []*workspaceTab{
-		{
-			id: 1, focused: left,
-			root: &terminalLayout{
-				first: &terminalLayout{session: left}, second: &terminalLayout{session: right}, ratio: .53,
+	a.tabs.Items = []*workspaceTab{
+		{id: 1, paneTab: paneTab{
+			Root: &terminalLayout{
+				First: &terminalLayout{Session: left}, Second: &terminalLayout{Session: right}, Ratio: .53,
 			},
-		},
-		{id: 2, root: &terminalLayout{session: staging}, focused: staging},
+			Focused: left,
+		}},
+		{id: 2, paneTab: paneTab{Root: &terminalLayout{Session: staging}, Focused: staging}},
 	}
 	a.nextTab, a.nextSession = 2, 9
 	cpu, memory, uptime, down, up, processes := 23.0, 41.0, 1225920.0, 4200000.0, 840000.0, 146
