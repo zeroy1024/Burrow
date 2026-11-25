@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/zeroy1024/Burrow/internal/persistence"
 	"github.com/zeroy1024/Burrow/internal/profile"
 	"github.com/zeroy1024/Burrow/internal/store"
 	"golang.org/x/crypto/ssh"
@@ -159,7 +160,7 @@ func (a *app) readCatalog() error {
 		return err
 	}
 	if c.Workspace != nil {
-		saved, err := decodeWorkspace(*c.Workspace)
+		saved, err := persistence.DecodeWorkspace(*c.Workspace)
 		if err != nil {
 			return err
 		}
@@ -215,7 +216,7 @@ func (a *app) catalogSnapshotData() (store.Catalog, error) {
 	if err := validateStoredWorkspace(saved, a.keys); err != nil {
 		return c, err
 	}
-	w, err := encodeWorkspace(saved)
+	w, err := persistence.EncodeWorkspace(saved)
 	if err != nil {
 		return c, err
 	}

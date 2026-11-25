@@ -8,6 +8,7 @@ import (
 
 	"github.com/egoist/mygo/ui"
 	"github.com/zeroy1024/Burrow/internal/locales"
+	"github.com/zeroy1024/Burrow/internal/persistence"
 	"github.com/zeroy1024/Burrow/internal/store"
 	"github.com/zeroy1024/Burrow/internal/workspace"
 )
@@ -15,7 +16,6 @@ import (
 type storedWorkspace = workspace.Snapshot
 type storedWorkspaceConnection = workspace.Connection
 type storedWorkspaceTab = workspace.SavedTab
-type storedWorkspaceLayout = workspace.Layout[workspace.Session]
 type storedWorkspaceSession = workspace.Session
 type storedFileTab = workspace.FileTab
 
@@ -153,7 +153,7 @@ type workspaceSaveState struct {
 }
 
 func (a *app) tickWorkspace(c *ui.Context) {
-	if a.catalogConfig.loadErr != nil || a.catalogSaving || a.quitPending || a.transfers.quitting {
+	if a.catalogConfig.loadErr != nil || a.catalogSaving || a.quitPending || a.transfers.Quitting {
 		return
 	}
 	saved := a.workspaceSnapshot()
@@ -179,7 +179,7 @@ func (a *app) tickWorkspace(c *ui.Context) {
 		a.persistenceNotice(locales.MessageUnableToSaveWorkspace, err)
 		return
 	}
-	value, err := encodeWorkspace(saved)
+	value, err := persistence.EncodeWorkspace(saved)
 	if err != nil {
 		a.persistenceNotice(locales.MessageUnableToSaveWorkspace, err)
 		return
@@ -202,7 +202,7 @@ func (a *app) persistBeforeClose(done func(error)) {
 			done(err)
 			return
 		}
-		value, err := encodeWorkspace(saved)
+		value, err := persistence.EncodeWorkspace(saved)
 		if err != nil {
 			done(err)
 			return

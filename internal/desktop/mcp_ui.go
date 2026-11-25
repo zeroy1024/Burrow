@@ -285,9 +285,9 @@ func (a *app) mcpPage(c *ui.Context) {
 			})
 			if res.ActionIndex == 0 {
 				a.mcp.activeTab = 2
-				for _, task := range a.transfers.tasks {
-					if task.mcp != nil && task.state == transferPaused {
-						a.mcp.selectedAuditID = task.mcp.OperationID
+				for _, task := range a.transfers.Tasks {
+					if task.MCP != nil && task.State == transferPaused {
+						a.mcp.selectedAuditID = task.MCP.OperationID
 						a.mcp.auditDrawerOpen = true
 						break
 					}

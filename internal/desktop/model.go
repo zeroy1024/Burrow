@@ -420,9 +420,9 @@ func (a *app) runtimeSSHGroups() []*sshConnectionGroup {
 			groups[session.connection] = struct{}{}
 		}
 	}
-	for _, task := range a.transfers.tasks {
-		if task.session.connection != nil {
-			groups[task.session.connection] = struct{}{}
+	for _, task := range a.transfers.Tasks {
+		if task.Session.connection != nil {
+			groups[task.Session.connection] = struct{}{}
 		}
 	}
 	// Reopening a closed tab restores its captured plan after catalog edits.

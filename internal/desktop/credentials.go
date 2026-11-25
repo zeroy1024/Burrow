@@ -213,8 +213,8 @@ func (a *app) preparePasswordClear(ids []string) func(error) {
 		for _, session := range a.fileSessions {
 			files[session] = true
 		}
-		for _, task := range a.transfers.tasks {
-			files[task.session] = true
+		for _, task := range a.transfers.Tasks {
+			files[task.Session] = true
 		}
 		for session := range files {
 			if changed[session.config.ID] || changed[session.endpoint.session.ID] {
@@ -413,8 +413,8 @@ func (a *app) keyUseCount(id string) int {
 	for _, session := range a.fileSessions {
 		fileSessions[session] = true
 	}
-	for _, task := range a.transfers.tasks {
-		fileSessions[task.session] = true
+	for _, task := range a.transfers.Tasks {
+		fileSessions[task.Session] = true
 	}
 	for _, closed := range a.closedTabs {
 		if closed.section == sectionFiles {

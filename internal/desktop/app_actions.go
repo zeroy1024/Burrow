@@ -296,7 +296,7 @@ func (a *app) installAppMenu() func() {
 			// AppKit handles Control-Tab before the native view's keyDown.
 			// Menu accelerators need their own guard for the UI's modal scope.
 			switch {
-			case a.settingsUI.open, a.settingsUI.recording != "", a.transfers.quitting:
+			case a.settingsUI.open, a.settingsUI.recording != "", a.transfers.Quitting:
 				return
 			case a.page().addHostOpen, a.page().groupDialogOpen:
 				return

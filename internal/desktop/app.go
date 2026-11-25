@@ -15,6 +15,7 @@ import (
 	"github.com/zeroy1024/Burrow/internal/locales"
 	"github.com/zeroy1024/Burrow/internal/localfs"
 	"github.com/zeroy1024/Burrow/internal/migration"
+	"github.com/zeroy1024/Burrow/internal/persistence"
 	"github.com/zeroy1024/Burrow/internal/store"
 	"github.com/zeroy1024/Burrow/internal/termtheme"
 	"github.com/zeroy1024/Burrow/internal/theme"
@@ -69,7 +70,7 @@ type app struct {
 	vault                  *vault.Manager
 	security               applicationSecurityState
 	store                  *store.Store
-	persistence            *persistenceWorker
+	persistence            *persistence.Writer
 	dataDirectory          string
 	catalogSaving          bool
 	catalogReady           []func()
@@ -272,7 +273,7 @@ func Run() (runErr error) {
 		runErr = errors.Join(runErr, a.finishPersistence())
 	})
 	defer finish()
-	a.persistence = newPersistenceWorker(func() *mygo.Window { return a.window })
+	a.persistence = persistence.NewWriter(func(f func()) { a.window.Update(f) })
 	for i := range a.pages {
 		a.pages[i].sidebarWidth = theme.Current().C.Sider.Width
 	}
@@ -629,7 +630,7 @@ func (a *app) view(c *ui.Context) {
 }
 
 func (a *app) interactionBlocked() bool {
-	return a.security.changing || a.transfers.quitting || a.catalogSaving || a.quitPending || a.terminal.importing
+	return a.security.changing || a.transfers.Quitting || a.catalogSaving || a.quitPending || a.terminal.importing
 }
 
 func (a *app) navigation(c *ui.Context) {
@@ -763,6 +764,6 @@ func (a *app) sidebarResizeHandle(c *ui.Context, shown float32) {
 }
 
 func (a *app) resetQuitAttempt() {
-	a.quitReady, a.quitPending, a.transfers.quitting = false, false, false
+	a.quitReady, a.quitPending, a.transfers.Quitting = false, false, false
 	a.refreshTray()
 }

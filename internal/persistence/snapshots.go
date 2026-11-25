@@ -1,15 +1,19 @@
-package desktop
+// Package persistence translates shared application snapshots into database records.
+package persistence
 
 import (
 	"encoding/json"
 	"errors"
 
+	"github.com/zeroy1024/Burrow/internal/profile"
 	"github.com/zeroy1024/Burrow/internal/store"
+	"github.com/zeroy1024/Burrow/internal/transfer"
+	"github.com/zeroy1024/Burrow/internal/workspace"
 )
 
 type endpointEncoder struct{ values map[string]store.Endpoint }
 
-func (e *endpointEncoder) add(value *storedSession) (string, error) {
+func (e *endpointEncoder) add(value *profile.Endpoint) (string, error) {
 	data, err := json.Marshal(value)
 	if err != nil {
 		return "", err
@@ -19,7 +23,7 @@ func (e *endpointEncoder) add(value *storedSession) (string, error) {
 		e.values = map[string]store.Endpoint{}
 	}
 	e.values[id] = store.Endpoint{ID: id, KeyID: value.KeyID, Value: data}
-	*value = storedSession{}
+	*value = profile.Endpoint{}
 	return id, nil
 }
 func (e *endpointEncoder) endpoints() []store.Endpoint {
@@ -42,7 +46,7 @@ func newEndpointDecoder(values []store.Endpoint) (endpointDecoder, error) {
 	}
 	return d, nil
 }
-func (d endpointDecoder) get(id string, value *storedSession) error {
+func (d endpointDecoder) get(id string, value *profile.Endpoint) error {
 	data, exists := d[id]
 	if !exists {
 		return errors.New("missing immutable endpoint " + id)
@@ -56,15 +60,15 @@ func (d endpointDecoder) get(id string, value *storedSession) error {
 	return nil
 }
 
-func visitWorkspace(w *storedWorkspace, visit func(*storedSession, *string) error) error {
+func visitWorkspace(w *workspace.Snapshot, visit func(*profile.Endpoint, *string) error) error {
 	for i := range w.Connections {
 		v := &w.Connections[i]
 		if err := visit(&v.Endpoint, &v.EndpointRef); err != nil {
 			return err
 		}
 	}
-	var walk func(*storedWorkspaceLayout) error
-	walk = func(n *storedWorkspaceLayout) error {
+	var walk func(*workspace.Layout[workspace.Session]) error
+	walk = func(n *workspace.Layout[workspace.Session]) error {
 		if n == nil {
 			return nil
 		}
@@ -90,18 +94,18 @@ func visitWorkspace(w *storedWorkspace, visit func(*storedSession, *string) erro
 	return nil
 }
 
-func encodeWorkspace(value *storedWorkspace) (store.Workspace, error) {
+func EncodeWorkspace(value *workspace.Snapshot) (store.Workspace, error) {
 	// Copy before replacing full endpoints with database references.
 	data, err := json.Marshal(value)
 	if err != nil {
 		return store.Workspace{}, err
 	}
-	var w storedWorkspace
+	var w workspace.Snapshot
 	if err := json.Unmarshal(data, &w); err != nil {
 		return store.Workspace{}, err
 	}
 	e := endpointEncoder{}
-	err = visitWorkspace(&w, func(v *storedSession, id *string) error { var err error; *id, err = e.add(v); return err })
+	err = visitWorkspace(&w, func(v *profile.Endpoint, id *string) error { var err error; *id, err = e.add(v); return err })
 	if err != nil {
 		return store.Workspace{}, err
 	}
@@ -109,20 +113,20 @@ func encodeWorkspace(value *storedWorkspace) (store.Workspace, error) {
 	return store.Workspace{Layout: data, Endpoints: e.endpoints()}, err
 }
 
-func decodeWorkspace(value store.Workspace) (*storedWorkspace, error) {
+func DecodeWorkspace(value store.Workspace) (*workspace.Snapshot, error) {
 	d, err := newEndpointDecoder(value.Endpoints)
 	if err != nil {
 		return nil, err
 	}
-	var w storedWorkspace
+	var w workspace.Snapshot
 	if err := json.Unmarshal(value.Layout, &w); err != nil {
 		return nil, err
 	}
-	err = visitWorkspace(&w, func(v *storedSession, id *string) error { return d.get(*id, v) })
+	err = visitWorkspace(&w, func(v *profile.Endpoint, id *string) error { return d.get(*id, v) })
 	return &w, err
 }
 
-func encodeTransfers(saved *storedTransferQueue) (store.Transfers, error) {
+func EncodeTransfers(saved *transfer.Snapshot) (store.Transfers, error) {
 	q := store.Transfers{NextID: saved.NextID, NextBatchID: saved.NextBatchID}
 	e := endpointEncoder{}
 	for _, b := range saved.Batches {
@@ -171,17 +175,17 @@ func encodeTransfers(saved *storedTransferQueue) (store.Transfers, error) {
 	return q, nil
 }
 
-func decodeTransfers(q store.Transfers) (*storedTransferQueue, error) {
-	w := &storedTransferQueue{Version: 4, NextID: q.NextID, NextBatchID: q.NextBatchID}
+func DecodeTransfers(q store.Transfers) (*transfer.Snapshot, error) {
+	w := &transfer.Snapshot{Version: 4, NextID: q.NextID, NextBatchID: q.NextBatchID}
 	d, err := newEndpointDecoder(q.Endpoints)
 	if err != nil {
 		return nil, err
 	}
 	for _, b := range q.Batches {
-		w.Batches = append(w.Batches, storedTransferBatch{ID: b.ID, Policy: b.Policy})
+		w.Batches = append(w.Batches, transfer.SavedBatch{ID: b.ID, Policy: b.Policy})
 	}
 	for _, v := range q.Sessions {
-		var s storedTransferSession
+		var s transfer.SavedSession
 		if err := json.Unmarshal(v.Value, &s); err != nil {
 			return nil, err
 		}
@@ -194,7 +198,7 @@ func decodeTransfers(q store.Transfers) (*storedTransferQueue, error) {
 		w.Sessions = append(w.Sessions, s)
 	}
 	for _, v := range q.Connections {
-		var c storedTransferConnection
+		var c transfer.SavedConnection
 		if err := json.Unmarshal(v.Value, &c); err != nil {
 			return nil, err
 		}
@@ -205,7 +209,7 @@ func decodeTransfers(q store.Transfers) (*storedTransferQueue, error) {
 			return nil, err
 		}
 		for _, id := range c.StepRefs {
-			var s storedSession
+			var s profile.Endpoint
 			if err := d.get(id, &s); err != nil {
 				return nil, err
 			}
@@ -214,7 +218,7 @@ func decodeTransfers(q store.Transfers) (*storedTransferQueue, error) {
 		w.Connections = append(w.Connections, c)
 	}
 	for _, v := range q.Tasks {
-		var t storedTransferTask
+		var t transfer.SavedTask
 		if err := json.Unmarshal(v.Value, &t); err != nil {
 			return nil, err
 		}

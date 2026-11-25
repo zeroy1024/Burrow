@@ -181,7 +181,7 @@ func dockerIntegrationSnapshot() {
         FileDragEntryPaths []string
         SettingsRecording, CatalogError, Locale, AppName string
     }{Prompts: len(a.sshPrompts), Tabs: len(a.tabs.Items), FileTabs:len(a.fileSessions), Section:int(a.section),
-      ActiveSection:int(a.activeSection()), Transfers:len(a.transfers.tasks), LocalOpen:a.files.localOpen,
+      ActiveSection:int(a.activeSection()), Transfers:len(a.transfers.Tasks), LocalOpen:a.files.localOpen,
       ActiveRemote:a.files.activeRemote, ClosedTabs:len(a.closedTabs), SettingsOpen:a.settingsUI.open,
       Locale:mygo.App.Locale(), AppName:mygo.App.Name(),
       SettingsRecording:a.settingsUI.recording, Sessions:[]sessionInfo{}, FileSessions:[]fileSessionInfo{},
@@ -241,19 +241,19 @@ func dockerIntegrationSnapshot() {
         if s.connection != nil { item.Connection, item.Generation = s.connection.id, s.connection.transport.Generation() }
         out.FileSessions = append(out.FileSessions, item)
     }
-    for _, task := range a.transfers.tasks {
-        item := transferInfo{ID:task.id, SessionID:task.session.id, RestoreID:task.session.restoreID,
-            Name:task.entry.name, State:int(task.state), SourcePath:task.sourcePath,
-            TargetPath:task.targetPath, Error:task.errorText.String(), ErrorText:task.errorText.String(), SourceRemote:task.sourceRemote,
-            RunPresent:task.run != nil, CleanupPending:task.cleanupPending, RemoveRequested:task.removeRequested,
-            Transferred:task.transferred, Total:task.total, Speed:task.speed, TemporaryCount:-1}
-        if task.view != nil { item.ViewID, item.ViewRestoreID = task.view.id, task.view.restoreID }
-        if task.job != nil {
-            item.BatchID = task.job.batch.id
+    for _, task := range a.transfers.Tasks {
+        item := transferInfo{ID:task.ID, SessionID:task.Session.id, RestoreID:task.Session.restoreID,
+            Name:task.Entry.Name, State:int(task.State), SourcePath:task.SourcePath,
+            TargetPath:task.TargetPath, Error:task.ErrorText.String(), ErrorText:task.ErrorText.String(), SourceRemote:task.SourceRemote,
+            RunPresent:task.Run != nil, CleanupPending:task.CleanupPending, RemoveRequested:task.RemoveRequested,
+            Transferred:task.Transferred, Total:task.Total, Speed:task.Speed, TemporaryCount:-1}
+        if task.View != nil { item.ViewID, item.ViewRestoreID = task.View.id, task.View.restoreID }
+        if task.Job != nil {
+            item.BatchID = task.Job.Batch.ID
             // A running worker exclusively owns the manifest and staging map.
-            if task.run == nil { item.TemporaryCount = len(task.job.temporary) }
+            if task.Run == nil { item.TemporaryCount = len(task.Job.Temporary) }
         }
-        if task.run != nil { item.RunTransferred, item.RunTotal = task.run.bytes.Load(), task.run.total.Load() }
+        if task.Run != nil { item.RunTransferred, item.RunTotal = task.Run.Bytes.Load(), task.Run.Total.Load() }
         out.TransferTasks = append(out.TransferTasks, item)
     }
     if drag := a.files.drag; drag != nil {
