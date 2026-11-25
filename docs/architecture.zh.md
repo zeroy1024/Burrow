@@ -7,8 +7,12 @@
 | 位置 | 职责 |
 |---|---|
 | [main.go](../main.go) | 应用入口 |
-| [internal/desktop](../internal/desktop/) | 页面组合、终端视图、认证交互、持久化与传输任务 |
+| [internal/desktop](../internal/desktop/) | 桌面页面、终端视图、认证与文件冲突弹窗、应用启动和退出 |
 | [internal/session](../internal/session/) | SSH 连接复用、通道排队与取消、Shell 生命周期、监控采样和转发监听 |
+| [internal/profile](../internal/profile/) | 主机端点、协议选项、网关路由和已保存配置的校验 |
+| [internal/workspace](../internal/workspace/) | 标签顺序、活动标签、分栏树、焦点和工作区快照恢复 |
+| [internal/transfer](../internal/transfer/) | 传输排队、并发限制、暂停恢复、冲突处理、分段校验和文件提交 |
+| [internal/persistence](../internal/persistence/) | 工作区与队列快照和数据库记录的转换、串行写入与完成通知 |
 | [internal/sshclient](../internal/sshclient/) | SSH 连接、认证、主机信任、Shell/Exec/子系统与连接租约 |
 | [internal/wggateway](../internal/wggateway/) | 纯用户态 WireGuard/netstack、严格的单 Peer 导入、隧道 DNS 与身份握手验证 |
 | [internal/fileclient](../internal/fileclient/) | 本地、SFTP、FTP/FTPS 文件操作及可选能力 |
@@ -51,9 +55,11 @@ WireGuard 传输按客户端/Peer 身份在终端、传输、MCP 和测试之间
 
 SSH、文件传输、MCP、设置互斥构建当前页面，页面挂载不拥有业务任务生命周期。切页保留连接、目录历史、终端滚动与传输；关闭设置只清临时 UI，复用窗口生命周期内的稳定句柄。工作区可保存并恢复 SSH、文件或 MCP 的页面选择；设置页仍为临时页面。
 
+工作区保存分栏方向、比例和焦点。桌面端根据可用尺寸计算像素位置，并负责键盘焦点、拖动和动画。读取旧工作区时，先验证分栏树与连接引用，再将每个叶节点还原成桌面会话。
+
 关闭主窗口与应用退出使用同一流程，所有平台都会保存工作区与设置、停止 MCP 服务、暂停并保存传输任务，再关闭会话连接并退出进程。关闭最后标签的行为按偏好单独处理。
 
-传输任务使用独立上下文和协议 client/subsystem。任务按文件标签身份分组，浏览视图关闭或站点配置改变不改向后台任务。执行与保存入口为 [transfer_backend.go](../internal/desktop/transfer_backend.go)、[transfer_store.go](../internal/desktop/transfer_store.go) 和 [workspace_store.go](../internal/desktop/workspace_store.go)。
+传输任务使用独立上下文和协议 client/subsystem。任务按文件标签身份分组，浏览视图关闭或站点配置改变不改向后台任务。桌面端提供认证、冲突选择和进度通知。队列负责限制并发、验证续传位置、提交目标文件和清理临时文件。[队列](../internal/transfer/queue.go) · [传输执行](../internal/transfer/worker.go) · [快照读写](../internal/persistence/snapshots.go)。
 
 ## 文件一致性与持久化
 
