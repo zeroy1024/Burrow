@@ -5,10 +5,14 @@ Every released version has a `## <version> - <date>` section, English first, the
 ## Unreleased
 
 - Upgrade to MyGo 0.10.0 for sharper text and cached controls during scaling.
+- Play a skippable Burrow rabbit animation on cold starts with automatic unlock. Reduced motion shows a brief still image and fade.
+- Reduce cold-start stutter as the burrow expands and the sidebar, tabs, and Shell panes rotate and scale into place.
 
 **简体中文**
 
 - 升级到 MyGo 0.10.0，改善缩放时文字和缓存控件的清晰度。
+- 自动解锁的冷启动会播放可跳过的 Burrow 兔子出洞动画。开启减少动态效果时，短暂显示静态画面后淡出。
+- 减少冷启动时地洞扩大，以及侧栏、标签栏和 Shell 窗格旋转、缩放入场时的卡顿。
 
 ## 0.1.12 - 2026-11-24
 

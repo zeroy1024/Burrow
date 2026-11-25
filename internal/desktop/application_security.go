@@ -125,6 +125,9 @@ func (a *app) beginStartup() {
 		a.security.status = "locked"
 		return
 	}
+	if a.security.status != "blocked" && a.prefsLoadErr == nil {
+		a.splash.arm()
+	}
 	a.security.busy = true
 	a.sshWorkers.Go(func() {
 		var err error
