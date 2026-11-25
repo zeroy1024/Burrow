@@ -9,45 +9,15 @@ import (
 	"slices"
 	"time"
 
-	"github.com/zeroy1024/Burrow/internal/hostinfo"
 	"github.com/zeroy1024/Burrow/internal/locales"
+	"github.com/zeroy1024/Burrow/internal/profile"
 	"github.com/zeroy1024/Burrow/internal/store"
 	"github.com/zeroy1024/Burrow/internal/vault"
 )
 
-type sessionConfig struct {
-	Gateway          string        `json:"gateway,omitempty"`
-	GatewayRoute     *[]gatewayHop `json:"gatewayRoute,omitempty"`
-	ID               string        `json:"id"`
-	Auth             string        `json:"auth"`
-	KeyID            string        `json:"keyId,omitempty"`
-	PortEdited       bool          `json:"portEdited"`
-	SSH              *sshOptions   `json:"ssh,omitempty"`
-	Files            *fileOptions  `json:"files,omitempty"`
-	PasswordSaved    bool          `json:"passwordSaved,omitempty"`
-	PasswordRevision string        `json:"passwordRevision,omitempty"`
-	CreatedAt        time.Time     `json:"createdAt"`
-	UpdatedAt        time.Time     `json:"updatedAt"`
-}
-
-type sshOptions struct {
-	KeepAlive   int      `json:"keepAlive"`             // TCP keepalive seconds
-	HealthCheck int      `json:"healthCheck,omitempty"` // SSH health-check seconds; zero is off
-	InitCommand string   `json:"initCommand,omitempty"`
-	TermScheme  string   `json:"termScheme,omitempty"`
-	Env         []string `json:"env,omitempty"`
-	// Platform pins the remote system; empty detects it on connect.
-	Platform string           `json:"platform,omitempty"`
-	Forwards []sshForwardRule `json:"forwards,omitempty"`
-}
-
-type fileOptions struct {
-	RemoteDir string `json:"remoteDir,omitempty"`
-	LocalDir  string `json:"localDir,omitempty"`
-	Encoding  string `json:"encoding"`
-	FTPMode   string `json:"ftpMode,omitempty"`
-	FTPTLS    string `json:"ftpTls,omitempty"`
-}
+type sessionConfig = profile.Config
+type sshOptions = profile.SSHOptions
+type fileOptions = profile.FileOptions
 
 type managedKey struct {
 	PublicKey   []byte    `json:"publicKey"`
@@ -222,59 +192,9 @@ func validateSessionCatalog(hosts []host, keys []managedKey) error {
 		byID[h.session.ID] = h
 	}
 	for _, h := range hosts {
-		if err := validateSessionProfile(h, byID, keyIDs); err != nil {
+		if err := h.session.Validate(h.protocol, keyIDs); err != nil {
 			return err
 		}
 	}
 	return nil
-}
-
-func validateSessionProfile(h host, byID map[string]host, keyIDs map[string]bool) error {
-	if h.session.ID == "" {
-		return errors.New("empty session id")
-	}
-	if !slices.Contains([]string{"password", "key", "agent", "anonymous"}, h.session.Auth) {
-		return errors.New("invalid authentication method")
-	}
-	if h.protocol == "ftp" && h.session.Auth != "password" && h.session.Auth != "anonymous" {
-		return errors.New("invalid FTP authentication method")
-	}
-	if h.protocol != "ftp" && h.session.Auth == "anonymous" {
-		return errors.New("anonymous authentication requires FTP")
-	}
-	if h.session.Auth == "key" && !keyIDs[h.session.KeyID] {
-		return errors.New("session references a missing private key")
-	}
-	if options := h.session.SSH; options != nil {
-		if options.KeepAlive < 0 || options.KeepAlive > 3600 {
-			return errors.New("invalid keepalive interval")
-		}
-		if options.HealthCheck < 0 || options.HealthCheck > 3600 {
-			return locales.NewError(locales.SshHealthCheckInvalid)
-		}
-		if !validPlatformOverride(options.Platform) {
-			return errors.New("invalid remote platform")
-		}
-		if err := validateForwardRules(options.Forwards); err != nil {
-			return err
-		}
-	}
-	if h.session.GatewayRoute != nil {
-		if err := validateGatewayRoute(*h.session.GatewayRoute); err != nil {
-			return err
-		}
-	}
-	if options := h.session.Files; options != nil {
-		if !slices.Contains([]string{"UTF-8", "GBK", "GB18030", "Big5", "Shift_JIS", "EUC-KR", "ISO-8859-1"}, options.Encoding) {
-			return errors.New("invalid filename encoding")
-		}
-		if h.protocol == "ftp" && (!slices.Contains([]string{"passive", "active"}, options.FTPMode) || !slices.Contains([]string{"none", "explicit", "implicit"}, options.FTPTLS)) {
-			return errors.New("invalid FTP options")
-		}
-	}
-	return nil
-}
-
-func validPlatformOverride(platform string) bool {
-	return platform == "" || slices.Contains(hostinfo.Overrides, hostinfo.Platform(platform))
 }

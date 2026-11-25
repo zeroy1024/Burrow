@@ -15,6 +15,7 @@ import (
 	"github.com/zeroy1024/Burrow/internal/fileclient"
 	"github.com/zeroy1024/Burrow/internal/locales"
 	"github.com/zeroy1024/Burrow/internal/mcpserver"
+	"github.com/zeroy1024/Burrow/internal/profile"
 	sshsession "github.com/zeroy1024/Burrow/internal/session"
 	"github.com/zeroy1024/Burrow/internal/sshclient"
 	"github.com/zeroy1024/Burrow/internal/store"
@@ -147,7 +148,7 @@ func (b *mcpDesktop) captureConnections() ([]mcpserver.Connection, error) {
 		}
 		digest := store.EndpointID(data)
 		session := b.sessions[h.session.ID+":"+digest]
-		if session == nil || !sameGatewayRoute(session.endpoint.session.GatewayRoute, &plan.route) {
+		if session == nil || !profile.SameRoute(session.endpoint.session.GatewayRoute, &plan.route) {
 			route := plan.route
 			h.session.GatewayRoute = &route
 			fileEndpoint := h

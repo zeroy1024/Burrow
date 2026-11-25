@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/egoist/mygo/ui"
-	"github.com/zeroy1024/Burrow/internal/locales"
-	"github.com/zeroy1024/Burrow/internal/store"
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/egoist/mygo/ui"
+	"github.com/zeroy1024/Burrow/internal/locales"
+	"github.com/zeroy1024/Burrow/internal/profile"
+	"github.com/zeroy1024/Burrow/internal/store"
 )
 
 type storedWorkspace struct {
@@ -105,7 +107,7 @@ func snapshotWorkspaceSession(endpoint host, config sessionConfig, temporary boo
 	endpoint.session = config
 	endpoint = cloneHostEndpoint(endpoint)
 	stored := storedSession{
-		sessionConfig: endpoint.session, Protocol: endpoint.protocol, Name: endpoint.name,
+		Config: endpoint.session, Protocol: endpoint.protocol, Name: endpoint.name,
 		Host: endpoint.address, Port: endpoint.port, User: endpoint.user, OS: endpoint.os, System: endpoint.system,
 	}
 	profile := ""
@@ -139,7 +141,7 @@ func (a *app) restoreWorkspaceTabs(saved *storedWorkspace) {
 		value := connection.Endpoint
 		endpoint := host{
 			name: value.Name, user: value.User, address: value.Host, port: value.Port,
-			os: value.OS, system: value.System, protocol: value.Protocol, session: value.sessionConfig,
+			os: value.OS, system: value.System, protocol: value.Protocol, session: value.Config,
 		}
 		groups[connection.ID] = a.newSSHGroup(endpoint)
 	}
@@ -147,7 +149,7 @@ func (a *app) restoreWorkspaceTabs(saved *storedWorkspace) {
 		value := stored.Endpoint
 		endpoint := host{
 			name: value.Name, user: value.User, address: value.Host, port: value.Port,
-			os: value.OS, system: value.System, protocol: value.Protocol, session: value.sessionConfig,
+			os: value.OS, system: value.System, protocol: value.Protocol, session: value.Config,
 		}
 		initializeSession(&endpoint)
 		id := hostID(slices.IndexFunc(a.hosts, func(h host) bool { return h.session.ID == stored.ProfileID }))
@@ -215,10 +217,6 @@ func validateStoredWorkspace(saved *storedWorkspace, hosts []host, keys []manage
 	if saved.ActiveSSH < 0 || saved.ActiveSSH >= max(1, sshCount) || saved.ActiveFile < 0 || saved.ActiveFile >= max(1, fileCount) {
 		return errors.New("invalid active workspace tab")
 	}
-	profiles := map[string]host{}
-	for _, profile := range hosts {
-		profiles[profile.session.ID] = profile
-	}
 	keyIDs := map[string]bool{}
 	for _, key := range keys {
 		keyIDs[key.ID] = true
@@ -239,7 +237,7 @@ func validateStoredWorkspace(saved *storedWorkspace, hosts []host, keys []manage
 		if stored.ProfileID != "" && stored.ProfileID != h.ID {
 			return errors.New("workspace profile id differs from its endpoint")
 		}
-		if err := validateSessionProfile(host{protocol: protocol, session: h.sessionConfig}, profiles, keyIDs); err != nil {
+		if err := h.Config.Validate(protocol, keyIDs); err != nil {
 			return err
 		}
 		return nil
@@ -266,11 +264,11 @@ func validateStoredWorkspace(saved *storedWorkspace, hosts []host, keys []manage
 		}
 		if stored.Connection > 0 {
 			if stored.Endpoint.GatewayRoute != nil {
-				if err := validateGatewayRoute(*stored.Endpoint.GatewayRoute); err != nil {
+				if err := profile.ValidateRoute(*stored.Endpoint.GatewayRoute); err != nil {
 					return err
 				}
 			}
-			if !sameGatewayRoute(stored.Endpoint.GatewayRoute, connectionRoutes[stored.Connection]) {
+			if !profile.SameRoute(stored.Endpoint.GatewayRoute, connectionRoutes[stored.Connection]) {
 				return errors.New("workspace session gateway route differs from its connection")
 			}
 		}

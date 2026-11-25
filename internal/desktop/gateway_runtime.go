@@ -3,7 +3,6 @@ package desktop
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net"
 	"strconv"
 	"strings"
@@ -11,6 +10,7 @@ import (
 	"time"
 
 	"github.com/zeroy1024/Burrow/internal/locales"
+	"github.com/zeroy1024/Burrow/internal/profile"
 	"github.com/zeroy1024/Burrow/internal/sshclient"
 	"github.com/zeroy1024/Burrow/internal/store"
 	"golang.org/x/net/proxy"
@@ -167,34 +167,12 @@ func (p *gatewayPool) acquire(
 }
 
 func gatewayRuntimeKey(route []gatewayHop, steps []sshDialStep, scope string) string {
-	var identity strings.Builder
-	fmt.Fprintf(&identity, "%q\n", scope)
-	sshIndex := 0
-	for _, hop := range route {
-		fmt.Fprintf(&identity, "%q %q\n", hop.ID, hop.Kind)
-		if hop.WG != nil {
-			data, _ := json.Marshal(hop.WG)
-			fmt.Fprintf(&identity, "%s\n", data)
-			continue
-		}
-		if hop.Kind == "socks5" {
-			s := hop.SOCKS
-			fmt.Fprintf(&identity, "%q %d %q %t %q\n", s.Address, s.Port, s.Username, s.PasswordSaved, s.PasswordRevision)
-			continue
-		}
-		step := steps[sshIndex]
-		sshIndex++
+	identity := profile.RouteIdentity(route, scope, func(i int) (profile.Endpoint, string, string) {
+		step := steps[i]
 		h := step.endpoint
-		keepalive, healthCheck := 0, 0
-		if h.session.SSH != nil {
-			keepalive = h.session.SSH.KeepAlive
-			healthCheck = h.session.SSH.HealthCheck
-		}
-		fmt.Fprintf(&identity, "%q %q %d %q %q %q %t %q %d %d %q %q\n",
-			h.session.ID, h.address, h.port, h.user, h.session.Auth, h.session.KeyID,
-			h.session.PasswordSaved, h.session.PasswordRevision, keepalive, healthCheck, step.key.SecretID, step.key.Fingerprint)
-	}
-	return store.EndpointID([]byte(identity.String()))
+		return profile.Endpoint{Config: h.session, Host: h.address, Port: h.port, User: h.user}, step.key.SecretID, step.key.Fingerprint
+	})
+	return store.EndpointID([]byte(identity))
 }
 
 func (a *app) gatewayDialer(ctx context.Context, plan sshDialPlan) (gatewayDialFunc, func(), error) {

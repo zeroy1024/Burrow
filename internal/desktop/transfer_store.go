@@ -11,6 +11,7 @@ import (
 
 	"github.com/zeroy1024/Burrow/internal/fileclient"
 	"github.com/zeroy1024/Burrow/internal/locales"
+	"github.com/zeroy1024/Burrow/internal/profile"
 )
 
 type storedTransferQueue struct {
@@ -395,57 +396,7 @@ func restoreTransferNode(stored *storedTransferNode) *transferNode {
 
 func transferStoredHost(value storedSession) host {
 	return cloneHostEndpoint(host{name: value.Name, address: value.Host, port: value.Port, user: value.User,
-		protocol: value.Protocol, os: value.OS, system: value.System, session: value.sessionConfig})
-}
-
-func validateTransferEndpoint(endpoint storedSession, files bool) error {
-	if strings.TrimSpace(endpoint.Name) == "" || strings.TrimSpace(endpoint.Host) == "" ||
-		strings.ContainsAny(endpoint.Host+endpoint.User, "\r\n\x00") || endpoint.Port < 1 || endpoint.Port > 65535 ||
-		endpoint.ID == "" || endpoint.OS < 0 || endpoint.OS >= len(systems) {
-		return locales.NewError(locales.MessageInvalidTransferSessionSnapshot)
-	}
-	if files && endpoint.Protocol != "sftp" && endpoint.Protocol != "ftp" ||
-		!files && endpoint.Protocol != "" && endpoint.Protocol != "sftp" {
-		return locales.NewError(locales.MessageInvalidTransferSessionProtocol)
-	}
-	if !slices.Contains([]string{"password", "key", "agent", "anonymous"}, endpoint.Auth) ||
-		endpoint.Protocol == "ftp" && endpoint.Auth != "password" && endpoint.Auth != "anonymous" ||
-		endpoint.Protocol != "ftp" && endpoint.Auth == "anonymous" {
-		return locales.NewError(locales.MessageInvalidTransferAuthenticationMethod)
-	}
-	if endpoint.Auth == "key" && (endpoint.KeyID == "" || endpoint.KeyID == "." || endpoint.KeyID == ".." ||
-		filepath.Base(endpoint.KeyID) != endpoint.KeyID) {
-		return locales.NewError(locales.MessageInvalidTransferPrivateKeyReference)
-	}
-	if options := endpoint.SSH; options != nil {
-		if options.KeepAlive < 0 || options.KeepAlive > 3600 {
-			return locales.NewError(locales.MessageInvalidTransferKeepalive)
-		}
-		if options.HealthCheck < 0 || options.HealthCheck > 3600 {
-			return locales.NewError(locales.SshHealthCheckInvalid)
-		}
-		if !validPlatformOverride(options.Platform) {
-			return locales.NewError(locales.MessageInvalidTransferRemoteSystem)
-		}
-	}
-	if options := endpoint.Files; options != nil {
-		if !slices.Contains([]string{"UTF-8", "GBK", "GB18030", "Big5", "Shift_JIS", "EUC-KR", "ISO-8859-1"}, options.Encoding) {
-			return locales.NewError(locales.MessageInvalidTransferFilenameEncoding)
-		}
-		if endpoint.Protocol == "ftp" && (!slices.Contains([]string{"none", "explicit", "implicit"}, options.FTPTLS) ||
-			!slices.Contains([]string{"passive", "active"}, options.FTPMode)) {
-			return locales.NewError(locales.MessageInvalidFtpTransferOptions)
-		}
-	}
-	if endpoint.GatewayRoute != nil {
-		return validateGatewayRoute(*endpoint.GatewayRoute)
-	}
-	return nil
-}
-
-func sameTransferEndpoint(left, right storedSession) bool {
-	return left.Host == right.Host && left.Port == right.Port && left.User == right.User &&
-		left.Auth == right.Auth && left.KeyID == right.KeyID && left.ID == right.ID
+		protocol: value.Protocol, os: value.OS, system: value.System, session: value.Config})
 }
 
 func validateTransferQueue(saved *storedTransferQueue) error {
@@ -464,7 +415,7 @@ func validateTransferQueue(saved *storedTransferQueue) error {
 		if group.ID <= 0 || groups[group.ID].ID != 0 {
 			return locales.NewError(locales.MessageDuplicateOrInvalidTransferConnectionId)
 		}
-		if err := validateTransferEndpoint(group.Endpoint, false); err != nil {
+		if err := profile.ValidateTransferEndpoint(group.Endpoint, false); err != nil {
 			return err
 		}
 		seen := map[string]bool{}
@@ -477,21 +428,21 @@ func validateTransferQueue(saved *storedTransferQueue) error {
 			}
 		}
 		for index, step := range group.Steps {
-			if err := validateTransferEndpoint(step, false); err != nil {
+			if err := profile.ValidateTransferEndpoint(step, false); err != nil {
 				return err
 			}
 			if seen[step.ID] {
 				return locales.NewError(locales.MessageTransferJumpHostSnapshotsContainALoop)
 			}
 			seen[step.ID] = true
-			if index < len(group.Steps)-1 && (index >= len(routeSteps) || !sameTransferEndpoint(step, routeSteps[index])) {
+			if index < len(group.Steps)-1 && (index >= len(routeSteps) || !profile.SameTransferEndpoint(step, routeSteps[index])) {
 				return locales.NewError(locales.MessageInvalidTransferGatewaySnapshotOrder)
 			}
 		}
 		if len(group.Steps) > 0 && len(group.Steps) != len(routeSteps)+1 {
 			return locales.NewError(locales.MessageInvalidTransferGatewaySnapshotCount)
 		}
-		if len(group.Steps) > 0 && !sameTransferEndpoint(group.Endpoint, group.Steps[len(group.Steps)-1]) {
+		if len(group.Steps) > 0 && !profile.SameTransferEndpoint(group.Endpoint, group.Steps[len(group.Steps)-1]) {
 			return locales.NewError(locales.MessageTheTransferConnectionTargetDoesNotMatchItsSnapshot)
 		}
 		groups[group.ID] = group
@@ -501,7 +452,7 @@ func validateTransferQueue(saved *storedTransferQueue) error {
 		if session.ID <= 0 || sessions[session.ID].ID != 0 {
 			return locales.NewError(locales.MessageDuplicateOrInvalidTransferFileSessionId)
 		}
-		if err := validateTransferEndpoint(session.Session.Endpoint, true); err != nil {
+		if err := profile.ValidateTransferEndpoint(session.Session.Endpoint, true); err != nil {
 			return err
 		}
 		if strings.TrimSpace(session.ViewID) != session.ViewID {
@@ -519,7 +470,7 @@ func validateTransferQueue(saved *storedTransferQueue) error {
 			}
 		} else {
 			group, ok := groups[session.Session.Connection]
-			if !ok || !sameTransferEndpoint(session.Session.Endpoint, group.Endpoint) || !sameGatewayRoute(session.Session.Endpoint.GatewayRoute, group.Endpoint.GatewayRoute) {
+			if !ok || !profile.SameTransferEndpoint(session.Session.Endpoint, group.Endpoint) || !profile.SameRoute(session.Session.Endpoint.GatewayRoute, group.Endpoint.GatewayRoute) {
 				return locales.NewError(locales.MessageTheSftpConnectionSnapshotDoesNotMatch)
 			}
 		}

@@ -4,28 +4,18 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"golang.org/x/crypto/ssh"
 	"slices"
 	"strings"
 	"time"
 
+	"github.com/zeroy1024/Burrow/internal/profile"
 	"github.com/zeroy1024/Burrow/internal/store"
+	"golang.org/x/crypto/ssh"
 )
 
 type catalogConfigState struct{ loadErr error }
 
-type storedSession struct {
-	sessionConfig
-	Protocol string `json:"protocol"`
-	Name     string `json:"name"`
-	Host     string `json:"host"`
-	Port     int    `json:"port"`
-	User     string `json:"user"`
-	GroupID  int    `json:"groupId"`
-	Order    int    `json:"order"`
-	OS       int    `json:"os"`
-	System   string `json:"system,omitempty"`
-}
+type storedSession = profile.Endpoint
 
 type catalogSnapshot struct {
 	gateways       []gatewayConfig

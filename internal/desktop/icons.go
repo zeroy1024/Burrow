@@ -4,6 +4,7 @@ import (
 	"image/color"
 
 	"github.com/egoist/mygo/ui"
+	"github.com/zeroy1024/Burrow/internal/profile"
 	"github.com/zeroy1024/Burrow/internal/uikit"
 )
 
@@ -45,9 +46,9 @@ type systemStyle struct {
 
 // Indexes are persisted for file connections; append new systems only.
 const (
-	linuxSystem   = 5
-	macOSSystem   = 7
-	windowsSystem = 8
+	linuxSystem   = profile.SystemLinux
+	macOSSystem   = profile.SystemMacOS
+	windowsSystem = profile.SystemWindows
 )
 
 func brand(hex uint32) color.NRGBA {
@@ -56,26 +57,44 @@ func brand(hex uint32) color.NRGBA {
 
 // Colors are the logos' official ones; uikit.OSLogoInk adjusts a glyph that
 // lacks contrast in the current theme.
-var systems = []systemStyle{
-	{name: "Ubuntu", color: brand(0xE95420), icon: uikit.LogoIcon(ubuntuLogo), ids: []string{"ubuntu"}},
-	{name: "Debian", color: brand(0xA81D33), icon: uikit.LogoIcon(debianLogo), ids: []string{"debian"}},
-	{name: "CentOS", color: brand(0x262577), icon: uikit.LogoIcon(centosLogo), ids: []string{"centos"}},
-	{name: "Alpine", color: brand(0x0D597F), icon: uikit.LogoIcon(alpineLogo), ids: []string{"alpine"}},
-	{name: "Fedora", color: brand(0x51A2DA), icon: uikit.LogoIcon(fedoraLogo), ids: []string{"fedora"}},
-	{name: "Linux", color: brand(0xFCC624), icon: uikit.LogoIcon(linuxLogo)},
-	{name: "Arch", color: brand(0x1793D1), icon: uikit.LogoIcon(archLogo), ids: []string{"arch"}},
-	{name: "macOS", color: brand(0x000000), icon: uikit.LogoIcon(appleLogo), ids: []string{"macos"}},
-	{name: "Windows", color: brand(0x0078D4), icon: uikit.LogoIcon(windowsLogo), ids: []string{"windows"}},
-	{name: "Red Hat", color: brand(0xEE0000), icon: uikit.LogoIcon(redHatLogo), ids: []string{"rhel"}},
-	{name: "Rocky Linux", color: brand(0x10B981), icon: uikit.LogoIcon(rockyLogo), ids: []string{"rocky"}},
-	{name: "AlmaLinux", color: brand(0x000000), icon: uikit.LogoIcon(almaLogo), ids: []string{"almalinux"}},
-	{name: "openSUSE", color: brand(0x73BA25), icon: uikit.LogoIcon(openSUSELogo),
+var systems = [profile.SystemCount]systemStyle{
+
+	profile.SystemUbuntu: {name: "Ubuntu", color: brand(0xE95420), icon: uikit.LogoIcon(ubuntuLogo), ids: []string{"ubuntu"}},
+
+	profile.SystemDebian: {name: "Debian", color: brand(0xA81D33), icon: uikit.LogoIcon(debianLogo), ids: []string{"debian"}},
+
+	profile.SystemCentOS: {name: "CentOS", color: brand(0x262577), icon: uikit.LogoIcon(centosLogo), ids: []string{"centos"}},
+
+	profile.SystemAlpine: {name: "Alpine", color: brand(0x0D597F), icon: uikit.LogoIcon(alpineLogo), ids: []string{"alpine"}},
+
+	profile.SystemFedora: {name: "Fedora", color: brand(0x51A2DA), icon: uikit.LogoIcon(fedoraLogo), ids: []string{"fedora"}},
+
+	profile.SystemLinux: {name: "Linux", color: brand(0xFCC624), icon: uikit.LogoIcon(linuxLogo)},
+
+	profile.SystemArch: {name: "Arch", color: brand(0x1793D1), icon: uikit.LogoIcon(archLogo), ids: []string{"arch"}},
+
+	profile.SystemMacOS: {name: "macOS", color: brand(0x000000), icon: uikit.LogoIcon(appleLogo), ids: []string{"macos"}},
+
+	profile.SystemWindows: {name: "Windows", color: brand(0x0078D4), icon: uikit.LogoIcon(windowsLogo), ids: []string{"windows"}},
+
+	profile.SystemRedHat: {name: "Red Hat", color: brand(0xEE0000), icon: uikit.LogoIcon(redHatLogo), ids: []string{"rhel"}},
+
+	profile.SystemRockyLinux: {name: "Rocky Linux", color: brand(0x10B981), icon: uikit.LogoIcon(rockyLogo), ids: []string{"rocky"}},
+
+	profile.SystemAlmaLinux: {name: "AlmaLinux", color: brand(0x000000), icon: uikit.LogoIcon(almaLogo), ids: []string{"almalinux"}},
+
+	profile.SystemOpenSUSE: {name: "openSUSE", color: brand(0x73BA25), icon: uikit.LogoIcon(openSUSELogo),
 		ids: []string{"opensuse", "opensuse-leap", "opensuse-tumbleweed", "opensuse-slowroll", "opensuse-microos"}},
-	{name: "Kali", color: brand(0x557C94), icon: uikit.LogoIcon(kaliLogo), ids: []string{"kali"}},
-	{name: "Linux Mint", color: brand(0x86BE43), icon: uikit.LogoIcon(mintLogo), ids: []string{"linuxmint"}},
-	{name: "Raspberry Pi OS", color: brand(0xA22846), icon: uikit.LogoIcon(raspberryPiLogo), ids: []string{"raspbian"}},
-	{name: "deepin", color: brand(0x007CFF), icon: uikit.LogoIcon(deepinLogo), ids: []string{"deepin"}},
-	{name: "FreeBSD", color: brand(0xAB2B28), icon: uikit.LogoIcon(freeBSDLogo), ids: []string{"freebsd"}},
+
+	profile.SystemKali: {name: "Kali", color: brand(0x557C94), icon: uikit.LogoIcon(kaliLogo), ids: []string{"kali"}},
+
+	profile.SystemLinuxMint: {name: "Linux Mint", color: brand(0x86BE43), icon: uikit.LogoIcon(mintLogo), ids: []string{"linuxmint"}},
+
+	profile.SystemRaspberryPiOS: {name: "Raspberry Pi OS", color: brand(0xA22846), icon: uikit.LogoIcon(raspberryPiLogo), ids: []string{"raspbian"}},
+
+	profile.SystemDeepin: {name: "deepin", color: brand(0x007CFF), icon: uikit.LogoIcon(deepinLogo), ids: []string{"deepin"}},
+
+	profile.SystemFreeBSD: {name: "FreeBSD", color: brand(0xAB2B28), icon: uikit.LogoIcon(freeBSDLogo), ids: []string{"freebsd"}},
 }
 
 func init() {

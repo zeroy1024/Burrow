@@ -27,8 +27,8 @@ import (
 	"github.com/zeroy1024/Burrow/internal/locales"
 	"github.com/zeroy1024/Burrow/internal/localfs"
 	"github.com/zeroy1024/Burrow/internal/mcpserver"
+	"github.com/zeroy1024/Burrow/internal/profile"
 	sshsession "github.com/zeroy1024/Burrow/internal/session"
-
 	"golang.org/x/text/cases"
 	"golang.org/x/text/unicode/norm"
 )
@@ -323,7 +323,7 @@ func sameTransferView(view, snapshot *fileSession) bool {
 		one.session.Files != nil && *one.session.Files != *two.session.Files {
 		return false
 	}
-	if !sameGatewayRoute(one.session.GatewayRoute, two.session.GatewayRoute) {
+	if !profile.SameRoute(one.session.GatewayRoute, two.session.GatewayRoute) {
 		return false
 	}
 	return one.protocol == "ftp" || view.connection == snapshot.connection

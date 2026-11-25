@@ -14,6 +14,7 @@ import (
 	"github.com/zeroy1024/Burrow/internal/fileclient"
 	"github.com/zeroy1024/Burrow/internal/locales"
 	"github.com/zeroy1024/Burrow/internal/mcpserver"
+	"github.com/zeroy1024/Burrow/internal/profile"
 	sshsession "github.com/zeroy1024/Burrow/internal/session"
 	"github.com/zeroy1024/Burrow/internal/sshclient"
 	"github.com/zeroy1024/Burrow/internal/uikit"
@@ -231,7 +232,7 @@ func (a *app) startFileSession(session *fileSession, refresh bool) {
 			session.connection = nil
 			session.endpoint, session.gatewayErr = a.freezeGatewayRoute(endpoint)
 			session.config = session.endpoint.session
-			if !sameGatewayRoute(previousRoute, session.endpoint.session.GatewayRoute) {
+			if !profile.SameRoute(previousRoute, session.endpoint.session.GatewayRoute) {
 				session.ftpSecret = ""
 			}
 		} else {

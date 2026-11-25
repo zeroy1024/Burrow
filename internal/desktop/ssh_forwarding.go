@@ -2,88 +2,17 @@ package desktop
 
 import (
 	"context"
-	"errors"
-	"net/netip"
 	"slices"
-	"strings"
 	"time"
 
 	"github.com/zeroy1024/Burrow/internal/locales"
+	"github.com/zeroy1024/Burrow/internal/profile"
 	sshsession "github.com/zeroy1024/Burrow/internal/session"
-	"github.com/zeroy1024/Burrow/internal/sshclient"
 )
 
-const defaultForwardListenHost = "127.0.0.1"
+const defaultForwardListenHost = profile.DefaultForwardListenHost
 
-type sshForwardRule struct {
-	ID         string `json:"id"`
-	Name       string `json:"name,omitempty"`
-	ListenHost string `json:"listenHost,omitempty"`
-	LocalPort  int    `json:"localPort"`
-	TargetHost string `json:"targetHost,omitempty"`
-	TargetPort int    `json:"targetPort,omitempty"`
-	SOCKS      bool   `json:"socks,omitempty"`
-}
-
-func (r sshForwardRule) target() (string, error) {
-	if r.SOCKS {
-		return "", nil
-	}
-	address, err := sshclient.ForwardTarget(r.TargetHost, r.TargetPort)
-	if err != nil {
-		return "", locales.NewError(locales.ForwardInvalidTarget)
-	}
-	return address, nil
-}
-
-func (r sshForwardRule) listenHost() string {
-	if r.ListenHost == "" {
-		return defaultForwardListenHost
-	}
-	return r.ListenHost
-}
-
-func parseForwardListenIP(value string) (netip.Addr, error) {
-	value = strings.TrimSpace(value)
-	if strings.HasPrefix(value, "[") && strings.HasSuffix(value, "]") {
-		value = value[1 : len(value)-1]
-	}
-	ip, err := netip.ParseAddr(value)
-	if err != nil {
-		return netip.Addr{}, locales.NewError(locales.ForwardInvalidListenHost)
-	}
-	return ip.Unmap(), nil
-}
-
-func (r sshForwardRule) bindAddress() (netip.AddrPort, error) {
-	if r.LocalPort < 1024 || r.LocalPort > 65535 {
-		return netip.AddrPort{}, locales.NewError(locales.ForwardInvalidLocalPort)
-	}
-	ip, err := parseForwardListenIP(r.listenHost())
-	if err != nil {
-		return netip.AddrPort{}, err
-	}
-	return netip.AddrPortFrom(ip, uint16(r.LocalPort)), nil
-}
-
-func (r sshForwardRule) localAddress() string {
-	bind, _ := r.bindAddress()
-	return bind.String()
-}
-
-func (r sshForwardRule) kind() string {
-	if r.SOCKS {
-		return locales.ForwardSOCKS()
-	}
-	return locales.ForwardLocal()
-}
-
-func (r sshForwardRule) title() string {
-	if r.Name != "" {
-		return r.Name
-	}
-	return r.kind()
-}
+type sshForwardRule = profile.ForwardRule
 
 type forwardRow struct {
 	rule        sshForwardRule
@@ -157,12 +86,12 @@ func (a *app) startForward(state *sshForwardState, row *forwardRow) {
 		return
 	}
 	row.stop()
-	bind, err := row.rule.bindAddress()
+	bind, err := row.rule.BindAddress()
 	if err != nil {
 		row.startError = locales.ErrorText(err)
 		return
 	}
-	target, err := row.rule.target()
+	target, err := row.rule.Target()
 	if err != nil {
 		row.startError = locales.ErrorText(err)
 		return
@@ -243,21 +172,4 @@ func (a *app) persistForward(endpoint host, before, after *sshForwardRule, done 
 		options.Forwards = append(options.Forwards, *after)
 	}
 	a.commitCatalogMoveAsync(func() { a.hosts[index].session.SSH = &options }, done)
-}
-
-func validateForwardRules(rules []sshForwardRule) error {
-	ids := make(map[string]bool, len(rules))
-	for _, rule := range rules {
-		if rule.ID == "" || ids[rule.ID] {
-			return errors.New("invalid or duplicate forwarding rule id")
-		}
-		ids[rule.ID] = true
-		if _, err := rule.bindAddress(); err != nil {
-			return err
-		}
-		if _, err := rule.target(); err != nil {
-			return err
-		}
-	}
-	return nil
 }
