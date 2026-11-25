@@ -11,7 +11,7 @@ mise install
 mise exec -- go run .
 ```
 
-[mise.toml](../mise.toml) 固定 Go 1.27.3 与 uv 0.13.6；[go.mod](../go.mod) 固定 MyGo v0.7.3 及项目依赖。沿用这些版本和现有依赖管理方式。
+[mise.toml](../mise.toml) 固定 Go 1.27.3 与 uv 0.13.6；[go.mod](../go.mod) 固定 MyGo v0.10.0 及项目依赖。沿用这些版本和现有依赖管理方式。
 
 普通 `go run` 使用 Burrow Dev 数据目录与独立凭据命名空间，正式打包使用 Burrow。数据模型、备份及旧格式边界见[数据与凭据](storage.zh.md)。SQLite 驱动固定为 `modernc.org/sqlite v1.61.1`，不要求系统 SQLite 或 CGo。
 

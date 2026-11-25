@@ -98,7 +98,7 @@ func (a *app) paneDragHandle(c *ui.Context, source ui.Element, transfer paneTran
 			d.kind == dragPane && !transfer.fromTab && d.session == transfer.session) {
 		d.pressed = source.Pressed()
 	}
-	// MyGo v0.7.3 fixes its native threshold at 4 DIPs; it exposes no hold-delay option.
+	// MyGo fixes its native threshold at 4 DIPs; it exposes no hold-delay option.
 	source.Drag(transfer).Cursor(ui.CursorDefault).FocusRing(false)
 	if transfer.fromTab {
 		source.DrawOver(func(_ *ui.Painter, _ ui.Rect) {

@@ -4,6 +4,12 @@ Every released version has a `## <version> - <date>` section, English first, the
 
 ## Unreleased
 
+- Upgrade to MyGo 0.10.0 for sharper text and cached controls during scaling.
+
+**简体中文**
+
+- 升级到 MyGo 0.10.0，改善缩放时文字和缓存控件的清晰度。
+
 ## 0.1.12 - 2026-11-24
 
 - Keep collecting SSH server metrics while the app is in the background, and show gaps when sampling is interrupted.

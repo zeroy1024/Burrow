@@ -467,7 +467,7 @@ func legacyCredentialStore() mygo.SecretsModule {return mygo.Secrets.Service("de
 
     module = json.loads(subprocess.check_output(["go", "list", "-m", "-json", "github.com/egoist/mygo"],
                                                cwd=repo, text=True))
-    if module.get("Version") != "v0.7.3":
+    if module.get("Version") != "v0.10.0":
         raise RuntimeError("native integration isolation must be reviewed for the pinned MyGo version")
     # Go disallows overlays beneath GOMODCACHE. Copy the pinned SDK unchanged
     # into this run, then overlay its two isolation seams through a local modfile.
@@ -486,12 +486,13 @@ func legacyCredentialStore() mygo.SecretsModule {return mygo.Secrets.Service("de
         # `open --env` invocation. Forward only this run's fixture variables.
         original = mygo_dir / "updater.go"
         replacement = overlay_dir / "mygo-migration-relaunch.go"
-        replacement.write_text(replace_once(original.read_text(), 'args := []string{"-n", bundle}', '''log := os.Getenv("BURROW_INTEGRATION_RELAUNCH_LOG")
-    args := []string{"-n", "--stdout", log, "--stderr", log}
+        open_bundle = 'return exec.Command("/usr/bin/open", append([]string{"-n"}, openArgs(bundle, args)...)...).Run() == nil'
+        replacement.write_text(replace_once(original.read_text(), open_bundle, '''log := os.Getenv("BURROW_INTEGRATION_RELAUNCH_LOG")
+    launch := []string{"-n", "--stdout", log, "--stderr", log}
     for _, key := range []string{"BURROW_INTEGRATION_CONFIG", "BURROW_TEST_DIR", "MYGO_AUTOMATION", "SSH_AUTH_SOCK"} {
-        args = append(args, "--env", key+"="+os.Getenv(key))
+        launch = append(launch, "--env", key+"="+os.Getenv(key))
     }
-    args = append(args, bundle)'''))
+    return exec.Command("/usr/bin/open", append(launch, openArgs(bundle, args)...)...).Run() == nil'''))
         mapping[str(original)] = str(replacement)
     # The fixed automation plugin formats keys on its socket goroutine. Pointer
     # keys must expose identity, not race with layout or reveal pane contents.

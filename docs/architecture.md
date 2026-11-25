@@ -83,7 +83,7 @@ Ghostty maintains terminal state; MyGo draws the grid, selection, cursor, and na
 
 `ViewportBackdrop` draws adjacent history lines continuously beneath the bars using the same frame's grid coordinates. It does not create another terminal or move the real viewport. Blur is an overlay. See [terminal and color schemes](terminal-themes.md).
 
-[go.mod](../go.mod) replaces two local modules while the main MyGo dependency remains pinned to v0.7.3:
+[go.mod](../go.mod) replaces two local modules while the main MyGo dependency remains pinned to v0.10.0:
 
 | Local module | Extension and maintenance basis |
 |---|---|

@@ -83,7 +83,7 @@ Ghostty 维护终端状态，MyGo 绘制文字网格、选区、光标及原生�
 
 `ViewportBackdrop` 读取同一帧的相邻历史行，按网格坐标连续补画到栏下；它不创建第二个终端，不移动真实视口。毛玻璃作为覆盖层绘制。显示行为见[终端与配色](terminal-themes.zh.md)。
 
-[go.mod](../go.mod) 用 `replace` 接入两个本地模块，主 MyGo 仍固定 v0.7.3：
+[go.mod](../go.mod) 用 `replace` 接入两个本地模块，主 MyGo 仍固定 v0.10.0：
 
 | 本地模块 | 扩展及维护依据 |
 |---|---|
