@@ -5,7 +5,6 @@ import (
 	"errors"
 	"io"
 	"io/fs"
-	"path/filepath"
 	"slices"
 	"time"
 
@@ -13,28 +12,29 @@ import (
 	"github.com/zeroy1024/Burrow/internal/locales"
 	"github.com/zeroy1024/Burrow/internal/mcpserver"
 	"github.com/zeroy1024/Burrow/internal/store"
+	"github.com/zeroy1024/Burrow/internal/transfer"
 )
 
 func (b *mcpDesktop) preflightTransfer(ctx context.Context, task *transferTask) error {
-	capability, local := "write", task.job.sourcePath
-	if task.sourceRemote {
-		capability, local = "read", task.job.targetPath
+	capability, local := "write", task.Job.SourcePath
+	if task.SourceRemote {
+		capability, local = "read", task.Job.TargetPath
 	}
-	key, connection, err := b.service.Authorize(ctx, task.mcp.KeyID, task.mcp.ConnectionID, capability)
+	key, connection, err := b.service.Authorize(ctx, task.MCP.KeyID, task.MCP.ConnectionID, capability)
 	if err != nil {
 		return err
 	}
-	if connection.Identity != task.mcp.Identity {
+	if connection.Identity != task.MCP.Identity {
 		return &mcpserver.Failure{Code: "permission_denied", Message: locales.MessageTheTaskSConnectionIdentityHasChanged()}
 	}
-	_, err = mcpserver.AuthorizeLocal(key, local, task.sourceRemote)
+	_, err = mcpserver.AuthorizeLocal(key, local, task.SourceRemote)
 	return err
 }
 
 func (b *mcpDesktop) checkTransfer(ctx context.Context, task *transferTask, name, side, action string, client fileclient.Client) error {
-	owner := task.mcp
+	owner := task.MCP
 	capability := "write"
-	if task.sourceRemote {
+	if task.SourceRemote {
 		capability = "read"
 	}
 	key, connection, err := b.service.Authorize(ctx, owner.KeyID, owner.ConnectionID, capability)
@@ -45,7 +45,7 @@ func (b *mcpDesktop) checkTransfer(ctx context.Context, task *transferTask, name
 		return &mcpserver.Failure{Code: "permission_denied", Message: locales.MessageTheTransferEndpointIdentityHasChangedAuthorizationIsRequiredAgain()}
 	}
 	if side == "local" {
-		if _, err := mcpserver.AuthorizeLocal(key, name, task.sourceRemote); err != nil {
+		if _, err := mcpserver.AuthorizeLocal(key, name, task.SourceRemote); err != nil {
 			return err
 		}
 	}
@@ -53,20 +53,20 @@ func (b *mcpDesktop) checkTransfer(ctx context.Context, task *transferTask, name
 }
 
 func (b *mcpDesktop) attachTransfer(task *transferTask) {
-	b.observeGroup(task.session.connection)
-	job := task.job
-	job.mcpFailConflict = task.mcp.Conflict == "error"
-	job.mcpCheck = func(ctx context.Context, source, target fileclient.Client, node *transferNode, destination string) error {
+	b.observeGroup(task.Session.connection)
+	job := task.Job
+	job.MCPFailConflict = task.MCP.Conflict == "error"
+	job.MCPCheck = func(ctx context.Context, source, target fileclient.Client, node *transferNode, destination string) error {
 		sourceSide, targetSide := "local", "remote"
-		if task.sourceRemote {
+		if task.SourceRemote {
 			sourceSide, targetSide = "remote", "local"
 		}
 		sourceAction := "read"
-		if node.entry.Directory {
+		if node.Entry.Directory {
 			sourceAction = "browse"
 		}
-		node.mcpPath, node.mcpSide, node.mcpAction = node.source, sourceSide, sourceAction
-		if err := b.checkTransfer(ctx, task, node.source, sourceSide, sourceAction, source); err != nil {
+		node.MCPPath, node.MCPSide, node.MCPAction = node.Source, sourceSide, sourceAction
+		if err := b.checkTransfer(ctx, task, node.Source, sourceSide, sourceAction, source); err != nil {
 			return err
 		}
 		existing, err := target.Stat(ctx, destination)
@@ -76,44 +76,44 @@ func (b *mcpDesktop) attachTransfer(task *transferTask) {
 		if err == nil && existing.Symlink {
 			return fs.ErrInvalid
 		}
-		if err == nil && node.entry.Directory && existing.Directory {
-			node.mcpPath, node.mcpSide, node.mcpAction = destination, targetSide, "merge"
+		if err == nil && node.Entry.Directory && existing.Directory {
+			node.MCPPath, node.MCPSide, node.MCPAction = destination, targetSide, "merge"
 			return nil
 		}
 		action := "create"
 		if err == nil {
 			action = "write"
 		}
-		node.mcpPath, node.mcpSide, node.mcpAction = destination, targetSide, action
+		node.MCPPath, node.MCPSide, node.MCPAction = destination, targetSide, action
 		if err := b.checkTransfer(ctx, task, destination, targetSide, action, target); err != nil {
 			return err
 		}
 		auditCtx, auditCancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 		defer auditCancel()
-		if err := b.a.store.MCPAddFile(auditCtx, store.MCPFileEvent{OperationID: task.mcp.OperationID,
+		if err := b.a.store.MCPAddFile(auditCtx, store.MCPFileEvent{OperationID: task.MCP.OperationID,
 			Path: destination, Side: targetSide, Action: action, Status: "running", At: time.Now().UTC()}); err != nil {
 			return b.service.FailStorage(err)
 		}
 		return nil
 	}
-	job.mcpFinish = func(ctx context.Context, node *transferNode, result error) error {
-		side, name, action := node.mcpSide, node.mcpPath, node.mcpAction
-		if node.skipped {
+	job.MCPFinish = func(ctx context.Context, node *transferNode, result error) error {
+		side, name, action := node.MCPSide, node.MCPPath, node.MCPAction
+		if node.Skipped {
 			ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 			defer cancel()
 			sourceSide := "local"
-			if task.sourceRemote {
+			if task.SourceRemote {
 				sourceSide = "remote"
 			}
 			if err := b.a.store.MCPAddFiles(ctx, []store.MCPFileEvent{
-				{OperationID: task.mcp.OperationID, Path: name, Side: side, Action: action, Status: "skipped", At: time.Now().UTC()},
-				{OperationID: task.mcp.OperationID, Path: node.source, Side: sourceSide, Action: "read", Status: "skipped", At: time.Now().UTC()},
+				{OperationID: task.MCP.OperationID, Path: name, Side: side, Action: action, Status: "skipped", At: time.Now().UTC()},
+				{OperationID: task.MCP.OperationID, Path: node.Source, Side: sourceSide, Action: "read", Status: "skipped", At: time.Now().UTC()},
 			}); err != nil {
 				return b.service.FailStorage(err)
 			}
 			return nil
 		}
-		return b.service.FileEvent(ctx, task.mcp.OperationID, name, side, action, result, max(node.entry.Size, 0))
+		return b.service.FileEvent(ctx, task.MCP.OperationID, name, side, action, result, max(node.Entry.Size, 0))
 	}
 }
 
@@ -127,7 +127,7 @@ type mcpSourceClient struct {
 
 func (b *mcpDesktop) sourceClient(task *transferTask, client fileclient.Client) fileclient.Client {
 	side := "local"
-	if task.sourceRemote {
+	if task.SourceRemote {
 		side = "remote"
 	}
 	return &mcpSourceClient{Client: client, b: b, task: task, side: side}
@@ -158,7 +158,7 @@ func (c *mcpSourceClient) ReadDir(ctx context.Context, name string) ([]fileclien
 	if len(entries) > 10000 || c.entries > 100000 {
 		err = locales.NewError(locales.MessageMcpDirectoryLimitExceededEntriesPerDirectoryPerTask)
 	}
-	if auditErr := c.b.service.FileEvent(context.WithoutCancel(ctx), c.task.mcp.OperationID, name, c.side, "browse", err, 0); auditErr != nil {
+	if auditErr := c.b.service.FileEvent(context.WithoutCancel(ctx), c.task.MCP.OperationID, name, c.side, "browse", err, 0); auditErr != nil {
 		err = errors.Join(err, auditErr)
 	}
 	if err == nil {
@@ -170,8 +170,8 @@ func (c *mcpSourceClient) ReadDir(ctx context.Context, name string) ([]fileclien
 			if entry.Symlink {
 				status = "skipped"
 			}
-			events = append(events, store.MCPFileEvent{OperationID: c.task.mcp.OperationID,
-				Path: transferJoin(c.task.sourceRemote, name, entry.Name), Side: c.side, Action: "enumerated", Status: status, At: time.Now().UTC()})
+			events = append(events, store.MCPFileEvent{OperationID: c.task.MCP.OperationID,
+				Path: transfer.Join(c.task.SourceRemote, name, entry.Name), Side: c.side, Action: "enumerated", Status: status, At: time.Now().UTC()})
 		}
 		if addErr := c.b.a.store.MCPAddFiles(auditCtx, events); addErr != nil {
 			return nil, c.b.service.FailStorage(addErr)
@@ -189,7 +189,7 @@ func (c *mcpSourceClient) OpenRead(ctx context.Context, name string, offset int6
 		return nil, err
 	}
 	return &mcpReadStream{ReadCloser: reader, done: func(size int64, result error) error {
-		return c.b.service.FileEvent(context.WithoutCancel(ctx), c.task.mcp.OperationID, name, c.side, "read", result, size)
+		return c.b.service.FileEvent(context.WithoutCancel(ctx), c.task.MCP.OperationID, name, c.side, "read", result, size)
 	}}, nil
 }
 
@@ -215,51 +215,51 @@ func (r *mcpReadStream) Close() error {
 }
 
 func (a *app) mcpTaskSnapshot(task *transferTask, result error) store.MCPTask {
-	owner := task.mcp
-	state := map[transferState]string{transferQueued: "queued", transferRunning: "running", transferPaused: "paused", transferDone: "completed", transferFailed: "failed"}[task.state]
-	if task.state == transferFailed && owner.Outcome != "" {
+	owner := task.MCP
+	state := map[transferState]string{transferQueued: "queued", transferRunning: "running", transferPaused: "paused", transferDone: "completed", transferFailed: "failed"}[task.State]
+	if task.State == transferFailed && owner.Outcome != "" {
 		state = owner.Outcome
 	}
-	if task.removeRequested {
+	if task.RemoveRequested {
 		state = "cancelled"
-		if task.run != nil {
+		if task.Run != nil {
 			state = "cancel_requested"
 		}
 	}
 	if owner.CleanupOnly {
 		state = "cleanup_pending"
-		if task.run != nil {
+		if task.Run != nil {
 			state = "cleaning"
-		} else if len(task.job.temporary) == 0 {
+		} else if len(task.Job.Temporary) == 0 {
 			state = "completed"
 		}
 	}
-	message := task.errorText.String()
-	if result != nil && task.state != transferPaused {
+	message := task.ErrorText.String()
+	if result != nil && task.State != transferPaused {
 		message = result.Error()
 	}
 	if owner.CleanupOnly && state == "completed" {
 		message = ""
 	}
-	done, total := task.transferred, task.total
-	if task.run != nil {
-		done, total = task.run.bytes.Load(), task.run.total.Load()
+	done, total := task.Transferred, task.Total
+	if task.Run != nil {
+		done, total = task.Run.Bytes.Load(), task.Run.Total.Load()
 	}
-	return store.MCPTask{ID: task.id, KeyID: owner.KeyID, OperationID: owner.OperationID,
+	return store.MCPTask{ID: task.ID, KeyID: owner.KeyID, OperationID: owner.OperationID,
 		ConnectionID: owner.ConnectionID, State: state, Error: message, Done: max(done, 0),
 		Total: max(total, done), CreatedAt: owner.CreatedAt, UpdatedAt: time.Now().UTC()}
 }
 
 func (a *app) mcpTransferChanged(task *transferTask, result error) {
-	if task.mcp == nil || a.mcpBackend == nil {
+	if task.MCP == nil || a.mcpBackend == nil {
 		return
 	}
-	if errors.Is(result, context.Canceled) && (task.state == transferQueued || task.state == transferPaused || task.state == transferRunning) {
+	if errors.Is(result, context.Canceled) && (task.State == transferQueued || task.State == transferPaused || task.State == transferRunning) {
 		result = nil
 	}
 	setMCPTransferOutcome(task, result)
 	snapshot := a.mcpTaskSnapshot(task, result)
-	cleanupOnly := task.mcp.CleanupOnly
+	cleanupOnly := task.MCP.CleanupOnly
 	if !cleanupOnly {
 		a.agentTransferChanged(snapshot.OperationID, snapshot.State, snapshot.Error)
 	}
@@ -304,27 +304,17 @@ func (a *app) mcpTransferChanged(task *transferTask, result error) {
 }
 
 func setMCPTransferOutcome(task *transferTask, result error) {
-	if task.mcp == nil {
+	if task.MCP == nil {
 		return
 	}
-	if task.state == transferQueued || task.state == transferRunning {
-		task.mcp.Outcome = ""
+	if task.State == transferQueued || task.State == transferRunning {
+		task.MCP.Outcome = ""
 	}
 	var failure *mcpserver.Failure
-	if task.run == nil && errors.As(result, &failure) && failure.Code == "intercepted" {
-		task.mcp.Outcome = "intercepted"
-		if task.job.doneBytes > 0 {
-			task.mcp.Outcome = "partial_intercepted"
+	if task.Run == nil && errors.As(result, &failure) && failure.Code == "intercepted" {
+		task.MCP.Outcome = "intercepted"
+		if task.Job.DoneBytes > 0 {
+			task.MCP.Outcome = "partial_intercepted"
 		}
 	}
-}
-
-// Restored MCP ownership is never inferred from a file tab or a display name.
-func validMCPTransfer(owner *mcpTransferOwner, task storedTransferTask) bool {
-	if owner.CleanupOnly && (task.SourceRemote || !task.CleanupPending || task.State != transferFailed) {
-		return false
-	}
-	return owner.KeyID != "" && owner.OperationID != "" && owner.ConnectionID != "" &&
-		owner.Identity != "" && filepath.IsAbs(owner.LocalRoot) && !owner.CreatedAt.IsZero() &&
-		(task.SourceRemote || task.SourcePath != "")
 }

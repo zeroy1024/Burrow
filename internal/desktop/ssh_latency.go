@@ -32,8 +32,8 @@ func (a *app) updateSSHLatency(c *ui.Context) {
 		return
 	}
 	var sessions []*remoteSession
-	for _, session := range tab.root.sessions() {
-		if !tab.maximized || session == tab.focused {
+	for _, session := range tab.Root.Sessions() {
+		if !tab.Maximized || session == tab.Focused {
 			sessions = append(sessions, session)
 		}
 	}
@@ -45,15 +45,15 @@ func (a *app) updateSSHLatency(c *ui.Context) {
 func (a *app) sampleSSHLatency(c *ui.Context, sessions []*remoteSession) {
 	seen := map[*sshConnectionGroup]bool{}
 	for _, session := range sessions {
-		if session.closing || session.state != connected || session.ssh == nil || session.ssh.conn == nil {
+		if session.closing || session.state != connected || session.ssh == nil || session.ssh.Stream() == nil {
 			continue
 		}
 		group := session.connection
-		if group == nil || group.connection == nil || seen[group] {
+		if group == nil || group.transport.Connection() == nil || seen[group] {
 			continue
 		}
 		seen[group] = true
-		connection := group.connection
+		connection := group.transport.Connection()
 		state := &group.latency
 		if state.connection != connection {
 			*state = sshLatencyState{connection: connection}
@@ -70,7 +70,7 @@ func (a *app) sampleSSHLatency(c *ui.Context, sessions []*remoteSession) {
 		a.sshWorkers.Go(func() {
 			elapsed, err := connection.TCPRTT()
 			a.window.Update(func() {
-				if a.ctx.Err() != nil || group.connection != connection || state.connection != connection {
+				if a.ctx.Err() != nil || group.transport.Connection() != connection || state.connection != connection {
 					return
 				}
 				state.pending = false
@@ -89,7 +89,7 @@ func sshLatencyMS(session *remoteSession, now time.Time) int {
 		return -1
 	}
 	state := &session.connection.latency
-	if state.connection != session.connection.connection || state.updated.IsZero() || now.Sub(state.updated) >= sshLatencyMaxAge {
+	if state.connection != session.connection.transport.Connection() || state.updated.IsZero() || now.Sub(state.updated) >= sshLatencyMaxAge {
 		return -1
 	}
 	return int(state.elapsed.Milliseconds())

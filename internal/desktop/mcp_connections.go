@@ -9,6 +9,7 @@ import (
 
 	"github.com/zeroy1024/Burrow/internal/locales"
 	"github.com/zeroy1024/Burrow/internal/mcpserver"
+	"github.com/zeroy1024/Burrow/internal/profile"
 	"github.com/zeroy1024/Burrow/internal/store"
 )
 
@@ -55,7 +56,7 @@ func (a *app) sameMCPSSH(left, right host) bool {
 	l, r := left.session, right.session
 	if left.address != right.address || left.port != right.port || left.user != right.user ||
 		l.Auth != r.Auth || l.KeyID != r.KeyID || l.PasswordSaved != r.PasswordSaved ||
-		!sameGatewayRoute(l.GatewayRoute, r.GatewayRoute) {
+		!profile.SameRoute(l.GatewayRoute, r.GatewayRoute) {
 		return false
 	}
 	// SSH file tools use UTF-8. A site with another filename encoding has

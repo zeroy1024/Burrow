@@ -22,8 +22,8 @@ func (a *app) importedThemeUse(name string) string {
 			return locales.MessageUsedByASavedSession()
 		}
 	}
-	for _, tab := range a.tabs {
-		for _, session := range tab.root.sessions() {
+	for _, tab := range a.tabs.Items {
+		for _, session := range tab.Root.Sessions() {
 			if session.config.SSH != nil && termtheme.ParseMode(session.config.SSH.TermScheme) == termtheme.Fixed(name) {
 				return locales.MessageUsedByAnOpenSession()
 			}

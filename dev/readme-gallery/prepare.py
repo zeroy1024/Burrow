@@ -46,12 +46,21 @@ assert content.count("func Run() (runErr error) {") == 1
 replacement.write_text(content.replace(
     "func Run() (runErr error) {", "func Run() (runErr error) {\n return runREADMEGallery()", 1,
 ))
+# Gallery sessions own static readings and have no authenticated transport.
+status_source = repo / "internal/desktop/status_backend.go"
+status_overlay = work / "status_backend.go"
+status_content = status_source.read_text()
+signature = "func (a *app) sessionMonitor(session *remoteSession) *monitorState {"
+assert status_content.count(signature) == 1
+status_overlay.write_text(status_content.replace(signature, signature + """
+    if session.ssh == nil && session.connection != nil { return session.connection.monitor }""", 1))
 scene = work / "gallery.go"
 scene.write_text((Path(__file__).parent / "scene.go.txt").read_text() +
                  "\nconst galleryScreenshotDirectory = " + json.dumps(str(screenshots)) + "\n")
 overlay = work / "overlay.json"
 overlay.write_text(json.dumps({"Replace": {
     str(original): str(replacement),
+    str(status_source): str(status_overlay),
     str(repo / "internal/desktop/readme_gallery.go"): str(scene),
 }}))
 subprocess.run(["gofmt", "-w", str(scene), str(replacement), str(paths)], check=True)

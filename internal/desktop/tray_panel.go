@@ -11,6 +11,7 @@ import (
 	"github.com/egoist/mygo/ui"
 	"github.com/zeroy1024/Burrow/internal/locales"
 	"github.com/zeroy1024/Burrow/internal/theme"
+	"github.com/zeroy1024/Burrow/internal/transfer"
 	"github.com/zeroy1024/Burrow/internal/uikit"
 )
 
@@ -206,8 +207,8 @@ type trayPanelSession struct {
 func (a *app) trayPanelSessions() []trayPanelSession {
 	var list []trayPanelSession
 	seen := map[any]bool{}
-	for _, tab := range a.tabs {
-		for _, session := range tab.root.sessions() {
+	for _, tab := range a.tabs.Items {
+		for _, session := range tab.Root.Sessions() {
 			if session.agent != nil || session.closing || session.state == disconnected {
 				continue
 			}
@@ -288,7 +289,7 @@ func (a *app) openSessionFromTray(tab *workspaceTab, session *remoteSession) {
 	}
 	focus := func() {
 		// A drag that finishes first may have reordered or closed the tab.
-		index := slices.Index(a.tabs, tab)
+		index := slices.Index(a.tabs.Items, tab)
 		if index < 0 || session.closing {
 			return
 		}
@@ -304,19 +305,19 @@ func (a *app) openSessionFromTray(tab *workspaceTab, session *remoteSession) {
 
 func (a *app) trayPanelTransfers(c *ui.Context) {
 	t := theme.Current()
-	active := slices.DeleteFunc(slices.Clone(a.transfers.tasks), func(task *transferTask) bool {
-		return task.state == transferDone || task.state == transferFailed
+	active := slices.DeleteFunc(slices.Clone(a.transfers.Tasks), func(task *transferTask) bool {
+		return task.State == transferDone || task.State == transferFailed
 	})
 	if len(active) == 0 {
 		return
 	}
-	s := summarizeTransfers(active)
+	s := transfer.Summarize(active)
 	fraction := float32(0)
-	if s.total > 0 {
-		fraction = float32(float64(s.bytes) / float64(s.total))
+	if s.Total > 0 {
+		fraction = float32(float64(s.Bytes) / float64(s.Total))
 	}
 	tone := uikit.ProgressRunning
-	if s.running == 0 {
+	if s.Running == 0 {
 		tone = uikit.ProgressPaused
 	}
 	uikit.Divider(c)
@@ -325,8 +326,8 @@ func (a *app) trayPanelTransfers(c *ui.Context) {
 		ui.Row(c).FillWidth().AlignItems(ui.Center).Gap(t.Space.N8).Children(func() {
 			uikit.Text(c, label, uikit.TextProps{Style: uikit.TextFootnote}).Grow(1).SingleLine()
 			detail := strconv.Itoa(int(fraction*100)) + "%"
-			if s.running > 0 {
-				detail += " · " + transferBytes(int64(s.speed)) + "/s"
+			if s.Running > 0 {
+				detail += " · " + transferBytes(int64(s.Speed)) + "/s"
 			}
 			uikit.Text(c, detail, uikit.TextProps{Style: uikit.TextFootnote, Tone: uikit.ToneSecondary}).
 				SingleLine().FontFeatures("tnum")

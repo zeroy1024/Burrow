@@ -16,8 +16,8 @@ type siteDeletion struct {
 
 func (a *app) siteTransfers(profileID string) []*transferTask {
 	tasks := []*transferTask{}
-	for _, task := range a.transfers.tasks {
-		if task.session.endpoint.session.ID == profileID {
+	for _, task := range a.transfers.Tasks {
+		if task.Session.endpoint.session.ID == profileID {
 			tasks = append(tasks, task)
 		}
 	}
@@ -25,7 +25,7 @@ func (a *app) siteTransfers(profileID string) []*transferTask {
 }
 
 func transferNeedsCancellation(task *transferTask) bool {
-	return task.state != transferDone || task.run != nil || task.cleanupPending || task.removeRequested
+	return task.State != transferDone || task.Run != nil || task.CleanupPending || task.RemoveRequested
 }
 
 func (a *app) siteDeletionPending(profileID string) bool {
@@ -33,7 +33,7 @@ func (a *app) siteDeletionPending(profileID string) bool {
 }
 
 func (a *app) beginSiteDeletion(profileID string, done func(error)) {
-	if a.siteDeletion != nil || a.catalogSaving || a.transfers.quitting {
+	if a.siteDeletion != nil || a.catalogSaving || a.transfers.Quitting {
 		done(locales.NewError(locales.MessageProcessing2))
 		return
 	}
@@ -46,7 +46,7 @@ func (a *app) beginSiteDeletion(profileID string, done func(error)) {
 		done(err)
 		return
 	}
-	if err := a.transfers.storeErr; err != nil {
+	if err := a.transfers.StoreErr; err != nil {
 		done(err)
 		return
 	}
@@ -57,7 +57,7 @@ func (a *app) beginSiteDeletion(profileID string, done func(error)) {
 			a.cancelTransfer(task)
 		} else {
 			// Completed history is retired without changing its MCP audit outcome.
-			a.transfers.tasks = slices.DeleteFunc(a.transfers.tasks, func(t *transferTask) bool { return t == task })
+			a.transfers.Tasks = slices.DeleteFunc(a.transfers.Tasks, func(t *transferTask) bool { return t == task })
 		}
 	}
 	// Persist even if cancellation was already requested, so retrying after a
@@ -83,17 +83,17 @@ func (a *app) advanceSiteDeletion() {
 	if pending == nil || pending.committing {
 		return
 	}
-	if err := a.transfers.storeErr; err != nil {
+	if err := a.transfers.StoreErr; err != nil {
 		a.finishSiteDeletion(err)
 		return
 	}
-	if err := a.transfers.writeErr; err != nil {
+	if err := a.transfers.WriteErr; err != nil {
 		a.finishSiteDeletion(err)
 		return
 	}
 	tasks := a.siteTransfers(pending.profileID)
 	for _, task := range tasks {
-		if task.run == nil && !task.removeRequested {
+		if task.Run == nil && !task.RemoveRequested {
 			a.finishSiteDeletion(locales.NewError(locales.SessionTransferCleanupBlocked))
 			return
 		}

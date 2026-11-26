@@ -2,111 +2,32 @@ package desktop
 
 import (
 	"context"
-	"errors"
-	"net/netip"
 	"slices"
-	"strings"
 	"time"
 
 	"github.com/zeroy1024/Burrow/internal/locales"
-	"github.com/zeroy1024/Burrow/internal/sshclient"
+	"github.com/zeroy1024/Burrow/internal/profile"
+	sshsession "github.com/zeroy1024/Burrow/internal/session"
 )
 
-const defaultForwardListenHost = "127.0.0.1"
+const defaultForwardListenHost = profile.DefaultForwardListenHost
 
-type sshForwardRule struct {
-	ID         string `json:"id"`
-	Name       string `json:"name,omitempty"`
-	ListenHost string `json:"listenHost,omitempty"`
-	LocalPort  int    `json:"localPort"`
-	TargetHost string `json:"targetHost,omitempty"`
-	TargetPort int    `json:"targetPort,omitempty"`
-	SOCKS      bool   `json:"socks,omitempty"`
-}
-
-func (r sshForwardRule) target() (string, error) {
-	if r.SOCKS {
-		return "", nil
-	}
-	address, err := sshclient.ForwardTarget(r.TargetHost, r.TargetPort)
-	if err != nil {
-		return "", locales.NewError(locales.ForwardInvalidTarget)
-	}
-	return address, nil
-}
-
-func (r sshForwardRule) listenHost() string {
-	if r.ListenHost == "" {
-		return defaultForwardListenHost
-	}
-	return r.ListenHost
-}
-
-func parseForwardListenIP(value string) (netip.Addr, error) {
-	value = strings.TrimSpace(value)
-	if strings.HasPrefix(value, "[") && strings.HasSuffix(value, "]") {
-		value = value[1 : len(value)-1]
-	}
-	ip, err := netip.ParseAddr(value)
-	if err != nil {
-		return netip.Addr{}, locales.NewError(locales.ForwardInvalidListenHost)
-	}
-	return ip.Unmap(), nil
-}
-
-func (r sshForwardRule) bindAddress() (netip.AddrPort, error) {
-	if r.LocalPort < 1024 || r.LocalPort > 65535 {
-		return netip.AddrPort{}, locales.NewError(locales.ForwardInvalidLocalPort)
-	}
-	ip, err := parseForwardListenIP(r.listenHost())
-	if err != nil {
-		return netip.AddrPort{}, err
-	}
-	return netip.AddrPortFrom(ip, uint16(r.LocalPort)), nil
-}
-
-func (r sshForwardRule) localAddress() string {
-	bind, _ := r.bindAddress()
-	return bind.String()
-}
-
-func (r sshForwardRule) kind() string {
-	if r.SOCKS {
-		return locales.ForwardSOCKS()
-	}
-	return locales.ForwardLocal()
-}
-
-func (r sshForwardRule) title() string {
-	if r.Name != "" {
-		return r.Name
-	}
-	return r.kind()
-}
+type sshForwardRule = profile.ForwardRule
 
 type forwardRow struct {
 	rule        sshForwardRule
 	saved       bool
-	run         *forwardRun
+	run         *sshsession.Forward
 	startError  locales.Text
 	targetError locales.Text
 	tested      bool
 	testing     bool
 }
 
-type forwardRun struct {
-	ctx      context.Context
-	cancel   context.CancelFunc
-	listener *sshclient.ForwardListener
-}
-
-// A transport owns the running rules. Only the window thread changes its rows.
+// Rows and validation messages are presentation state; the listeners belong to the shell scope.
 type sshForwardState struct {
-	connection *sshclient.Connection
-	ctx        context.Context
-	cancel     context.CancelFunc
-	terminals  int
-	rows       []*forwardRow
+	*sshsession.ShellServices
+	rows []*forwardRow
 }
 
 func (a *app) forwardingHost(endpoint host) int {
@@ -129,51 +50,23 @@ func (a *app) savedForwardRows(endpoint host) []*forwardRow {
 	return rows
 }
 
-func (a *app) attachForwards(session *remoteSession) *sshForwardState {
+func (a *app) attachForwards(session *remoteSession, services *sshsession.ShellServices) *sshForwardState {
 	group := session.connection
 	state := group.forwarding
-	if state == nil || state.connection != group.connection {
-		if state != nil {
-			state.close()
-		}
-		ctx, cancel := context.WithCancel(group.ctx)
-		state = &sshForwardState{connection: group.connection, ctx: ctx, cancel: cancel}
+	if state == nil || state.ShellServices != services {
+		state = &sshForwardState{ShellServices: services}
 		if !session.temporary {
 			state.rows = a.savedForwardRows(session.endpoint)
 		}
 		group.forwarding = state
 	}
-	state.terminals++
 	return state
-}
-
-func (run *sshRuntime) stopForwards() {
-	state := run.forwarding
-	if state == nil {
-		return
-	}
-	run.forwarding = nil
-	state.terminals--
-	if state.terminals == 0 {
-		state.close()
-		if group := run.request.group; group.forwarding == state {
-			group.forwarding = nil
-		}
-	}
-}
-
-func (s *sshForwardState) close() {
-	s.cancel()
-	for _, row := range s.rows {
-		row.stop()
-	}
 }
 
 func (row *forwardRow) stop() {
 	if run := row.run; run != nil {
 		row.run = nil
-		run.cancel()
-		run.listener.Close()
+		run.Close()
 	}
 	row.testing, row.tested = false, false
 	row.startError, row.targetError = locales.Text{}, locales.Text{}
@@ -181,7 +74,7 @@ func (row *forwardRow) stop() {
 
 func (session *remoteSession) forwarding() *sshForwardState {
 	if session.ssh != nil && session.state == connected {
-		if state := session.ssh.forwarding; state != nil && state.ctx.Err() == nil {
+		if state := session.ssh.forwarding; state != nil && state.Context().Err() == nil {
 			return state
 		}
 	}
@@ -189,38 +82,36 @@ func (session *remoteSession) forwarding() *sshForwardState {
 }
 
 func (a *app) startForward(state *sshForwardState, row *forwardRow) {
-	if state.ctx.Err() != nil || row.run != nil {
+	if state.Context().Err() != nil || row.run != nil {
 		return
 	}
 	row.stop()
-	bind, err := row.rule.bindAddress()
+	bind, err := row.rule.BindAddress()
 	if err != nil {
 		row.startError = locales.ErrorText(err)
 		return
 	}
-	target, err := row.rule.target()
+	target, err := row.rule.Target()
 	if err != nil {
 		row.startError = locales.ErrorText(err)
 		return
 	}
-	ctx, cancel := context.WithCancel(state.ctx)
-	run := &forwardRun{ctx: ctx, cancel: cancel}
-	run.listener, err = state.connection.ListenForward(ctx, bind, target, func(err error) {
+	var run *sshsession.Forward
+	run, err = state.Listen(bind, target, func(err error) {
 		a.window.Update(func() {
-			if row.run == run && ctx.Err() == nil {
+			if row.run != nil && row.run == run && run.Context().Err() == nil {
 				row.tested = false
 				row.targetError = locales.ErrorText(locales.Errorf(locales.ForwardTargetFailed, err))
 			}
 		})
 	})
 	if err != nil {
-		cancel()
 		row.startError = locales.ErrorText(locales.Errorf(locales.ForwardListenFailed, err))
 		return
 	}
 	row.run = run
 	a.sshWorkers.Go(func() {
-		err := run.listener.Wait()
+		err := run.Wait()
 		a.window.Update(func() {
 			if row.run == run {
 				row.stop()
@@ -234,14 +125,14 @@ func (a *app) startForward(state *sshForwardState, row *forwardRow) {
 
 func (a *app) testForward(state *sshForwardState, row *forwardRow, target string) {
 	run := row.run
-	if run == nil || run.ctx.Err() != nil || row.testing {
+	if run == nil || run.Context().Err() != nil || row.testing {
 		return
 	}
-	ctx, cancel := context.WithTimeout(run.ctx, 5*time.Second)
+	ctx, cancel := context.WithTimeout(run.Context(), 5*time.Second)
 	row.testing, row.tested, row.targetError = true, false, locales.Text{}
 	a.sshWorkers.Go(func() {
 		defer cancel()
-		remote, err := state.connection.DialContext(ctx, "tcp", target)
+		remote, err := state.Connection().DialContext(ctx, "tcp", target)
 		if err == nil {
 			remote.Close()
 		}
@@ -281,21 +172,4 @@ func (a *app) persistForward(endpoint host, before, after *sshForwardRule, done 
 		options.Forwards = append(options.Forwards, *after)
 	}
 	a.commitCatalogMoveAsync(func() { a.hosts[index].session.SSH = &options }, done)
-}
-
-func validateForwardRules(rules []sshForwardRule) error {
-	ids := make(map[string]bool, len(rules))
-	for _, rule := range rules {
-		if rule.ID == "" || ids[rule.ID] {
-			return errors.New("invalid or duplicate forwarding rule id")
-		}
-		ids[rule.ID] = true
-		if _, err := rule.bindAddress(); err != nil {
-			return err
-		}
-		if _, err := rule.target(); err != nil {
-			return err
-		}
-	}
-	return nil
 }

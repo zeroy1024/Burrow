@@ -1,6 +1,7 @@
 package desktop
 
 import (
+	"github.com/zeroy1024/Burrow/internal/workspace"
 	"math"
 	"slices"
 	"time"
@@ -33,10 +34,9 @@ type host struct {
 }
 
 type workspaceTab struct {
-	id                 int
-	root               *terminalLayout
-	focused            *remoteSession
-	maximized          bool
+	id int
+
+	paneTab
 	frame              ui.Handle
 	zoomFrom, zoomMix  float32
 	zoomPane           *remoteSession
@@ -50,7 +50,7 @@ type workspaceTab struct {
 }
 
 func (tab *workspaceTab) canSeparateSessions() bool {
-	sessions := tab.root.sessions()
+	sessions := tab.Root.Sessions()
 	if len(sessions) < 2 {
 		return false
 	}
@@ -122,10 +122,7 @@ func demoHosts() []host {
 }
 
 func (a *app) currentTab() *workspaceTab {
-	if len(a.tabs) == 0 {
-		return nil
-	}
-	return a.tabs[a.activeTab]
+	return a.tabs.Current()
 }
 
 func (a *app) newSession(id hostID) *remoteSession {
@@ -188,7 +185,7 @@ func (a *app) focusSession(tab *workspaceTab, session *remoteSession) {
 	if session.closing {
 		return
 	}
-	tab.focused = session
+	tab.Focused = session
 	// The target may still be waiting for its terminal view to be created.
 	session.focusPending = true
 	session.focus.Focus()
@@ -202,47 +199,40 @@ func (session *remoteSession) markViewed() {
 
 func (a *app) activateTab(index int) {
 	a.selectTab(index)
-	a.tabs[index].focused.focus.Focus()
+	a.tabs.Items[index].Focused.focus.Focus()
 }
 
 func (a *app) selectTab(index int) {
 	a.settingsUI.previousFocus = ui.Handle{}
 	a.closeSettings()
-	a.activeTab = index
-	a.tabs[index].focused.markViewed()
+	a.tabs.Active = index
+	a.tabs.Items[index].Focused.markViewed()
 }
 
 func (a *app) openHost(id hostID) {
 	a.nextTab++
 	session := a.newSession(id)
-	a.tabs = append(a.tabs, &workspaceTab{
-		id: a.nextTab, root: &terminalLayout{session: session}, focused: session,
-	})
-	a.activateTab(len(a.tabs) - 1)
+	a.tabs.Items = append(a.tabs.Items, &workspaceTab{id: a.nextTab, paneTab: workspace.NewTab(session)})
+	a.activateTab(len(a.tabs.Items) - 1)
 }
 
 func (a *app) ungroupTab(tab *workspaceTab) {
-	index := slices.Index(a.tabs, tab)
+	index := slices.Index(a.tabs.Items, tab)
 	if index < 0 || !tab.canSeparateSessions() {
 		return
 	}
-	active, focused := a.currentTab(), tab.focused
-	sessions := tab.root.sessions()
+	active, focused := a.currentTab(), tab.Focused
+	sessions := tab.Root.Sessions()
 	separated := make([]*workspaceTab, 0, len(sessions))
-	*tab = workspaceTab{
-		id: tab.id, frame: tab.frame,
-		root: &terminalLayout{session: sessions[0]}, focused: sessions[0],
-	}
+	*tab = workspaceTab{id: tab.id, frame: tab.frame, paneTab: workspace.NewTab(sessions[0])}
 	separated = append(separated, tab)
 	for _, session := range sessions[1:] {
 		a.nextTab++
-		separated = append(separated, &workspaceTab{
-			id: a.nextTab, root: &terminalLayout{session: session}, focused: session,
-		})
+		separated = append(separated, &workspaceTab{id: a.nextTab, paneTab: workspace.NewTab(session)})
 	}
-	a.tabs = slices.Replace(a.tabs, index, index+1, separated...)
+	a.tabs.Items = slices.Replace(a.tabs.Items, index, index+1, separated...)
 	if active != tab {
-		a.activeTab = slices.Index(a.tabs, active)
+		a.tabs.Active = slices.Index(a.tabs.Items, active)
 		return
 	}
 	a.resizing = nil
@@ -250,67 +240,55 @@ func (a *app) ungroupTab(tab *workspaceTab) {
 }
 
 func (a *app) detachPaneToTab(source *workspaceTab, session *remoteSession, index int, area ui.Rect) *workspaceTab {
-	if !source.canSeparateSessions() || slices.Index(a.tabs, source) < 0 {
+	if !source.canSeparateSessions() || slices.Index(a.tabs.Items, source) < 0 {
 		return nil
 	}
-	if source.root.find(session) == nil {
+	if source.Root.Find(session) == nil {
 		return nil
 	}
-	if index < 0 || index > len(a.tabs) {
+	if index < 0 || index > len(a.tabs.Items) {
 		return nil
 	}
-	minimum := source.root.minimum()
+	minimum := minimumLayoutSize(source.Root)
 	canvas := ui.Rect{W: max(area.W, minimum.X), H: max(area.H, minimum.Y)}
-	remaining := source.root.copyAt(canvas).remove(session)
-	focused := source.focused
+	remaining := copyLayoutAt(source.Root, canvas).Remove(session)
+	focused := source.Focused
 	if focused == session {
-		focused = remaining.firstSession()
+		focused = remaining.FirstSession()
 	}
-	*source = workspaceTab{
-		id: source.id, frame: source.frame, root: remaining, focused: focused,
-	}
+	*source = workspaceTab{id: source.id, frame: source.frame, paneTab: paneTab{Root: remaining, Focused: focused}}
 	a.markPaneLayout(source, theme.Current().C.ReorderMotion.PaneDrop.Duration)
 	a.nextTab++
-	tab := &workspaceTab{
-		id: a.nextTab, root: &terminalLayout{session: session}, focused: session,
-	}
-	a.tabs = slices.Insert(a.tabs, index, tab)
+	tab := &workspaceTab{id: a.nextTab, paneTab: workspace.NewTab(session)}
+	a.tabs.Items = slices.Insert(a.tabs.Items, index, tab)
 	a.resizing = nil
 	a.activateTab(index)
 	return tab
 }
 
 func (a *app) closeTab(index int) {
-	if tab := a.tabs[index]; tab.root != nil {
+	if tab := a.tabs.Items[index]; tab.Root != nil {
 		// An agent's record outlives its tab; a shell's tab reopens as a new shell.
-		if session := tab.focused; session.agent != nil {
+		if session := tab.Focused; session.agent != nil {
 			a.closeAgentSession(session.agent)
 		} else {
-			for _, session := range tab.root.sessions() {
+			for _, session := range tab.Root.Sessions() {
 				releaseSSH(session)
 			}
 			a.closedTabs = append(a.closedTabs, closedWorkspaceTab{host: session.host, section: sectionSSH,
 				endpoint: cloneHostEndpoint(session.endpoint), temporary: session.temporary, connection: session.connection})
 		}
 	}
-	closedActive := index == a.activeTab
-	a.tabs = append(a.tabs[:index], a.tabs[index+1:]...)
-	switch {
-	case len(a.tabs) == 0:
-		a.activeTab = 0
-	case index < a.activeTab:
-		a.activeTab--
-	case a.activeTab >= len(a.tabs):
-		a.activeTab = len(a.tabs) - 1
-	}
-	if closedActive && len(a.tabs) > 0 && a.activeSection() == sectionSSH {
+	closedActive := index == a.tabs.Active
+	a.tabs.Remove(index)
+	if closedActive && len(a.tabs.Items) > 0 && a.activeSection() == sectionSSH {
 		a.focusWorkspace()
 	}
 }
 
 func (a *app) splitSession(session *remoteSession, stacked bool) {
 	tab := a.currentTab()
-	if session.agent != nil || tab.root.count() >= maxTerminalPanes {
+	if session.agent != nil || tab.Root.Count() >= maxTerminalPanes {
 		return
 	}
 	zone := dropRight
@@ -328,9 +306,9 @@ func (a *app) splitSession(session *remoteSession, stacked bool) {
 		}
 	}
 	child := a.newShellSession(session.host, session.endpoint, session.temporary, session.connection)
-	node := tab.root.find(session)
-	node.insert(child, zone)
-	if tab.focused != session {
+	node := tab.Root.Find(session)
+	node.Insert(child, zone)
+	if tab.Focused != session {
 		a.focusSession(tab, session)
 	}
 	a.startPaneRelayout(tab, child)
@@ -340,11 +318,11 @@ func (a *app) splitSession(session *remoteSession, stacked bool) {
 }
 
 func (tab *workspaceTab) canClosePane(session *remoteSession) bool {
-	if session.closing || tab.root.find(session) == nil {
+	if session.closing || tab.Root.Find(session) == nil {
 		return false
 	}
 	available := 0
-	for _, candidate := range tab.root.sessions() {
+	for _, candidate := range tab.Root.Sessions() {
 		if !candidate.closing {
 			available++
 		}
@@ -359,23 +337,23 @@ func (a *app) closePane(tab *workspaceTab, session *remoteSession) {
 	session.closing = true
 	// Close the channel now. The terminal renderer stays alive for the exit copy.
 	stopSSH(session)
-	if tab.focused != session {
+	if tab.Focused != session {
 		return
 	}
-	session.closeMaximized = tab.maximized
+	session.closeMaximized = tab.Maximized
 	a.setPaneZoom(tab, false)
 	a.focusRemainingPane(tab)
 }
 
 func (a *app) focusRemainingPane(tab *workspaceTab) {
-	for _, next := range tab.root.sessions() {
+	for _, next := range tab.Root.Sessions() {
 		if next.closing {
 			continue
 		}
 		if tab == a.currentTab() && a.activeSection() == sectionSSH {
 			a.focusSession(tab, next)
 		} else {
-			tab.focused = next
+			tab.Focused = next
 		}
 		return
 	}
@@ -383,9 +361,9 @@ func (a *app) focusRemainingPane(tab *workspaceTab) {
 
 func (a *app) removePane(tab *workspaceTab, session *remoteSession) {
 	releaseSSH(session)
-	tab.root = tab.root.remove(session)
+	tab.Root = tab.Root.Remove(session)
 	a.startPaneRelayout(tab, nil)
-	if tab.focused == session {
+	if tab.Focused == session {
 		a.focusRemainingPane(tab)
 		a.setPaneZoom(tab, false)
 	}
@@ -430,8 +408,8 @@ func (a *app) latestSessionEndpoint(current host, temporary bool) (host, hostID,
 
 func (a *app) runtimeSSHGroups() []*sshConnectionGroup {
 	groups := map[*sshConnectionGroup]struct{}{}
-	for _, tab := range a.tabs {
-		for _, session := range tab.root.sessions() {
+	for _, tab := range a.tabs.Items {
+		for _, session := range tab.Root.Sessions() {
 			if session.connection != nil {
 				groups[session.connection] = struct{}{}
 			}
@@ -442,9 +420,9 @@ func (a *app) runtimeSSHGroups() []*sshConnectionGroup {
 			groups[session.connection] = struct{}{}
 		}
 	}
-	for _, task := range a.transfers.tasks {
-		if task.session.connection != nil {
-			groups[task.session.connection] = struct{}{}
+	for _, task := range a.transfers.Tasks {
+		if task.Session.connection != nil {
+			groups[task.Session.connection] = struct{}{}
 		}
 	}
 	// Reopening a closed tab restores its captured plan after catalog edits.

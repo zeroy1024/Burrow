@@ -89,8 +89,8 @@ func (a *app) initializeBusiness() error {
 	a.security.migrationKey = nil
 	a.security.migrationPassword = nil
 	a.security.migration = false
-	if len(a.tabs) > 0 && a.section == sectionSSH {
-		a.activateTab(a.activeTab)
+	if len(a.tabs.Items) > 0 && a.section == sectionSSH {
+		a.activateTab(a.tabs.Active)
 	}
 	a.startMCPBackend()
 	a.refreshTray()

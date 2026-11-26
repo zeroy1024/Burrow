@@ -310,7 +310,7 @@ func (a *app) openSettings() {
 			}
 		}
 	} else if tab := a.currentTab(); tab != nil {
-		a.settingsUI.previousFocus = tab.focused.focus
+		a.settingsUI.previousFocus = tab.Focused.focus
 	}
 	a.clearWorkspaceGestures()
 	a.settingsUI.open = true

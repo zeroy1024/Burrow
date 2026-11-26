@@ -2,6 +2,7 @@ package desktop
 
 import (
 	"fmt"
+	"github.com/zeroy1024/Burrow/internal/profile"
 	"net/url"
 	"slices"
 	"strconv"
@@ -25,8 +26,8 @@ type forwardPanel struct {
 }
 
 func (a *app) forwardSession() *remoteSession {
-	if tab := a.currentTab(); tab != nil && tab.focused.agent == nil && !tab.focused.closing {
-		return tab.focused
+	if tab := a.currentTab(); tab != nil && tab.Focused.agent == nil && !tab.Focused.closing {
+		return tab.Focused
 	}
 	return nil
 }
@@ -92,7 +93,7 @@ func (a *app) sshWorkspace(c *ui.Context, size ui.Point) {
 	open := session != nil && a.forwardUI.visible
 	minimum := float32(0)
 	if tab := a.currentTab(); tab != nil {
-		minimum = tab.root.minimum().Y
+		minimum = minimumLayoutSize(tab.Root).Y
 	}
 	gutter := t.C.Window.Gutter
 	available := max(0, size.Y-minimum)
@@ -229,7 +230,7 @@ func (a *app) forwardDockRow(c *ui.Context, session *remoteSession, state *sshFo
 	t := theme.Current()
 	motion := uikit.MotionOverride(a.reduceMotion(c))
 	compact := width < t.C.TransferDock.CompactBreakpoint
-	address, _ := row.rule.target()
+	address, _ := row.rule.Target()
 	if row.rule.SOCKS {
 		address = locales.ForwardClientDestination()
 	}
@@ -247,13 +248,13 @@ func (a *app) forwardDockRow(c *ui.Context, session *remoteSession, state *sshFo
 			label.Width(width * .22)
 		}
 		label.Children(func() {
-			uikit.Text(c, row.rule.title(), uikit.TextProps{Style: uikit.TextBodyStrong}).SingleLine().Ellipsis("…")
-			sub := row.rule.kind()
+			uikit.Text(c, row.rule.Title(), uikit.TextProps{Style: uikit.TextBodyStrong}).SingleLine().Ellipsis("…")
+			sub := row.rule.Kind()
 			if !row.saved {
 				sub += " · " + locales.ForwardTemporary()
 			}
 			if compact {
-				sub = row.rule.localAddress() + " · " + address
+				sub = row.rule.LocalAddress() + " · " + address
 				if detail != "" {
 					sub = detail
 				}
@@ -262,7 +263,7 @@ func (a *app) forwardDockRow(c *ui.Context, session *remoteSession, state *sshFo
 			uikit.Tip(c, text, sub)
 		})
 		if !compact {
-			uikit.Text(c, row.rule.localAddress(), uikit.TextProps{Style: uikit.TextMono}).Width(width * .22).SingleLine().Ellipsis("…")
+			uikit.Text(c, row.rule.LocalAddress(), uikit.TextProps{Style: uikit.TextMono}).Width(width * .22).SingleLine().Ellipsis("…")
 			ui.Column(c).Grow(1).MinWidth(0).Gap(t.Space.N2).Children(func() {
 				uikit.Text(c, address, uikit.TextProps{Style: uikit.TextFootnote, Mono: !row.rule.SOCKS}).SingleLine().Ellipsis("…")
 				if detail != "" {
@@ -299,7 +300,7 @@ func (row *forwardRow) forwardDetail() (string, uikit.Tone) {
 
 func (a *app) forwardRowActions(c *ui.Context, session *remoteSession, state *sshForwardState, row *forwardRow, address string, motion uikit.MotionMode) {
 	uikit.TransferAction(c, "copy", locales.ForwardCopyAddress(), uikit.IconSVG(uikit.IconCopy), row.run == nil).OnClick(func() {
-		value := row.rule.localAddress()
+		value := row.rule.LocalAddress()
 		if row.rule.SOCKS {
 			value = (&url.URL{Scheme: "socks5", Host: value}).String()
 		}
@@ -371,7 +372,7 @@ func (a *app) openForwardDialog(session *remoteSession, state *sshForwardState, 
 	}
 	if row != nil && action == forwardEdit {
 		d.name, d.saved = row.rule.Name, row.saved
-		d.listen = row.rule.listenHost()
+		d.listen = row.rule.EffectiveListenHost()
 		d.port = strconv.Itoa(row.rule.LocalPort)
 		if row.rule.SOCKS {
 			d.kind = 1
@@ -420,7 +421,7 @@ func (a *app) sshForwardDialog(c *ui.Context) {
 	result := uikit.Modal(c.Key("ssh-forward-dialog").Key(d), &open, props, func(parts uikit.ModalParts) {
 		fields := func() {
 			if d.action == forwardDelete {
-				uikit.Text(c, d.row.rule.title(), uikit.TextProps{})
+				uikit.Text(c, d.row.rule.Title(), uikit.TextProps{})
 			} else {
 				a.forwardFields(c, d)
 			}
@@ -502,7 +503,7 @@ func (a *app) forwardFields(c *ui.Context, d *forwardDialog) {
 	if d.action == forwardEdit {
 		field("forward-name", locales.CommonName(), &d.name, false)
 		listener := field("forward-listen", locales.ForwardListenHost(), &d.listen, true)
-		if ip, err := parseForwardListenIP(d.listen); err == nil && !ip.IsLoopback() {
+		if ip, err := profile.ParseForwardListenIP(d.listen); err == nil && !ip.IsLoopback() {
 			hint := locales.ForwardNonLoopbackHelp()
 			if d.kind == 1 {
 				hint = locales.ForwardSOCKSNonLoopbackHelp()
@@ -529,7 +530,7 @@ func (a *app) submitForwardDialog(d *forwardDialog) {
 		a.commitForwardDialog(d, nil)
 		return
 	}
-	if d.state == nil || d.state.ctx.Err() != nil {
+	if d.state == nil || d.state.Context().Err() != nil {
 		d.err = locales.Deferred(locales.ForwardNeedsSSH)
 		return
 	}
@@ -552,7 +553,7 @@ func (a *app) submitForwardDialog(d *forwardDialog) {
 		d.err = locales.Deferred(locales.ForwardInvalidListenHost)
 		return
 	}
-	bind, err := rule.bindAddress()
+	bind, err := rule.BindAddress()
 	if err != nil {
 		d.err = locales.ErrorText(err)
 		return
@@ -561,7 +562,7 @@ func (a *app) submitForwardDialog(d *forwardDialog) {
 	if !rule.SOCKS {
 		rule.TargetHost, rule.TargetPort = strings.TrimSpace(d.target), targetPort
 	}
-	if _, err := rule.target(); err != nil {
+	if _, err := rule.Target(); err != nil {
 		d.err = locales.ErrorText(err)
 		return
 	}
@@ -588,7 +589,7 @@ func (a *app) commitForwardDialog(d *forwardDialog, rule *sshForwardRule) {
 			return
 		}
 		d.modal.Close()
-		if d.state == nil || d.state.ctx.Err() != nil {
+		if d.state == nil || d.state.Context().Err() != nil {
 			return
 		}
 		if d.row != nil {

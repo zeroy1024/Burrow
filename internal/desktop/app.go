@@ -5,26 +5,26 @@ import (
 	"errors"
 	"os"
 	"runtime"
-	"slices"
 	"sync"
 	"time"
-
-	"github.com/zeroy1024/Burrow/internal/locales"
-	"github.com/zeroy1024/Burrow/internal/localfs"
-	"github.com/zeroy1024/Burrow/internal/migration"
-	"github.com/zeroy1024/Burrow/internal/store"
-	"github.com/zeroy1024/Burrow/internal/termtheme"
-	"github.com/zeroy1024/Burrow/internal/theme"
-	"github.com/zeroy1024/Burrow/internal/uikit"
-	"github.com/zeroy1024/Burrow/internal/vault"
 
 	"github.com/egoist/mygo"
 	nativeterm "github.com/egoist/mygo/burrow-terminal"
 	updatewindow "github.com/egoist/mygo/plugins/updater/native"
 	"github.com/egoist/mygo/ui"
+	"github.com/zeroy1024/Burrow/internal/locales"
+	"github.com/zeroy1024/Burrow/internal/localfs"
+	"github.com/zeroy1024/Burrow/internal/migration"
+	"github.com/zeroy1024/Burrow/internal/persistence"
+	"github.com/zeroy1024/Burrow/internal/store"
+	"github.com/zeroy1024/Burrow/internal/termtheme"
+	"github.com/zeroy1024/Burrow/internal/theme"
+	"github.com/zeroy1024/Burrow/internal/uikit"
+	"github.com/zeroy1024/Burrow/internal/vault"
+	"github.com/zeroy1024/Burrow/internal/workspace"
 )
 
-type section int
+type section = workspace.Section
 
 type sidebarMotionKey section
 
@@ -36,16 +36,12 @@ type pageDialogKey struct {
 }
 
 const (
-	sectionSSH section = iota
-	sectionFiles
-	sectionSettings
-	sectionMCP
-	sectionGateways
+	sectionSSH      = workspace.SSH
+	sectionFiles    = workspace.Files
+	sectionSettings = workspace.Settings
+	sectionMCP      = workspace.MCP
+	sectionGateways = workspace.Gateways
 )
-
-func (s section) hasCatalog() bool {
-	return s == sectionSSH || s == sectionFiles
-}
 
 type pageState struct {
 	lastGroup         *hostGroup
@@ -74,7 +70,7 @@ type app struct {
 	vault                  *vault.Manager
 	security               applicationSecurityState
 	store                  *store.Store
-	persistence            *persistenceWorker
+	persistence            *persistence.Writer
 	dataDirectory          string
 	catalogSaving          bool
 	catalogReady           []func()
@@ -109,8 +105,7 @@ type app struct {
 	theme              *ui.Theme
 	hosts              []host
 	groups             []*hostGroup
-	tabs               []*workspaceTab
-	activeTab          int
+	tabs               workspace.Tabs[workspaceTab]
 	nextTab            int
 	nextSession        int
 	tabScroll          ui.ScrollState
@@ -198,7 +193,7 @@ func (a *app) focusWorkspace() {
 	switch a.activeSection() {
 	case sectionSSH:
 		if tab := a.currentTab(); tab != nil {
-			a.focusSession(tab, tab.focused)
+			a.focusSession(tab, tab.Focused)
 		}
 	case sectionFiles:
 		if session := a.currentFileSession(); session != nil {
@@ -219,9 +214,7 @@ func (a *app) clearWorkspaceGestures() {
 		item.offset = ui.Point{}
 	}
 	if d := a.drag; d != nil && d.kind == dragTab && d.phase == dragActive {
-		active := a.currentTab()
-		a.tabs = slices.Clone(d.order)
-		a.activeTab = slices.Index(a.tabs, active)
+		a.tabs.RestoreOrder(d.order)
 	}
 	a.drag, a.resizing, a.pendingDock, a.dockPreview = nil, nil, nil, nil
 	a.files.drag = nil
@@ -259,7 +252,7 @@ func Run() (runErr error) {
 
 	a := &app{
 		ctx: ctx, cancel: cancel, store: data.db, vault: data.vault, dataDirectory: directory,
-		tabs: []*workspaceTab{}, statusFactsOpen: true, migrationNotice: data.notice,
+		statusFactsOpen: true, migrationNotice: data.notice,
 	}
 	finish := sync.OnceFunc(func() {
 		a.cancel()
@@ -280,7 +273,7 @@ func Run() (runErr error) {
 		runErr = errors.Join(runErr, a.finishPersistence())
 	})
 	defer finish()
-	a.persistence = newPersistenceWorker(func() *mygo.Window { return a.window })
+	a.persistence = persistence.NewWriter(func(f func()) { a.window.Update(f) })
 	for i := range a.pages {
 		a.pages[i].sidebarWidth = theme.Current().C.Sider.Width
 	}
@@ -515,7 +508,7 @@ func (a *app) view(c *ui.Context) {
 	if active == sectionSSH {
 		a.beginWorkspaceFrame(c)
 	}
-	if active.hasCatalog() {
+	if active.HasCatalog() {
 		a.beginCatalogFrame(c)
 	}
 	a.enforcePaneMinimum(c)
@@ -568,7 +561,7 @@ func (a *app) view(c *ui.Context) {
 			a.finishWorkspaceDrag(c)
 			a.dragPreview(c)
 		}
-		if active.hasCatalog() {
+		if active.HasCatalog() {
 			a.finishCatalogDrag(c)
 			a.catalogDragPreview(c)
 		}
@@ -585,7 +578,7 @@ func (a *app) view(c *ui.Context) {
 		)
 		a.terminalError = nil
 	}
-	if active.hasCatalog() {
+	if active.HasCatalog() {
 		if a.page().addHostOpen {
 			a.hostDialog(c.Key(pageDialogKey{section: a.section, kind: "host"}))
 		}
@@ -637,7 +630,7 @@ func (a *app) view(c *ui.Context) {
 }
 
 func (a *app) interactionBlocked() bool {
-	return a.security.changing || a.transfers.quitting || a.catalogSaving || a.quitPending || a.terminal.importing
+	return a.security.changing || a.transfers.Quitting || a.catalogSaving || a.quitPending || a.terminal.importing
 }
 
 func (a *app) navigation(c *ui.Context) {
@@ -771,6 +764,6 @@ func (a *app) sidebarResizeHandle(c *ui.Context, shown float32) {
 }
 
 func (a *app) resetQuitAttempt() {
-	a.quitReady, a.quitPending, a.transfers.quitting = false, false, false
+	a.quitReady, a.quitPending, a.transfers.Quitting = false, false, false
 	a.refreshTray()
 }

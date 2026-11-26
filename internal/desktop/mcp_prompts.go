@@ -28,9 +28,9 @@ func (b *mcpDesktop) observeGroup(group *sshConnectionGroup) {
 	group.plan.gatewayScope = "mcp:" + strconv.Itoa(group.id)
 	group.plan.promptChanged = func(waiting bool, detail string) {
 		b.a.window.Update(func() {
-			for request := range group.waiters {
-				if request.mcpOperationID != "" {
-					b.a.recordMCPWaiting(request.mcpOperationID, request.mcpTaskID, waiting, detail)
+			for ctx := range group.transport.Waiting() {
+				if id, taskID := mcpserver.OperationID(ctx); id != "" {
+					b.a.recordMCPWaiting(id, taskID, waiting, detail)
 				}
 			}
 		})

@@ -11,7 +11,9 @@ import (
 
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
+	"github.com/zeroy1024/Burrow/internal/fileclient"
 	"github.com/zeroy1024/Burrow/internal/hostinfo"
+	"github.com/zeroy1024/Burrow/internal/persistence"
 	"github.com/zeroy1024/Burrow/internal/store"
 	"github.com/zeroy1024/Burrow/internal/uikit"
 )
@@ -36,7 +38,7 @@ func runREADMEGallery() error {
 	}
 	defer db.Close()
 	a := &app{ctx: ctx, cancel: cancel, store: db, dataDirectory: directory, statusVisible: true}
-	a.persistence = newPersistenceWorker(func() *mygo.Window { return a.window })
+	a.persistence = persistence.NewWriter(func(f func()) { a.window.Update(f) })
 	defer a.finishPersistence()
 	if err := a.loadTerminalSettings(); err != nil {
 		return err
@@ -168,19 +170,19 @@ func (a *app) galleryTerminals() {
 		"atlas-2026-11-05.dump  latest.dump",
 	})
 	staging := newSession(4)
-	a.tabs = []*workspaceTab{
-		{
-			id: 1, focused: left,
-			root: &terminalLayout{
-				first: &terminalLayout{session: left}, second: &terminalLayout{session: right}, ratio: .53,
+	a.tabs.Items = []*workspaceTab{
+		{id: 1, paneTab: paneTab{
+			Root: &terminalLayout{
+				First: &terminalLayout{Session: left}, Second: &terminalLayout{Session: right}, Ratio: .53,
 			},
-		},
-		{id: 2, root: &terminalLayout{session: staging}, focused: staging},
+			Focused: left,
+		}},
+		{id: 2, paneTab: paneTab{Root: &terminalLayout{Session: staging}, Focused: staging}},
 	}
 	a.nextTab, a.nextSession = 2, 9
 	cpu, memory, uptime, down, up, processes := 23.0, 41.0, 1225920.0, 4200000.0, 840000.0, 146
 	monitor := &monitorState{
-		cancel: func() {},
+		platform: hostinfo.Linux, updatedAt: time.Now(),
 		metrics: &hostinfo.Metrics{
 			CPU: &cpu, Memory: &memory, Uptime: &uptime, Down: &down, Up: &up, Cores: 8,
 			Load: "0.82 / 0.64 / 0.51", MemoryUsed: 6600000000, MemoryTotal: 16000000000,
@@ -193,11 +195,13 @@ func (a *app) galleryTerminals() {
 		diskIdentity: "/", diskStats: &hostinfo.Usage{Total: 120000000000, Free: 68400000000},
 	}
 	for i := range 60 {
-		monitor.history.cpu = append(monitor.history.cpu, 22+7*math.Sin(float64(i)/4)+3*math.Sin(float64(i)/1.7))
-		monitor.history.down = append(monitor.history.down, 3800000+1800000*math.Sin(float64(i)/6))
-		monitor.history.up = append(monitor.history.up, 600000+300000*math.Sin(float64(i)/5))
+		cpu := 22 + 7*math.Sin(float64(i)/4) + 3*math.Sin(float64(i)/1.7)
+		down := 3800000 + 1800000*math.Sin(float64(i)/6)
+		up := 600000 + 300000*math.Sin(float64(i)/5)
+		at := monitor.updatedAt.Add(time.Duration(i-59) * 2 * time.Second)
+		monitor.history.add(at, hostinfo.Metrics{CPU: &cpu, Down: &down, Up: &up})
 	}
-	a.monitors = map[*sshConnectionGroup]*monitorState{left.connection: monitor}
+	left.connection.monitor = monitor
 	a.hostFacts.values = map[string]hostinfo.Facts{
 		hostFactsKey(left.connection.plan): {
 			Platform: hostinfo.Linux, Hostname: "prod-web-01", OSID: "ubuntu", OSVersion: "24.04",
@@ -246,23 +250,23 @@ func (a *app) galleryFiles() {
 	a.fileSessions = []*fileSession{s}
 	a.nextFileSession = 1
 	a.transfers.dockHeight = 220
-	a.transfers.tasks = []*transferTask{
+	a.transfers.Tasks = []*transferTask{
 		{
-			id: 1, session: s, view: s, entry: fileEntry{name: "atlas-api-1.8.2.tar.gz"},
-			sourcePath: s.local.path + "/atlas-api-1.8.2.tar.gz", targetPath: s.remote.path + "/releases",
-			state: transferRunning, transferred: 31457280, total: 48234496, speed: 8400000,
+			ID: 1, Session: s, View: s, Entry: fileclient.Entry{Name: "atlas-api-1.8.2.tar.gz"},
+			SourcePath: s.local.path + "/atlas-api-1.8.2.tar.gz", TargetPath: s.remote.path + "/releases",
+			State: transferRunning, Transferred: 31457280, Total: 48234496, Speed: 8400000,
 		},
 		{
-			id: 2, session: s, view: s, entry: fileEntry{name: "media-assets.zip"},
-			sourcePath: s.local.path + "/media-assets.zip", targetPath: s.remote.path + "/public",
-			state: transferPaused, transferred: 12582912, total: 104857600,
+			ID: 2, Session: s, View: s, Entry: fileclient.Entry{Name: "media-assets.zip"},
+			SourcePath: s.local.path + "/media-assets.zip", TargetPath: s.remote.path + "/public",
+			State: transferPaused, Transferred: 12582912, Total: 104857600,
 		},
 		{
-			id: 3, session: s, view: s, entry: fileEntry{name: "compose.yaml"},
-			sourcePath: s.local.path + "/compose.yaml", targetPath: s.remote.path,
-			state: transferDone, transferred: 2840, total: 2840,
-			started:   time.Date(2026, 11, 5, 9, 40, 10, 0, time.Local),
-			completed: time.Date(2026, 11, 5, 9, 40, 11, 0, time.Local),
+			ID: 3, Session: s, View: s, Entry: fileclient.Entry{Name: "compose.yaml"},
+			SourcePath: s.local.path + "/compose.yaml", TargetPath: s.remote.path,
+			State: transferDone, Transferred: 2840, Total: 2840,
+			Started:   time.Date(2026, 11, 5, 9, 40, 10, 0, time.Local),
+			Completed: time.Date(2026, 11, 5, 9, 40, 11, 0, time.Local),
 		},
 	}
 }

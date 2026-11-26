@@ -467,8 +467,8 @@ func (a *app) mcpBusy() bool { return a.mcpBackend != nil && a.mcpBackend.busy }
 
 func (a *app) mcpQueuedTasks(keyID string) int {
 	count := 0
-	for _, task := range a.transfers.tasks {
-		if task.mcp != nil && task.mcp.KeyID == keyID && task.state == transferQueued {
+	for _, task := range a.transfers.Tasks {
+		if task.MCP != nil && task.MCP.KeyID == keyID && task.State == transferQueued {
 			count++
 		}
 	}
@@ -477,8 +477,8 @@ func (a *app) mcpQueuedTasks(keyID string) int {
 
 func (a *app) mcpPausedTasks() int {
 	count := 0
-	for _, task := range a.transfers.tasks {
-		if task.mcp != nil && task.state == transferPaused {
+	for _, task := range a.transfers.Tasks {
+		if task.MCP != nil && task.State == transferPaused {
 			count++
 		}
 	}

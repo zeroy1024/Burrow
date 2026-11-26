@@ -203,8 +203,8 @@ func (a *app) preparePasswordClear(ids []string) func(error) {
 				config.PasswordSaved, config.PasswordRevision, config.UpdatedAt = false, "", updated
 			}
 		}
-		for _, tab := range a.tabs {
-			for _, session := range tab.root.sessions() {
+		for _, tab := range a.tabs.Items {
+			for _, session := range tab.Root.Sessions() {
 				clearFlag(&session.config)
 				clearFlag(&session.endpoint.session)
 			}
@@ -213,8 +213,8 @@ func (a *app) preparePasswordClear(ids []string) func(error) {
 		for _, session := range a.fileSessions {
 			files[session] = true
 		}
-		for _, task := range a.transfers.tasks {
-			files[task.session] = true
+		for _, task := range a.transfers.Tasks {
+			files[task.Session] = true
 		}
 		for session := range files {
 			if changed[session.config.ID] || changed[session.endpoint.session.ID] {
@@ -400,8 +400,8 @@ func (a *app) keyUseCount(id string) int {
 		add(h.session, "")
 	}
 	groups := map[*sshConnectionGroup]bool{}
-	for _, tab := range a.tabs {
-		for _, session := range tab.root.sessions() {
+	for _, tab := range a.tabs.Items {
+		for _, session := range tab.Root.Sessions() {
 			add(session.endpoint.session, "")
 			add(session.config, "")
 			if session.connection != nil {
@@ -413,8 +413,8 @@ func (a *app) keyUseCount(id string) int {
 	for _, session := range a.fileSessions {
 		fileSessions[session] = true
 	}
-	for _, task := range a.transfers.tasks {
-		fileSessions[task.session] = true
+	for _, task := range a.transfers.Tasks {
+		fileSessions[task.Session] = true
 	}
 	for _, closed := range a.closedTabs {
 		if closed.section == sectionFiles {

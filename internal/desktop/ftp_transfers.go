@@ -4,72 +4,42 @@ import (
 	"fmt"
 	"path"
 	"slices"
-	"time"
-
-	"github.com/zeroy1024/Burrow/internal/locales"
-	"github.com/zeroy1024/Burrow/internal/theme"
-	"github.com/zeroy1024/Burrow/internal/uikit"
 
 	"github.com/egoist/mygo/i18n"
 	"github.com/egoist/mygo/ui"
+	"github.com/zeroy1024/Burrow/internal/fileclient"
+	"github.com/zeroy1024/Burrow/internal/locales"
+	"github.com/zeroy1024/Burrow/internal/theme"
+	"github.com/zeroy1024/Burrow/internal/transfer"
+	"github.com/zeroy1024/Burrow/internal/uikit"
 )
 
-type transferState int
+type transferTask = transfer.Task[fileSession]
+type transferState = transfer.State
+type transferSummary = transfer.Summary
 
 const (
-	transferQueued transferState = iota
-	transferRunning
-	transferPaused
-	transferDone
-	transferFailed
+	transferQueued  = transfer.Queued
+	transferRunning = transfer.Running
+	transferPaused  = transfer.Paused
+	transferDone    = transfer.Done
+	transferFailed  = transfer.Failed
 )
 
-type transferTask struct {
-	mcp       *mcpTransferOwner
-	id        int
-	persisted bool
-	session   *fileSession
-	// view is the owning tab; destination reveal never transfers ownership.
-	view                   *fileSession
-	entry                  fileEntry
-	sourceRemote           bool
-	sourcePath, targetPath string
-	state                  transferState
-	transferred, total     int64
-	speed                  float64
-	started, completed     time.Time
-	errorText              locales.Text
-	job                    *transferJob
-	run                    *transferRun
-	removeRequested        bool
-	failureNotice          bool
-	cleanupPending         bool
-}
-
 type transferQueueState struct {
+	transfer.Queue[fileSession]
 	persistenceRevision uint64
-	tasks               []*transferTask
-	nextID              int
-	nextBatchID         int
-	collapsed           bool
-	filter              int
-	displaySpeed        float64
-	dockScroll          ui.ScrollState
-	dockHeight          float32
-	dockResizing        bool
-	conflicts           []*fileConflict
-	locks               transferLocks
-	storeErr            error
-	writeErr            error
-	quitting            bool
-	storing             bool
-	quitDone            []func(error)
-}
 
-type transferSummary struct {
-	running, queued, paused, done int
-	bytes, total                  int64
-	speed                         float64
+	collapsed    bool
+	filter       int
+	displaySpeed float64
+	dockScroll   ui.ScrollState
+	dockHeight   float32
+	dockResizing bool
+	conflicts    []*fileConflict
+
+	storing  bool
+	quitDone []func(error)
 }
 
 var (
@@ -80,27 +50,7 @@ var (
 )
 
 func (q *transferQueueState) summary() transferSummary {
-	return summarizeTransfers(q.tasks)
-}
-
-func summarizeTransfers(tasks []*transferTask) transferSummary {
-	s := transferSummary{}
-	for _, task := range tasks {
-		s.bytes += task.transferred
-		s.total += task.total
-		switch task.state {
-		case transferRunning:
-			s.running++
-			s.speed += task.speed
-		case transferQueued:
-			s.queued++
-		case transferPaused:
-			s.paused++
-		case transferDone:
-			s.done++
-		}
-	}
-	return s
+	return transfer.Summarize(q.Tasks)
 }
 
 func (a *app) activeTransferSession() *fileSession {
@@ -115,8 +65,8 @@ func (q *transferQueueState) sessionTasks(session *fileSession) []*transferTask 
 	if session == nil {
 		return tasks
 	}
-	for _, task := range q.tasks {
-		if task.view == session {
+	for _, task := range q.Tasks {
+		if task.View == session {
 			tasks = append(tasks, task)
 		}
 	}
@@ -125,8 +75,8 @@ func (q *transferQueueState) sessionTasks(session *fileSession) []*transferTask 
 
 func (a *app) detachedTransferCount() int {
 	count := 0
-	for _, task := range a.transfers.tasks {
-		if !slices.Contains(a.fileSessions, task.view) {
+	for _, task := range a.transfers.Tasks {
+		if !slices.Contains(a.fileSessions, task.View) {
 			count++
 		}
 	}
@@ -137,11 +87,11 @@ func (a *app) recoverTransferTabs(c *ui.Context, tasks []*transferTask) {
 	recovered := map[string]*fileSession{}
 	var first *fileSession
 	for _, task := range tasks {
-		if slices.Contains(a.fileSessions, task.view) {
+		if slices.Contains(a.fileSessions, task.View) {
 			continue
 		}
-		snapshot := task.session
-		view := task.view
+		snapshot := task.Session
+		view := task.View
 		if view == nil {
 			view = recovered[snapshot.restoreID]
 			if view == nil {
@@ -157,7 +107,7 @@ func (a *app) recoverTransferTabs(c *ui.Context, tasks []*transferTask) {
 		// Keep every private endpoint snapshot, while persisting the recovered
 		// tab identity for all batches that belonged to the same original tab.
 		recovered[view.restoreID] = view
-		task.view, snapshot.restoreID = view, view.restoreID
+		task.View, snapshot.restoreID = view, view.restoreID
 		if first == nil {
 			first = view
 		}
@@ -166,7 +116,7 @@ func (a *app) recoverTransferTabs(c *ui.Context, tasks []*transferTask) {
 		if len(tasks) == 0 {
 			return
 		}
-		first = tasks[0].view
+		first = tasks[0].View
 	}
 	a.closedTabs = slices.DeleteFunc(a.closedTabs, func(closed closedWorkspaceTab) bool {
 		return closed.section == sectionFiles && slices.Contains(a.fileSessions, closed.file)
@@ -192,7 +142,7 @@ func (a *app) enqueueFiles(
 	var snapshot *fileSession
 	var batch *transferBatch
 	for _, entry := range entries {
-		if !transferSafeName(entry.name) {
+		if !transfer.SafeName(entry.name) {
 			uikit.Toast(c, uikit.ToastProps{ID: "transfer-invalid-name", Tone: uikit.ToneDanger,
 				Title: locales.Deferred(
 					locales.MessageTheFilenameCannotBeSafelyUsedInTheDestinationPath,
@@ -203,25 +153,24 @@ func (a *app) enqueueFiles(
 		}
 		if snapshot == nil {
 			snapshot = a.snapshotTransferSession(session)
-			a.transfers.nextBatchID++
-			batch = &transferBatch{id: a.transfers.nextBatchID}
-			batch.policy.Store(int32(transferPolicy(a.prefs.ConflictPolicy)))
+			batch = a.transfers.NewBatch(transfer.ParsePolicy(a.prefs.ConflictPolicy))
 		}
-		a.transfers.nextID++
 		sourcePath := entry.path
 		if sourcePath == "" {
 			pane := session.local
 			if sourceRemote {
 				pane = session.remote
 			}
-			sourcePath = transferJoin(sourceRemote, pane.path, entry.name)
+			sourcePath = transfer.Join(sourceRemote, pane.path, entry.name)
 		}
-		task := &transferTask{id: a.transfers.nextID, session: snapshot, view: session, entry: entry,
-			sourceRemote: sourceRemote, sourcePath: sourcePath, targetPath: targetPath, state: transferQueued}
-		task.job = &transferJob{sourceRemote: sourceRemote, sourcePath: sourcePath,
-			targetPath: targetPath, name: entry.name, policy: transferPolicy(a.prefs.ConflictPolicy), batch: batch,
-			temporary: map[string]struct{}{}}
-		a.transfers.tasks = append(a.transfers.tasks, task)
+		task := &transferTask{
+			Session: snapshot, View: session, SourceRemote: sourceRemote, SourcePath: sourcePath, TargetPath: targetPath,
+			Entry: fileclient.Entry{
+				Name: entry.name, Size: entry.size, Directory: entry.dir, Symlink: entry.symlink,
+				Modified: entry.modified, Owner: entry.owner, Permissions: entry.permissions,
+			},
+		}
+		a.transfers.Enqueue(task, batch)
 	}
 	a.persistTransfers()
 	a.scheduleTransfers()
@@ -230,9 +179,9 @@ func (a *app) enqueueFiles(
 func (a *app) tickTransfers(c *ui.Context) {
 	a.advanceTransferConflicts()
 	session := a.activeTransferSession()
-	for _, task := range a.transfers.tasks {
-		if task.failureNotice && session != nil && task.view == session {
-			task.failureNotice = false
+	for _, task := range a.transfers.Tasks {
+		if task.FailureNotice && session != nil && task.View == session {
+			task.FailureNotice = false
 			a.transferFailureNotice(c, task)
 		}
 	}
@@ -307,7 +256,7 @@ func (a *app) transferDock(c *ui.Context, maxHeight float32) {
 						if len(rows) == 0 {
 							return "empty"
 						}
-						return rows[index].id
+						return rows[index].ID
 					}).Rows(func(row ui.ListRow) {
 					if len(rows) != 0 {
 						a.transferRow(row.Context, rows[row.Index])
@@ -369,10 +318,10 @@ func (a *app) filteredTransfers(tasks []*transferTask) []*transferTask {
 	q := &a.transfers
 	rows := []*transferTask{}
 	for _, task := range tasks {
-		if q.filter == 1 && (task.state == transferDone || task.state == transferFailed) {
+		if q.filter == 1 && (task.State == transferDone || task.State == transferFailed) {
 			continue
 		}
-		if q.filter == 2 && task.state != transferDone {
+		if q.filter == 2 && task.State != transferDone {
 			continue
 		}
 		rows = append(rows, task)
@@ -382,7 +331,7 @@ func (a *app) filteredTransfers(tasks []*transferTask) []*transferTask {
 
 func (a *app) transferHeader(c *ui.Context, session *fileSession, tasks []*transferTask) {
 	t, q := theme.Current(), &a.transfers
-	s := summarizeTransfers(tasks)
+	s := transfer.Summarize(tasks)
 	header := uikit.TransferHeader(c)
 	compact := header.Bounds().W < t.C.TransferDock.CompactBreakpoint
 	header.Children(func() {
@@ -394,28 +343,28 @@ func (a *app) transferHeader(c *ui.Context, session *fileSession, tasks []*trans
 				Variant: uikit.ButtonPlain, Size: uikit.SizeSm,
 			}).Key("recover-transfers").Shrink(0)
 			uikit.Tip(c, button, locales.MessageReopenTheTransferSTabWithoutConnectingOrResumingTheTransfer())
-			button.OnClick(func() { a.recoverTransferTabs(c, q.tasks) })
+			button.OnClick(func() { a.recoverTransferTabs(c, q.Tasks) })
 		} else if !compact {
 			uikit.TransferHeaderSummary(
 				c,
-				locales.MessageTotalSpeed()+transferBytes(int64(s.speed))+"/s · "+transferRemaining(s.total-s.bytes, s.speed),
+				locales.MessageTotalSpeed()+transferBytes(int64(s.Speed))+"/s · "+transferRemaining(s.Total-s.Bytes, s.Speed),
 			)
 		}
 		pauseIcon, pauseLabel := transferPauseIcon, locales.MessagePauseAll()
-		if s.running+s.queued == 0 && s.paused > 0 {
+		if s.Running+s.Queued == 0 && s.Paused > 0 {
 			pauseIcon, pauseLabel = transferPlayIcon, locales.MessageResumeAll()
 		}
-		uikit.TransferAction(c, "pause-all", pauseLabel, pauseIcon, s.running+s.queued+s.paused == 0).
+		uikit.TransferAction(c, "pause-all", pauseLabel, pauseIcon, s.Running+s.Queued+s.Paused == 0).
 			OnClick(func() { a.pauseAllTransfers(c, session) })
 		uikit.TransferAction(
 			c,
 			"clear-done",
 			locales.MessageClearCompleted(),
 			transferTrashIcon,
-			s.done == 0,
+			s.Done == 0,
 		).OnClick(func() {
-			q.tasks = slices.DeleteFunc(q.tasks, func(task *transferTask) bool {
-				return session != nil && task.view == session && task.state == transferDone
+			q.Tasks = slices.DeleteFunc(q.Tasks, func(task *transferTask) bool {
+				return session != nil && task.View == session && task.State == transferDone
 			})
 		})
 		label := locales.MessageCollapseTransferList()
@@ -437,7 +386,7 @@ func (a *app) transferHeader(c *ui.Context, session *fileSession, tasks []*trans
 
 func (a *app) transferFilters(c *ui.Context, summary transferSummary, total int) {
 	q := &a.transfers
-	active, done := summary.running+summary.queued+summary.paused, summary.done
+	active, done := summary.Running+summary.Queued+summary.Paused, summary.Done
 	items := []uikit.SegItem{{Label: locales.MessageAll(), Count: &total}, {Label: locales.MessageInProgress(), Count: &active}, {Label: locales.MessageCompleted(), Count: &done}}
 	if uikit.TransferFilters(c, locales.MessageTransferCategory(), &q.filter, items, uikit.MotionOverride(a.reduceMotion(c))).Changed() {
 		a.saveFilePreferences(c)
@@ -450,22 +399,22 @@ func (a *app) transferRow(c *ui.Context, task *transferTask) {
 		transferPaused: uikit.TransferPaused, transferDone: uikit.TransferDone, transferFailed: uikit.TransferFailed,
 	}
 	view := uikit.Transfer{
-		Key: task.id, Name: task.entry.name, SourcePath: task.sourcePath,
-		TargetPath: path.Join(task.targetPath, task.entry.name),
-		Amount:     transferBytes(task.transferred) + " / " + transferBytes(task.total),
+		Key: task.ID, Name: task.Entry.Name, SourcePath: task.SourcePath,
+		TargetPath: path.Join(task.TargetPath, task.Entry.Name),
+		Amount:     transferBytes(task.Transferred) + " / " + transferBytes(task.Total),
 		Percent:    fmt.Sprintf("%d%%", int(transferFraction(task)*100)),
 		Value:      transferFraction(task),
-		State:      states[task.state], Download: task.sourceRemote, Zebra: task.id%2 == 0,
-		Speed: "0 B/s", Remaining: locales.MessageRemaining(), Error: task.errorText.String(),
+		State:      states[task.State], Download: task.SourceRemote, Zebra: task.ID%2 == 0,
+		Speed: "0 B/s", Remaining: locales.MessageRemaining(), Error: task.ErrorText.String(),
 		Motion: uikit.MotionOverride(a.reduceMotion(c)),
 	}
-	if task.state == transferRunning {
-		view.Speed = transferBytes(int64(task.speed)) + "/s"
-		view.Remaining = transferRemaining(task.total-task.transferred, task.speed)
+	if task.State == transferRunning {
+		view.Speed = transferBytes(int64(task.Speed)) + "/s"
+		view.Remaining = transferRemaining(task.Total-task.Transferred, task.Speed)
 	}
-	if task.state == transferDone {
-		view.Elapsed = fmt.Sprintf(locales.MessageCompletedInS(), task.completed.Sub(task.started).Seconds())
-		view.Completed = localizedDate(task.completed, i18n.NoStyle, i18n.MediumStyle) + locales.MessageCompleted2()
+	if task.State == transferDone {
+		view.Elapsed = fmt.Sprintf(locales.MessageCompletedInS(), task.Completed.Sub(task.Started).Seconds())
+		view.Completed = localizedDate(task.Completed, i18n.NoStyle, i18n.MediumStyle) + locales.MessageCompleted2()
 	}
 	result := uikit.TransferRow(c, &view)
 	menu := []uikit.MenuEntry{}
@@ -487,12 +436,12 @@ func (a *app) transferRow(c *ui.Context, task *transferTask) {
 
 func (a *app) transferFailureNotice(c *ui.Context, task *transferTask) {
 	uikit.Toast(c, uikit.ToastProps{
-		ID: fmt.Sprintf("transfer-failed-%d", task.id), Title: locales.Concat(
-			locales.Raw(task.entry.name),
+		ID: fmt.Sprintf("transfer-failed-%d", task.ID), Title: locales.Concat(
+			locales.Raw(task.Entry.Name),
 			locales.Deferred(locales.MessageTransferFailed),
-		), Detail: task.errorText,
+		), Detail: task.ErrorText,
 		Tone: uikit.ToneDanger, Action: locales.Deferred(locales.MessageRetry), OnAction: func() {
-			if !slices.Contains(a.transfers.tasks, task) {
+			if !slices.Contains(a.transfers.Tasks, task) {
 				return
 			}
 			a.resumeTransfer(task)
@@ -502,12 +451,12 @@ func (a *app) transferFailureNotice(c *ui.Context, task *transferTask) {
 
 func (a *app) pauseAllTransfers(c *ui.Context, session *fileSession) {
 	tasks := a.transfers.sessionTasks(session)
-	s := summarizeTransfers(tasks)
-	resume := s.running+s.queued == 0 && s.paused > 0
+	s := transfer.Summarize(tasks)
+	resume := s.Running+s.Queued == 0 && s.Paused > 0
 	for _, task := range tasks {
-		if resume && task.state == transferPaused {
+		if resume && task.State == transferPaused {
 			a.resumeTransfer(task)
-		} else if !resume && (task.state == transferRunning || task.state == transferQueued) {
+		} else if !resume && (task.State == transferRunning || task.State == transferQueued) {
 			a.pauseTransfer(task)
 		}
 	}

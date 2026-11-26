@@ -4,28 +4,19 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"golang.org/x/crypto/ssh"
 	"slices"
 	"strings"
 	"time"
 
+	"github.com/zeroy1024/Burrow/internal/persistence"
+	"github.com/zeroy1024/Burrow/internal/profile"
 	"github.com/zeroy1024/Burrow/internal/store"
+	"golang.org/x/crypto/ssh"
 )
 
 type catalogConfigState struct{ loadErr error }
 
-type storedSession struct {
-	sessionConfig
-	Protocol string `json:"protocol"`
-	Name     string `json:"name"`
-	Host     string `json:"host"`
-	Port     int    `json:"port"`
-	User     string `json:"user"`
-	GroupID  int    `json:"groupId"`
-	Order    int    `json:"order"`
-	OS       int    `json:"os"`
-	System   string `json:"system,omitempty"`
-}
+type storedSession = profile.Endpoint
 
 type catalogSnapshot struct {
 	gateways       []gatewayConfig
@@ -169,11 +160,11 @@ func (a *app) readCatalog() error {
 		return err
 	}
 	if c.Workspace != nil {
-		saved, err := decodeWorkspace(*c.Workspace)
+		saved, err := persistence.DecodeWorkspace(*c.Workspace)
 		if err != nil {
 			return err
 		}
-		if err := validateStoredWorkspace(saved, a.hosts, a.keys); err != nil {
+		if err := validateStoredWorkspace(saved, a.keys); err != nil {
 			return err
 		}
 		a.savedWorkspace = saved
@@ -222,10 +213,10 @@ func (a *app) catalogSnapshotData() (store.Catalog, error) {
 		return c, errors.New("every profile must belong to exactly one group")
 	}
 	saved := a.workspaceSnapshot()
-	if err := validateStoredWorkspace(saved, a.hosts, a.keys); err != nil {
+	if err := validateStoredWorkspace(saved, a.keys); err != nil {
 		return c, err
 	}
-	w, err := encodeWorkspace(saved)
+	w, err := persistence.EncodeWorkspace(saved)
 	if err != nil {
 		return c, err
 	}

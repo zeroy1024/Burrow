@@ -17,16 +17,13 @@ func TestTerminalPaneZoomSurvivesWorkspaceResize(t *testing.T) {
 	left := a.newDisconnectedSession(0, host{name: "Left", port: 22}, false, nil)
 	below := a.newDisconnectedSession(1, host{name: "Below", port: 22}, false, nil)
 	right := a.newDisconnectedSession(2, host{name: "Right", port: 22}, false, nil)
-	tab := &workspaceTab{
-		root: &terminalLayout{
-			first: &terminalLayout{
-				first: &terminalLayout{session: left}, second: &terminalLayout{session: below}, stacked: true, ratio: .5,
-			},
-			second: &terminalLayout{session: right}, ratio: .5,
+	tab := &workspaceTab{paneTab: paneTab{Root: &terminalLayout{
+		First: &terminalLayout{
+			First: &terminalLayout{Session: left}, Second: &terminalLayout{Session: below}, Stacked: true, Ratio: .5,
 		},
-		focused: left,
-	}
-	a.tabs = []*workspaceTab{tab}
+		Second: &terminalLayout{Session: right}, Ratio: .5,
+	}, Focused: left}}
+	a.tabs.Items = []*workspaceTab{tab}
 	workspace := ui.Point{X: 660, Y: 400}
 	var shown ui.Rect
 	var zoomAndResize bool
@@ -40,7 +37,7 @@ func TestTerminalPaneZoomSurvivesWorkspaceResize(t *testing.T) {
 		a.beginWorkspaceFrame(c)
 		root := ui.Column(c).Fill()
 		target := float32(0)
-		if tab.maximized {
+		if tab.Maximized {
 			target = 1
 		}
 		spring := uikit.Spring(theme.Current().Motion.Spring.Smooth)

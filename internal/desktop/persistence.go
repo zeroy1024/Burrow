@@ -5,42 +5,19 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/egoist/mygo"
 	"github.com/zeroy1024/Burrow/internal/locales"
+	"github.com/zeroy1024/Burrow/internal/persistence"
 	"github.com/zeroy1024/Burrow/internal/store"
+	"github.com/zeroy1024/Burrow/internal/transfer"
 	"github.com/zeroy1024/Burrow/internal/uikit"
 )
 
-type persistenceRequest struct {
-	work func() error
-	done func(error)
-}
-type persistenceWorker struct {
-	requests chan persistenceRequest
-	stopped  chan struct{}
-}
-
-func newPersistenceWorker(window func() *mygo.Window) *persistenceWorker {
-	p := &persistenceWorker{requests: make(chan persistenceRequest, 64), stopped: make(chan struct{})}
-	go func() {
-		defer close(p.stopped)
-		for r := range p.requests {
-			err := r.work()
-			if r.done != nil {
-				window().Update(func() { r.done(err) })
-			}
-		}
-	}()
-	return p
-}
-func (p *persistenceWorker) close() { close(p.requests); <-p.stopped }
-
 func (a *app) persist(work func() error, done func(error)) {
-	a.persistence.requests <- persistenceRequest{work: work, done: func(err error) {
+	a.persistence.Submit(work, func(err error) {
 		if done != nil {
 			done(err)
 		}
-	}}
+	})
 }
 
 func (a *app) saveCatalogAsync(done func(error)) { a.saveCatalogSecretsAsync(nil, done) }
@@ -95,21 +72,21 @@ func (a *app) persistTransfers() {
 }
 
 func (a *app) persistTransfersDone(done func(error)) {
-	if a.store == nil || a.transfers.quitting || a.transfers.storeErr != nil {
+	if a.store == nil || a.transfers.Quitting || a.transfers.StoreErr != nil {
 		if done != nil {
 			done(locales.NewError(locales.MessageTransferStorageIsUnavailable))
 		}
 		return
 	}
 	saved := a.transferSnapshot()
-	if err := validateTransferQueue(saved); err != nil {
+	if err := saved.Validate(); err != nil {
 		a.persistenceNotice(locales.MessageUnableToSaveTransferHistory, err)
 		if done != nil {
 			done(err)
 		}
 		return
 	}
-	q, err := encodeTransfers(saved)
+	q, err := persistence.EncodeTransfers(saved)
 	if err != nil {
 		a.persistenceNotice(locales.MessageUnableToSaveTransferHistory, err)
 		if done != nil {
@@ -120,18 +97,18 @@ func (a *app) persistTransfersDone(done func(error)) {
 	a.transfers.persistenceRevision++
 	revision := a.transfers.persistenceRevision
 	active := map[int]bool{}
-	for _, task := range a.transfers.tasks {
-		active[task.id] = task.run != nil
-		if task.run == nil {
-			task.persisted = false
+	for _, task := range a.transfers.Tasks {
+		active[task.ID] = task.Run != nil
+		if task.Run == nil {
+			task.Persisted = false
 		}
 	}
 	for i := range q.Tasks {
 		q.Tasks[i].PreserveManifest = active[q.Tasks[i].ID]
 	}
 	owners := []store.MCPTask{}
-	for _, task := range a.transfers.tasks {
-		if task.mcp != nil {
+	for _, task := range a.transfers.Tasks {
+		if task.MCP != nil {
 			owners = append(owners, a.mcpTaskSnapshot(task, nil))
 		}
 	}
@@ -141,18 +118,18 @@ func (a *app) persistTransfersDone(done func(error)) {
 			defer done(err)
 		}
 		if err != nil {
-			a.transfers.writeErr = err
+			a.transfers.WriteErr = err
 			a.persistenceNotice(locales.MessageUnableToSaveTransferHistory, err)
 			return
 		}
-		a.transfers.writeErr = nil
+		a.transfers.WriteErr = nil
 		if revision != a.transfers.persistenceRevision {
 			return
 		}
-		for _, task := range a.transfers.tasks {
+		for _, task := range a.transfers.Tasks {
 			for _, saved := range q.Tasks {
-				if task.id == saved.ID {
-					task.persisted = true
+				if task.ID == saved.ID {
+					task.Persisted = true
 					break
 				}
 			}
@@ -161,24 +138,9 @@ func (a *app) persistTransfersDone(done func(error)) {
 	})
 }
 
-type transferManifestSnapshot struct {
-	Root                   *storedTransferNode
-	Temporary              []string
-	Total, Done            int64
-	SourcePath, TargetPath string
-}
-
-func transferManifest(job *transferJob) *transferManifestSnapshot {
-	m := &transferManifestSnapshot{Root: snapshotTransferNode(job.root), Total: job.total, Done: job.doneBytes, Temporary: []string{}, SourcePath: job.sourcePath, TargetPath: job.targetPath}
-	for name := range job.temporary {
-		m.Temporary = append(m.Temporary, name)
-	}
-	return m
-}
-
 func (a *app) journalTransfer(taskID int, run *transferRun, job *transferJob) error {
-	m := transferManifest(job)
-	run.manifest.Store(m)
+	m := transfer.SnapshotManifest(job)
+	run.Manifest.Store(m)
 	if a.store == nil {
 		return nil
 	}
@@ -192,22 +154,22 @@ func (a *app) journalTransfer(taskID int, run *transferRun, job *transferJob) er
 	}
 	ctx, cancel := context.WithTimeout(a.ctx, 5*time.Second)
 	defer cancel()
-	name := job.name
+	name := job.Name
 	if m.Root != nil && m.Root.Destination != "" {
-		name = transferBase(!job.sourceRemote, m.Root.Destination)
+		name = transfer.Base(!job.SourceRemote, m.Root.Destination)
 	}
 	if err := a.store.SaveManifest(ctx, taskID, store.Manifest{Root: root, Temporary: temporary, Total: m.Total, Done: m.Done, SourcePath: m.SourcePath, TargetPath: m.TargetPath, EntryName: name}); err != nil {
 		return err
 	}
-	if run.mcp != nil {
-		return a.store.MCPProgress(ctx, taskID, max(run.bytes.Load(), 0), max(run.total.Load(), 0))
+	if run.MCP != nil {
+		return a.store.MCPProgress(ctx, taskID, max(run.Bytes.Load(), 0), max(run.Total.Load(), 0))
 	}
 	return nil
 }
 
 func (a *app) finishPersistence() error {
 	if a.persistence != nil {
-		a.persistence.close()
+		a.persistence.Close()
 	}
 	return a.store.Close()
 }

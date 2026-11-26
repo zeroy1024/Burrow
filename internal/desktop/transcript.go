@@ -42,8 +42,8 @@ func (a *app) terminalLines(c *ui.Context, session *remoteSession, focused bool)
 	}
 	// Native text selection owns keyboard focus. Sync the pane without moving
 	// that focus to the scroll view, which would hide the selection.
-	if column.FocusWithin() && a.currentTab().focused != session {
-		a.currentTab().focused = session
+	if column.FocusWithin() && a.currentTab().Focused != session {
+		a.currentTab().Focused = session
 		session.hasNewOutput, session.hasBell = false, false
 		session.cursorStarted = time.Time{}
 		c.AnimationFrame()

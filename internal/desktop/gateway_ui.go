@@ -319,12 +319,12 @@ func (a *app) gatewayRuntimeReferences(id string) []gatewayRef {
 			files = append(files, closed.file)
 		}
 	}
-	for _, task := range a.transfers.tasks {
-		files = append(files, task.session)
+	for _, task := range a.transfers.Tasks {
+		files = append(files, task.Session)
 	}
 	if a.mcpBackend != nil {
 		for _, session := range a.mcpBackend.sessions {
-			if session.connection != nil && (session.connection.connection != nil || session.connection.connecting) {
+			if session.connection != nil && (session.connection.transport.Connection() != nil || session.connection.transport.Connecting()) {
 				files = append(files, session)
 			}
 		}

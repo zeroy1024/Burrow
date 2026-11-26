@@ -2,19 +2,15 @@ package desktop
 
 import (
 	"github.com/zeroy1024/Burrow/internal/theme"
+	"github.com/zeroy1024/Burrow/internal/workspace"
 
 	"github.com/egoist/mygo/ui"
 )
 
-const maxTerminalPanes = 4
+const maxTerminalPanes = workspace.MaxPanes
 
-type terminalLayout struct {
-	session *remoteSession
-	first   *terminalLayout
-	second  *terminalLayout
-	stacked bool
-	ratio   float32
-}
+type terminalLayout = workspace.Layout[remoteSession]
+type paneTab = workspace.Tab[remoteSession]
 
 type panePlacement struct {
 	session  *remoteSession
@@ -27,41 +23,41 @@ type splitPlacement struct {
 	rect, parent ui.Rect
 }
 
-func (n *terminalLayout) minimum() ui.Point {
+func minimumLayoutSize(n *terminalLayout) ui.Point {
 	t := theme.Current()
-	if n.session != nil {
+	if n.Session != nil {
 		return ui.Point{X: t.C.Desktop.PaneMinWidth, Y: t.C.Desktop.PaneMinHeight}
 	}
-	a, b := n.first.minimum(), n.second.minimum()
-	if n.stacked {
+	a, b := minimumLayoutSize(n.First), minimumLayoutSize(n.Second)
+	if n.Stacked {
 		return ui.Point{X: max(a.X, b.X), Y: a.Y + b.Y + t.C.Pane.Gap}
 	}
 	return ui.Point{X: a.X + b.X + t.C.Pane.Gap, Y: max(a.Y, b.Y)}
 }
 
-func (n *terminalLayout) placements(r ui.Rect, panes *[]panePlacement, splits *[]splitPlacement) {
-	if n.session != nil {
-		*panes = append(*panes, panePlacement{session: n.session, rect: r})
+func placeLayout(n *terminalLayout, r ui.Rect, panes *[]panePlacement, splits *[]splitPlacement) {
+	if n.Session != nil {
+		*panes = append(*panes, panePlacement{session: n.Session, rect: r})
 		return
 	}
-	first, second, gap := n.divide(r)
+	first, second, gap := divideLayout(n, r)
 	*splits = append(*splits, splitPlacement{node: n, rect: gap, parent: r})
-	n.first.placements(first, panes, splits)
-	n.second.placements(second, panes, splits)
+	placeLayout(n.First, first, panes, splits)
+	placeLayout(n.Second, second, panes, splits)
 }
 
-func (n *terminalLayout) divide(r ui.Rect) (first, second, gap ui.Rect) {
+func divideLayout(n *terminalLayout, r ui.Rect) (first, second, gap ui.Rect) {
 	t := theme.Current()
 	first, second, gap = r, r, r
-	a, b := n.first.minimum(), n.second.minimum()
-	if n.stacked {
+	a, b := minimumLayoutSize(n.First), minimumLayoutSize(n.Second)
+	if n.Stacked {
 		available := r.H - t.C.Pane.Gap
-		first.H = min(max(available*n.ratio, a.Y), available-b.Y)
+		first.H = min(max(available*n.Ratio, a.Y), available-b.Y)
 		second.Y, second.H = r.Y+first.H+t.C.Pane.Gap, available-first.H
 		gap.Y, gap.H = r.Y+first.H, t.C.Pane.Gap
 	} else {
 		available := r.W - t.C.Pane.Gap
-		first.W = min(max(available*n.ratio, a.X), available-b.X)
+		first.W = min(max(available*n.Ratio, a.X), available-b.X)
 		second.X, second.W = r.X+first.W+t.C.Pane.Gap, available-first.W
 		gap.X, gap.W = r.X+first.W, t.C.Pane.Gap
 	}
@@ -69,28 +65,28 @@ func (n *terminalLayout) divide(r ui.Rect) (first, second, gap ui.Rect) {
 }
 
 // Preserve displayed proportions when removing a pane releases a size constraint.
-func (n *terminalLayout) copyAt(r ui.Rect) *terminalLayout {
+func copyLayoutAt(n *terminalLayout, r ui.Rect) *terminalLayout {
 	t := theme.Current()
 	copy := *n
-	if n.session == nil {
-		first, second, _ := n.divide(r)
-		copy.ratio = first.W / (r.W - t.C.Pane.Gap)
-		if n.stacked {
-			copy.ratio = first.H / (r.H - t.C.Pane.Gap)
+	if n.Session == nil {
+		first, second, _ := divideLayout(n, r)
+		copy.Ratio = first.W / (r.W - t.C.Pane.Gap)
+		if n.Stacked {
+			copy.Ratio = first.H / (r.H - t.C.Pane.Gap)
 		}
-		copy.first, copy.second = n.first.copyAt(first), n.second.copyAt(second)
+		copy.First, copy.Second = copyLayoutAt(n.First, first), copyLayoutAt(n.Second, second)
 	}
 	return &copy
 }
 
-type dropZone uint8
+type dropZone = workspace.Side
 
 const (
-	dropCenter dropZone = iota
-	dropLeft
-	dropRight
-	dropTop
-	dropBottom
+	dropCenter = workspace.Center
+	dropLeft   = workspace.Left
+	dropRight  = workspace.Right
+	dropTop    = workspace.Top
+	dropBottom = workspace.Bottom
 )
 
 func zoneAt(x, y, w, h float32, edgeOnly bool) dropZone {
@@ -114,65 +110,4 @@ func zoneAt(x, y, w, h float32, edgeOnly bool) dropZone {
 		}
 	}
 	return zone
-}
-
-func (n *terminalLayout) insert(session *remoteSession, zone dropZone) {
-	old := &terminalLayout{session: n.session}
-	added := &terminalLayout{session: session}
-	n.session, n.stacked, n.ratio = nil, zone == dropTop || zone == dropBottom, .5
-	n.first, n.second = old, added
-	if zone == dropLeft || zone == dropTop {
-		n.first, n.second = added, old
-	}
-}
-
-func (n *terminalLayout) count() int {
-	if n.session != nil {
-		return 1
-	}
-	return n.first.count() + n.second.count()
-}
-
-func (n *terminalLayout) firstSession() *remoteSession {
-	if n.session != nil {
-		return n.session
-	}
-	return n.first.firstSession()
-}
-
-func (n *terminalLayout) sessions() []*remoteSession {
-	if n.session != nil {
-		return []*remoteSession{n.session}
-	}
-	return append(n.first.sessions(), n.second.sessions()...)
-}
-
-func (n *terminalLayout) find(session *remoteSession) *terminalLayout {
-	if n.session != nil {
-		if n.session == session {
-			return n
-		}
-		return nil
-	}
-	if found := n.first.find(session); found != nil {
-		return found
-	}
-	return n.second.find(session)
-}
-
-func (n *terminalLayout) remove(session *remoteSession) *terminalLayout {
-	if n.session != nil {
-		if n.session == session {
-			return nil
-		}
-		return n
-	}
-	n.first, n.second = n.first.remove(session), n.second.remove(session)
-	if n.first == nil {
-		return n.second
-	}
-	if n.second == nil {
-		return n.first
-	}
-	return n
 }

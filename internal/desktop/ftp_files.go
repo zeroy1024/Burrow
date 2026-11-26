@@ -11,6 +11,7 @@ import (
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
 	"github.com/zeroy1024/Burrow/internal/locales"
+	"github.com/zeroy1024/Burrow/internal/transfer"
 	"github.com/zeroy1024/Burrow/internal/uikit"
 )
 
@@ -181,7 +182,7 @@ func (a *app) resolveFileConflicts(c *ui.Context) {
 		return
 	}
 	if conflict.applyAll {
-		conflict.task.job.batch.policy.Store(int32(conflict.choice))
+		conflict.task.Job.Batch.Policy.Store(int32(conflict.choice))
 		a.persistTransfers()
 	}
 	select {
@@ -194,12 +195,12 @@ func (a *app) resolveFileConflicts(c *ui.Context) {
 }
 
 func (a *app) completeFileTransfer(task *transferTask) {
-	view := task.view
-	if view == nil || !slices.Contains(a.fileSessions, view) || !task.sourceRemote && !sameTransferView(view, task.session) {
+	view := task.View
+	if view == nil || !slices.Contains(a.fileSessions, view) || !task.SourceRemote && !sameTransferView(view, task.Session) {
 		return
 	}
 	pane := view.remote
-	if task.sourceRemote {
+	if task.SourceRemote {
 		pane = view.local
 	}
 	if pane.remote && view.state != connected {
@@ -209,8 +210,8 @@ func (a *app) completeFileTransfer(task *transferTask) {
 }
 
 func (a *app) revealTransferredFile(c *ui.Context, task *transferTask) {
-	if task.sourceRemote {
-		location, err := localFileLocation(transferJoin(false, task.targetPath, task.entry.name))
+	if task.SourceRemote {
+		location, err := localFileLocation(transfer.Join(false, task.TargetPath, task.Entry.Name))
 		if err != nil {
 			uikit.Toast(
 				c,
@@ -241,18 +242,18 @@ func (a *app) revealTransferredFile(c *ui.Context, task *transferTask) {
 		})
 		return
 	}
-	view := task.view
-	if !sameTransferView(view, task.session) || !slices.Contains(a.fileSessions, view) {
+	view := task.View
+	if !sameTransferView(view, task.Session) || !slices.Contains(a.fileSessions, view) {
 		view = nil
 	}
 	index := slices.Index(a.fileSessions, view)
 	if view == nil {
-		endpoint := task.session.endpoint
+		endpoint := task.Session.endpoint
 		profile := hostID(slices.IndexFunc(a.hosts, func(candidate host) bool {
 			return candidate.session.ID == endpoint.session.ID && candidate.protocol == endpoint.protocol
 		}))
-		view = a.newFileSession(profile, endpoint, task.session.temporary || profile < 0, task.session.connection)
-		view.ftpSecret = task.session.ftpSecret
+		view = a.newFileSession(profile, endpoint, task.Session.temporary || profile < 0, task.Session.connection)
+		view.ftpSecret = task.Session.ftpSecret
 		a.fileSessions = append(a.fileSessions, view)
 		index = len(a.fileSessions) - 1
 	}
@@ -263,9 +264,9 @@ func (a *app) revealTransferredFile(c *ui.Context, task *transferTask) {
 		a.startFileSession(view, false)
 	}
 	pane := view.remote
-	pane.reveal = transferJoin(pane.remote, task.targetPath, task.entry.name)
+	pane.reveal = transfer.Join(pane.remote, task.TargetPath, task.Entry.Name)
 	pane.query = ""
 	a.files.activeRemote = pane.remote
-	a.queueFileDirectory(view, pane, fileNavigation{path: task.targetPath, historyIndex: -1})
+	a.queueFileDirectory(view, pane, fileNavigation{path: task.TargetPath, historyIndex: -1})
 	pane.focus.Focus()
 }

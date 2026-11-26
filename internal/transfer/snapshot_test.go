@@ -1,4 +1,4 @@
-package desktop
+package transfer
 
 import (
 	"strings"
@@ -22,7 +22,7 @@ func TestValidateTransferNodePrivateDirectory(t *testing.T) {
 		{"unowned directory name", "/target/saved-files", "/target/saved-files/content", false},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			node := &storedTransferNode{Source: "/source/data.txt", Destination: "/target/data.txt",
+			node := &SavedNode{Source: "/source/data.txt", Destination: "/target/data.txt",
 				StageDirectory: tt.directory, Temporary: tt.content, Entry: fileclient.Entry{Name: "data.txt", Size: 4}, Total: 4}
 			owned := make(map[string]bool)
 			_, _, err := validateTransferNode(node, false, node.Source, "/target", owned, 0)

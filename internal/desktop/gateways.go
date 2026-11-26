@@ -7,19 +7,14 @@ import (
 	"strings"
 
 	"github.com/zeroy1024/Burrow/internal/locales"
+	"github.com/zeroy1024/Burrow/internal/profile"
 	"github.com/zeroy1024/Burrow/internal/store"
 	"github.com/zeroy1024/Burrow/internal/wggateway"
 )
 
 const directGateway = "direct"
 
-type socksGateway struct {
-	Address          string `json:"address"`
-	Port             int    `json:"port"`
-	Username         string `json:"username,omitempty"`
-	PasswordSaved    bool   `json:"passwordSaved,omitempty"`
-	PasswordRevision string `json:"passwordRevision,omitempty"`
-}
+type socksGateway = profile.SOCKSGateway
 
 type gatewayConfig struct {
 	ID           string            `json:"id"`
@@ -31,16 +26,7 @@ type gatewayConfig struct {
 	WG           *wggateway.Config `json:"wireguard,omitempty"`
 }
 
-// Captured routes contain endpoint and credential references, never passwords.
-// A non-nil empty route means explicitly captured direct access.
-type gatewayHop struct {
-	ID    string            `json:"id"`
-	Name  string            `json:"name"`
-	Kind  string            `json:"kind"`
-	SSH   *storedSession    `json:"ssh,omitempty"`
-	SOCKS *socksGateway     `json:"socks,omitempty"`
-	WG    *wggateway.Config `json:"wireguard,omitempty"`
-}
+type gatewayHop = profile.GatewayHop
 
 func gatewayCredentialKey(id string) string { return "gateway/" + id + "/credential" }
 
@@ -49,23 +35,6 @@ func gatewayReference(selection string) string {
 		return ""
 	}
 	return selection
-}
-
-func sameGatewayRoute(left, right *[]gatewayHop) bool {
-	key := func(value *[]gatewayHop) string {
-		route := []gatewayHop{}
-		if value != nil {
-			route = *value
-		}
-		steps := []sshDialStep{}
-		for _, hop := range route {
-			if hop.SSH != nil {
-				steps = append(steps, sshDialStep{endpoint: transferStoredHost(*hop.SSH)})
-			}
-		}
-		return gatewayRuntimeKey(route, steps, "")
-	}
-	return key(left) == key(right)
 }
 
 // gatewayCatalog resolves routes over one catalog state. A host is reached
@@ -193,7 +162,7 @@ func (r gatewayCatalog) gatewayRoute(id string, visiting []string) ([]string, er
 
 func (a *app) captureGatewayRoute(h host) ([]gatewayHop, error) {
 	if h.session.GatewayRoute != nil {
-		return *h.session.GatewayRoute, validateGatewayRoute(*h.session.GatewayRoute)
+		return *h.session.GatewayRoute, profile.ValidateRoute(*h.session.GatewayRoute)
 	}
 	catalog := a.gatewayCatalog()
 	ids, err := catalog.hostRoute(h.session.ID, h.session.Gateway, nil)
@@ -225,53 +194,7 @@ func (a *app) captureGatewayRoute(h host) ([]gatewayHop, error) {
 		}
 		route = append(route, hop)
 	}
-	return route, validateGatewayRoute(route)
-}
-
-func validateGatewayRoute(route []gatewayHop) error {
-	seen := map[string]bool{}
-	for index, hop := range route {
-		if hop.ID == "" || seen[hop.ID] {
-			return locales.NewError(locales.MessageInvalidGatewaySnapshotIdOrRoutingLoop)
-		}
-		seen[hop.ID] = true
-		switch hop.Kind {
-		case "ssh":
-			if hop.SSH == nil || hop.SOCKS != nil || hop.WG != nil || hop.SSH.Protocol != "" || hop.SSH.GatewayRoute != nil {
-				return locales.NewError(locales.MessageInvalidSshGatewaySnapshot)
-			}
-			if err := validateTransferEndpoint(*hop.SSH, false); err != nil {
-				return err
-			}
-		case "socks5":
-			if hop.SSH != nil || hop.SOCKS == nil || hop.WG != nil {
-				return locales.NewError(locales.MessageInvalidSocks5GatewaySnapshot)
-			}
-			if err := validateSOCKS(*hop.SOCKS); err != nil {
-				return err
-			}
-		case "wireguard":
-			if index != 0 || hop.WG == nil || hop.SSH != nil || hop.SOCKS != nil {
-				return locales.NewError(locales.WgRouteFirst)
-			}
-			if err := validateWGConfig(*hop.WG); err != nil {
-				return err
-			}
-		default:
-			return locales.NewError(locales.MessageUnknownGatewaySnapshotType)
-		}
-	}
-	return nil
-}
-
-func validateSOCKS(s socksGateway) error {
-	if !validSessionHost(s.Address) || s.Port < 1 || s.Port > 65535 {
-		return locales.NewError(locales.MessageInvalidSocks5AddressOrPort)
-	}
-	if len(s.Username) > 255 || s.PasswordSaved && (s.Username == "" || s.PasswordRevision == "") {
-		return locales.NewError(locales.MessageInvalidSocks5AuthenticationInformation)
-	}
-	return nil
+	return route, profile.ValidateRoute(route)
 }
 
 func (a *app) validateGateways() error {
@@ -292,14 +215,14 @@ func (a *app) validateGateways() error {
 			if g.WG != nil || g.SSHProfileID != "" || g.SOCKS == nil {
 				return locales.NewError(locales.MessageInvalidSocks5GatewayConfiguration)
 			}
-			if err := validateSOCKS(*g.SOCKS); err != nil {
+			if err := profile.ValidateSOCKS(*g.SOCKS); err != nil {
 				return err
 			}
 		} else if g.Kind == "wireguard" {
 			if g.WG == nil || g.SSHProfileID != "" || g.SOCKS != nil || g.UpstreamID != "" {
 				return locales.NewError(locales.WgRouteFirst)
 			}
-			if err := validateWGConfig(*g.WG); err != nil {
+			if err := profile.ValidateWireGuard(*g.WG); err != nil {
 				return err
 			}
 		} else {
@@ -331,13 +254,6 @@ func cloneWGConfig(config wggateway.Config) wggateway.Config {
 	config.AllowedIPs = slices.Clone(config.AllowedIPs)
 	config.DNS = slices.Clone(config.DNS)
 	return config
-}
-
-func validateWGConfig(config wggateway.Config) error {
-	if config.CredentialRevision == "" {
-		return locales.NewError(locales.WgMissingPrivateKey)
-	}
-	return config.Validate()
 }
 
 func (a *app) freezeGatewayRoute(h host) (host, error) {

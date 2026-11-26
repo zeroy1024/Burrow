@@ -145,7 +145,7 @@ func (a *app) paneDragHandle(c *ui.Context, source ui.Element, transfer paneTran
 		d.viewport = terminalDragViewportFor(transfer.session)
 	}
 	if transfer.fromTab {
-		d.order = slices.Clone(a.tabs)
+		d.order = slices.Clone(a.tabs.Items)
 		bar := a.tabScroll.Bounds(c)
 		d.grab = ui.Point{X: a.tabPress.X + bar.X - r.X, Y: a.tabPress.Y + bar.Y - r.Y}
 		d.detached = a.pointer.Y > bar.Y+bar.H+t.C.Desktop.TabDetachDistance
@@ -234,11 +234,11 @@ func (a *app) tabStripTarget(c *ui.Context, parts uikit.TabsResult) {
 	}
 
 	// Reconstruct the slots from their widths, independent of position animations.
-	from := slices.Index(a.tabs, d.originTab)
+	from := slices.Index(a.tabs.Items, d.originTab)
 	to := from
 	center := a.pointer.X - d.grab.X + d.origin.W/2
 	x := r.X - a.tabScroll.X
-	for i, tab := range a.tabs {
+	for i, tab := range a.tabs.Items {
 		width := tab.frame.Bounds(c).W
 		if i < from && center < x+width/2 {
 			to = min(to, i)
@@ -249,10 +249,7 @@ func (a *app) tabStripTarget(c *ui.Context, parts uikit.TabsResult) {
 		x += width + t.C.Titlebar.TabsGap
 	}
 	if to != from {
-		active := a.currentTab()
-		a.tabs = slices.Delete(a.tabs, from, from+1)
-		a.tabs = slices.Insert(a.tabs, to, d.originTab)
-		a.activeTab = slices.Index(a.tabs, active)
+		a.tabs.Move(from, to)
 		c.AnimationFrame()
 	}
 	if released {
@@ -263,11 +260,11 @@ func (a *app) tabStripTarget(c *ui.Context, parts uikit.TabsResult) {
 
 func (a *app) paneTabInsertion(c *ui.Context, parts uikit.TabsResult, width float32) (int, float32) {
 	t := theme.Current()
-	index, x := len(a.tabs), parts.Scroller.Bounds().X-a.tabScroll.X
+	index, x := len(a.tabs.Items), parts.Scroller.Bounds().X-a.tabScroll.X
 	slotX, total := x, float32(0)
-	for i, tab := range a.tabs {
+	for i, tab := range a.tabs.Items {
 		w := tab.frame.Bounds(c).W
-		if index == len(a.tabs) && a.pointer.X < x+w/2 {
+		if index == len(a.tabs.Items) && a.pointer.X < x+w/2 {
 			index, slotX = i, x
 		}
 		x += w + t.C.Titlebar.TabsGap
@@ -276,13 +273,13 @@ func (a *app) paneTabInsertion(c *ui.Context, parts uikit.TabsResult, width floa
 		}
 		total += w
 	}
-	if index == len(a.tabs) {
+	if index == len(a.tabs.Items) {
 		slotX = x
 	}
 	space := float32(0)
 	if width > 0 {
 		space = width + t.C.Titlebar.TabsGap
-		for i, tab := range a.tabs {
+		for i, tab := range a.tabs.Items {
 			if i >= index {
 				c.Resolve(tab.frame).Left(space)
 			}
@@ -302,7 +299,7 @@ func (a *app) tabSlot(c *ui.Context, tab *workspaceTab) ui.Rect {
 	t := theme.Current()
 	r := tab.frame.Bounds(c)
 	r.X = a.tabScroll.Bounds(c).X - a.tabScroll.X
-	for _, before := range a.tabs[:slices.Index(a.tabs, tab)] {
+	for _, before := range a.tabs.Items[:slices.Index(a.tabs.Items, tab)] {
 		r.X += before.frame.Bounds(c).W + t.C.Titlebar.TabsGap
 	}
 	return r
@@ -324,9 +321,7 @@ func (a *app) finishWorkspaceDrag(c *ui.Context) {
 			return
 		}
 		if d.kind == dragTab {
-			active := a.currentTab()
-			a.tabs = slices.Clone(d.order)
-			a.activeTab = slices.Index(a.tabs, active)
+			a.tabs.RestoreOrder(d.order)
 		}
 		a.drag = nil
 		a.clearTerminalPreviews()
@@ -338,9 +333,7 @@ func (a *app) finishWorkspaceDrag(c *ui.Context) {
 		return
 	}
 	if d.kind == dragTab {
-		active := a.currentTab()
-		a.tabs = slices.Clone(d.order)
-		a.activeTab = slices.Index(a.tabs, active)
+		a.tabs.RestoreOrder(d.order)
 	}
 	d.phase, d.returnStarted, d.returnRect = dragReturning, c.Now(), d.origin
 	switch d.kind {
@@ -384,7 +377,7 @@ func (a *app) dragPreview(c *ui.Context) {
 	ghost.Children(func() {
 		if tabPreview {
 			uikit.DragTabGhost(c, radius).Children(func() {
-				if d.originTab.root.count() > 1 {
+				if d.originTab.Root.Count() > 1 {
 					uikit.Icon(c, uikit.IconGrid, uikit.IconProps{Size: uikit.SizeXs, Tone: uikit.ToneSecondary}).PassThrough()
 				} else {
 					uikit.ConnectionDot(c, connectionIndicatorState(d.session.state), t.C.Tab.DotSize)
@@ -410,7 +403,7 @@ func (a *app) paneTabDragPreview(c *ui.Context, d *paneDragState) {
 	p := t.C.DragGhost
 	targetKnown := false
 	if d.phase == dragTabLanding {
-		if slices.Index(a.tabs, d.landingTab) < 0 {
+		if slices.Index(a.tabs.Items, d.landingTab) < 0 {
 			a.drag = nil
 			return
 		}
@@ -514,7 +507,7 @@ func (a *app) paneDrop(c *ui.Context, pane ui.Element, target *remoteSession, ca
 	}
 	tab := a.currentTab()
 	x, y, _ := pane.PointerPosition()
-	edgeOnly := tab.root.count() == 1 || !paneDropCanSwap(payload)
+	edgeOnly := tab.Root.Count() == 1 || !paneDropCanSwap(payload)
 	zone := zoneAt(x, y, pane.Bounds().W, pane.Bounds().H, edgeOnly)
 	plan, valid := a.planPaneDrop(c, target, payload, zone)
 	if !valid {
@@ -572,15 +565,15 @@ func (a *app) catalogPaneDropTarget(c *ui.Context, target *remoteSession) (hostD
 		return source, false, false
 	}
 	tab := a.currentTab()
-	sessions := tab.root.sessions()
-	focused := slices.Index(sessions, tab.focused)
+	sessions := tab.Root.Sessions()
+	focused := slices.Index(sessions, tab.Focused)
 	sessions = slices.Delete(sessions, focused, focused+1)
-	sessions = append(sessions, tab.focused)
+	sessions = append(sessions, tab.Focused)
 	// The focused wrapper paints last. Select one target in reverse paint
 	// order, using persistent wrappers rather than newly created drop shields.
 	for i := len(sessions) - 1; i >= 0; i-- {
 		candidate := sessions[i]
-		if tab.maximized && candidate != tab.focused {
+		if tab.Maximized && candidate != tab.Focused {
 			continue
 		}
 		r := candidate.frame.Bounds(c)
@@ -627,11 +620,11 @@ func (a *app) planPaneDrop(c *ui.Context, target *remoteSession, value any, zone
 		return plan, paneDropCanSwap(value)
 	}
 	if local != nil {
-		area, minimum := a.workArea.Bounds(c), tab.root.minimum()
+		area, minimum := a.workArea.Bounds(c), minimumLayoutSize(tab.Root)
 		canvas := ui.Rect{W: max(area.W, minimum.X), H: max(area.H, minimum.Y)}
-		remaining := tab.root.copyAt(canvas).remove(local)
+		remaining := copyLayoutAt(tab.Root, canvas).Remove(local)
 		panes, splits := []panePlacement{}, []splitPlacement{}
-		remaining.placements(canvas, &panes, &splits)
+		placeLayout(remaining, canvas, &panes, &splits)
 		for _, pane := range panes {
 			if pane.session == target {
 				plan.target = pane.rect
@@ -645,7 +638,7 @@ func (a *app) planPaneDrop(c *ui.Context, target *remoteSession, value any, zone
 		// Only an existing Shell pane may fall back to swapping positions.
 		return paneDropPlan{zone: dropCenter, target: target.layoutRect}, paneDropCanSwap(value)
 	}
-	return plan, local != nil || tab.root.count() < maxTerminalPanes
+	return plan, local != nil || tab.Root.Count() < maxTerminalPanes
 }
 
 func (a *app) dockSession(tab *workspaceTab, target *remoteSession, value any, plan paneDropPlan) {
@@ -656,29 +649,29 @@ func (a *app) dockSession(tab *workspaceTab, target *remoteSession, value any, p
 	switch source := value.(type) {
 	case hostDrag:
 		session = a.newSession(source.id)
-		tab.root.find(target).insert(session, zone)
+		tab.Root.Find(target).Insert(session, zone)
 	case paneTransfer:
 		session = source.session
 		if zone == dropCenter && !source.fromTab {
-			source.tab.root.find(session).session, tab.root.find(target).session = target, session
-			if source.tab != tab && source.tab.focused == session {
-				source.tab.focused = target
+			source.tab.Root.Find(session).Session, tab.Root.Find(target).Session = target, session
+			if source.tab != tab && source.tab.Focused == session {
+				source.tab.Focused = target
 			}
 		} else {
 			if source.tab == tab {
 				localReorder = !source.fromTab
-				tab.root = plan.remaining
+				tab.Root = plan.remaining
 			} else {
-				source.tab.root = source.tab.root.remove(session)
-				if source.tab.root == nil {
-					index := slices.Index(a.tabs, source.tab)
-					a.tabs = slices.Delete(a.tabs, index, index+1)
-					a.activeTab = slices.Index(a.tabs, tab)
-				} else if source.tab.focused == session {
-					source.tab.focused = source.tab.root.firstSession()
+				source.tab.Root = source.tab.Root.Remove(session)
+				if source.tab.Root == nil {
+					index := slices.Index(a.tabs.Items, source.tab)
+					a.tabs.Items = slices.Delete(a.tabs.Items, index, index+1)
+					a.tabs.Active = slices.Index(a.tabs.Items, tab)
+				} else if source.tab.Focused == session {
+					source.tab.Focused = source.tab.Root.FirstSession()
 				}
 			}
-			tab.root.find(target).insert(session, zone)
+			tab.Root.Find(target).Insert(session, zone)
 		}
 	}
 	if localReorder {

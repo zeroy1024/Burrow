@@ -3,60 +3,21 @@ package desktop
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
-	"fmt"
+	"slices"
+	"time"
+
 	"github.com/egoist/mygo/ui"
 	"github.com/zeroy1024/Burrow/internal/locales"
+	"github.com/zeroy1024/Burrow/internal/persistence"
 	"github.com/zeroy1024/Burrow/internal/store"
-	"slices"
-	"strings"
-	"time"
+	"github.com/zeroy1024/Burrow/internal/workspace"
 )
 
-type storedWorkspace struct {
-	Version     int                         `json:"version,omitempty"`
-	Tabs        []storedWorkspaceTab        `json:"tabs,omitempty"`
-	FileTabs    []storedFileTab             `json:"fileTabs,omitempty"`
-	Connections []storedWorkspaceConnection `json:"connections,omitempty"`
-	Section     section                     `json:"section"`
-	ActiveSSH   int                         `json:"activeSSH"`
-	ActiveFile  int                         `json:"activeFile"`
-}
-
-type storedWorkspaceConnection struct {
-	EndpointRef string        `json:"endpointRef,omitempty"`
-	ID          int           `json:"id"`
-	Endpoint    storedSession `json:"endpoint,omitzero"`
-}
-
-type storedWorkspaceTab struct {
-	Root      *storedWorkspaceLayout `json:"root"`
-	Focused   int                    `json:"focused"`
-	Maximized bool                   `json:"maximized,omitempty"`
-}
-
-type storedWorkspaceLayout struct {
-	Session *storedWorkspaceSession `json:"session,omitempty"`
-	First   *storedWorkspaceLayout  `json:"first,omitempty"`
-	Second  *storedWorkspaceLayout  `json:"second,omitempty"`
-	Stacked bool                    `json:"stacked,omitempty"`
-	Ratio   float32                 `json:"ratio,omitempty"`
-}
-
-type storedWorkspaceSession struct {
-	EndpointRef string        `json:"endpointRef,omitempty"`
-	ProfileID   string        `json:"profileId,omitempty"`
-	Endpoint    storedSession `json:"endpoint,omitzero"`
-	Temporary   bool          `json:"temporary,omitempty"`
-	Connection  int           `json:"connection,omitempty"`
-}
-
-type storedFileTab struct {
-	ID         string                 `json:"id,omitempty"`
-	Session    storedWorkspaceSession `json:"session"`
-	LocalPath  string                 `json:"localPath"`
-	RemotePath string                 `json:"remotePath"`
-}
+type storedWorkspace = workspace.Snapshot
+type storedWorkspaceConnection = workspace.Connection
+type storedWorkspaceTab = workspace.SavedTab
+type storedWorkspaceSession = workspace.Session
+type storedFileTab = workspace.FileTab
 
 func (a *app) workspaceSnapshot() *storedWorkspace {
 	result := &storedWorkspace{
@@ -77,19 +38,19 @@ func (a *app) workspaceSnapshot() *storedWorkspace {
 		result.Connections = append(result.Connections, storedWorkspaceConnection{ID: id, Endpoint: stored.Endpoint})
 		return id
 	}
-	for index, tab := range a.tabs {
+	for index, tab := range a.tabs.Items {
 		// An agent's record belongs to this run; the saved active tab counts
 		// only the tabs kept, and falls back to the last of them.
-		if tab.focused.agent != nil {
+		if tab.Focused.agent != nil {
 			continue
 		}
-		if index <= a.activeTab {
+		if index <= a.tabs.Active {
 			result.ActiveSSH = len(result.Tabs)
 		}
-		result.Tabs = append(result.Tabs, storedWorkspaceTab{
-			Root:    snapshotWorkspaceLayout(tab.root, connectionID),
-			Focused: slices.Index(tab.root.sessions(), tab.focused), Maximized: tab.maximized,
-		})
+		result.Tabs = append(result.Tabs, workspace.SaveTab(tab.paneTab, func(s *remoteSession) *workspace.Session {
+			stored := snapshotWorkspaceSession(s.endpoint, s.config, s.temporary, connectionID(s.connection))
+			return &stored
+		}))
 	}
 	for _, session := range a.fileSessions {
 		result.FileTabs = append(result.FileTabs, storedFileTab{
@@ -105,7 +66,7 @@ func snapshotWorkspaceSession(endpoint host, config sessionConfig, temporary boo
 	endpoint.session = config
 	endpoint = cloneHostEndpoint(endpoint)
 	stored := storedSession{
-		sessionConfig: endpoint.session, Protocol: endpoint.protocol, Name: endpoint.name,
+		Config: endpoint.session, Protocol: endpoint.protocol, Name: endpoint.name,
 		Host: endpoint.address, Port: endpoint.port, User: endpoint.user, OS: endpoint.os, System: endpoint.system,
 	}
 	profile := ""
@@ -113,18 +74,6 @@ func snapshotWorkspaceSession(endpoint host, config sessionConfig, temporary boo
 		profile = endpoint.session.ID
 	}
 	return storedWorkspaceSession{ProfileID: profile, Endpoint: stored, Temporary: temporary, Connection: connection}
-}
-
-func snapshotWorkspaceLayout(node *terminalLayout, connectionID func(*sshConnectionGroup) int) *storedWorkspaceLayout {
-	if node.session != nil {
-		session := node.session
-		stored := snapshotWorkspaceSession(session.endpoint, session.config, session.temporary, connectionID(session.connection))
-		return &storedWorkspaceLayout{Session: &stored}
-	}
-	return &storedWorkspaceLayout{
-		First: snapshotWorkspaceLayout(node.first, connectionID), Second: snapshotWorkspaceLayout(node.second, connectionID),
-		Stacked: node.stacked, Ratio: node.ratio,
-	}
 }
 
 func (a *app) restoreWorkspace() {
@@ -139,7 +88,7 @@ func (a *app) restoreWorkspaceTabs(saved *storedWorkspace) {
 		value := connection.Endpoint
 		endpoint := host{
 			name: value.Name, user: value.User, address: value.Host, port: value.Port,
-			os: value.OS, system: value.System, protocol: value.Protocol, session: value.sessionConfig,
+			os: value.OS, system: value.System, protocol: value.Protocol, session: value.Config,
 		}
 		groups[connection.ID] = a.newSSHGroup(endpoint)
 	}
@@ -147,7 +96,7 @@ func (a *app) restoreWorkspaceTabs(saved *storedWorkspace) {
 		value := stored.Endpoint
 		endpoint := host{
 			name: value.Name, user: value.User, address: value.Host, port: value.Port,
-			os: value.OS, system: value.System, protocol: value.Protocol, session: value.sessionConfig,
+			os: value.OS, system: value.System, protocol: value.Protocol, session: value.Config,
 		}
 		initializeSession(&endpoint)
 		id := hostID(slices.IndexFunc(a.hosts, func(h host) bool { return h.session.ID == stored.ProfileID }))
@@ -158,22 +107,13 @@ func (a *app) restoreWorkspaceTabs(saved *storedWorkspace) {
 		}
 		return id, endpoint, temporary, group
 	}
-	var layout func(*storedWorkspaceLayout) *terminalLayout
-	layout = func(stored *storedWorkspaceLayout) *terminalLayout {
-		if stored.Session != nil {
-			id, endpoint, temporary, group := restore(*stored.Session)
-			return &terminalLayout{session: a.newDisconnectedSession(id, endpoint, temporary, group)}
-		}
-		return &terminalLayout{
-			first: layout(stored.First), second: layout(stored.Second), stacked: stored.Stacked, ratio: stored.Ratio,
-		}
-	}
 	for _, stored := range saved.Tabs {
-		root := layout(stored.Root)
-		a.nextTab++
-		a.tabs = append(a.tabs, &workspaceTab{
-			id: a.nextTab, root: root, focused: root.sessions()[stored.Focused], maximized: stored.Maximized,
+		tab := workspace.RestoreTab(stored, func(s *workspace.Session) *remoteSession {
+			id, endpoint, temporary, group := restore(*s)
+			return a.newDisconnectedSession(id, endpoint, temporary, group)
 		})
+		a.nextTab++
+		a.tabs.Items = append(a.tabs.Items, &workspaceTab{id: a.nextTab, paneTab: tab})
 	}
 	for _, stored := range saved.FileTabs {
 		id, endpoint, temporary, group := restore(stored.Session)
@@ -192,148 +132,19 @@ func (a *app) restoreWorkspaceTabs(saved *storedWorkspace) {
 		}
 		a.fileSessions = append(a.fileSessions, session)
 	}
-	a.activeTab, a.activeFile, a.section = saved.ActiveSSH, saved.ActiveFile, saved.Section
-	if len(a.tabs) > 0 {
+	a.tabs.Active, a.activeFile, a.section = saved.ActiveSSH, saved.ActiveFile, saved.Section
+	if len(a.tabs.Items) > 0 {
 		// Let Enter reach the active pane's connect prompt without a click first.
-		a.tabs[a.activeTab].focused.focusPending = true
+		a.tabs.Items[a.tabs.Active].Focused.focusPending = true
 	}
 }
 
-func validateStoredWorkspace(saved *storedWorkspace, hosts []host, keys []managedKey) error {
-	if saved == nil {
-		return nil
-	}
-	if saved.Version != 2 {
-		return errors.New("unsupported workspace version")
-	}
-	switch saved.Section {
-	case sectionSSH, sectionFiles, sectionMCP, sectionGateways:
-	default:
-		return errors.New("invalid workspace section")
-	}
-	sshCount, fileCount := len(saved.Tabs), len(saved.FileTabs)
-	if saved.ActiveSSH < 0 || saved.ActiveSSH >= max(1, sshCount) || saved.ActiveFile < 0 || saved.ActiveFile >= max(1, fileCount) {
-		return errors.New("invalid active workspace tab")
-	}
-	profiles := map[string]host{}
-	for _, profile := range hosts {
-		profiles[profile.session.ID] = profile
-	}
+func validateStoredWorkspace(saved *storedWorkspace, keys []managedKey) error {
 	keyIDs := map[string]bool{}
 	for _, key := range keys {
 		keyIDs[key.ID] = true
 	}
-	validate := func(stored storedWorkspaceSession, files bool) error {
-		h := stored.Endpoint
-		if stored.Connection < 0 || strings.TrimSpace(h.Name) == "" || strings.TrimSpace(h.Host) == "" ||
-			h.Port < 1 || h.Port > 65535 || h.OS < 0 || h.OS >= len(systems) {
-			return errors.New("invalid saved workspace endpoint")
-		}
-		protocol := h.Protocol
-		if protocol == "ssh" {
-			protocol = ""
-		}
-		if files && protocol != "sftp" && protocol != "ftp" || !files && protocol != "" {
-			return errors.New("workspace endpoint protocol does not match its view")
-		}
-		if stored.ProfileID != "" && stored.ProfileID != h.ID {
-			return errors.New("workspace profile id differs from its endpoint")
-		}
-		if err := validateSessionProfile(host{protocol: protocol, session: h.sessionConfig}, profiles, keyIDs); err != nil {
-			return err
-		}
-		return nil
-	}
-	connections := map[int]bool{}
-	connectionRoutes := map[int]*[]gatewayHop{}
-	for _, connection := range saved.Connections {
-		if connection.ID <= 0 || connections[connection.ID] {
-			return errors.New("invalid or duplicate workspace connection id")
-		}
-		connections[connection.ID] = true
-		connectionRoutes[connection.ID] = connection.Endpoint.GatewayRoute
-		files := connection.Endpoint.Protocol == "sftp"
-		if connection.Endpoint.Protocol == "ftp" {
-			return errors.New("FTP cannot use a shared SSH connection")
-		}
-		if err := validate(storedWorkspaceSession{Endpoint: connection.Endpoint, Temporary: true}, files); err != nil {
-			return err
-		}
-	}
-	validateConnection := func(stored storedWorkspaceSession) error {
-		if stored.Connection > 0 && !connections[stored.Connection] {
-			return errors.New("workspace session references an unknown connection")
-		}
-		if stored.Connection > 0 {
-			if stored.Endpoint.GatewayRoute != nil {
-				if err := validateGatewayRoute(*stored.Endpoint.GatewayRoute); err != nil {
-					return err
-				}
-			}
-			if !sameGatewayRoute(stored.Endpoint.GatewayRoute, connectionRoutes[stored.Connection]) {
-				return errors.New("workspace session gateway route differs from its connection")
-			}
-		}
-		if stored.Endpoint.Protocol == "ftp" && stored.Connection != 0 {
-			return errors.New("FTP workspace has an SSH connection reference")
-		}
-		return nil
-	}
-	for _, tab := range saved.Tabs {
-		leaves, nodes := 0, 0
-		var walk func(*storedWorkspaceLayout) error
-		walk = func(node *storedWorkspaceLayout) error {
-			nodes++
-			if node == nil || nodes > 2*maxTerminalPanes-1 {
-				return errors.New("invalid workspace layout tree")
-			}
-			if node.Session != nil {
-				if node.First != nil || node.Second != nil {
-					return errors.New("workspace leaf contains child layouts")
-				}
-				leaves++
-				if err := validateConnection(*node.Session); err != nil {
-					return err
-				}
-				return validate(*node.Session, false)
-			}
-			if !(node.Ratio > 0 && node.Ratio < 1) {
-				return errors.New("invalid workspace split ratio")
-			}
-			if err := walk(node.First); err != nil {
-				return err
-			}
-			return walk(node.Second)
-		}
-		if err := walk(tab.Root); err != nil {
-			return err
-		}
-		if leaves > maxTerminalPanes || tab.Focused < 0 || tab.Focused >= leaves {
-			return errors.New("invalid workspace focus or pane count")
-		}
-	}
-	fileIDs := map[string]bool{}
-	for _, file := range saved.FileTabs {
-		if saved.Version >= 2 && file.ID == "" {
-			return errors.New("missing file workspace identity")
-		}
-		if file.ID != "" {
-			if strings.TrimSpace(file.ID) != file.ID || fileIDs[file.ID] {
-				return errors.New("invalid or duplicate file workspace identity")
-			}
-			fileIDs[file.ID] = true
-		}
-		if err := validateConnection(file.Session); err != nil {
-			return err
-		}
-		if err := validate(file.Session, true); err != nil {
-			return fmt.Errorf("file workspace: %w", err)
-		}
-		if strings.ContainsAny(file.LocalPath+file.RemotePath, "\x00") {
-			return errors.New("workspace path contains NUL")
-		}
-	}
-	return nil
+	return saved.Validate(keyIDs)
 }
 
 type workspaceSaveState struct {
@@ -342,7 +153,7 @@ type workspaceSaveState struct {
 }
 
 func (a *app) tickWorkspace(c *ui.Context) {
-	if a.catalogConfig.loadErr != nil || a.catalogSaving || a.quitPending || a.transfers.quitting {
+	if a.catalogConfig.loadErr != nil || a.catalogSaving || a.quitPending || a.transfers.Quitting {
 		return
 	}
 	saved := a.workspaceSnapshot()
@@ -364,11 +175,11 @@ func (a *app) tickWorkspace(c *ui.Context) {
 		return
 	}
 	a.workspaceSave.dirtyAt = time.Time{}
-	if err := validateStoredWorkspace(saved, a.hosts, a.keys); err != nil {
+	if err := validateStoredWorkspace(saved, a.keys); err != nil {
 		a.persistenceNotice(locales.MessageUnableToSaveWorkspace, err)
 		return
 	}
-	value, err := encodeWorkspace(saved)
+	value, err := persistence.EncodeWorkspace(saved)
 	if err != nil {
 		a.persistenceNotice(locales.MessageUnableToSaveWorkspace, err)
 		return
@@ -387,11 +198,11 @@ func (a *app) persistBeforeClose(done func(error)) {
 	settings := map[string][]byte{}
 	if a.catalogConfig.loadErr == nil {
 		saved := a.workspaceSnapshot()
-		if err := validateStoredWorkspace(saved, a.hosts, a.keys); err != nil {
+		if err := validateStoredWorkspace(saved, a.keys); err != nil {
 			done(err)
 			return
 		}
-		value, err := encodeWorkspace(saved)
+		value, err := persistence.EncodeWorkspace(saved)
 		if err != nil {
 			done(err)
 			return
@@ -431,8 +242,8 @@ func (a *app) enforceScrollback() {
 	if limit == 0 {
 		return
 	}
-	for _, tab := range a.tabs {
-		for _, session := range tab.root.sessions() {
+	for _, tab := range a.tabs.Items {
+		for _, session := range tab.Root.Sessions() {
 			// This pass also runs while settings/files or another tab is visible.
 			// Apply the limit in place; rendering must not own terminal lifetime.
 			if live := session.terminal; live != nil && live.scrollbackLines != limit {

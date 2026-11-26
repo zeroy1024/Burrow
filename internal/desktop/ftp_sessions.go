@@ -5,11 +5,10 @@ import (
 	"slices"
 	"time"
 
+	"github.com/egoist/mygo/ui"
 	"github.com/zeroy1024/Burrow/internal/locales"
 	"github.com/zeroy1024/Burrow/internal/theme"
 	"github.com/zeroy1024/Burrow/internal/uikit"
-
-	"github.com/egoist/mygo/ui"
 )
 
 type fileSession struct {
@@ -335,8 +334,8 @@ func (a *app) deleteFileSite(id hostID, done func(error)) {
 		for _, session := range a.fileSessions {
 			remainingFiles[session] = true
 		}
-		for _, task := range a.transfers.tasks {
-			remainingFiles[task.session] = true
+		for _, task := range a.transfers.Tasks {
+			remainingFiles[task.Session] = true
 		}
 		if a.mcpBackend != nil {
 			for _, session := range a.mcpBackend.sessions {
@@ -361,20 +360,20 @@ func (a *app) deleteFileSite(id hostID, done func(error)) {
 				session.host--
 			}
 		}
-		for i := len(a.tabs) - 1; i >= 0; i-- {
-			tab := a.tabs[i]
-			for _, session := range tab.root.sessions() {
+		for i := len(a.tabs.Items) - 1; i >= 0; i-- {
+			tab := a.tabs.Items[i]
+			for _, session := range tab.Root.Sessions() {
 				if !session.temporary && session.endpoint.session.ID == deleted.session.ID {
 					releaseSSH(session)
-					tab.root = tab.root.remove(session)
-					if tab.focused == session && tab.root != nil {
-						tab.focused = tab.root.firstSession()
+					tab.Root = tab.Root.Remove(session)
+					if tab.Focused == session && tab.Root != nil {
+						tab.Focused = tab.Root.FirstSession()
 					}
 				} else if session.host > id {
 					session.host--
 				}
 			}
-			if tab.root == nil {
+			if tab.Root == nil {
 				a.closeTab(i)
 			}
 		}
@@ -409,29 +408,29 @@ func (a *app) deleteSiteDialogContents(c *ui.Context, parts uikit.ModalParts) bo
 		})
 		list := ui.Scroll(c).FillWidth().MinHeight(0).MaxHeight(parts.Bounds.MaxHeight / 2).TrackScroll(&d.scroll).Children(func() {
 			for _, task := range tasks {
-				ui.Column(c).Key(task.id).FillWidth().Gap(t.Space.N4).Padding(t.Space.N8, 0).Children(func() {
+				ui.Column(c).Key(task.ID).FillWidth().Gap(t.Space.N4).Padding(t.Space.N8, 0).Children(func() {
 					ui.Row(c).FillWidth().Gap(t.Space.N8).AlignItems(ui.Center).Children(func() {
 						source := locales.SessionManualTransfer()
-						if task.mcp != nil {
+						if task.MCP != nil {
 							source = "MCP"
 						}
 						uikit.Badge(c, source, uikit.BadgeProps{})
-						uikit.Text(c, task.entry.name, uikit.TextProps{}).Grow(1).MinWidth(0).SingleLine().Ellipsis("…")
+						uikit.Text(c, task.Entry.Name, uikit.TextProps{}).Grow(1).MinWidth(0).SingleLine().Ellipsis("…")
 						state := [...]func() string{
 							transferQueued: locales.MessageQueued, transferRunning: locales.MessageRunning,
 							transferPaused: locales.MessagePaused, transferDone: locales.MessageCompleted,
 							transferFailed: locales.MessageTransferFailed2,
-						}[task.state]()
-						if task.removeRequested {
+						}[task.State]()
+						if task.RemoveRequested {
 							state = locales.MessageCancellationRequested()
-						} else if task.cleanupPending {
+						} else if task.CleanupPending {
 							state = locales.SessionTransferCleanupPending()
 						}
 						uikit.Badge(c, state, uikit.BadgeProps{Tone: uikit.ToneMuted})
 					})
-					uikit.Text(c, task.sourcePath+" → "+task.targetPath, uikit.TextProps{Style: uikit.TextCaption, Tone: uikit.ToneSecondary}).SingleLine().Ellipsis("…")
-					if task.errorText.String() != "" {
-						uikit.Text(c, task.errorText.String(), uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneDanger})
+					uikit.Text(c, task.SourcePath+" → "+task.TargetPath, uikit.TextProps{Style: uikit.TextCaption, Tone: uikit.ToneSecondary}).SingleLine().Ellipsis("…")
+					if task.ErrorText.String() != "" {
+						uikit.Text(c, task.ErrorText.String(), uikit.TextProps{Style: uikit.TextSmall, Tone: uikit.ToneDanger})
 					}
 				})
 			}

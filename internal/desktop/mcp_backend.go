@@ -15,8 +15,11 @@ import (
 	"github.com/zeroy1024/Burrow/internal/fileclient"
 	"github.com/zeroy1024/Burrow/internal/locales"
 	"github.com/zeroy1024/Burrow/internal/mcpserver"
+	"github.com/zeroy1024/Burrow/internal/profile"
+	sshsession "github.com/zeroy1024/Burrow/internal/session"
 	"github.com/zeroy1024/Burrow/internal/sshclient"
 	"github.com/zeroy1024/Burrow/internal/store"
+	"github.com/zeroy1024/Burrow/internal/transfer"
 	"github.com/zeroy1024/Burrow/internal/wggateway"
 )
 
@@ -30,14 +33,6 @@ type mcpDesktop struct {
 	keys        []store.MCPKey
 	policies    []store.MCPPolicy
 	connections []mcpserver.Connection
-}
-
-type mcpTransferOwner struct {
-	KeyID, OperationID, ConnectionID, Identity, LocalRoot, Conflict string
-	Outcome                                                         string
-	CleanupOnly                                                     bool
-	CreatedAt                                                       time.Time
-	PolicyConnectionID                                              string `json:",omitempty"`
 }
 
 func mcpOnUI[T any](ctx context.Context, b *mcpDesktop, fn func() (T, error)) (T, error) {
@@ -146,7 +141,7 @@ func (b *mcpDesktop) captureConnections() ([]mcpserver.Connection, error) {
 		}
 		digest := store.EndpointID(data)
 		session := b.sessions[h.session.ID+":"+digest]
-		if session == nil || !sameGatewayRoute(session.endpoint.session.GatewayRoute, &plan.route) {
+		if session == nil || !profile.SameRoute(session.endpoint.session.GatewayRoute, &plan.route) {
 			route := plan.route
 			h.session.GatewayRoute = &route
 			fileEndpoint := h
@@ -186,7 +181,7 @@ func (b *mcpDesktop) OpenFiles(ctx context.Context, c mcpserver.Connection) (fil
 			return false, errAppUnavailable
 		}
 		b.a.openFileClient(ctx, c.Runtime.(*fileSession), func(client fileclient.Client, err error) {
-			ready <- transferClientResult{client, err}
+			ready <- transferClientResult{Client: client, Err: err}
 		})
 		return true, nil
 	})
@@ -195,7 +190,7 @@ func (b *mcpDesktop) OpenFiles(ctx context.Context, c mcpserver.Connection) (fil
 	}
 	select {
 	case result := <-ready:
-		return result.client, result.err
+		return result.Client, result.Err
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	}
@@ -211,18 +206,17 @@ func (b *mcpDesktop) Exec(ctx context.Context, c mcpserver.Connection, command s
 		if !b.a.businessReady() {
 			return false, errAppUnavailable
 		}
-		request := &sshConnectionRequest{ctx: ctx, group: c.Runtime.(*fileSession).connection}
-		request.mcpOperationID, request.mcpTaskID = mcpserver.OperationID(ctx)
-		request.failed = func(err error) { ready <- result{err: err} }
-		request.ready = func(connection *sshclient.Connection) {
+		request := &sshsession.Request{Context: ctx}
+		request.Failed = func(err error) { ready <- result{err: err} }
+		request.Ready = func(connection *sshclient.Connection) {
 			b.a.sshWorkers.Go(func() {
 				output, err := connection.ExecObserved(ctx, command, observe)
 				ready <- result{output, err}
-				b.a.window.Update(func() { b.a.completeSSHRequest(request) })
+				b.a.window.Update(func() { request.Complete() })
 			})
 		}
-		context.AfterFunc(ctx, func() { b.a.window.Update(func() { cancelSSHRequest(request) }) })
-		b.a.acquireSSH(request)
+		context.AfterFunc(ctx, func() { b.a.window.Update(func() { request.Cancel() }) })
+		b.a.acquireSSH(c.Runtime.(*fileSession).connection, request)
 		return true, nil
 	})
 	if err != nil {
@@ -239,7 +233,7 @@ func (b *mcpDesktop) Exec(ctx context.Context, c mcpserver.Connection, command s
 func (b *mcpDesktop) WriteText(ctx context.Context, c mcpserver.Connection, remotePath, text, mode string,
 	check func(context.Context, fileclient.Client, string, bool) error) (result error) {
 	name := path.Base(remotePath)
-	if !transferSafeName(name) {
+	if !transfer.SafeName(name) {
 		return fs.ErrInvalid
 	}
 	dir, err := os.MkdirTemp("", "burrow-mcp-text-*")
@@ -271,10 +265,10 @@ func (b *mcpDesktop) WriteText(ctx context.Context, c mcpserver.Connection, remo
 		}
 	}()
 	batch := &transferBatch{}
-	batch.policy.Store(1)
-	job := &transferJob{sourcePath: file.Name(), targetPath: path.Dir(remotePath), name: name,
-		policy: 1, batch: batch, temporary: make(map[string]struct{}), destinationKey: fmt.Sprintf("%q/%q/%q/%d", c.Runtime.(*fileSession).endpoint.protocol, c.User, c.Host, c.Port),
-		mcpCheck: func(ctx context.Context, source, target fileclient.Client, node *transferNode, destination string) error {
+	batch.Policy.Store(1)
+	job := &transferJob{SourcePath: file.Name(), TargetPath: path.Dir(remotePath), Name: name,
+		Batch: batch, Temporary: make(map[string]struct{}), DestinationKey: fmt.Sprintf("%q/%q/%q/%d", c.Runtime.(*fileSession).endpoint.protocol, c.User, c.Host, c.Port),
+		MCPCheck: func(ctx context.Context, source, target fileclient.Client, node *transferNode, destination string) error {
 			entry, err := target.Stat(ctx, destination)
 			if err != nil && !errors.Is(err, fs.ErrNotExist) {
 				return err
@@ -284,15 +278,16 @@ func (b *mcpDesktop) WriteText(ctx context.Context, c mcpserver.Connection, remo
 			}
 			return check(ctx, target, destination, err == nil)
 		}}
-	run := &transferRun{ctx: ctx}
-	task := &transferTask{job: job, run: run}
+	run := &transferRun{Context: ctx}
+	task := &transferTask{Job: job, Run: run}
 	var locks *transferLocks
-	_, err = mcpOnUI(ctx, b, func() (bool, error) { locks = &b.a.transfers.locks; return true, nil })
+	_, err = mcpOnUI(ctx, b, func() (bool, error) { locks = &b.a.transfers.Locks; return true, nil })
 	if err != nil {
 		return err
 	}
-	err = b.a.performTransfer(ctx, task, run, job, local, remote, locks)
-	if err != nil && len(job.temporary) > 0 {
+	b.a.bindTransferEvents(task, run)
+	err = job.Execute(ctx, run, local, remote, locks)
+	if err != nil && len(job.Temporary) > 0 {
 		err = errors.Join(err, remote.Close())
 		remote = nil
 		// Cancellation closes the original protocol client. Cleanup owns a new
@@ -300,11 +295,11 @@ func (b *mcpDesktop) WriteText(ctx context.Context, c mcpserver.Connection, remo
 		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 		cleanupClient, cleanupErr := b.OpenFiles(cleanupCtx, c)
 		if cleanupErr == nil {
-			cleanupErr = errors.Join(cleanupTransferFiles(cleanupCtx, cleanupClient, job), cleanupClient.Close())
+			cleanupErr = errors.Join(transfer.Cleanup(cleanupCtx, cleanupClient, job), cleanupClient.Close())
 		}
 		cancel()
 		err = errors.Join(err, cleanupErr)
-		if len(job.temporary) > 0 {
+		if len(job.Temporary) > 0 {
 			err = errors.Join(err, b.keepWriteCleanup(ctx, c, job, dir, err))
 		}
 	}
@@ -324,20 +319,20 @@ func (b *mcpDesktop) keepWriteCleanup(ctx context.Context, c mcpserver.Connectio
 	ready := make(chan error, 1)
 	_, err = mcpOnUI(saveCtx, b, func() (bool, error) {
 		a := b.a
-		a.transfers.nextID++
-		a.transfers.nextBatchID++
-		job.batch.id = a.transfers.nextBatchID
+		a.transfers.NextID++
+		a.transfers.NextBatchID++
+		job.Batch.ID = a.transfers.NextBatchID
 		owner := &mcpTransferOwner{KeyID: op.KeyID, OperationID: op.ID, ConnectionID: c.ID, Identity: c.Identity, PolicyConnectionID: c.CanonicalID,
 			LocalRoot: root, Conflict: "overwrite", CleanupOnly: true, CreatedAt: time.Now().UTC()}
-		task := &transferTask{id: a.transfers.nextID, mcp: owner, job: job,
-			session: a.snapshotTransferSession(c.Runtime.(*fileSession)),
-			state:   transferFailed, cleanupPending: true, errorText: locales.Concat(
+		task := &transferTask{ID: a.transfers.NextID, MCP: owner, Job: job,
+			Session: a.snapshotTransferSession(c.Runtime.(*fileSession)),
+			State:   transferFailed, CleanupPending: true, ErrorText: locales.Concat(
 				locales.Deferred(locales.MessageTemporaryFileAwaitingCleanupAfterWriting),
 				locales.ErrorText(cause),
 			),
-			sourcePath: job.sourcePath, targetPath: job.targetPath, total: job.total, transferred: job.doneBytes,
-			entry: fileEntry{name: job.name, path: job.sourcePath, size: job.root.entry.Size}}
-		a.transfers.tasks = append(a.transfers.tasks, task)
+			SourcePath: job.SourcePath, TargetPath: job.TargetPath, Total: job.Total, Transferred: job.DoneBytes,
+			Entry: fileclient.Entry{Name: job.Name, Size: job.Root.Entry.Size}}
+		a.transfers.Tasks = append(a.transfers.Tasks, task)
 		a.persistTransfersDone(func(err error) {
 			ready <- err
 		})
@@ -406,14 +401,10 @@ func (b *mcpDesktop) Enqueue(ctx context.Context, request mcpserver.TransferRequ
 		if a.siteDeletionPending(request.Connection.ID) || !slices.ContainsFunc(a.hosts, func(h host) bool { return h.session.ID == request.Connection.ID }) {
 			return false, locales.NewError(locales.SessionUnavailableForTransfer)
 		}
-		if !a.businessReady() || !b.service.Accepting() || a.quitPending || len(a.transfers.tasks) >= 1000 || a.transfers.quitting || a.transfers.storeErr != nil || a.transfers.writeErr != nil {
+		if !a.businessReady() || !b.service.Accepting() || a.quitPending || len(a.transfers.Tasks) >= 1000 || a.transfers.Quitting || a.transfers.StoreErr != nil || a.transfers.WriteErr != nil {
 			return false, locales.NewError(locales.MessageTheTransferQueueIsUnavailableOrAtCapacity)
 		}
-		a.transfers.nextID++
-		a.transfers.nextBatchID++
-		batch := &transferBatch{id: a.transfers.nextBatchID}
-		policy := transferPolicy(request.Conflict)
-		batch.policy.Store(int32(policy))
+		batch := a.transfers.NewBatch(transfer.ParsePolicy(request.Conflict))
 		source, target := request.LocalPath, request.RemotePath
 		if request.Download {
 			source, target = request.RemotePath, request.LocalPath
@@ -422,19 +413,17 @@ func (b *mcpDesktop) Enqueue(ctx context.Context, request mcpserver.TransferRequ
 			ConnectionID: request.Connection.ID, Identity: request.Connection.Identity, PolicyConnectionID: request.Connection.CanonicalID, LocalRoot: root,
 			Conflict: request.Conflict, CreatedAt: time.Now().UTC()}
 		session := a.snapshotTransferSession(request.Connection.Runtime.(*fileSession))
-		task := &transferTask{id: a.transfers.nextID, session: session, sourceRemote: request.Download,
-			sourcePath: source, targetPath: target, state: transferQueued, mcp: owner,
-			entry: fileEntry{name: transferBase(request.Download, source), path: source, size: entry.Size,
-				dir: entry.Directory, symlink: entry.Symlink, modified: entry.Modified, permissions: entry.Permissions, owner: entry.Owner}}
-		task.job = &transferJob{sourceRemote: request.Download, sourcePath: source, targetPath: target,
-			name: task.entry.name, policy: policy, batch: batch, temporary: make(map[string]struct{})}
-		a.transfers.tasks = append(a.transfers.tasks, task)
+		task := &transferTask{Session: session, SourceRemote: request.Download,
+			SourcePath: source, TargetPath: target, MCP: owner,
+			Entry: fileclient.Entry{Name: transfer.Base(request.Download, source), Size: entry.Size, Directory: entry.Directory,
+				Symlink: entry.Symlink, Modified: entry.Modified, Permissions: entry.Permissions, Owner: entry.Owner}}
+		a.transfers.Enqueue(task, batch)
 		b.attachTransfer(task)
-		saved = store.MCPTask{ID: task.id, KeyID: owner.KeyID, OperationID: owner.OperationID, ConnectionID: owner.ConnectionID,
+		saved = store.MCPTask{ID: task.ID, KeyID: owner.KeyID, OperationID: owner.OperationID, ConnectionID: owner.ConnectionID,
 			State: "queued", Total: max(entry.Size, 0), CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC()}
 		a.persistTransfersDone(func(err error) {
 			if err != nil {
-				a.transfers.tasks = slices.DeleteFunc(a.transfers.tasks, func(t *transferTask) bool { return t == task })
+				a.transfers.Tasks = slices.DeleteFunc(a.transfers.Tasks, func(t *transferTask) bool { return t == task })
 			}
 			if err == nil {
 				a.mcpTransferChanged(task, nil)
@@ -462,8 +451,8 @@ func (b *mcpDesktop) ControlTask(ctx context.Context, id int, action string) err
 		if action == "resume" && !b.a.businessReady() {
 			return false, errAppUnavailable
 		}
-		for _, t := range b.a.transfers.tasks {
-			if t.id != id || t.mcp == nil {
+		for _, t := range b.a.transfers.Tasks {
+			if t.ID != id || t.MCP == nil {
 				continue
 			}
 			switch action {
@@ -493,14 +482,14 @@ func (b *mcpDesktop) Quiesce(ctx context.Context, keyID string, pause bool) erro
 		}
 	}
 	_, err = mcpOnUI(ctx, b, func() (bool, error) {
-		for _, t := range slices.Clone(b.a.transfers.tasks) {
-			if t.mcp == nil || t.mcp.CleanupOnly || keyID != "" && t.mcp.KeyID != keyID || t.state == transferDone {
+		for _, t := range slices.Clone(b.a.transfers.Tasks) {
+			if t.MCP == nil || t.MCP.CleanupOnly || keyID != "" && t.MCP.KeyID != keyID || t.State == transferDone {
 				continue
 			}
 			if keyID != "" && key.State == "active" && mcpTaskAllowed(key, t) {
 				continue
 			}
-			if pause && t.state != transferQueued && t.state != transferRunning {
+			if pause && t.State != transferQueued && t.State != transferRunning {
 				continue
 			}
 			if pause {
@@ -516,13 +505,13 @@ func (b *mcpDesktop) Quiesce(ctx context.Context, keyID string, pause bool) erro
 
 func mcpTaskAllowed(key store.MCPKey, task *transferTask) bool {
 	for _, g := range key.Grants {
-		if g.ConnectionID == task.mcp.ConnectionID && g.EndpointDigest == task.mcp.Identity && (task.sourceRemote && g.Read || !task.sourceRemote && g.Write) {
-			local := task.sourcePath
-			if task.sourceRemote {
-				local = task.targetPath
+		if g.ConnectionID == task.MCP.ConnectionID && g.EndpointDigest == task.MCP.Identity && (task.SourceRemote && g.Read || !task.SourceRemote && g.Write) {
+			local := task.SourcePath
+			if task.SourceRemote {
+				local = task.TargetPath
 			}
 			dirs := key.UploadDirs
-			if task.sourceRemote {
+			if task.SourceRemote {
 				dirs = key.DownloadDirs
 			}
 			for _, dir := range dirs {

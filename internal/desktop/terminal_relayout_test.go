@@ -1,6 +1,7 @@
 package desktop
 
 import (
+	"github.com/zeroy1024/Burrow/internal/workspace"
 	"math"
 	"testing"
 	"time"
@@ -15,8 +16,8 @@ func TestTerminalPaneRelayoutAnimatesSurvivor(t *testing.T) {
 	a.terminal.prefs = termtheme.DefaultPrefs()
 	top := a.newDisconnectedSession(0, host{name: "Shell", port: 22}, false, nil)
 	top.config.SSH.TermScheme = termtheme.Fixed(termtheme.DefaultDark).String()
-	tab := &workspaceTab{root: &terminalLayout{session: top}, focused: top}
-	a.tabs = []*workspaceTab{tab}
+	tab := &workspaceTab{paneTab: workspace.NewTab(top)}
+	a.tabs.Items = []*workspaceTab{tab}
 	workspace := ui.Point{X: 660, Y: 416}
 	var bottom *remoteSession
 	var shown, bottomShown ui.Rect
@@ -25,15 +26,15 @@ func TestTerminalPaneRelayoutAnimatesSurvivor(t *testing.T) {
 		if split {
 			split = false
 			a.splitSession(top, true)
-			bottom = tab.root.sessions()[1]
+			bottom = tab.Root.Sessions()[1]
 			workspace.Y -= 16
 		}
 		if closeBottom {
 			closeBottom = false
-			a.closePane(tab, tab.focused)
+			a.closePane(tab, tab.Focused)
 		}
 		a.updatePaneClosures(c)
-		if resizeOnRemoval && tab.root.count() == 1 {
+		if resizeOnRemoval && tab.Root.Count() == 1 {
 			resizeOnRemoval = false
 			workspace.Y += 16
 		}
@@ -55,24 +56,24 @@ func TestTerminalPaneRelayoutAnimatesSurvivor(t *testing.T) {
 	full := shown
 	split = true
 	tt.Frame()
-	if tab.root.count() != 2 || shown != full {
-		t.Fatalf("split started at %v with %d panes, want the visible geometry %v", shown, tab.root.count(), full)
+	if tab.Root.Count() != 2 || shown != full {
+		t.Fatalf("split started at %v with %d panes, want the visible geometry %v", shown, tab.Root.Count(), full)
 	}
 	half := (workspace.Y - theme.Current().C.Pane.Gap) / 2
 	tt.Advance(80 * time.Millisecond)
 	if shown.Y != full.Y || shown.H <= half || shown.H >= full.H {
 		t.Fatalf("existing pane did not retract through an intermediate frame: %v", shown)
 	}
-	if bottomShown.H != 0 || tab.focused != top {
-		t.Fatalf("new pane was visible or focused during retraction: %v, focused pane %d", bottomShown, tab.focused.id)
+	if bottomShown.H != 0 || tab.Focused != top {
+		t.Fatalf("new pane was visible or focused during retraction: %v, focused pane %d", bottomShown, tab.Focused.id)
 	}
 	const sampleX, sampleY = int(530 * scale), int(364 * scale)
 	empty := tt.Image().RGBAAt(sampleX, sampleY)
 	for i := 0; i < 36 && bottomShown.H == 0; i++ {
 		tt.Advance(16 * time.Millisecond)
 	}
-	if shown.H != half || bottomShown.H != half || tab.focused != bottom {
-		t.Fatalf("reveal must start after the layout settles: top=%v bottom=%v focus=%d", shown, bottomShown, tab.focused.id)
+	if shown.H != half || bottomShown.H != half || tab.Focused != bottom {
+		t.Fatalf("reveal must start after the layout settles: top=%v bottom=%v focus=%d", shown, bottomShown, tab.Focused.id)
 	}
 	tt.Advance(48 * time.Millisecond)
 	fading := tt.Image().RGBAAt(sampleX, sampleY)
@@ -85,11 +86,11 @@ func TestTerminalPaneRelayoutAnimatesSurvivor(t *testing.T) {
 	closeBottom, resizeOnRemoval = true, true
 	tt.Frame()
 	tt.Advance(80 * time.Millisecond)
-	if tab.root.count() != 2 || shown.H != half {
+	if tab.Root.Count() != 2 || shown.H != half {
 		t.Fatalf("survivor moved while the closed pane was fading: %v", shown)
 	}
 	tt.Advance(144 * time.Millisecond)
-	if tab.root.count() != 1 || shown.Y != full.Y || shown.H <= half || shown.H >= full.H {
+	if tab.Root.Count() != 1 || shown.Y != full.Y || shown.H <= half || shown.H >= full.H {
 		t.Fatalf("survivor did not expand through an intermediate frame: %v", shown)
 	}
 	tt.Advance(560 * time.Millisecond)
@@ -104,16 +105,13 @@ func TestTerminalPaneDropKeepsTargetFarEdgeAnchored(t *testing.T) {
 	top := a.newDisconnectedSession(0, host{name: "Top", port: 22}, false, nil)
 	middle := a.newDisconnectedSession(1, host{name: "Middle", port: 22}, false, nil)
 	bottom := a.newDisconnectedSession(2, host{name: "Bottom", port: 22}, false, nil)
-	tab := &workspaceTab{
-		root: &terminalLayout{
-			first: &terminalLayout{
-				first: &terminalLayout{session: top}, second: &terminalLayout{session: middle}, stacked: true, ratio: .5,
-			},
-			second: &terminalLayout{session: bottom}, stacked: true, ratio: 2.0 / 3,
+	tab := &workspaceTab{paneTab: paneTab{Root: &terminalLayout{
+		First: &terminalLayout{
+			First: &terminalLayout{Session: top}, Second: &terminalLayout{Session: middle}, Stacked: true, Ratio: .5,
 		},
-		focused: middle,
-	}
-	a.tabs = []*workspaceTab{tab}
+		Second: &terminalLayout{Session: bottom}, Stacked: true, Ratio: 2.0 / 3,
+	}, Focused: middle}}
+	a.tabs.Items = []*workspaceTab{tab}
 	workspace := ui.Point{X: 660, Y: 600}
 	var targetBounds, movedBounds ui.Rect
 	var drop bool
@@ -148,11 +146,11 @@ func TestTerminalPaneDropKeepsTargetFarEdgeAnchored(t *testing.T) {
 			t.Fatalf("target lost its right anchor or revealed the moved pane early: target=%v moved=%v", targetBounds, movedBounds)
 		}
 	}
-	if targetBounds.X <= start.X || targetBounds.W >= start.W || tab.focused != top {
+	if targetBounds.X <= start.X || targetBounds.W >= start.W || tab.Focused != top {
 		t.Fatalf("target did not retract in place with focus: %v", targetBounds)
 	}
 	tt.Advance(650 * time.Millisecond)
-	if gap := targetBounds.X - (movedBounds.X + movedBounds.W); gap != theme.Current().C.Pane.Gap || tab.focused != middle {
+	if gap := targetBounds.X - (movedBounds.X + movedBounds.W); gap != theme.Current().C.Pane.Gap || tab.Focused != middle {
 		t.Fatalf("drop did not settle in the left slot: target=%v moved=%v", targetBounds, movedBounds)
 	}
 }

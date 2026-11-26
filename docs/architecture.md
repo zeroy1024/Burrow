@@ -7,7 +7,12 @@
 | Location | Responsibility |
 |---|---|
 | [main.go](../main.go) | App entry point |
-| [internal/desktop](../internal/desktop/) | Page composition, sessions, connection scheduling, persistence, credentials, and task lifecycle |
+| [internal/desktop](../internal/desktop/) | Desktop pages, terminal views, credential and file conflict prompts, application startup and shutdown |
+| [internal/session](../internal/session/) | SSH connection reuse, channel queuing and cancellation, shell lifetime, monitoring, and forwarding listeners |
+| [internal/profile](../internal/profile/) | Endpoint snapshots, protocol options, gateway routes, and saved configuration validation |
+| [internal/workspace](../internal/workspace/) | Tab order and selection, split trees, focused panes, and workspace snapshot restoration |
+| [internal/transfer](../internal/transfer/) | Transfer scheduling, concurrency limits, pause/resume, conflicts, verified checkpoints, and file commits |
+| [internal/persistence](../internal/persistence/) | Workspace and queue snapshot codecs, serialized writes, and completion callbacks |
 | [internal/sshclient](../internal/sshclient/) | SSH connections, authentication, host trust, Shell/Exec/subsystems, and connection leases |
 | [internal/wggateway](../internal/wggateway/) | Pure user-space WireGuard/netstack, strict single-peer import, tunnel DNS, and authenticated probes |
 | [internal/fileclient](../internal/fileclient/) | Local, SFTP, and FTP/FTPS file operations and optional capabilities |
@@ -30,7 +35,9 @@ Saved entries describe future connections; SSH and file catalogs are separate. A
 
 SSH transports and business channels are separate. Splits open independent Shell channels on the same connection. Moving panes, regrouping, and dragging them back into tabs preserves terminal objects. Closing one channel leaves sibling channels alive; the last consumer releases the shared connection.
 
-Entry points: [ssh_sessions.go](../internal/desktop/ssh_sessions.go), [ssh_terminal.go](../internal/desktop/ssh_terminal.go), [file_connections.go](../internal/desktop/file_connections.go), and [pane_drag.go](../internal/desktop/pane_drag.go).
+Shells on one connection share monitoring and forwarding listeners. Both stop when the final shell exits. Open SFTP channels can continue transferring files. The caller supplies the dial function and dispatches callbacks in order. The desktop uses its window thread for this.
+
+Entry points: [group.go](../internal/session/group.go), [shell.go](../internal/session/shell.go), [ssh_sessions.go](../internal/desktop/ssh_sessions.go), [ssh_terminal.go](../internal/desktop/ssh_terminal.go), [file_connections.go](../internal/desktop/file_connections.go), and [pane_drag.go](../internal/desktop/pane_drag.go).
 
 WireGuard transports are shared by client/peer identity across terminal, transfer, MCP, and test scopes. Matching settings share one UDP device; incompatible settings for an active identity produce an error until its consumers close. Each consumer owns a lease, and the final release closes the device and in-memory stack. This differs from scoped SSH transports because independent WireGuard devices with the same identity can compete for the peer endpoint. See [WireGuard gateways](wireguard.md).
 
@@ -48,9 +55,11 @@ Protection changes and password changes use the existing persistence worker. The
 
 SSH, File Transfer, MCP, and Settings build the current page exclusively; mounting a page does not own business tasks. Switching preserves connections, directory history, terminal scrollback, and transfers. Closing Settings clears temporary UI while reusing stable window-lifetime handles. Workspace state can restore SSH, file, or MCP page selection; Settings remains temporary.
 
+The workspace records split direction, proportions, and focus. The desktop computes pixel bounds and handles keyboard focus, dragging, and animation. Restoration validates the saved tree and its connection references before creating a view for each leaf.
+
 Closing the main window and quitting share one process on every platform: save the workspace and settings, stop MCP, pause and save transfers, close session connections, then exit. Last-tab behavior is a separate preference.
 
-Transfers use independent contexts and protocol clients/subsystems. Tasks are grouped by file-tab identity. Closing a browsing view or editing a site does not redirect them. Entry points: [transfer_backend.go](../internal/desktop/transfer_backend.go), [transfer_store.go](../internal/desktop/transfer_store.go), and [workspace_store.go](../internal/desktop/workspace_store.go).
+Transfers use independent contexts and protocol clients/subsystems. Tasks are grouped by file-tab identity. Closing a browsing view or editing a site does not redirect them. The desktop supplies authentication, conflict choices, and progress notifications. The shared queue limits concurrent work, verifies resume offsets, commits destination files, and cleans up staging files. [Queue](../internal/transfer/queue.go) · [Worker](../internal/transfer/worker.go) · [Snapshot codecs](../internal/persistence/snapshots.go).
 
 ## File consistency and persistence
 

@@ -6,51 +6,30 @@ import (
 	"net"
 	"slices"
 	"strconv"
-	"time"
 
 	"github.com/zeroy1024/Burrow/internal/locales"
+	sshsession "github.com/zeroy1024/Burrow/internal/session"
 	"github.com/zeroy1024/Burrow/internal/sshclient"
 )
 
 var errSSHConnectCanceled = locales.NewError(locales.MessageSshConnectionCancelled)
 
-// The group outlives each view's request and owns one authenticated transport.
-// All group fields and request callbacks are owned by the window thread.
+// Connection settings and published UI snapshots belong to the desktop owner.
 type sshConnectionGroup struct {
+	transport  sshsession.Group
 	id         int
 	endpoint   host
 	plan       sshDialPlan
 	planErr    error
-	connection *sshclient.Connection
-	ctx        context.Context
-	cancel     context.CancelFunc
-	generation int
-	connecting bool
-	waiters    map[*sshConnectionRequest]struct{}
-	queue      []*sshConnectionRequest
-	opening    *sshConnectionRequest
 	latency    sshLatencyState
 	facts      hostFactsProbe
 	monitor    *monitorState
 	forwarding *sshForwardState
 }
 
-type sshConnectionRequest struct {
-	mcpOperationID string
-	mcpTaskID      int
-	ctx            context.Context
-	group          *sshConnectionGroup
-	connection     *sshclient.Connection
-	release        func()
-	ready          func(*sshclient.Connection)
-	failed         func(error)
-}
-
 type sshRuntime struct {
-	ctx        context.Context
-	cancel     context.CancelFunc
-	conn       *sshclient.Conn
-	request    *sshConnectionRequest
+	*sshsession.Shell
+	group      *sshConnectionGroup
 	monitor    *monitorState
 	forwarding *sshForwardState
 }
@@ -83,19 +62,18 @@ func (a *app) startSSHSession(session *remoteSession, refresh bool) {
 			session.config = session.endpoint.session
 		}
 	}
-	ctx, cancel := context.WithCancel(a.ctx)
-	run := &sshRuntime{ctx: ctx, cancel: cancel}
+	run := &sshRuntime{Shell: sshsession.NewShell(a.ctx), group: session.connection}
+	ctx := run.Context()
 	session.ssh, session.state = run, connecting
 	session.hasNewOutput, session.hasBell = false, false
 	h := session.endpoint
 	showSSHMessage(session, locales.MessageConnectingTo()+h.user+"@"+net.JoinHostPort(h.address, strconv.Itoa(h.port))+"…")
-	request := &sshConnectionRequest{ctx: ctx, group: session.connection}
-	run.request = request
-	request.failed = func(err error) {
+	request := &run.Request
+	request.Failed = func(err error) {
 		if session.ssh != run || ctx.Err() != nil {
 			return
 		}
-		cancel()
+		run.Close()
 		session.state = connectionFailed
 		if errors.Is(err, errSSHConnectCanceled) {
 			session.state = disconnected
@@ -105,8 +83,7 @@ func (a *app) startSSHSession(session *remoteSession, refresh bool) {
 		}
 		showReconnectHint(session, false)
 	}
-	request.ready = func(connection *sshclient.Connection) {
-		channelCtx, cancelChannel := context.WithCancel(ctx)
+	request.Ready = func(connection *sshclient.Connection) {
 		columns, rows := session.columns, session.rows
 		if columns == 0 {
 			columns = 80
@@ -122,255 +99,65 @@ func (a *app) startSSHSession(session *remoteSession, refresh bool) {
 		onError := func(err error) {
 			a.window.Update(func() {
 				if session.ssh == run && ctx.Err() == nil && session.state != connectionFailed {
-					run.stopMonitor()
-					run.stopForwards()
+					run.detachServices()
 					session.state = connectionFailed
 					showSSHMessage(session, err.Error())
 					showReconnectHint(session, false)
 				}
 			})
 		}
+		opts := sshclient.ShellOptions{Columns: columns, Rows: rows, Env: env, InitCommand: initCommand, OnError: onError}
 		a.sshWorkers.Go(func() {
-			setupCtx, cancelSetup := context.WithTimeout(channelCtx, 2*time.Minute)
-			defer cancelSetup()
-			stopSetup := context.AfterFunc(setupCtx, cancelChannel)
-			defer stopSetup()
-			var conn *sshclient.Conn
-			var err error
-			for {
-				err = connection.WaitChannelReady(setupCtx)
-				if err != nil {
-					break
-				}
-				conn, err = connection.OpenShell(channelCtx, sshclient.ShellOptions{
-					Columns: columns, Rows: rows, Env: env, InitCommand: initCommand,
-					OnError: onError,
-				})
-				if !errors.Is(err, sshclient.ErrChannelPending) {
-					break
-				}
-			}
-			if err != nil {
-				setupErr := setupCtx.Err()
-				cancelChannel()
-				if setupErr != nil {
-					err = setupErr
-				}
-			}
-			a.window.Update(func() {
-				a.completeSSHRequest(request)
-				if session.ssh != run || ctx.Err() != nil {
-					if conn != nil {
-						conn.Close()
-					}
+			run.Open(connection, opts, a.window.Update, func() {
+				if session.ssh != run || session.state == connectionFailed {
+					run.Close()
 					return
 				}
-				if err != nil {
-					request.failed(err)
-					return
-				}
-				if channelCtx.Err() != nil || session.state == connectionFailed {
-					conn.Close()
-					return
-				}
-				run.conn = conn
 				a.attachSSH(session, run)
 			})
-			if err != nil {
-				return
-			}
-			// The reader must attach before a large initial command can finish:
-			// its remote echo may exceed the channel's receive window.
-			select {
-			case <-conn.InitializationDone():
-			case <-setupCtx.Done():
-			}
-			stopSetup()
-			if setupCtx.Err() != nil {
-				cancelChannel()
-				if ctx.Err() == nil {
-					onError(setupCtx.Err())
-				}
-			}
 		})
 	}
-	a.acquireSSH(request)
+	a.acquireSSH(session.connection, request)
 }
 
-func (a *app) acquireSSH(request *sshConnectionRequest) {
+func (a *app) acquireSSH(group *sshConnectionGroup, request *sshsession.Request) {
 	if !a.businessReady() {
-		request.failed(errAppUnavailable)
+		request.Failed(errAppUnavailable)
 		return
 	}
-	group := request.group
-	if request.ctx.Err() != nil {
+	attempt := group.transport.Acquire(a.ctx, request)
+	if attempt == nil {
 		return
 	}
-	if connection := group.connection; connection != nil {
-		select {
-		case <-connection.Done():
-			group.connection = nil
-		default:
-			err := a.deliverSSHConnection(request, connection)
-			if err == nil {
-				return
-			}
-			if !errors.Is(err, sshclient.ErrClosed) {
-				request.failed(err)
-				return
-			}
-			group.connection = nil
-		}
-	}
-	if !group.connecting || group.ctx.Err() != nil {
-		group.generation++
-		group.ctx, group.cancel = context.WithCancel(a.ctx)
-		group.connecting = true
-		group.waiters = make(map[*sshConnectionRequest]struct{})
-		group.waiters[request] = struct{}{}
-		a.dialSSHGroup(group)
-		return
-	}
-	group.waiters[request] = struct{}{}
-}
-
-func (a *app) deliverSSHConnection(request *sshConnectionRequest, connection *sshclient.Connection) error {
-	release, err := connection.Retain()
-	if err != nil {
-		return err
-	}
-	request.release = release
-	request.connection = connection
-	request.group.queue = append(request.group.queue, request)
-	a.nextSSHRequest(request.group)
-	return nil
-}
-
-func (a *app) nextSSHRequest(group *sshConnectionGroup) {
-	if group.opening != nil {
-		return
-	}
-	for len(group.queue) > 0 {
-		request := group.queue[0]
-		group.queue = group.queue[1:]
-		if request.ctx.Err() != nil {
-			request.release()
-			continue
-		}
-		group.opening = request
-		request.ready(request.connection)
-		return
-	}
-}
-
-func (a *app) completeSSHRequest(request *sshConnectionRequest) {
-	if request == nil {
-		return
-	}
-	if request.release != nil {
-		request.release()
-	}
-	group := request.group
-	if group.opening == request {
-		group.opening = nil
-		a.nextSSHRequest(group)
-	}
-}
-
-func (a *app) dialSSHGroup(group *sshConnectionGroup) {
-	ctx, generation, plan, planErr := group.ctx, group.generation, group.plan, group.planErr
-	cancel := group.cancel
+	plan, planErr := group.plan, group.planErr
 	a.sshWorkers.Go(func() {
-		var connection *sshclient.Connection
-		err := planErr
-		if err == nil {
-			connection, err = a.dialSSHPlan(ctx, plan, sshSecretsOverride{}, nil)
-		}
-		a.window.Update(func() {
-			if group.generation != generation || ctx.Err() != nil {
-				cancel()
-				if connection != nil {
-					connection.Close()
-				}
-				return
+		attempt.Run(func(ctx context.Context) (*sshclient.Connection, error) {
+			if planErr != nil {
+				return nil, planErr
 			}
-			group.connecting = false
-			waiters := group.waiters
-			group.waiters = nil
-			if err != nil {
-				cancel()
-				for request := range waiters {
-					if request.ctx.Err() == nil {
-						request.failed(err)
-					}
-				}
-				return
-			}
-			// Reserve the transport while every still-wanted child gets its lease.
-			guard, err := connection.Retain()
-			if err != nil {
-				connection.Close()
-				cancel()
-				for request := range waiters {
-					if request.ctx.Err() == nil {
-						request.failed(err)
-					}
-				}
-				return
-			}
-			group.connection = connection
-			for request := range waiters {
-				if request.ctx.Err() == nil {
-					if err := a.deliverSSHConnection(request, connection); err != nil {
-						request.failed(err)
-					}
-				}
-			}
-			guard()
-		})
-		if connection != nil {
-			connection.Wait()
-			cancel()
-			a.window.Update(func() {
-				if group.generation == generation && group.connection == connection {
-					group.connection = nil
-				}
-			})
-		}
+			return a.dialSSHPlan(ctx, plan, sshSecretsOverride{}, nil)
+		}, a.window.Update)
 	})
 }
 
-func cancelSSHRequest(request *sshConnectionRequest) {
-	if request == nil {
-		return
+// detachServices drops any presentation state belonging to a finished generation.
+func (run *sshRuntime) detachServices() {
+	run.EndServices()
+	if m := run.monitor; m != nil && m.Context().Err() != nil && run.group.monitor == m {
+		run.group.monitor = nil
 	}
-	if request.release != nil {
-		request.release()
+	if state := run.forwarding; state != nil && state.Context().Err() != nil && run.group.forwarding == state {
+		run.group.forwarding = nil
 	}
-	group := request.group
-	delete(group.waiters, request)
-	for i, queued := range group.queue {
-		if queued == request {
-			group.queue = append(group.queue[:i], group.queue[i+1:]...)
-			break
-		}
-	}
-	if group.connecting && len(group.waiters) == 0 {
-		group.cancel()
-	}
+	run.monitor, run.forwarding = nil, nil
 }
 
 // Invalidate the view before canceling so late callbacks cannot reattach a channel.
 func stopSSH(session *remoteSession) {
 	if run := session.ssh; run != nil {
 		session.ssh = nil
-		run.stopMonitor()
-		run.stopForwards()
-		run.cancel()
-		cancelSSHRequest(run.request)
-		if run.conn != nil {
-			run.conn.Close()
-		}
+		run.detachServices()
+		run.Close()
 	}
 }
 
@@ -381,8 +168,8 @@ func (a *app) closeConnections() {
 		a.closeLocalFiles(session)
 		session.ftpSecret = ""
 	}
-	for _, tab := range a.tabs {
-		for _, session := range tab.root.sessions() {
+	for _, tab := range a.tabs.Items {
+		for _, session := range tab.Root.Sessions() {
 			releaseSSH(session)
 		}
 	}

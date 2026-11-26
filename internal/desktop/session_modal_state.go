@@ -2,16 +2,15 @@ package desktop
 
 import (
 	"context"
-	"net"
 	"regexp"
 	"slices"
 	"strconv"
 	"strings"
-	"unicode"
 
 	"github.com/egoist/mygo/ui"
 	"github.com/zeroy1024/Burrow/internal/hostinfo"
 	"github.com/zeroy1024/Burrow/internal/locales"
+	"github.com/zeroy1024/Burrow/internal/profile"
 	"github.com/zeroy1024/Burrow/internal/uikit"
 )
 
@@ -60,7 +59,6 @@ type sessionAgentResult struct {
 }
 
 var environmentPattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*=.*$`)
-var hostnamePattern = regexp.MustCompile(`^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?$`)
 
 func (a *app) startHostDraft() {
 	page := a.page()
@@ -260,28 +258,6 @@ func (d *hostDraft) advancedSummary(a *app) string {
 	return strings.Join(parts, " · ")
 }
 
-func validSessionHost(value string) bool {
-	if strings.IndexFunc(value, unicode.IsSpace) >= 0 {
-		return false
-	}
-	if strings.HasPrefix(value, "[") || strings.HasSuffix(value, "]") {
-		return strings.HasPrefix(value, "[") && strings.HasSuffix(value, "]") && net.ParseIP(value[1:len(value)-1]) != nil
-	}
-	if net.ParseIP(value) != nil {
-		return true
-	}
-	if len(value) > 253 || strings.ContainsAny(value, ":[]/") {
-		return false
-	}
-	value = strings.TrimSuffix(value, ".")
-	for _, label := range strings.Split(value, ".") {
-		if len(label) > 63 || !hostnamePattern.MatchString(label) {
-			return false
-		}
-	}
-	return true
-}
-
 func (a *app) draftError(d *hostDraft, field string) locales.Text {
 	switch field {
 	case "host":
@@ -289,7 +265,7 @@ func (a *app) draftError(d *hostDraft, field string) locales.Text {
 		if h == "" {
 			return locales.Deferred(locales.MessageEnterAHost)
 		}
-		if !validSessionHost(h) {
+		if !profile.ValidHost(h) {
 			return locales.Deferred(locales.MessageInvalidHostFormat)
 		}
 	case "port":
@@ -576,8 +552,8 @@ func (a *app) draftOpenTabs(d *hostDraft) int {
 		return 0
 	}
 	n := 0
-	for _, tab := range a.tabs {
-		if slices.ContainsFunc(tab.root.sessions(), func(s *remoteSession) bool { return s.host == d.id }) {
+	for _, tab := range a.tabs.Items {
+		if slices.ContainsFunc(tab.Root.Sessions(), func(s *remoteSession) bool { return s.host == d.id }) {
 			n++
 		}
 	}
