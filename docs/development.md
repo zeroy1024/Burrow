@@ -11,7 +11,7 @@ mise install
 mise exec -- go run .
 ```
 
-[mise.toml](../mise.toml) pins Go 1.27.3 and uv 0.13.6. [go.mod](../go.mod) pins MyGo v0.7.3 and project dependencies. Keep these versions and the existing dependency workflow.
+[mise.toml](../mise.toml) pins Go 1.27.3 and uv 0.13.6. [go.mod](../go.mod) pins MyGo v0.10.0 and project dependencies. Keep these versions and the existing dependency workflow.
 
 Ordinary `go run` uses Burrow Dev data and a separate credential namespace; release packages use Burrow. See [data and credentials](storage.md) for data models, backups, and legacy-format boundaries. SQLite uses pinned `modernc.org/sqlite v1.61.1`, without system SQLite or CGo.
 

@@ -188,6 +188,7 @@ func (a *app) hideMainWindow() {
 		a.reportTrayError(a.tray.err)
 		return
 	}
+	a.splash.dismiss()
 	a.window.Hide()
 	if runtime.GOOS == "darwin" && a.prefs.HideDockInBackground {
 		mygo.App.Dock.Hide()

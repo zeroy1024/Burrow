@@ -21,6 +21,7 @@ func (a *app) terminals(c *ui.Context, size ui.Point) {
 	area := ui.Box(c).Key("terminals").Grow(1).MinWidth(0).MinHeight(0).Bind(&a.workArea)
 	tab := a.currentTab()
 	if tab == nil {
+		a.splash.pose(c, area, splashMainPane)
 		_, over := ui.DragOver[hostDrag](area)
 		source, dropped := ui.Drop[hostDrag](area)
 		catalogSource, catalogOver, catalogDropped := a.catalogHostDropTarget(area)
@@ -182,6 +183,11 @@ func (a *app) terminalPane(c *ui.Context, tab *workspaceTab, placement panePlace
 		return pane.Hidden(true)
 	}
 	a.paneMotion(c, pane, tab, placement)
+	part := splashSplitPane
+	if tab.Focused == session {
+		part = splashMainPane
+	}
+	a.splash.pose(c, pane, part)
 	_, catalogActive, _ := a.catalogHostTransfer()
 	focused := tab.Focused == session
 	transitioning := pane.Transitioning() || c.Now().Before(tab.layoutUntil)

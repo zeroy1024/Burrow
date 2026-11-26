@@ -172,7 +172,7 @@ func (a *app) trackCatalogDrag(c *ui.Context, row ui.Element, slot catalogSlot) 
 		options.Bounds, options.Rigid = &ui.Rect{}, true
 		options.Animation = ui.Animation{Duration: t.C.Desktop.InstantDuration}
 	}
-	// MyGo v0.7.3 exposes neither a threshold nor a hold delay in DraggableOptions.
+	// MyGo exposes neither a threshold nor a hold delay in DraggableOptions.
 	row.Draggable(&motion.offset, options)
 	offset := row.DragOffset()
 	if settlingSource && (blockGesture || idle) {

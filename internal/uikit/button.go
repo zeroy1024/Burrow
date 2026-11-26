@@ -109,7 +109,7 @@ func StyleDisabled(e ui.Element, disabled bool) ui.Element {
 	e.Disabled(false)
 	if disabled && !e.IsDisabled() {
 		e.Disabled(true)
-		// MyGo v0.7.3 already paints Disabled at 0.5; compensate to the token's total.
+		// MyGo already paints Disabled at 0.5; compensate to the token's total.
 		// A disabled ancestor owns the fade for its entire subtree.
 		e.Opacity(theme.Current().Opacity.Disabled / 0.5)
 	}

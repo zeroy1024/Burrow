@@ -69,6 +69,7 @@ type pageState struct {
 type app struct {
 	vault                  *vault.Manager
 	security               applicationSecurityState
+	splash                 startupSplash
 	store                  *store.Store
 	persistence            *persistence.Writer
 	dataDirectory          string
@@ -351,16 +352,20 @@ func Run() (runErr error) {
 		if err := a.syncTray(); err != nil {
 			a.reportTrayError(err)
 		}
-		// Windows can build the first frame synchronously when shown. Finish
-		// assigning and setting up a.window before that frame starts UI work.
-		a.showMainWindow()
+		// Windows can build the first frame synchronously when shown. Choose the
+		// startup surface before that frame, while initialization runs in parallel.
 		a.beginStartup()
+		a.showMainWindow()
 	}
 	mygo.App.WhenReady(openWindow)
-	stopSecondInstance := mygo.App.OnSecondInstance(func([]string, string) { a.showMainWindow() })
+	stopSecondInstance := mygo.App.OnSecondInstance(func([]string, string) {
+		a.splash.dismiss()
+		a.showMainWindow()
+	})
 	defer stopSecondInstance()
 	stopActivate := mygo.App.OnActivate(func(visible bool) {
 		if !visible && a.ctx.Err() == nil {
+			a.splash.dismiss()
 			a.showMainWindow()
 		}
 	})
@@ -469,8 +474,13 @@ func Run() (runErr error) {
 }
 
 func (a *app) view(c *ui.Context) {
+	a.advanceStartupSplash(c)
 	if !a.security.ready {
-		a.startupView(c)
+		if a.splash.visible {
+			a.startupSplashOverlay(c)
+		} else {
+			a.startupView(c)
+		}
 		return
 	}
 	a.tickMCPBackend(c)
@@ -494,10 +504,26 @@ func (a *app) view(c *ui.Context) {
 		}
 	}
 	c.Root().Background(background)
+	handoff := a.splash.behindWorkspace()
+	if handoff {
+		a.drawStartupSplash(c)
+		headerBackground, contentBackground = ui.Transparent, ui.Transparent
+	}
 	root := ui.Column(c).Fill()
+	if handoff {
+		// MyGo paints absolute children after flow siblings. Keep the workspace
+		// above the splash artwork while both occupy the full client area.
+		root.Absolute().Top(0).Left(0)
+	}
 	x, y, _ := root.PointerPosition()
 	a.pointer = ui.Point{X: x, Y: y}
-	if !a.interactionBlocked() {
+	if a.splash.returnFocus {
+		a.splash.returnFocus = false
+		if !a.interactionBlocked() {
+			a.focusWorkspace()
+		}
+	}
+	if !a.interactionBlocked() && !a.splash.visible {
 		a.appShortcuts(c)
 	}
 	if a.drag == nil && !a.terminalCapturePressed(c) {
@@ -525,7 +551,9 @@ func (a *app) view(c *ui.Context) {
 	}
 	shown := root.AnimateTo(sidebarMotionKey(a.section), target, a.positionAnimation(ui.Animation{Spring: uikit.Spring(t.Motion.Spring.Smooth)}))
 	root.Children(func() {
-		ui.Column(c).Key(pageHeaderKey(active)).FillWidth().Shrink(0).Background(headerBackground).Children(func() {
+		header := ui.Column(c).Key(pageHeaderKey(active)).FillWidth().Shrink(0).Background(headerBackground)
+		a.splash.pose(c, header, splashTabs)
+		header.Children(func() {
 			switch active {
 			case sectionSSH:
 				a.titleBar(c, shown)
@@ -537,7 +565,11 @@ func (a *app) view(c *ui.Context) {
 		})
 		ui.Row(c).Grow(1).MinHeight(0).AlignItems(ui.Stretch).Background(contentBackground).Children(func() {
 			a.navigation(c)
-			ui.Box(c).Key(active).Grow(1).MinWidth(0).FillHeight().Children(func() {
+			content := ui.Box(c).Key(active).Grow(1).MinWidth(0).FillHeight()
+			if !active.HasCatalog() {
+				a.splash.pose(c, content, splashMainPane)
+			}
+			content.Children(func() {
 				switch active {
 				case sectionSSH, sectionFiles:
 					a.workspace(c, shown)
@@ -627,6 +659,9 @@ func (a *app) view(c *ui.Context) {
 			uikit.InputShield(c).Modal().AutoFocus().Role(ui.RoleStatus).Label(locales.MessageProcessing2())
 		})
 	}
+	if a.splash.visible {
+		a.startupSplashOverlay(c)
+	}
 }
 
 func (a *app) interactionBlocked() bool {
@@ -635,6 +670,7 @@ func (a *app) interactionBlocked() bool {
 
 func (a *app) navigation(c *ui.Context) {
 	rail := uikit.Rail(c)
+	a.splash.pose(c, rail, splashRail)
 	var buttons [5]ui.Element
 	targets := [5]section{sectionSSH, sectionFiles, sectionGateways, sectionMCP, sectionSettings}
 	selected := -1
@@ -710,10 +746,10 @@ func (a *app) workspace(c *ui.Context, shown float32) {
 	statusShown := panel.AnimateTo("status", statusTarget, a.positionAnimation(ui.Animation{Spring: uikit.Spring(t.Motion.Spring.Smooth)}))
 	statusOpacity := uikit.Visual(panel, "status-opacity", statusTarget, t.C.Desktop.SidebarDuration)
 	panel.Children(func() {
-		uikit.Card(c).Key("sessions").Width(a.page().sidebarWidth * shown).Shrink(0).
-			MarginEnd(t.C.Window.Gutter * shown).Hidden(shown == 0).Children(func() {
-			a.sidebar(c, shown)
-		})
+		sidebar := uikit.Card(c).Key("sessions").Width(a.page().sidebarWidth * shown).Shrink(0).
+			MarginEnd(t.C.Window.Gutter * shown).Hidden(shown == 0)
+		a.splash.pose(c, sidebar, splashSidebar)
+		sidebar.Children(func() { a.sidebar(c, shown) })
 		if a.section == sectionFiles {
 			a.fileWorkspace(c)
 			a.sidebarResizeHandle(c, shown)
@@ -730,6 +766,7 @@ func (a *app) workspace(c *ui.Context, shown float32) {
 		a.sshWorkspace(c, size)
 		status := uikit.Card(c).Key("status").Width(t.Size.StatsPanel * statusShown).Shrink(0).
 			MarginStart(t.C.Window.Gutter * statusShown).Hidden(statusShown == 0 && statusOpacity == 0)
+		a.splash.pose(c, status, splashStatus)
 		if !a.statusVisible {
 			status.PassThrough()
 		}

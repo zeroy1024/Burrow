@@ -28,6 +28,7 @@ var (
 func (a *app) fileWorkspace(c *ui.Context) {
 	t := theme.Current()
 	workspace := uikit.FileWorkspace(c)
+	a.splash.pose(c, workspace, splashMainPane)
 	workspace.Children(func() {
 		session := a.currentFileSession()
 		if session == nil {
